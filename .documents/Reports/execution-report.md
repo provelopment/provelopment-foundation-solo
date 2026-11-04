@@ -1,58 +1,86 @@
 # Foundation Solo — Execution Report
 
-**Work order:** `SOLO-WO-003` **R01** (Owner-issued) — residual reporting-authority reconciliation following the Chief Architect's `REVISE` disposition of R00
+**Work order:** `SOLO-WO-004` **R00** (Owner-issued) — canonical architecture, contact-scope and neutral-status reconciliation
 **Session date:** 2026-11-04
-**Status:** **COMPLETE** — R01 corrections delivered; Phase 0 remains **PAUSED pending Architect acceptance**
+**Run status:** **COMPLETE** — evidence published and awaiting independent Architect review. This describes the run only; it is not a project state.
 **Repository:** [provelopment/provelopment-foundation-solo](https://github.com/provelopment/provelopment-foundation-solo) · branch `main`
-**Working root:** `C:\Users\Sean\Documents\Provelopment\00.foundation-solo` — `git rev-parse --show-toplevel` confirmed; real directory, not a symlink or junction
-**Initial commit:** `23bb5daa33c1813403fb3f0c44941f0cc281ab2f`
-**Content commit:** `004d142f54aa50950a6ef6b54ce5b9b86900801b`
-**Final report commit:** supplied in the chat handoff after publication — deliberately not embedded here, because a report cannot contain its own commit hash
+**Working root:** `C:\Users\Sean\Documents\Provelopment\00.foundation-solo` — `git rev-parse --show-toplevel` matched exactly; real directory, not a symlink or junction
+**Starting HEAD:** `7ad0a7346ea29a4040c272f357fa8147682109c0`
+**Content commit (Phase A):** `6d66c116203312ba9b7ba9120135b69347ae5700`
+**Final report commit:** reported in chat after publication — deliberately not embedded here, because a report cannot contain its own commit hash
 
-## Why this run existed — the R00 `REVISE`
+## Preflight — every gate passed
 
-The Architect verified R00's two-commit publication, the single report and the WIP triad, then returned **REVISE**: residual statements still conflicted on two points — (a) whether a run's evidence belongs in `workorder-active.md` or in the report, and (b) whether a report-only commit/push requires a normal active implementation order. R01 removes only those contradictions.
-
-## Corrections made
-
-| File | Change |
+| Gate | Evidence |
 | --- | --- |
-| `README.md` | *Roles and authorization* now separates bounded **implementation** authorization from the one standing **report-only** exception, and points to `AGENTS.md` §2A plus §6B/§7A and §5B/§5C. Product rules untouched. |
-| `AGENTS.md` | §2A now states that authorization has **exactly two forms** — implementation (issued order + matching handoff) and reporting (the standing exception). The report-only paragraph explicitly permits committing and pushing that one file and is named the sole exception to "an order is required before a commit or push". §4 records the same carve-out. |
-| `sop-architect.md` | §6 item 7 and the execution **Sequence** now require the run's primary evidence in `.documents/Reports/execution-report.md`, with WIP evidence only where the exact order permits; the initialization exception preserves §7A's report-only permission. **§6B untouched — still the sole version-control authority**; §7A unchanged. |
-| `sop-implementation.md` | §4 marks itself implementation-only and names the §5C exception; step 5 restricts ACTIVE evidence to orders that permit it and makes the report primary; §9 ACTIVE description and the §11 checklist updated so the report is primary evidence and WIP evidence is conditional. |
-## Validations performed
+| Owner issued this exact order | `SOLO-WO-004 R00` installed as the sole `workorder-active.md` (24,398 bytes) plus the matching Owner handoff |
+| Physical Solo root | `C:/Users/Sean/Documents/Provelopment/00.foundation-solo`, identical to the Git top level; not parent, symlink or junction |
+| Branch / starting revision | `main`, `7ad0a73…`, equal to `origin/main` and to the GitHub API ref |
+| Remote and checkout count | exactly one remote `origin` (the public Solo repository), one worktree, one local branch, zero tags |
+| WIP / report shape | `.documents/WIP` held exactly three files; `.documents/Reports` held exactly one `execution-report.md` |
+| Working tree before edits | only the Owner-installed `workorder-active.md` modified; no staged, other modified or untracked content |
+| Parent guard | `/00.foundation-solo/` rule committed; `git check-ignore` resolves `.gitignore:52`; parent tracks zero Solo paths; parent left untouched |
+| Credentials | `gh` authenticated as the owning account; invocation-local helper only; no credentials displayed |
+
+## Changes — exactly the nine authorized paths
+
+| Path | Change |
+| --- | --- |
+| `.documents/Architecture/ARCHITECTURE.md` | §5 retitled and rewritten so **Strict Hexagonal Architecture (Ports and Adapters) is a binding Owner-decided contract**: domain core, application ports, inbound/outbound adapters and composition root, with inward-only dependencies, core ownership of EFS decisions, replaceability and mandatory verification. §3.4 now states the included contact scope (`mailto:` + simple form) and the explicit exclusion of advanced contact forms; §7 item 5 reflects that split, and item 6 records the parent ignore rule as committed and verified rather than uncommitted. §8 corrects the obsolete Reports prohibition: one report file outside WIP, overwritten each run, disjoint from the three WIP files. |
+| `.documents/About/FOUNDATION-SOLO.md` | §4B now states the approved `visibilityDefault`/`visibility` names, `public` default, override precedence, single-declaration parity across JSON/Markdown, and limits what remains open to schema/versioning/validation. Capability table separates the contact action and simple form from other integrations; §6 adds the explicit advanced-contact-form exclusion; §7 adds strict Hexagonal as a mandatory quality; §8 records both decisions. |
+| `.documents/SOP/sop-architect.md` | §7A replaces the Phase 0 pause paragraph with the rule that **run status is not project status**; §7 adds a mandatory structural review requiring hexagonal boundary evidence and confirming contact scope with no advanced-form subsystem. §6B and the GitHub-first report procedure retain their text. |
+| `.documents/SOP/sop-implementation.md` | §6 adds binding rules 11 (hexagonal boundary enforcement and evidence) and 12 (contact scope, no advanced forms, no delivery claims from stubs); §7 adds Hexagonal-boundary and Contact-scope proof rows. §5B/§5C untouched. |
+| `README.md` | Pause language replaced by a neutral current status naming the two settled contracts; next action now states plainly that nothing is authorized. |
+| `AGENTS.md` | §7 removes pause framing, distinguishes `NONE` from permission, and points to the canonical architecture for the hexagonal and contact rules. |
+| `.documents/WIP/plan-next.md` | `NONE — PAUSED` replaced by **one non-executable candidate**: the first implementation contract dossier (identity/ID grammar, base URL and route grammar, property and visibility encoding, hexagonal skeleton and port catalogue, contact ports). No work-order ID, no executable task. |
+| `.documents/WIP/plan-outlook.md` | Pause and reopening gates pruned; short-term now carries the hexagonal skeleton and `visibilityDefault` encoding, medium-term adds the included contact module with advanced forms excluded, long-term names the included contact capability; gates reference a newly issued order. |
+| `.documents/WIP/workorder-active.md` | Preserved verbatim in Phase A as the frozen issued order; neutralized to `NONE` only in Phase B. |
+## Acceptance coverage
+
+1. **Owner issuance and clean preflight** — recorded above, anchored at `7ad0a73…`.
+2. **Authorized paths and history** — nine Phase A paths plus two Phase B paths; two fast-forward commits; `7ad0a73…` remains an ancestor; no force, amend or rebase; the frozen order blob is identical locally and on GitHub (`17ef9ce7…`).
+3. **Hexagonal requirement** — Architecture §5 states it as binding and verifiable, with inward-only dependencies and no technology chosen; Product §7 and §8, both SOPs, README and AGENTS reinforce it.
+4. **Visibility names** — Product §4B and Architecture §3.2A now agree on `visibilityDefault` (default `public`) and representation `visibility`, with precedence and JSON/Markdown parity; only schema encoding, placement and validation remain open.
+5. **Contact scope** — `mailto:` included, simple form included, advanced forms excluded in Architecture §3.4/§7, Product §5/§6/§8, SOPs §6/§7 and §7A review, README, AGENTS and PLAN; no technology or provider selected.
+6. **Obsolete statements corrected** — parent ignore now described as committed and verified; the Reports prohibition replaced by the single-report rule clearly disjoint from the three WIP files.
+7. **No live project status** — no `PAUSED`, `pending Architect acceptance` or `reopen before continuing` status remains in README, AGENTS, the SOPs or WIP; ACTIVE is `NONE` and NEXT holds one non-executable candidate.
+8. **Links and prose** — checked as recorded below; no build, test or CI claim is made.
+9. **Remote read-back** — verified at the final revision as recorded below.
+
+## Validation performed
 
 | Check | Result |
 | --- | --- |
-| Relative-link sweep across all Markdown | 14 files, **85 links, 0 broken** |
-| Contradiction sweep (`evidence in ACTIVE`, blanket commit/push rules) | No stale requirement remains; every remaining statement is qualified |
-| `sop-architect.md` diff scope | Exactly 3 lines, all inside §6; §6B and §7A byte-unchanged |
-| Order snapshot integrity | local blob = remote blob = `8bf3801e26b37e0fd50b4ec69e0e1dbdf58c25fb` |
-| Remote content commit contents | Exactly the five authorized paths, nothing else |
-| History | `23bb5da…` remains an ancestor; linear fast-forward; no force, amend or rebase |
+| Relative-link sweep across all Markdown | 14 files, **88 links, 0 broken** |
+| Project-pause vocabulary sweep over the eight edited live documents | No status claim remains. Two deliberate **negations** are retained — `AGENTS.md` §7 ("is not a project-wide pause … reopening gate") and `sop-architect.md` §7A (a policy sentence forbidding such status). Both prohibit the vocabulary; neither records a project state. |
+| Hexagonal coverage | Architecture 2 mentions (§5 heading + rule), Product 2, both SOPs, README, AGENTS, PLAN all reference the contract |
+| Visibility schema parity | `visibilityDefault` appears in Product §4B/§8 and Architecture §3.2A/§3.2B/§7 — consistent names, default and precedence |
+| Contact inclusion/exclusion | `mailto:` present in all seven contract documents; advanced-form exclusion present in all seven |
+| WIP vs report disjointness | WIP exactly three files; Reports exactly one file; Architecture §8 states they are disjoint |
+| Staged scope | Phase A staged exactly 9 paths; Phase B staged exactly 2 |
 
-## Repository hygiene
+## Not run
 
-- One worktree, one remote (`origin` = the Solo public repository), one local branch, zero tags, zero untracked files.
-- No `.temp/`, cache, scratch or generated material created; no write outside Solo; parent repository untouched and still tracking no Solo files.
-- No local-only commits, no extra branches, no new report or plan files.
+No build, test suite, linter, CI, release or deployment was executed, and none is claimed. This repository still contains no application code, toolchain or dependency manifest, so the hexagonal rules and contact contract are documented requirements, not verified implementation.
 
-## WIP and report state
+## Deviations and observations
 
-- `workorder-active.md` → `NONE — PHASE 0 PAUSED; awaiting Architect acceptance`.
-- `plan-next.md` and `plan-outlook.md` — **unchanged byte-for-byte**; they already recorded `PAUSED`.
-- `.documents/Reports/` contains exactly this one report; it is overwritten, never duplicated.
+- The frozen order snapshot still carries its original `NOT ISSUED — OWNER REVIEW REQUIRED` label, because it is preserved byte-for-byte as installed; the Owner's installation plus handoff is the issuing act, exactly as with prior orders. No label was edited.
+- `plan-next.md` was rewritten in place rather than appended to, keeping one candidate and no history.
+- Two pause-vocabulary negations are intentional, as described above.
+- Shell output capture intermittently reported incomplete completion while writing long PowerShell here-strings; every write was therefore verified afterwards by reading the file back, and no command was assumed successful without that check.
 
-## Checks not run
+## Git and workspace hygiene
 
-No build, test suite, CI, release or deployment was executed. This repository contains no application code, toolchain or dependency manifest, and none is in scope for a documentation-only correction. No application behaviour is claimed.
+- Two ordinary commits, linear and fast-forwarded; previous history intact.
+- Final `git status --porcelain=v1` is empty; 18 tracked files; one worktree; one remote; one branch; zero tags; zero untracked files; no `.temp/` or other agent-created scratch material.
+- No parent or sibling repository was modified: the parent HEAD is unchanged at `2548cc7153f026456bded6f76a2d5d74a567a24e` and it still tracks zero Solo paths.
 
 ## Limitations
 
-- Local cleanliness and temporary-file hygiene are agent-observed through the commands quoted above; the commit, file list and blob hashes are independently verifiable on GitHub.
-- Phase 0 is **delivered, not accepted**. No self-acceptance is claimed, and no Phase 1 work was started, drafted or scheduled.
+- Local facts (clean tree, worktree count, file counts) are first-hand agent observations from the commands above; the commit SHAs, changed-file lists and file contents are independently verifiable on GitHub.
+- Documentation-only reconciliation: it establishes contracts for later work and proves no runtime behaviour.
 
 ## Next action
 
-The Chief Architect reads this report on GitHub at the current `main`, verifies the R01 revision and diffs, and returns a written `ACCEPT / REVISE / STOP`. Solo stays **PAUSED**.
+The Architect reads this report directly from GitHub at the final `main` revision and returns `ACCEPT / REVISE / STOP`. No further task is started, and no implementation is authorized by this report.
