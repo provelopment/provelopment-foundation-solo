@@ -121,6 +121,8 @@ These rules supplement the Solo-only write confinement in §5/§5A and the autho
 8. Reject malformed input and ambiguous claims with diagnostics, not guesses. Never read from unrelated sibling content as fallback.
 9. Keep authored source, generated output and secret/server-only configuration distinct. Generated files may not silently overwrite authored material.
 10. When a new question is materially architectural, STOP and return an explicit proposal; do not fill the gap with incidental code.
+11. **Strict Hexagonal Architecture is mandatory, not stylistic.** Keep the domain core and application use cases free of framework, HTTP, persistence, filesystem, email-provider and delivery-adapter imports; declare explicit ports; implement delivery, storage and email transport as adapters wired at a composition root; translate external types at the adapter boundary. Prove the boundary with import/dependency checks where the toolchain allows, tests through ports with fake adapters, and real-adapter evidence when a concrete adapter is exercised. Never add a ceremonial layer that serves no boundary purpose.
+12. **Contact scope.** When contact work is authorized, implement safe `mailto:` action handling and a **simple** contact form through an application use case plus an outbound delivery port. Do not add an advanced form builder, conditional/multistep workflows, form administration, attachments, CRM/ticketing integration or any comparable advanced-form subsystem — not even dormant or optional. Baseline requirements for the simple form are validation, proportionate anti-abuse controls, accessibility and truthful delivery/receipt evidence; never claim message delivery from a stub, mock or offline demonstration.
 
 ## 7. Tests and evidence requirements
 
@@ -138,6 +140,8 @@ When the task touches these subjects, verify positive and negative cases:
 | Unlisted | Exact URL reachable; `noindex`; absent from navigation/sitemap/alternates; never treated as private |
 | Safe authored pages | JSON and Markdown validation, safe links, controlled assets and proper error paths |
 | Graphic library | Platform generic graphic sources reachable across all EFS levels; property cascade and explicit suppression correct; no accidental mixing of private authored and generic public graphic sources |
+| Hexagonal boundary | Inward-only imports proven by an import/boundary check; domain core free of framework/provider code; use cases exercised through ports with fake adapters; adapters replaceable at the composition root |
+| Contact scope | `mailto:` address validation and URI encoding correct; simple form validates, applies anti-abuse controls and reports honest delivery status; no advanced-form subsystem present |
 | Accessibility and rendering | Browser/rendered behavior where affected, including mobile and keyboard affordances |
 | Repo/lifecycle | Only allowed paths changed, generated output handled, no unexpected deployments or dependency changes |
 

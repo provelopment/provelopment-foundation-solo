@@ -212,6 +212,10 @@ Generic-library files may also be referenced deliberately by any node without du
 
 Targets include SEO/discovery, public and unlisted Pages, optionally authored contact facts, contact/inquiry integration, links to maps/directions or external booking services, and configurable privacy-respecting analytics. Integration contracts should be small ports/adapters, independent of the content model; no CRM, account management, payments, commerce, scheduling inventory or external service is required for basic publication.
 
+**Owner-decided contact scope — included.** Solo's planned contact capability includes **both** (a) safe `mailto:` action handling — validated author-supplied addresses and correctly encoded URIs where the visitor's own mail client performs the sending — and (b) a **simple contact form** with a bounded field set, validation, safe server-side handling, proportionate anti-abuse controls and honest delivery/receipt status. Both are implemented as an application use case plus explicit ports with replaceable adapters; no provider SDK, credential or mail-transport detail may appear in EFS domain objects or authored Page sections.
+
+**Explicitly excluded — advanced contact forms.** Solo will **not** contain a built-in or optional advanced form builder, arbitrary conditional or multistep workflows, complex form administration, file attachments, CRM/ticketing pipelines or any comparable advanced-form subsystem; none of these may exist as a hidden default, dormant option or optional module. Essential validation, spam/rate controls, accessibility and security for the **simple** form are baseline requirements of that simple form, not advanced-form features. Exact fields, delivery adapter/provider, abuse controls and retention configuration remain later technical design decisions under a separate Owner-approved contract.
+
 A form must not claim successful delivery when it has merely validated a request or handled an offline demonstration. Server-side policies, secrets and receipt/delivery evidence are separate from authored Page content.
 
 ### 3.5 Preserve author ownership and portability
@@ -274,20 +278,27 @@ Only declared public representations may be advertised through generated discove
 
 Physical location properties can supply deliberate visible facts or permitted structured data, but must **never determine the base URL, canonical URL, route claim, Page selection or locale**.
 
-## 5. Deployment, release and software boundaries
+## 5. Deployment, release and software boundaries — strict Hexagonal Architecture
 
 A Solo **product release** is an independently reviewable platform artifact; a Solo **Installation** is one Entity's configured adoption of that artifact; a **deployment** is the runtime serving it. These identities must not collapse into one. Initial setup, content updates, product upgrades and deployment/rollback should be separate controllable operations.
 
-The implementation is expected to keep a **domain-centered/ports-and-adapters boundary**:
+**Strict Hexagonal Architecture (Ports and Adapters) is a binding Owner-decided contract, not an aspiration.** It is mandatory for all Solo application code; it is not a preference an implementation may trade away for convenience. The required shape is:
 
 ```text
-Domain:             identities, hierarchy, properties, Page schema, locale and route contracts
-Application:        use cases to validate, resolve, author, establish and publish
-Adapters:           filesystem/content loading, rendering, integrations, storage, deployment
-Entry points/UI:    request handling, accessible components, configuration authoring surfaces
+Domain core:        identities, hierarchy, properties, Page schema, locale and route contracts; pure rules and invariants
+Application:        use cases that orchestrate domain behaviour behind explicit inbound/outbound ports
+Ports:              interfaces/contracts declared at the domain/application boundary
+Adapters:           inbound (request handling, UI, content loading) and outbound (rendering, storage, email transport, integrations, deployment)
+Composition root:   wires concrete adapters to the inner contracts
 ```
 
-This is a boundary principle, **not** a decision to use a specific framework, directory tree, application server or database. The simplest implementation that maintains these boundaries is preferable.
+- **Dependencies point inward, only.** The domain core and application policies must not import web-framework code, database or storage models, HTTP transport, provider SDKs, filesystem details or delivery adapters. Adapters depend on the inner contracts; the core never depends on an adapter or on a runtime/provider detail.
+- **The core owns the decisions.** EFS ownership, localization, visibility, properties, safe route claims and domain validation live in the domain core even when a framework or datastore is used elsewhere.
+- **Ports are explicit and minimal.** An inbound adapter invokes an application port; an outbound adapter implements a port the application uses. External types, payload shapes and provider details are translated at the adapter boundary and never leak inward.
+- **Delivery is replaceable.** HTTP, static rendering, content loading, email transport and external integrations are adapters: changing one must not require rewriting EFS domain decisions.
+- **Verification is required in code-bearing work.** Enforce dependency direction with explicit import/boundary checks where the toolchain allows it, test behaviour through ports with fake adapters, and add focused real-adapter integration evidence where relevant. No architecture-test or build claim may be made while this repository remains documentation-only.
+
+This contract does **not** select a framework, language, directory tree, application server, persistence model or hosting platform, and it does not justify a ceremonial abstraction layer with no boundary purpose. The simplest implementation that provably preserves these boundaries is preferred.
 
 Solo must have no runtime dependency on the existing Foundation, its demonstration installation, Spokes, Provelopment root governance files or an external managed tenant router. Reference code may be evaluated and deliberately reused only after checking compatibility, provenance, licensing and fit for Solo's clean architecture.
 
@@ -318,8 +329,8 @@ At implementation time, tests must exercise both the ordinary one-Facet/one-Site
 2. **Route grammar and base URL validation:** single authored base URL at establishment (origin + optional prefix), safe normalization, config-only changes, default Site paths, full-locale path segment and preference negotiation per §3.2, alias policy, discovery metadata and multi-Site collisions. **Owner accepted:** public paths are case-insensitive with lowercase canonicals; unlisted Page-route tokens remain exact-case; collisions must fail; short browser preference tokens require explicit mappings; same-Page default fallback is preferred. **Still technical:** specific URL grammar, redirect codes, path encoding, mapping storage and collision algorithm.
 3. **Typed property contract:** exact schema, explicit suppression, safe projection and structured/multiple location facts. **Location as a five-level cascade** is already Owner-decided; its encoding is not.
 4. **Page formats, visibility and presentation:** approved section catalog, JSON/Markdown precedence, **Owner-approved Page-level `visibilityDefault` with representation-level `visibility` override**, design tokens, shared generic public library, cascading graphic roles and dictionary precedence. Field placement and behavior are decided; schema encoding, valid graphic roles and defaults remain technical choices. Unlisted serving/discovery behavior itself is Owner-accepted.
-5. **Integration scope:** contact behavior, safe external actions, booking/map links and analytics defaults.
-6. **Tooling/lifecycle:** framework, runtime, validation/test gates, release/upgrade strategy, **Apache-2.0 (Owner approved), copyright/attribution, third-party notices, private vulnerability intake**, and independent Solo repo setup (parent Git ignore safeguard is reported effective locally but uncommitted, and remains outside the Solo agent boundary).
+5. **Integration scope:** the **included** contact scope is the safe `mailto:` action and the **simple** contact form; **advanced contact forms are excluded** (see §3.4). Remaining technical choices are the field set, delivery adapter/provider, anti-abuse controls, retention, and the booking/map-link and analytics defaults.
+6. **Tooling/lifecycle:** framework, runtime, validation/test gates, release/upgrade strategy, **Apache-2.0 (Owner approved), copyright/attribution, third-party notices, private vulnerability intake**, and independent Solo repo setup (the parent `/00.foundation-solo/` ignore rule is **committed and verified effective** in the enclosing repository at its recorded local revision, which tracks no Solo paths; the parent remains outside the Solo agent's write boundary, and its remote publication is a separate Owner/parent-operator concern, not a Solo bootstrap gate).
 
 **No undefined implementation mechanism should be treated as approved merely because it appears as an example in this document.**
 
@@ -331,6 +342,6 @@ At implementation time, tests must exercise both the ordinary one-Facet/one-Site
 
 The Solo repository and its own source are the future first-hand implementation evidence. All standalone Solo documentation belongs under `00.foundation-solo/.documents/`, except the required root `README.md` and `AGENTS.md`. Decisions and approved execution tasks must be recorded in that same project, not delegated to historical Foundation or Provelopment root documentation.
 
-The initial files are intentionally self-contained. Solo operating policy resides in [`SOP/sop-architect.md`](../SOP/sop-architect.md) and [`SOP/sop-implementation.md`](../SOP/sop-implementation.md); the only authorized live work surface is [`WIP/workorder-active.md`](../WIP/workorder-active.md), with one candidate in [`plan-next.md`](../WIP/plan-next.md) and pruned short/medium/long outlook in [`plan-outlook.md`](../WIP/plan-outlook.md). `WIP/` contains **exactly** these three files. No separate Work-Orders or Reports directories may accumulate.
+The initial files are intentionally self-contained. Solo operating policy resides in [`SOP/sop-architect.md`](../SOP/sop-architect.md) and [`SOP/sop-implementation.md`](../SOP/sop-implementation.md); the only authorized live work surface is [`WIP/workorder-active.md`](../WIP/workorder-active.md), with one candidate in [`plan-next.md`](../WIP/plan-next.md) and pruned short/medium/long outlook in [`plan-outlook.md`](../WIP/plan-outlook.md). `WIP/` contains **exactly** these three files. No separate `Work-Orders` directory and no archive of reports may accumulate. The single canonical execution report sits deliberately **outside** WIP at [`Reports/execution-report.md`](../Reports/execution-report.md): it is overwritten on every run, including failed and read-only runs, is the only permitted current execution-report file, and is neither a WIP file nor a source of authority. That one report and the three WIP files are disjoint sets.
 
 `provelopment-root`, `provelopment-foundation` and `provelopment-web-1` may be consulted for background, but they are **not normative dependencies** of Foundation Solo and must not be edited as part of Solo implementation without an explicit separate authorization.

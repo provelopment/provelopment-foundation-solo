@@ -1,19 +1,25 @@
 # Foundation Solo — plan-next (Immediate Candidate)
 
-**Purpose:** Exactly one next candidate (or `NONE`) while current work is governed by `workorder-active.md`. This file is planning/reference only and is **not executable**.  
-**Status:** `NONE — PAUSED; awaiting new Owner instruction`  
-**Last reviewed:** 2026-11-04 (Phase 0 governance delivered; project paused pending Architect review)
+**Purpose:** Exactly one next candidate (or `NONE`) while current work is governed by `workorder-active.md`. This file is planning/reference only and is **not executable**.
+**Status:** `ONE CANDIDATE — non-executable`
+**Last reviewed:** 2026-11-04 (canonical reconciliation: strict hexagonal contract, contact scope, neutral status)
 
 ## Next candidate
 
-**NONE — Phase 0 is delivered and paused pending independent Architect review.** No next task is proposed as executable. The live WIP deliberately carries no candidate, because resuming requires a new Owner instruction and a newly issued work order.
+**Prepare the first implementation contract dossier — decisions only, no code.** A future Owner-issued work order would need, at minimum:
 
-The outstanding architectural questions — identity and ID grammar, the minimal authoring data structure, base URL and route grammar, and cascading property types — are **not** lost: their direction is retained in the short-term horizon of [`plan-outlook.md`](plan-outlook.md). They are **not** an executable Phase 1 task and must not be started, drafted or scheduled while the project is paused.
+1. Entity/Facet/Site/Page identity and ID grammar, the minimal authoring manifest, and whether incomplete drafts may exist.
+2. Authored base URL and route grammar: origin/prefix validation, default Site paths, canonical and alias rules, and fail-closed collision handling.
+3. Typed property encoding for the five-level cascade (location, graphics, suppression) plus encoding of the approved `visibilityDefault`/`visibility` declaration.
+4. A minimal hexagonal module skeleton and port catalogue: the first inbound/outbound ports, composition-root wiring, and the import/boundary check that will enforce inward-only dependencies.
+5. Contact ports for the included `mailto:` action and the **simple** contact form — field set, delivery adapter, anti-abuse controls and retention. Advanced contact forms remain excluded.
+
+This is a dossier of decisions, not an implementation task. It becomes executable only when the Owner issues an exact `SOLO-WO-*` order installed in `workorder-active.md` with a matching handoff.
 
 ## Standing report-only exception
 
-Only one permission survives an empty ACTIVE slot: an agent may inspect Solo and overwrite and publish **only** `.documents/Reports/execution-report.md` after repository-safety checks, as defined in [`README.md`](../../README.md), [`AGENTS.md`](../../AGENTS.md) and both SOPs. Nothing else is authorized.
+Only one permission survives an empty ACTIVE slot: an agent may inspect Solo and overwrite, commit and publish **only** `.documents/Reports/execution-report.md` after repository-safety checks, as defined in [`README.md`](../../README.md), [`AGENTS.md`](../../AGENTS.md) and both SOPs. Nothing else is authorized.
 
-**Not executable.** This file proposes no task and authorizes nothing. Any future work requires its own exact Owner-issued `SOLO-WO-*` order installed in `workorder-active.md` with a matching handoff.
+**Not executable.** This file proposes no task and authorizes nothing; no item here is an implementation order. Any future work requires its own exact Owner-issued `SOLO-WO-*` order installed in `workorder-active.md` with a matching handoff.
 
 WIP may contain only this file, `plan-outlook.md`, and `workorder-active.md`. Do not create more `plan-*.md`, `workorder-*.md` or report files.

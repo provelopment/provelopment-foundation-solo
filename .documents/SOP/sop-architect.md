@@ -132,6 +132,8 @@ The Architect must not rely on the agent's claimed success alone. Verify the exa
 
 For each acceptance criterion record **pass**, **fail** or **unverified** and cite its direct evidence. Explicitly test refusal boundaries where relevant: second Entity, ambiguous route, unlisted leaks, public/unlisted case-fold collisions, unknown Site/Page, property privacy, graphic suppression and generic-library isolation, route/location independence, undeclared source files and duplicate address claims.
 
+**Mandatory structural review.** Future code-bearing work cannot pass review without evidence that **strict Hexagonal Architecture (Ports and Adapters)** holds: dependencies point inward only, the domain core is free of framework, transport, storage and provider imports, ports are explicit, adapters are replaceable, and wiring happens at a composition root — shown by import/boundary checks where available, behaviour tests through ports with fake adapters, and focused real-adapter evidence when a concrete adapter is exercised. Review must also confirm the Owner-approved contact scope: safe `mailto:` actions and the **simple** contact form are supported through ports/adapters, and **no advanced contact-form subsystem** (form builder, conditional/multistep workflows, form administration, attachments, CRM/ticketing) has appeared as a built-in, optional or dormant feature. A claimed architecture gate that was not actually run is **unverified**, never `ACCEPT`.
+
 **Disposition meanings:**
 
 - `ACCEPT`: reviewed exact revision satisfies scope and gates; does **not** by itself approve merge, release or deployment.
@@ -154,7 +156,7 @@ Do not launch another work order until the prior work has a reviewed disposition
 
 **Permissible exception — expressly authorized local-only code.** Unfinished or not-publicly-safe code may remain only when its own work order expressly permits it, preserved as identified local-only commit(s) on a named local branch inside the same single checkout — never as a second worktree, clone, shadow copy, stash or unexplained untracked state. The run returns to a clean `main`, pushes its documentation and report from `main`, and names the branch, commit and reason it is unpublished **without disclosing sensitive code**. Because such a branch is invisible to a fresh machine, the report must mark the handoff as partly dependent on that workspace. Unsafe content is never pushed silently, and no data is destroyed merely to manufacture a clean tree.
 
-**Phase 0 pause.** On successful delivery of `SOLO-WO-003`, Phase 0 is *delivered, pending Architect review*: the live WIP records `PAUSED` with no executable next task, and no Phase 1 work is scheduled, proposed as executable or started. Phase 0 closes only on the Architect's accepted review, and the project then stays paused until the Owner reopens it.
+**Run status is not project status.** A completed run is recorded in the report as `COMPLETE`, `STOPPED`, `FAILED` or `READ-ONLY`; awaiting a disposition describes that run's evidence, not a project-wide condition. An empty ACTIVE slot means only that **no Owner-issued work order is currently active** — the ordinary absence of authority, not a pause, freeze or reopening gate. No live document may record a conversational "paused", "waiting for the Architect" or "reopen before continuing" project status; implementation starts only with a newly Owner-issued order and a matching handoff.
 
 ## 8. WIP pruning — mandatory on every transition
 

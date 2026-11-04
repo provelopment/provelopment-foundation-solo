@@ -105,12 +105,12 @@ Precise property keys, value types, multiplicity, validation, suppression syntax
 An implementation must validate supported HTTP(S) origins, prefixes and conflicts, and derive public links, canonical URLs, assets and discovery metadata from the effective configured public address. Precise normalization, aliases, redirects, the public route grammar and deployment host wiring remain separately designed; "whatever base URL" does not bypass URL safety or external DNS/provider requirements.
 
 ## 4B. Public and unlisted Pages
-**Owner-accepted granularity:** Each localized representation has its own effective visibility, and an entire Page can be made unlisted conveniently. **Recommended, still-unapproved schema:** one Page-level visibility default (`public` unless authored `unlisted`), overridden only by an explicit representation-level visibility declaration. The same declaration applies to JSON and Markdown sources.
+**Owner-accepted granularity and approved names:** Each localized representation has its own effective visibility, and an entire Page can be made unlisted conveniently. The approved authoring names are Page-level **`visibilityDefault`** (defaulting to `public`) and representation-level **`visibility`** (an explicit override). The effective state is the representation's own `visibility`, otherwise the Page's `visibilityDefault`; `visibilityDefault: unlisted` marks all variants unlisted unless a variant explicitly declares `public`. One validated Page/representation declaration is the single authority for both JSON and Markdown sources, with no contradictory second visibility setting inside a content file. Only the versioned schema encoding, field placement and validation mechanics remain open technical details.
 
 
 **Owner-settled capability:** Solo retains **unlisted** content. A Page may have localized representations with `public` or `unlisted` discovery behavior. The implementation must support making an entire Page effectively unlisted by keeping all of its representations unlisted, while retaining the finer representation-level capability drawn from EFS.
 
-An unlisted representation is **directly reachable through its exact authorized URL** but is **not** included in generated navigation, sitemaps, language alternates or other discovery. It carries the appropriate `noindex` policy. An unlisted Page is **not** private, password-protected or access-controlled; it cannot be used to store secrets. The location of the visibility declaration in the final authoring schema and consistent treatment across JSON/Markdown remain open technical details, not an excuse to remove the behavior.
+An unlisted representation is **directly reachable through its exact authorized URL** but is **not** included in generated navigation, sitemaps, language alternates or other discovery. It carries the appropriate `noindex` policy. An unlisted Page is **not** private, password-protected or access-controlled; it cannot be used to store secrets. The versioned schema encoding and validation of the approved `visibilityDefault`/`visibility` declaration remain open technical details — not a reason to remove the behavior.
 
 ### Cascading graphics and one generic public graphic library
 
@@ -135,7 +135,8 @@ The following are **target capabilities to assess and specify for Solo**, drawin
 | Content assets and dictionaries | Owner-scoped authored files, predictable precedence, no silent overwrites |
 | SEO and discoverability | Correct titles, descriptions, canonical addresses, Open Graph, structured data when explicitly supported, sitemap, `robots` and `hreflang` |
 | Page visibility | Public and unlisted per localized representation; directly reachable unlisted URLs omitted from discovery and marked noindex; no false privacy claim |
-| Useful integrations | Optional contact/inquiry, external booking links, maps/directions links and analytics through small, clear interfaces |
+| Contact actions and simple inquiry form | Safe authored `mailto:` actions plus a straightforward contact form with validation, proportionate anti-abuse controls and honest delivery status, behind replaceable ports/adapters |
+| Other useful integrations | External booking links, maps/directions links and privacy-respecting analytics through small, clear interfaces |
 | Installation lifecycle | Standalone establishment, authored updates, deliberate upgrades, reproducible releases and recoverable deployment |
 | Validation and diagnostics | Errors name incorrect authored input; malformed declarations fail closed rather than guess or silently fall back |
 
@@ -149,9 +150,12 @@ It does not need legacy Foundation migration branches or compatibility subsystem
 
 A Solo Installation may be deployed by many independent adopters **as separate Installations**, but each Installation continues to own exactly one Entity. This does not transform Solo into a multi-Entity hosting runtime.
 
+**Advanced contact forms are explicitly excluded.** Solo will not contain a built-in or optional advanced form builder, arbitrary conditional or multistep workflows, complex form administration, file attachments, CRM/ticketing pipelines or any comparable advanced-form subsystem — not as a hidden default, a dormant feature or an optional module. Essential validation, spam/rate controls, accessibility and security belong to the **simple** contact form itself and are not advanced-form features.
+
 ## 7. Product quality expectations
 
 - **First-class single-Entity architecture:** no unused multi-Entity abstractions preserved merely for historical parity.
+- **Strict Hexagonal Architecture is mandatory:** Ports and Adapters with dependencies pointing inward only. The domain core stays framework-, provider- and transport-independent; application use cases sit behind explicit ports; delivery, storage and email/provider details are replaceable adapters wired at a composition root. Future code-bearing work must verify the boundary, not merely assert it.
 - **Configuration first:** separate authored configuration/content/assets from platform code; favor unsurprising defaults.
 - **Orthogonal concepts:** ownership hierarchy, conceptual functionality and public routing are separately defined, implemented and verified.
 - **No inferred authority:** paths do not create identities; properties do not grant publication rights; content files do not self-publish by mere presence.
@@ -173,6 +177,8 @@ A Solo Installation may be deployed by many independent adopters **as separate I
 - Start from a blank slate; do not preserve an architectural mechanism merely because Foundation used it.
 - **Location is a five-level cascading EFS property**. Entity `Australia` → Facet `Indonesia` → Site `Bali`/`Jakarta` illustrates nearest-declaration precedence; `en-001`, `de-DE`, `zh-Hans-CN`, `id-ID` do not imply geography. Routing and location never infer one another.
 - **Unlisted Pages are retained**, with directly reachable but undiscoverable localized representations; this does not confer privacy. A Page-wide unlisted authoring convenience is required, with per-representation exceptions retained.
+- **Strict Hexagonal Architecture (Ports and Adapters) is a binding decision**, with inward-only dependencies, a provider-independent domain core and verifiable architectural boundaries.
+- **The planned contact capability includes safe `mailto:` actions and a simple contact form**; advanced contact forms are excluded rather than optional. Exact fields, delivery adapter and abuse controls remain later technical design decisions.
 - **A configurable base URL is selected at Entity creation**, including an authored origin and optional path prefix. A subsequent base URL change must not alter EFS identities or require code redesign.
 - Published Page representations use full locale tags such as `en-001`, `de-DE`, `id-ID`, `zh-Hans-CN`, never bare language-only tags; locale-less entry precedence and preference for explicit same-Page default fallback are Owner-decided.
 - **Apache License 2.0 is Owner-approved** as Solo's open-source license.
@@ -183,7 +189,7 @@ A Solo Installation may be deployed by many independent adopters **as separate I
 
 - Exact identifiers, defaults and schema formats for Entity, Facet, Site, Page and representation.
 - Exact base URL and route grammar, normalization, default Site treatment, canonical-host and alias behavior. The configurable base URL outcome itself is not open.
-- JSON Page section catalogue, Markdown parity, unlisted Page-default/representation-override schema validation, and how much of Foundation's current renderer is adopted or redesigned.
+- JSON Page section catalogue, Markdown parity, validation and versioned encoding of the approved `visibilityDefault`/`visibility` declaration, and how much of Foundation's current renderer is adopted or redesigned.
 - Property catalogue, structured/multiple location value schema, suppression syntax, publication privacy and validation. Location-as-data and inheritance across all five EFS levels are already decided.
 - The theme, asset, dictionary, integration, establishment and release contracts.
 - Chosen programming language, framework, runtime, test tooling, technical repository/release policies, copyright/attribution and private security-reporting setup. **Apache-2.0 is Owner-approved.**
