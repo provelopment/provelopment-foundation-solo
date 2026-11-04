@@ -89,7 +89,7 @@ If repository initialization itself is the task, record that no prior HEAD exist
 5. **Respect policy and never infer merge.** Honour protected-branch and merge permissions as found. Merge, release and deployment require separate Owner authorization or express delegation in the applicable order; a successful push never implies them.
 6. **Prove the result.** Verify branch, HEAD, tree and remote URL against the remote-side commit and leave a clean working tree before reporting completion.
 7. **Report real failures.** If authentication or permission genuinely fails, report the exact response. Do not convert an unverified assumption into a routine request for the Owner to run Git.
-8. **Prune when the Owner closes the task.** Completed work is pruned from the three live WIP files; Git history retains past orders, and no report or extra WIP file is created.
+8. **Prune when the Owner closes the task.** Completed work is pruned from the three live WIP files; Git history retains past orders. No **second** report, report archive or extra WIP file is created — while the single `.documents/Reports/execution-report.md` **must** still be overwritten and published on every run when safe, exactly as §5C and `sop-architect.md` §7A require.
 
 These rules supplement the Solo-only write confinement in §5/§5A and the authorization gate in §4; they never relax either.
 
