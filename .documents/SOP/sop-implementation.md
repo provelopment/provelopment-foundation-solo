@@ -40,7 +40,7 @@ The agent **may not** during read-only initialization create or edit files, init
 **Filename semantics:** `plan-next.md` and `plan-outlook.md` (and any `plan-*.md` reference) are non-executable. `workorder-active.md` is the single `workorder-*.md` current-execution slot. An active-looking filename does not suffice: check `OWNER-ISSUED`, the frozen exact scope, the unique `SOLO-WO-*` ID, and a matching Owner handoff. There must never be a per-task archive of `workorder-xxx.md` files in WIP or a parallel order store.
 
 
-**Only `.documents/WIP/workorder-active.md` can identify current execution authority**, and only when its **Approved Scope** is explicitly marked `OWNER-ISSUED`, names a unique `SOLO-WO-*` ID, includes the exact permitted operations, and the Owner has actually issued the matching handoff. A draft, `plan-next.md`, `plan-outlook.md`, README, GitHub issue, previous agent report or conversational idea **does not authorize writing**.
+**Only `.documents/WIP/workorder-active.md` can identify current execution authority**, and only when its **Approved Scope** is explicitly marked `OWNER-ISSUED`, names a unique `SOLO-WO-*` ID, includes the exact permitted operations, and the Owner has actually issued the matching handoff. A draft, `plan-next.md`, `plan-outlook.md`, README, GitHub issue, previous agent report or conversational idea **does not authorize writing**. This section governs **implementation** authority only: the single exception is the standing **report-only** permission in §5C, which needs no active order and reaches only `.documents/Reports/execution-report.md`.
 
 On receiving a handoff:
 
@@ -48,7 +48,7 @@ On receiving a handoff:
 2. Confirm there is only **one** active work order and the agent is not being asked to take another concurrently.
 3. Read its objective, allowed paths, exclusions, exact acceptance gates, stop conditions and scope-specific permission ledger.
 4. If starting HEAD, target branch or allowed write paths are unspecified, verify whether the scope expressly authorizes a bounded initialization/creation operation. Otherwise STOP and request clarification through Owner/Architect.
-5. Treat the **Approved Scope** block as frozen. The implementation agent may fill the separate **Execution Evidence** section but must never broaden/rewrite approved scope, mark Owner approval or self-accept the result.
+5. Treat the **Approved Scope** block as frozen. The implementation agent may fill a separate **Execution Evidence** section **only if this order expressly permits that WIP edit**; the primary evidence always belongs in the report (§5C). It must never broaden or rewrite approved scope, mark Owner approval or self-accept the result.
 
 Changes to the work order require an exact Owner-issued amendment or a replacement work order, not an agent's interpretation. A task that will need an additional design decision must return to the Architect before implementation.
 
@@ -161,7 +161,7 @@ The Architect independently inspects the exact result and writes a separate **Ar
 
 `WIP/` has exactly these three files, and no others:
 
-- `workorder-active.md` — one issued task or `None`, with temporary evidence and disposition;
+- `workorder-active.md` — one issued task or `None`, with frozen scope and Architect disposition; optional short evidence only where the order expressly permits it, the primary evidence being the report;
 - `plan-next.md` — one candidate, non-authorizing;
 - `plan-outlook.md` — short-, medium-, long-term outcomes and **documentation outlook**.
 
@@ -189,6 +189,6 @@ When blocked, preserve work and report exact observed state, completed subset, s
 - [ ] Identity, property, base URL, locale and unlisted constraints remain intact.
 - [ ] Relevant successful and refusal tests were run and evidenced, or named as unverified.
 - [ ] `.documents/Reports/execution-report.md` was overwritten with this run's factual evidence, published to `origin/main`, and independently read back — or the exact blocker was reported.
-- [ ] Execution Evidence is complete and exact; no self-approval is claimed.
+- [ ] Any WIP Execution Evidence was written **only** where this order expressly permitted it, and the report remains the primary evidence; no self-approval is claimed.
 - [ ] No unauthorized merge, release, deploy, account or other-repository changes occurred.
 - [ ] Architect has the exact revision and findings needed for independent review.

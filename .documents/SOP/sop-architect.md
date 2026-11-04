@@ -90,11 +90,11 @@ After explicit Owner acceptance, propose a precise, non-contradictory update to 
 4. Architectural decisions the agent must preserve and technical details the agent must **not** choose autonomously;
 5. Expected complete deliverables, focused checks and final verification evidence;
 6. Permissions, separately, for commit, push, PR creation, merge, dependency installation, network/provider access, deployment, secrets and destructive operations; unmentioned actions are **not** authorized;
-7. Stop/escalation triggers; evidence and reporting fields to fill in the same `workorder-active.md`.
+7. Stop/escalation triggers, and the evidence the run must publish in `.documents/Reports/execution-report.md`; short WIP status or evidence fields may be named **only** if that order expressly permits editing `workorder-active.md`.
 
-**Sequence:** Architect drafts a single candidate → Owner reviews exact contents → Owner installs or expressly approves the exact `workorder-active.md` approved-scope block and issues an explicit handoff naming the ID/ref → Implementation Agent performs preflight and only authorized edits → Agent supplies evidence in the execution section of `workorder-active.md` → Architect independently checks the exact result → Architect records an **ACCEPT / REVISE / STOP** disposition for Owner review. A `plan-next.md` candidate may not be worked on while ACTIVE is open.
+**Sequence:** Architect drafts a single candidate → Owner reviews exact contents → Owner installs or expressly approves the exact `workorder-active.md` approved-scope block and issues an explicit handoff naming the ID/ref → Implementation Agent performs preflight and only authorized edits → Agent records the primary evidence in `.documents/Reports/execution-report.md`, adding short WIP status only where the order permits it → Architect independently checks the exact result → Architect records an **ACCEPT / REVISE / STOP** disposition for Owner review. A `plan-next.md` candidate may not be worked on while ACTIVE is open.
 
-**Initialization exception:** the implementation agent may onboard read-only—read docs, inspect Git and source, identify missing setup, and report observations—without an implementation order. Creating, modifying, deleting, installing, committing, pushing or deploying anything is not read-only onboarding and requires explicit scope.
+**Initialization exception:** the implementation agent may onboard read-only—read docs, inspect Git and source, identify missing setup, and report observations—without an implementation order. Creating, modifying, deleting, installing, committing, pushing or deploying anything is not read-only onboarding and requires explicit scope. The sole exception is the standing **report-only** permission of §7A: overwriting and publishing only `.documents/Reports/execution-report.md` after the repository-safety checks.
 
 ## 6A. Bounded repository and temporary-workspace governance
 

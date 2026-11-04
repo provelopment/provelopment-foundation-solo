@@ -73,7 +73,7 @@ Solo's implementation technology, executable commands, file layout, content mani
 
 The **Owner** approves architecture, source-changing work and separate merge/release/deployment decisions. The **Chief Architect** develops bounded proposals, requirements and independent acceptance; the **Implementation Agent** executes only an exact Owner-issued order. The Architect and implementation role are distinct.
 
-An agent may initialize **read-only** without a work order. Any source write, Git initialization, dependency install, commit, push or external operation requires explicit authorized scope in `.documents/WIP/workorder-active.md` and Owner handoff. `plan-next.md` and `plan-outlook.md` never authorize implementation. Consult [AGENTS.md](AGENTS.md) and both SOPs before acting.
+An agent may initialize **read-only** without a work order. Any **implementation** change — source write, Git initialization, dependency install, commit, push or external operation — requires explicit authorized scope in `.documents/WIP/workorder-active.md` and an Owner handoff. The **one** exception is the standing report-only permission: with no active order an agent may overwrite, commit and push **only** `.documents/Reports/execution-report.md`, after the repository-safety checks in the SOPs. That exception never authorizes implementation, WIP edits, dependency changes or a second checkout. `plan-next.md` and `plan-outlook.md` never authorize implementation. See [AGENTS.md](AGENTS.md) §2A and the version-control and reporting sections of both SOPs (§6B/§7A and §5B/§5C) before acting.
 
 ## Independence
 ## Open-source repository hygiene
