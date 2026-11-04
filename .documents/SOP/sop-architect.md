@@ -34,7 +34,7 @@ The Architect must separately evaluate (a) ownership architecture and identities
 
 **Owner:** final authority for project purpose, architecture, product scope, accepted risks, authorizing tasks, merge, releases, external services, deployment and go-live. The Owner's written approval of an exact task is required before source modifications.
 
-**Architect:** owns requirements analysis, architecture, decision proposals, technical scope boundaries, sequencing, candidate work orders, acceptance criteria, independent verification, architectural disposition and proposed WIP pruning. The Architect **does not simultaneously act as the implementation agent**, and does not self-issue a work order or self-authorize merging, release or deployment. A written proposal in chat or Git is not an approval.
+**Architect:** owns requirements analysis, architecture, decision proposals, technical scope boundaries, sequencing, candidate work orders, acceptance criteria, independent verification, architectural disposition and proposed WIP pruning. The Architect **does not simultaneously act as the implementation agent**, and does not self-issue a work order or self-authorize merging, release or deployment. A written proposal in chat or Git is not an approval. When the Owner signals that a run has finished, the Architect's first act is to read the current execution report directly from GitHub and then verify the exact revision (§7A); pasted chat text is never a substitute.
 
 **Implementation Agent:** implements only the Owner-issued task in `WIP/workorder-active.md`; may provide evidence and identify blockers, but cannot expand scope, reclassify proposals as decisions, or accept its own work. Consult [`sop-implementation.md`](sop-implementation.md).
 
@@ -53,7 +53,7 @@ The Architect must separately evaluate (a) ownership architecture and identities
 | **Immediate next candidate** | `WIP/plan-next.md` | The sole next candidate, never execution authority |
 | **Forward outlook** | `WIP/plan-outlook.md` | Pruned short-, medium- and long-term goals and documentation outlook |
 
-**Hard WIP limit:** `WIP/` contains **exactly** `workorder-active.md`, `plan-next.md` and `plan-outlook.md`. No `Reports/`, `Work-Orders/`, `Archive/`, `Completed/`, dated snapshots, per-agent logs, duplicate task boards, or extra Markdown files inside WIP or elsewhere as a competing WIP system. This naming rule does **not** create new directories or authorize per-task plan/workorder archives. The immutable Git history preserves closed work. Approved durable architecture is integrated into its canonical product/architecture authority, not left buried in a completed WIP record. A later dedicated decision register, if genuinely necessary, requires Owner approval and is *not* an alternative task queue.
+**Hard WIP limit:** `WIP/` contains **exactly** `workorder-active.md`, `plan-next.md` and `plan-outlook.md`. No `Work-Orders/`, `Archive/`, `Completed/`, dated snapshots, per-agent logs, duplicate task boards, or extra Markdown files inside WIP or elsewhere as a competing WIP system. One exception sits deliberately **outside** WIP and is not a WIP file: the single canonical execution report at `.documents/Reports/execution-report.md` (§7A), which is overwritten on every run and never duplicated. This naming rule does **not** create new directories or authorize per-task plan/workorder archives. The immutable Git history preserves closed work. Approved durable architecture is integrated into its canonical product/architecture authority, not left buried in a completed WIP record. A later dedicated decision register, if genuinely necessary, requires Owner approval and is *not* an alternative task queue.
 
 ## 4. Initiating architectural work
 
@@ -140,11 +140,27 @@ For each acceptance criterion record **pass**, **fail** or **unverified** and ci
 
 Do not launch another work order until the prior work has a reviewed disposition and the Owner authorizes progression.
 
+## 7A. Mandatory execution report and GitHub-first review
+
+**One report, overwritten every run.** Every implementation-agent run — authorized implementation, partial work, `STOPPED`, `FAILED`, or read-only onboarding — must leave **exactly one** current report at `.documents/Reports/execution-report.md` and publish it to `origin/main` whenever that is safe and technically possible. This file is the Architect's default review source. It is **overwritten**, never duplicated: no dated, task-named or archived copies and no parallel evidence folder anywhere. Git history preserves superseded versions. The three-file WIP limit is unaffected — the report is not a WIP file and never grants authority.
+
+**Standing report-only permission.** Once this procedure is adopted, the Owner's standing permission lets an agent open a reporting run with no current implementation order: it may inspect Solo, overwrite **only** this report, and commit and push that single file if root, branch, credentials, privacy and Git safety all check out. It authorizes no product change, dependency install, other documentation edit, WIP modification, other-repository write or second checkout.
+
+**Review is GitHub-first.** When the Owner says "report ready" or "agent finished", the Architect's **first** action is to read `.documents/Reports/execution-report.md` **from GitHub** at the exact revision, then verify that commit, the repository diff and any claimed results. A missing, stale or unpushed report is itself a verification failure. Chat pastes supplement — never replace — the published report, and the Architect must distinguish agent-reported local evidence from independently observed GitHub evidence. The agent's own success claim is never acceptance.
+
+**Disposition and handoff.** The Architect returns a written `ACCEPT / REVISE / STOP` against the exact revision. Only then may it draft **one** complete replacement `workorder-active.md` candidate with a matching copy-paste prompt, or a bounded `Rxx` correction, for Owner review. Only the Owner installs the WIP work order and issues the handoff; neither agent self-issues or starts the next order, and a `plan-*.md` never authorizes execution.
+
+**Clean Git expectation.** A normally completed run leaves `git status --porcelain` empty, one verified Solo checkout, no task-created temporary files, and all changed documentation including the report committed and visible on GitHub. A push never implies merge, release or deployment.
+
+**Permissible exception — expressly authorized local-only code.** Unfinished or not-publicly-safe code may remain only when its own work order expressly permits it, preserved as identified local-only commit(s) on a named local branch inside the same single checkout — never as a second worktree, clone, shadow copy, stash or unexplained untracked state. The run returns to a clean `main`, pushes its documentation and report from `main`, and names the branch, commit and reason it is unpublished **without disclosing sensitive code**. Because such a branch is invisible to a fresh machine, the report must mark the handoff as partly dependent on that workspace. Unsafe content is never pushed silently, and no data is destroyed merely to manufacture a clean tree.
+
+**Phase 0 pause.** On successful delivery of `SOLO-WO-003`, Phase 0 is *delivered, pending Architect review*: the live WIP records `PAUSED` with no executable next task, and no Phase 1 work is scheduled, proposed as executable or started. Phase 0 closes only on the Architect's accepted review, and the project then stays paused until the Owner reopens it.
+
 ## 8. WIP pruning — mandatory on every transition
 
 **The WIP is a live control surface, not a history library.** Maintain these three files at every accepted planning change, closure and handoff:
 
-- **ACTIVE:** only the currently issued task (or `None`), frozen scope, concise latest evidence, blocker and disposition. Do not accumulate past task reports or multiple work orders; after Owner-reviewed closure, reset to a neutral template and rely on Git history for the old record.
+- **ACTIVE:** only the currently issued task (or `None`), frozen scope, concise latest evidence, blocker and disposition. The full run evidence belongs in the single report of §7A, not here. Do not accumulate past task reports or multiple work orders; after Owner-reviewed closure, reset to a neutral template and rely on Git history for the old record.
 - **NEXT:** only **one** actionable next candidate, with dependencies and a concise ready/not-ready assessment. It is a proposal, not an authorization. Replace it when completed, rejected or superseded; do not append a backlog.
 - **PLAN:** three concise horizons: **short term** (next foundational milestone), **medium term** (subsequent capability milestone) and **long term** (strategic direction). Each horizon contains outcomes, dependencies and **documentation to create/review/update/remove**. Remove completed, rejected or invalidated items; move relevant work forward as horizons shift. Never retain completed tasks as crossed-out historical rows.
 

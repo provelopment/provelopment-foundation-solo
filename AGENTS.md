@@ -17,13 +17,28 @@ Foundation Solo is an independent product with **exactly one Entity** and the hi
 3. [`.documents/Architecture/ARCHITECTURE.md`](.documents/Architecture/ARCHITECTURE.md) — settled and open architecture.
 4. [Architect SOP](.documents/SOP/sop-architect.md) and [Implementation SOP](.documents/SOP/sop-implementation.md) — mandatory role-specific procedures.
 5. [ACTIVE](.documents/WIP/workorder-active.md), [NEXT](.documents/WIP/plan-next.md), [PLAN](.documents/WIP/plan-outlook.md) — exact current authority, immediate candidate and pruned outlook.
-6. Actual code, tests, manifests and only the additional product references pertinent to the authorized task.
+6. [Execution report](.documents/Reports/execution-report.md) — the **one** current run report, overwritten after every run; read it before acting.
+7. Actual code, tests, manifests and only the additional product references pertinent to the authorized task.
 
 **Full-locale contract:** Only explicit full, region-qualified locale tags (e.g. `en-001`, `de-DE`, `id-ID`, `zh-Hans-CN`) identify published representations. Bare `en`, `de`, `id` or `zh` must not become authored/public keys. Locale-less entry checks supported saved preference, browser preference and the declared default in that order. Fallback is permitted only to a real public representation of the **same** Page; the declared default is preferred. Do not infer location or Page identity from locale.
 
 **Temporary workspace restriction:** The agent may not create additional Git worktrees (`git worktree add`, linked worktrees), alternate checkouts, nested repository clones, or shadow working directories. All agent-created files—tests, scratch, downloads, generated files, caches and intermediate outputs—must stay **inside the verified Solo root**, and ephemeral material should use Solo root `.temp/` only. Remove agent-owned temporary material as soon as unnecessary and verify no leftover temporary directories/files at task closure. Unknown/Owner-owned contents must never be deleted automatically; stop and report. See the Implementation SOP for exact cleanup gates and tool side-effect controls.
 
 **One authority per concern:** `About/` defines product purpose; `Architecture/` defines EFS and routing constraints; `SOP/` defines roles and procedure; `WIP/workorder-active.md` contains **the only active implementation authorization**. `NEXT` and `PLAN` are non-authorizing. Documents from other repositories are not Solo governance.
+
+## 2A. Handoff protocol — how a run begins and ends
+
+**Authorization is one file.** Only `.documents/WIP/workorder-active.md`, labelled `OWNER-ISSUED` with a unique `SOLO-WO-*` ID **and** accompanied by a matching Owner handoff, authorizes writing. The Owner alone installs that order. `plan-*.md` files are reference only. Neither agent self-issues an order, starts the next one, or approves its own work.
+
+**Verify before you act.** Confirm the actual workspace root (not the parent workspace, a symlink or a junction), `git rev-parse --show-toplevel`, branch `main`, `HEAD`, `git status --porcelain` apart from a permitted order installation, exactly one worktree, exactly one remote `origin` = `provelopment/provelopment-foundation-solo`, exactly three WIP files, and whether `.documents/Reports/execution-report.md` exists and is current. Any unexplained mismatch is a **STOP**.
+
+**Every run ends with the report.** Overwrite `.documents/Reports/execution-report.md` and publish it to `origin/main` when safe — including after a `STOP`, a failure, or a read-only onboarding. It is the Architect's default review source, is never duplicated, dated or archived, and never grants authority. Never embed the report's own final commit SHA inside it; give that SHA in chat after publication.
+
+**Standing report-only permission.** With no issued order an agent may inspect Solo and overwrite and push **only** that report, after the repository-safety checks above. Nothing else: no product change, dependency install, other documentation edit, WIP change, other-repository write or second checkout.
+
+**Where the Architect reads it.** Directly from GitHub at the exact revision — <https://github.com/provelopment/provelopment-foundation-solo/blob/main/.documents/Reports/execution-report.md>. A missing, stale or unpushed report is itself a verification failure, and chat pastes never substitute for it. The Architect then returns `ACCEPT / REVISE / STOP` against that revision and may draft — never issue — the single next order for Owner approval.
+
+**Clean tree, honestly reported.** A completed run leaves an empty `git status --porcelain`, one checkout, no task-created temporary files, and all documentation including the report on GitHub. Unfinished or unsuitable code stays local only when its own order expressly allows it, as a named local branch within the same checkout and declared in the report. Never delete unknown work to manufacture cleanliness; **STOP** instead.
 
 ## 3. Non-negotiable product constraints
 
@@ -64,7 +79,7 @@ If any instruction conflicts with these accepted requirements, STOP and escalate
 2. [`plan-next.md`](.documents/WIP/plan-next.md): one candidate for next activity, no backlog or execution permission.
 3. [`plan-outlook.md`](.documents/WIP/plan-outlook.md): short-, medium- and long-term outcomes and **documentation outlook**, continuously pruned.
 
-Never create `WIP/Reports`, `WIP/Work-Orders`, `WIP/Archive`, per-task reports or any duplicate status folder elsewhere. Agents report current-task evidence in ACTIVE if authorized and in their handoff; Git history retains past versions. On Owner-approved closure, reset ACTIVE, replace NEXT and prune PLAN; permanent accepted facts go into the relevant About/Architecture authority.
+Never create `WIP/Reports`, `WIP/Work-Orders`, `WIP/Archive`, per-task or dated reports, or any duplicate status folder elsewhere. The **single** exception outside WIP is `.documents/Reports/execution-report.md` — overwritten every run, never duplicated, and neither a WIP file nor a source of authority. Git history retains past versions. On Owner-approved closure, reset ACTIVE, replace NEXT and prune PLAN; permanent accepted facts go into the relevant About/Architecture authority.
 
 ## 6. Source/quality and stopping rules
 
@@ -76,4 +91,4 @@ Never create `WIP/Reports`, `WIP/Work-Orders`, `WIP/Archive`, per-task reports o
 
 ## 7. Current state
 
-This package supplies planning and operating documents plus a published source repository — **not** verified implementation. Solo is an independent Git repository on `main`; `origin` is the public GitHub repository `provelopment/provelopment-foundation-solo`, owned by the personal `provelopment` account, with default branch `main` and GitHub private vulnerability reporting enabled. The parent `/00.foundation-solo/` ignore guard is committed and verified, so the enclosing workspace tracks no Solo files. There is **no application code, toolchain, dependency manifest, test suite, release or deployment**; do not describe any of those as existing. Read [`plan-next.md`](.documents/WIP/plan-next.md) for the sole candidate. [`workorder-active.md`](.documents/WIP/workorder-active.md) holds the current issued order; do not make a source change until the Owner issues a specific task.
+This package supplies planning and operating documents plus a published source repository — **not** verified implementation. Solo is an independent Git repository on `main`; `origin` is the public GitHub repository `provelopment/provelopment-foundation-solo`, owned by the personal `provelopment` account, with default branch `main` and GitHub private vulnerability reporting enabled. The parent `/00.foundation-solo/` ignore guard is committed and verified, so the enclosing workspace tracks no Solo files. There is **no application code, toolchain, dependency manifest, test suite, release or deployment**; do not describe any of those as existing. **Phase 0 is delivered and PAUSED, pending independent Architect review** of the current [execution report](.documents/Reports/execution-report.md). [`workorder-active.md`](.documents/WIP/workorder-active.md) records `NONE — PHASE 0 PAUSED`, and [`plan-next.md`](.documents/WIP/plan-next.md) records `NONE — PAUSED`; no executable task exists. Do not start Phase 1, draft its order, select a framework or write application code until the Owner issues a new work order.

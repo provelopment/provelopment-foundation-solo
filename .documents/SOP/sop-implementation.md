@@ -34,7 +34,7 @@ When initialized without a current issued task, the agent may:
 - Compare the stated design with source as evidence and identify missing contracts or setup prerequisites;
 - Return a concise **read-only initialization report in the conversation**, listing actual workspace, repository/branch/HEAD if present, open questions and suggested first bounded task.
 
-The agent **may not** during read-only initialization create or edit files, initialize Git, install dependencies, alter configuration, create branches, commit/push, configure external services or claim a successful build. The Owner will issue a bounded order for any such action.
+The agent **may not** during read-only initialization create or edit files, initialize Git, install dependencies, alter configuration, create branches, commit/push, configure external services or claim a successful build. The Owner will issue a bounded order for any such action. The **single** exception is the mandatory execution report (§5C): overwriting and publishing that one file is required on every run, including read-only onboarding and `STOP`, when repository safety checks pass.
 
 ## 4. The sole implementation authorization
 **Filename semantics:** `plan-next.md` and `plan-outlook.md` (and any `plan-*.md` reference) are non-executable. `workorder-active.md` is the single `workorder-*.md` current-execution slot. An active-looking filename does not suffice: check `OWNER-ISSUED`, the frozen exact scope, the unique `SOLO-WO-*` ID, and a matching Owner handoff. There must never be a per-task archive of `workorder-xxx.md` files in WIP or a parallel order store.
@@ -93,6 +93,22 @@ If repository initialization itself is the task, record that no prior HEAD exist
 
 These rules supplement the Solo-only write confinement in §5/§5A and the authorization gate in §4; they never relax either.
 
+## 5C. Mandatory execution report — every run
+
+**One canonical report.** Write, then overwrite on every later run, exactly `.documents/Reports/execution-report.md`. Never create dated, task-named, archived or parallel report files, and never a second evidence folder. Git history retains earlier versions. `WIP/` still contains exactly three files; the report is not one of them and grants no authority. Common Git rules remain in `sop-architect.md` §6B — this section adds only the reporting obligation.
+
+**Every run reports.** A run is any session: authorized implementation, read-only inspection or onboarding, an attempted preflight, success, partial work, or `STOP`/failure. Reporting is mandatory in all of them.
+
+**Standing report-only permission.** With no current implementation order you may still verify the Solo root, branch, remote and repository safety; overwrite **only** this report; commit and push **that single file** to the existing Solo `origin/main`; and report. This permission does not extend to product changes, dependencies, other documentation, WIP authority, other repositories or a second checkout.
+
+**Report content.** ISO session date; work-order ID and edition, or `NO ACTIVE ORDER`; status `COMPLETE | STOPPED | FAILED | READ-ONLY`; objective and scope; exact root and branch; starting/source commit; changed files; commands or actions with results; checks marked pass/fail/not run; limitations; any local-only commits; unexpected state; temporary-file cleanup; report-publication verification; and an explicit next action or stop point. Keep it concise, prefer Git URLs over long logs, and include **no** secrets, access tokens, confidential personal details, unsafe vulnerability reproduction data or unredacted credentials — the report is public.
+
+**Never self-reference the commit.** Do not embed the report's own final commit SHA in its content; that is self-referential. State the known preceding content commit, publish, then give the resulting report-commit SHA and GitHub link only in the chat handoff.
+
+**Failure still reports.** A `STOP` does not waive the report. If the work failed but reporting is safe, publish a factual `STOPPED`/`FAILED` report. If GitHub is unavailable, repository access is unauthorized, or unrelated dirty/Owner-owned material makes a safe commit impossible, preserve everything, avoid reset/clean/force, keep the local report if safely writable, and state the exact blocker in chat. **Never claim the remote report was updated without independently checking it.**
+
+**Clean-tree gate and the local-only exception.** Normal completion leaves `git status --porcelain` empty, one verified checkout, no task-created temporary files, and all changed documentation including the report committed and present on GitHub. Unfinished or not-publicly-safe code stays local **only** when its own order expressly authorizes it, as identified commit(s) on a named local branch in the same checkout — never a second worktree, clone, shadow copy, stash or unexplained untracked state. Return to a clean `main`, push the documentation and report from `main`, and name the branch and reason in the report without exposing sensitive code; mark the handoff as dependent on that workspace. If unknown content, an unsafe branch switch, a non-fast-forward push, missing network or any real obstacle appears, **STOP** rather than destroy data.
+
 ## 6. Implementing a bounded task
 
 1. State the exact target behavior from accepted Solo requirements; separate **architecture/identity**, **functionality**, and **routing** in the change description.
@@ -129,7 +145,7 @@ A checked source file is not equivalent to a passing build. An agent-authored te
 
 ## 8. Reporting — no report-file proliferation
 
-Place only **the current task's** compact evidence in the **Execution Evidence** area of `WIP/workorder-active.md`, if the order authorizes that WIP edit. Also report to the Owner in the conversation. Do **not** create `WIP/Reports/`, `.documents/Reports/`, one file per task, a second backlog or another status log.
+Record the run in the **one** canonical report, `.documents/Reports/execution-report.md` (§5C), overwriting it every run and publishing it to `origin/main` when safe, and summarize it in the conversation. You may fill the **Execution Evidence** area of `WIP/workorder-active.md` only if the order authorizes that WIP edit. Do **not** create `WIP/Reports/`, dated or per-task report files, a second backlog or another status log — the single report is the only permitted evidence file and the only exception to "no report proliferation".
 
 The current record includes:
 
@@ -172,6 +188,7 @@ When blocked, preserve work and report exact observed state, completed subset, s
 - [ ] All agent-created temporary/cache/output paths were confined to Solo; `.temp/` and other agent-created temporary directories were cleaned or explicitly stopped/reported.
 - [ ] Identity, property, base URL, locale and unlisted constraints remain intact.
 - [ ] Relevant successful and refusal tests were run and evidenced, or named as unverified.
+- [ ] `.documents/Reports/execution-report.md` was overwritten with this run's factual evidence, published to `origin/main`, and independently read back — or the exact blocker was reported.
 - [ ] Execution Evidence is complete and exact; no self-approval is claimed.
 - [ ] No unauthorized merge, release, deploy, account or other-repository changes occurred.
 - [ ] Architect has the exact revision and findings needed for independent review.

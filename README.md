@@ -2,6 +2,19 @@
 
 > **Status:** New, independent open-source project. The architecture and operating documentation are published as a **public source repository**, [`provelopment/provelopment-foundation-solo`](https://github.com/provelopment/provelopment-foundation-solo), 2026-11-04. Publication covers **source and documentation only**: there is **no implemented application, no verified test suite, no released version and no deployment**.
 
+## Start here
+
+A new Architect or Implementation Agent can begin with this file and [`AGENTS.md`](AGENTS.md). Read in this order:
+
+1. **This file** — product overview, current status and document map.
+2. **[`AGENTS.md`](AGENTS.md)** — mandatory agent entry point: authorization gates, write boundary and handoff protocol.
+3. **[Product definition](.documents/About/FOUNDATION-SOLO.md)** and **[architecture charter](.documents/Architecture/ARCHITECTURE.md)** — purpose, and settled versus open architecture.
+4. **[Architect SOP](.documents/SOP/sop-architect.md)** and **[Implementation SOP](.documents/SOP/sop-implementation.md)** — role procedures; the SOPs hold the single version-control procedure (§6B, §5B) and the mandatory reporting obligation (§7A, §5C).
+5. **[ACTIVE](.documents/WIP/workorder-active.md)**, **[NEXT](.documents/WIP/plan-next.md)**, **[PLAN](.documents/WIP/plan-outlook.md)** — the only executable authority, the one next candidate, and the pruned outlook.
+6. **The current execution report** — [`.documents/Reports/execution-report.md`](.documents/Reports/execution-report.md), also readable on GitHub at <https://github.com/provelopment/provelopment-foundation-solo/blob/main/.documents/Reports/execution-report.md>. It is overwritten after **every** run, including failed and read-only runs, and is the Architect's default review source.
+
+**Current phase:** Phase 0 is **delivered and PAUSED, pending independent Architect review**. `plan-*.md` files are reference only; only an `OWNER-ISSUED` `workorder-active.md` with a matching Owner handoff authorizes work. No application implementation, framework selection, release or deployment is authorized while paused.
+
 **Foundation Solo is a first-class, configuration-first website foundation for exactly one Entity.** An Entity may have any purpose or identity. Solo deliberately avoids presuming a particular type of owner.
 
 ## The EFS content model
@@ -42,6 +55,7 @@ All authoritative Solo documentation resides in **`.documents/`**, except the tw
 | [NEXT](.documents/WIP/plan-next.md) | **One** immediate candidate, not implementation permission |
 | [PLAN](.documents/WIP/plan-outlook.md) | Pruned short-, medium- and long-term work **and documentation** outlook |
 | [AGENTS.md](AGENTS.md) | Mandatory entry-point instructions for every agent and contributor |
+| [Execution report](.documents/Reports/execution-report.md) | **One** current run report, overwritten every run; the Architect's default review source |
 
 **Strict single-root discipline:** Implementation agents may not use additional Git worktrees, shadow checkouts, nested clones or temporary directories outside Solo. Agent-created scratch and redirectable caches belong under Solo `.temp/` and must be promptly cleaned; the SOP forbids deleting pre-existing unknown files. Parent-repository `.gitignore` changes are outside Solo agent permissions.
 
@@ -71,4 +85,4 @@ Standard community-facing files live in [`.github/`](.github/) so GitHub recogni
 
 Solo is an independent repository and product. Historic Foundation and other Provelopment repositories can be read as reference but are **not governing Solo documents and are not authorized write targets**. All operational knowledge needed for Solo must be documented here. The Owner's intended local root is `C:\Users\Sean\Documents\Provelopment\00.foundation-solo`; agents must verify their actual available workspace.
 
-**Next action:** read-only onboarding, the local Git baseline and the initial public publication are complete. `origin` is the public GitHub repository and its default branch is `main`; the parent `/00.foundation-solo/` ignore guard is committed and verified. The sole candidate in [NEXT](.documents/WIP/plan-next.md) is architectural acceptance of the first implementation contracts, explicitly without selecting a framework or authorizing code. No application source, release or deployment is authorized by this README.
+**Next action:** Phase 0 governance is delivered and **paused pending independent Architect review** of the published [execution report](.documents/Reports/execution-report.md) on GitHub. The project resumes only on a new Owner-issued work order; [NEXT](.documents/WIP/plan-next.md) records `NONE — PAUSED`. No application source, framework selection, release or deployment is authorized by this README.
