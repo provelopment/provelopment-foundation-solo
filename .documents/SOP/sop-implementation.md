@@ -1,10 +1,10 @@
 # Foundation Solo — Implementation Agent Standard Operating Procedure
 
 **Document:** `.documents/SOP/sop-implementation.md`  
-**Edition:** 2026-11-04, revision 5 (Owner URL-case, graphic-cascade and bootstrap gates)  
+**Edition:** 2026-11-04, revision 6 (four-file WIP execution discipline, reference-reuse and A1 cross-references)  
 **Authority:** Owner-issued project procedure upon acceptance and installation. Until then, a review draft; **not** an issued work order.  
 **Scope:** Every implementation agent or code-modifying contributor to the independent Foundation Solo project.  
-**Companions:** [`sop-architect.md`](sop-architect.md), [`workorder-active.md`](../WIP/workorder-active.md), [`plan-next.md`](../WIP/plan-next.md), [`plan-outlook.md`](../WIP/plan-outlook.md).
+**Companions:** [`sop-architect.md`](sop-architect.md), [`workorder-active.md`](../WIP/workorder-active.md), [`plan-next.md`](../WIP/plan-next.md), [`plan-roadmap.md`](../WIP/plan-roadmap.md), [`plan-outlook.md`](../WIP/plan-outlook.md).
 
 ## 1. Agent mission and limits
 
@@ -21,7 +21,7 @@ If code or a candidate design contradicts these invariants, **STOP**, report, an
 1. Repository root `README.md` and `AGENTS.md`.
 2. `.documents/About/FOUNDATION-SOLO.md` and `.documents/Architecture/ARCHITECTURE.md`.
 3. Both SOPs in `.documents/SOP/`.
-4. Exactly three live WIP files: `.documents/WIP/workorder-active.md`, `plan-next.md` and `plan-outlook.md`.
+4. Exactly four live WIP files: `.documents/WIP/plan-roadmap.md`, `plan-next.md`, `workorder-active.md` and `plan-outlook.md`.
 5. Only the directly relevant implementation files, existing tests, dependency manifests and accepted decisions described by the current authorized task.
 
 Do not depend on private Provelopment root documentation to understand Solo's authority. Historic Foundation projects are read-only references, not implementation targets or mandatory libraries. The Windows path `C:\Users\Sean\Documents\Provelopment\00.foundation-solo` describes the Owner's local directory; verify the actual workspace presented to this agent and do not assume a mount.
@@ -37,7 +37,7 @@ When initialized without a current issued task, the agent may:
 The agent **may not** during read-only initialization create or edit files, initialize Git, install dependencies, alter configuration, create branches, commit/push, configure external services or claim a successful build. The Owner will issue a bounded order for any such action. The **single** exception is the mandatory execution report (§5C): overwriting and publishing that one file is required on every run, including read-only onboarding and `STOP`, when repository safety checks pass.
 
 ## 4. The sole implementation authorization
-**Filename semantics:** `plan-next.md` and `plan-outlook.md` (and any `plan-*.md` reference) are non-executable. `workorder-active.md` is the single `workorder-*.md` current-execution slot. An active-looking filename does not suffice: check `OWNER-ISSUED`, the frozen exact scope, the unique `SOLO-WO-*` ID, and a matching Owner handoff. There must never be a per-task archive of `workorder-xxx.md` files in WIP or a parallel order store.
+**Filename semantics:** `plan-roadmap.md`, `plan-next.md` and `plan-outlook.md` (and any `plan-*.md` reference) are non-executable. `workorder-active.md` is the single `workorder-*.md` current-execution slot. An active-looking filename does not suffice: check `OWNER-ISSUED`, the frozen exact scope, the unique `SOLO-WO-*` ID, and a matching Owner handoff. There must never be a per-task archive of `workorder-xxx.md` files in WIP or a parallel order store.
 
 
 **Only `.documents/WIP/workorder-active.md` can identify current execution authority**, and only when its **Approved Scope** is explicitly marked `OWNER-ISSUED`, names a unique `SOLO-WO-*` ID, includes the exact permitted operations, and the Owner has actually issued the matching handoff. A draft, `plan-next.md`, `plan-outlook.md`, README, GitHub issue, previous agent report or conversational idea **does not authorize writing**. This section governs **implementation** authority only: the single exception is the standing **report-only** permission in §5C, which needs no active order and reaches only `.documents/Reports/execution-report.md`.
@@ -89,13 +89,13 @@ If repository initialization itself is the task, record that no prior HEAD exist
 5. **Respect policy and never infer merge.** Honour protected-branch and merge permissions as found. Merge, release and deployment require separate Owner authorization or express delegation in the applicable order; a successful push never implies them.
 6. **Prove the result.** Verify branch, HEAD, tree and remote URL against the remote-side commit and leave a clean working tree before reporting completion.
 7. **Report real failures.** If authentication or permission genuinely fails, report the exact response. Do not convert an unverified assumption into a routine request for the Owner to run Git.
-8. **Prune when the Owner closes the task.** Completed work is pruned from the three live WIP files; Git history retains past orders. No **second** report, report archive or extra WIP file is created — while the single `.documents/Reports/execution-report.md` **must** still be overwritten and published on every run when safe, exactly as §5C and `sop-architect.md` §7A require.
+8. **Prune when the Owner closes the task.** Completed work is pruned from the four live WIP files; Git history retains past orders. No **second** report, report archive or extra WIP file is created — while the single `.documents/Reports/execution-report.md` **must** still be overwritten and published on every run when safe, exactly as §5C and `sop-architect.md` §7A require.
 
 These rules supplement the Solo-only write confinement in §5/§5A and the authorization gate in §4; they never relax either.
 
 ## 5C. Mandatory execution report — every run
 
-**One canonical report.** Write, then overwrite on every later run, exactly `.documents/Reports/execution-report.md`. Never create dated, task-named, archived or parallel report files, and never a second evidence folder. Git history retains earlier versions. `WIP/` still contains exactly three files; the report is not one of them and grants no authority. Common Git rules remain in `sop-architect.md` §6B — this section adds only the reporting obligation.
+**One canonical report.** Write, then overwrite on every later run, exactly `.documents/Reports/execution-report.md`. Never create dated, task-named, archived or parallel report files, and never a second evidence folder. Git history retains earlier versions. `WIP/` still contains exactly four files; the report is not one of them and grants no authority. Common Git rules remain in `sop-architect.md` §6B — this section adds only the reporting obligation.
 
 **Every run reports.** A run is any session: authorized implementation, read-only inspection or onboarding, an attempted preflight, success, partial work, or `STOP`/failure. Reporting is mandatory in all of them.
 
@@ -124,6 +124,8 @@ These rules supplement the Solo-only write confinement in §5/§5A and the autho
 11. **Strict Hexagonal Architecture is mandatory, not stylistic.** Keep the domain core and application use cases free of framework, HTTP, persistence, filesystem, email-provider and delivery-adapter imports; declare explicit ports; implement delivery, storage and email transport as adapters wired at a composition root; translate external types at the adapter boundary. Prove the boundary with import/dependency checks where the toolchain allows, tests through ports with fake adapters, and real-adapter evidence when a concrete adapter is exercised. Never add a ceremonial layer that serves no boundary purpose.
 12. **Contact scope.** When contact work is authorized, implement safe `mailto:` action handling and a **simple** contact form through an application use case plus an outbound delivery port. Do not add an advanced form builder, conditional/multistep workflows, form administration, attachments, CRM/ticketing integration or any comparable advanced-form subsystem — not even dormant or optional. Baseline requirements for the simple form are validation, proportionate anti-abuse controls, accessibility and truthful delivery/receipt evidence; never claim message delivery from a stub, mock or offline demonstration.
 
+**Source reuse.** Reusing code or assets from `provelopment-foundation` or any other historical repository requires the Architect/Owner-approved exact scope and the reference-fit review specified by `sop-architect.md` §4. Inspecting, forking or "just adapting" a reference is never permission to copy it, and no reference-repository file carries Solo architectural authority.
+
 ## 7. Tests and evidence requirements
 
 Use proportional, first-hand validation. At minimum, run the task's required focused tests, then the relevant project verification/build gates actually available. Capture command, result, revision and environment limits. Do not label an unrun or unavailable test "passed".
@@ -147,6 +149,8 @@ When the task touches these subjects, verify positive and negative cases:
 
 A checked source file is not equivalent to a passing build. An agent-authored test is not independent acceptance. Real external delivery (e.g. a contact message) must not be claimed from a stub/offline result.
 
+Apply the permanent A1 evidence standard in [`sop-architect.md`](sop-architect.md) §7B; this section supplies the operational checks, while the acceptance policy and its `PASS`/`FAIL`/`UNVERIFIED` disposition belong to the Architect. The agent reports facts and cannot certify its own acceptance.
+
 ## 8. Reporting — no report-file proliferation
 
 Record the run in the **one** canonical report, `.documents/Reports/execution-report.md` (§5C), overwriting it every run and publishing it to `origin/main` when safe, and summarize it in the conversation. You may fill the **Execution Evidence** area of `WIP/workorder-active.md` only if the order authorizes that WIP edit. Do **not** create `WIP/Reports/`, dated or per-task report files, a second backlog or another status log — the single report is the only permitted evidence file and the only exception to "no report proliferation".
@@ -161,15 +165,15 @@ The current record includes:
 
 The Architect independently inspects the exact result and writes a separate **Architect Disposition** section in ACTIVE (or supplies that section for Owner-controlled installation). Agent may not mark `ACCEPT` for itself or represent a commit as deployed merely because CI passed.
 
-## 9. WIP updates, closure and pruning
+## 9. WIP file purity, work-order execution and closure
 
-`WIP/` has exactly these three files, and no others:
+WIP holds exactly `plan-roadmap.md`, `plan-next.md`, `workorder-active.md` and `plan-outlook.md`. Their definitions, selection and reduction rules are governed solely by [`sop-architect.md`](sop-architect.md) §8. ROADMAP and NEXT contain only remaining-stage and candidate work; ACTIVE contains only the current issued work order and its permitted evidence; OUTLOOK contains only speculative ideas. No other WIP file, archive or parallel report may be created.
 
-- `workorder-active.md` — one issued task or `None`, with frozen scope and Architect disposition; optional short evidence only where the order expressly permits it, the primary evidence being the report;
-- `plan-next.md` — one candidate, non-authorizing;
-- `plan-outlook.md` — short-, medium-, long-term outcomes and **documentation outlook**.
+Reading ROADMAP, NEXT or OUTLOOK grants no write permission. Execution requires the exact `OWNER-ISSUED` `SOLO-WO-*` approved scope in ACTIVE plus its matching Owner handoff, with the one exception of the standing report-only permission for `.documents/Reports/execution-report.md`. Pass the original repository-safety preflight and verify the four-file inventory before acting; the Owner-authorized migration to this four-file inventory was a specifically scoped transition rather than a standing exception.
 
-Do not append completed tasks to `workorder-active.md` or `plan-next.md`. Do not add historical chronological sections to `plan-outlook.md`. After accepted closure, **only when Owner-authorized**, reconcile durable architecture changes into About/Architecture, reset ACTIVE to its neutral template, promote or replace NEXT, and prune PLAN. Git history provides traceability of prior tasks. If the active order does not authorize WIP updates, supply proposed text to Owner instead of editing.
+Never select or promote a stage, self-issue work, mark a candidate complete, declare `ACCEPT`, clear ACTIVE or consume a ROADMAP obligation. The agent's output is executed work plus the canonical factual report; any WIP modification — including clearing NEXT at the authorized issue transition and accepted-closure reconciliation — requires exact Owner-authorized scope. On `FAILED`, `STOP`, `REVISE`, partial completion or unverified acceptance, preserve the pending obligation and report the blocker, and never move failed work into OUTLOOK. After independent Architect `ACCEPT` and express Owner closure, make only the separately authorized transition edits and leave no completed-task narrative in any execution file.
+
+When all committed work is accepted and closed, the retained ROADMAP, NEXT and ACTIVE files hold no work entries, while OUTLOOK may still contain ideas. The historical record remains Git history plus the single overwritten current report — never execution-file archives. Do not delete or blank unknown Owner-owned material to simulate closure. If the active order does not authorize WIP updates, supply proposed text to the Owner instead of editing.
 
 Every task that changes a durable product contract must update its **existing authority** in the same accepted scope (or identify a separate follow-up gate). A code change that leaves current architecture docs contradicting actual accepted behavior is not fully closed.
 
@@ -179,7 +183,7 @@ Every task that changes a durable product contract must update its **existing au
 
 **Not authorized by default:** merge, release, deployment, DNS/domain/TLS changes, external provider/account operations, purchases or paid services, reading/using undisclosed secrets, mass migration, deleting Owner data, modifying other repositories, licensing changes, force-push or publication of private data. A successful test does not imply authorization for any of these actions.
 
-STOP immediately if: missing or contradictory approval; uncertain branch/root; unexpected dirty tree; target is another repository; additional Entity or hidden Spoke appears; site identity is inferred from URL; location is inferred from route or determines route; unlisted content is exposed in discovery; inherited private properties leak; a schema/route collision needs an architectural choice; validation cannot be evidenced; or scope changes materially.
+STOP immediately if: missing or contradictory approval; uncertain branch/root; unexpected dirty tree; a plan, candidate or idea treated as authorization; an attempt to promote, clear or prune any WIP slot without exact Owner-authorized scope; target is another repository; additional Entity or hidden Spoke appears; site identity is inferred from URL; location is inferred from route or determines route; unlisted content is exposed in discovery; inherited private properties leak; a schema/route collision needs an architectural choice; validation cannot be evidenced; or scope changes materially.
 
 When blocked, preserve work and report exact observed state, completed subset, smallest decision needed and safe resumption point. Do not silently substitute an alternative task.
 
@@ -187,7 +191,8 @@ When blocked, preserve work and report exact observed state, completed subset, s
 
 - [ ] Owner-issued ID and approved scope were confirmed before edits.
 - [ ] Correct Solo repository/branch/revision were verified.
-- [ ] Only authorized files and operations were used.
+- [ ] Only authorized files and operations were used, and the exact four-file WIP inventory was verified before acting and again after publishing.
+- [ ] ACTIVE still holds the exact issued order; no candidate was promoted, no ROADMAP obligation consumed and no acceptance claimed.
 - [ ] No secondary or linked Git worktrees, shadow checkouts or nested clones were created.
 - [ ] All agent-created temporary/cache/output paths were confined to Solo; `.temp/` and other agent-created temporary directories were cleaned or explicitly stopped/reported.
 - [ ] Identity, property, base URL, locale and unlisted constraints remain intact.

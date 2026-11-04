@@ -1,10 +1,10 @@
 # Foundation Solo — Architect Standard Operating Procedure
 
 **Document:** `.documents/SOP/sop-architect.md`  
-**Edition:** 2026-11-04, revision 5 (Owner URL-case, graphic-cascade and Solo-bootstrap decisions)  
+**Edition:** 2026-11-04, revision 6 (four-slot WIP lifecycle, reference-only engineering, permanent A1 acceptance standard)  
 **Authority:** Owner-issued project procedure upon acceptance and installation. Until then, a review draft; **not** an implementation authorization.  
 **Scope:** Chief Architect and any person exercising architectural review on Foundation Solo only.  
-**Companions:** [`sop-implementation.md`](sop-implementation.md), [`workorder-active.md`](../WIP/workorder-active.md), [`plan-next.md`](../WIP/plan-next.md), [`plan-outlook.md`](../WIP/plan-outlook.md).
+**Companions:** [`sop-implementation.md`](sop-implementation.md), [`workorder-active.md`](../WIP/workorder-active.md), [`plan-next.md`](../WIP/plan-next.md), [`plan-roadmap.md`](../WIP/plan-roadmap.md), [`plan-outlook.md`](../WIP/plan-outlook.md).
 
 ## 1. Mission and governing boundaries
 
@@ -49,19 +49,22 @@ The Architect must separately evaluate (a) ownership architecture and identities
 | Product definition | `About/FOUNDATION-SOLO.md` | Why Solo exists, scope and supported outcomes |
 | Architecture | `Architecture/ARCHITECTURE.md` | Structural invariants, interfaces and distinct open decisions |
 | Agent procedures | `SOP/sop-architect.md`; `SOP/sop-implementation.md` | How decisions, execution, evidence and WIP maintenance work |
+| **Remaining committed stages** | `WIP/plan-roadmap.md` | Unfinished implementation stages, their work packages, prerequisites and gates; never execution authority |
+| **Immediate next candidate** | `WIP/plan-next.md` | The sole bounded next candidate, never execution authority |
 | **Current authorized execution** | `WIP/workorder-active.md` | One active work order, its bounded execution notes and independent disposition |
-| **Immediate next candidate** | `WIP/plan-next.md` | The sole next candidate, never execution authority |
-| **Forward outlook** | `WIP/plan-outlook.md` | Pruned short-, medium- and long-term goals and documentation outlook |
+| **Optional ideas** | `WIP/plan-outlook.md` | Speculative aspirations only; never a requirement, delivery backlog or authorizing document |
 
-**Hard WIP limit:** `WIP/` contains **exactly** `workorder-active.md`, `plan-next.md` and `plan-outlook.md`. No `Work-Orders/`, `Archive/`, `Completed/`, dated snapshots, per-agent logs, duplicate task boards, or extra Markdown files inside WIP or elsewhere as a competing WIP system. One exception sits deliberately **outside** WIP and is not a WIP file: the single canonical execution report at `.documents/Reports/execution-report.md` (§7A), which is overwritten on every run and never duplicated. This naming rule does **not** create new directories or authorize per-task plan/workorder archives. The immutable Git history preserves closed work. Approved durable architecture is integrated into its canonical product/architecture authority, not left buried in a completed WIP record. A later dedicated decision register, if genuinely necessary, requires Owner approval and is *not* an alternative task queue.
+**Hard WIP limit:** `WIP/` contains **exactly** `plan-roadmap.md`, `plan-next.md`, `workorder-active.md` and `plan-outlook.md`. No `Work-Orders/`, `Archive/`, `Completed/`, dated snapshots, per-agent logs, duplicate task boards, or extra Markdown files inside WIP or elsewhere as a competing WIP system. One exception sits deliberately **outside** WIP and is not a WIP file: the single canonical execution report at `.documents/Reports/execution-report.md` (§7A), which is overwritten on every run and never duplicated. This naming rule does **not** create new directories or authorize per-task plan/workorder archives. The immutable Git history preserves closed work. Approved durable architecture is integrated into its canonical product/architecture authority, not left buried in a completed WIP record. A later dedicated decision register, if genuinely necessary, requires Owner approval and is *not* an alternative task queue.
 
 ## 4. Initiating architectural work
 
-1. Read `README.md`, `AGENTS.md`, both SOPs, the current `WIP/workorder-active.md`, `WIP/plan-next.md` and `WIP/plan-outlook.md`, and only the pertinent product/architecture references.
+1. Read `README.md`, `AGENTS.md`, both SOPs, the current `WIP/workorder-active.md`, `WIP/plan-next.md`, `WIP/plan-roadmap.md` and `WIP/plan-outlook.md`, and only the pertinent product/architecture references.
 2. Determine actual state from **the Solo working repository**: correct local root, `git status`, branch, HEAD, relevant files/tests and existing approvals. If Solo has not yet been initialized as a repository, state that explicitly rather than inventing commits.
 3. Classify the incoming request as **discussion**, **read-only initialization**, **architecture/contract decision**, **bounded implementation**, or **distinct merge/release/deployment**. Do not combine these classes under one ambiguous approval.
 4. Propose the smallest coherent end-to-end change. Prefer a first-class domain model, explicit typed contracts and a single authority for each fact over layers and compatibility branches.
 5. Identify what is **Owner-decided**, what is **source-observed**, and what remains **proposed**. In particular, no chosen framework, URL grammar, property-schema encoding, content storage format or test tool is implied by high-level examples alone.
+
+**Reference-only engineering.** `provelopment/provelopment-foundation` and other historical repositories are untrusted technical references for Solo: the Architect may inspect behavior, test design, defects and successful concepts, but must not assume their modules, frameworks, migrations, configurations or test results meet Solo's accepted contracts. Any proposed code or asset reuse requires a separately scoped, evidenced review of Solo contract fit, hidden dependencies, correctness, security, provenance, licensing/attribution and negative cases. No Spoke, multi-Entity design, legacy geographic routing, unfinished refactor or defect may enter Solo by compatibility assumption. Prefer independently engineered, minimal Solo-native interfaces and testable behavior. No reference-repository file becomes a source of Solo architectural authority; inspection is never permission to copy.
 
 No work order should hide a major new architectural decision inside an apparently mechanical implementation detail. When a design choice is unresolved, seek its acceptance before writing executable scope.
 
@@ -82,7 +85,7 @@ After explicit Owner acceptance, propose a precise, non-contradictory update to 
 
 **Exactly one active implementation work order** may exist, embedded as a clearly separated, frozen **Approved Scope** block in `WIP/workorder-active.md`.
 
-**Filename and authority rule:** The only live WIP filenames are `workorder-active.md`, `plan-next.md` and `plan-outlook.md`. The prefix `plan-` means reference/planning, **never executable**. The prefix `workorder-` means an execution document type, but **only** the one Owner-approved, `OWNER-ISSUED`, ID-matched and handed-off Approved Scope is executable. A draft `workorder-*.md` or a renamed plan does not grant authority. Use an immutable unique `SOLO-WO-*` ID inside the active file, not a stream of new WIP filenames. When the task closes, reset the same `workorder-active.md`; Git records history. No individual `plan-xxx.md` or `workorder-xxx.md` files should accumulate. The work order has a unique ID such as `SOLO-WO-001` and states:
+**Filename and authority rule:** The only live WIP filenames are `plan-roadmap.md`, `plan-next.md`, `workorder-active.md` and `plan-outlook.md`. The prefix `plan-` means reference/planning, **never executable**. The prefix `workorder-` means an execution document type, but **only** the one Owner-approved, `OWNER-ISSUED`, ID-matched and handed-off Approved Scope is executable. A draft `workorder-*.md` or a renamed plan does not grant authority. Use an immutable unique `SOLO-WO-*` ID inside the active file, not a stream of new WIP filenames. When the task closes, reset the same `workorder-active.md`; Git records history. No individual `plan-xxx.md` or `workorder-xxx.md` files should accumulate. The work order has a unique ID such as `SOLO-WO-001` and states:
 
 1. The Owner-approved objective and exact acceptance conditions;
 2. The **one** target Solo repository/local path, target branch/ref and actual starting HEAD when available; if HEAD is not yet available, a bounded bootstrap preflight must establish it before authorized writes;
@@ -120,7 +123,7 @@ The Owner's parent repository is **outside** the Solo agent's write boundary. Ve
 
 **(f) Evidence is mandatory.** For a task to be reportable as complete, the exact branch, HEAD, tree and remote URL must be verified as agreeing with the remote-side commit, and the final working tree must be clean.
 
-**(g) Prune on closure.** Completed work is pruned from the three live WIP files; Git history retains past orders. No report archive or additional WIP file is created.
+**(g) Prune on closure.** Completed work is pruned from the four live WIP files under the lifecycle of §8; Git history retains past orders. No report archive or additional WIP file is created.
 
 **(h) Report real failures.** The agent uses installed authenticated tooling and reports an actual authentication or permissions failure with concrete evidence. It does not substitute a routine Owner-run Git command for work it was authorized to perform.
 
@@ -144,7 +147,7 @@ Do not launch another work order until the prior work has a reviewed disposition
 
 ## 7A. Mandatory execution report and GitHub-first review
 
-**One report, overwritten every run.** Every implementation-agent run — authorized implementation, partial work, `STOPPED`, `FAILED`, or read-only onboarding — must leave **exactly one** current report at `.documents/Reports/execution-report.md` and publish it to `origin/main` whenever that is safe and technically possible. This file is the Architect's default review source. It is **overwritten**, never duplicated: no dated, task-named or archived copies and no parallel evidence folder anywhere. Git history preserves superseded versions. The three-file WIP limit is unaffected — the report is not a WIP file and never grants authority.
+**One report, overwritten every run.** Every implementation-agent run — authorized implementation, partial work, `STOPPED`, `FAILED`, or read-only onboarding — must leave **exactly one** current report at `.documents/Reports/execution-report.md` and publish it to `origin/main` whenever that is safe and technically possible. This file is the Architect's default review source. It is **overwritten**, never duplicated: no dated, task-named or archived copies and no parallel evidence folder anywhere. Git history preserves superseded versions. The four-file WIP limit is unaffected — the report is not a WIP file and never grants authority.
 
 **Standing report-only permission.** Once this procedure is adopted, the Owner's standing permission lets an agent open a reporting run with no current implementation order: it may inspect Solo, overwrite **only** this report, and commit and push that single file if root, branch, credentials, privacy and Git safety all check out. It authorizes no product change, dependency install, other documentation edit, WIP modification, other-repository write or second checkout.
 
@@ -158,15 +161,46 @@ Do not launch another work order until the prior work has a reviewed disposition
 
 **Run status is not project status.** A completed run is recorded in the report as `COMPLETE`, `STOPPED`, `FAILED` or `READ-ONLY`; awaiting a disposition describes that run's evidence, not a project-wide condition. An empty ACTIVE slot means only that **no Owner-issued work order is currently active** — the ordinary absence of authority, not a pause, freeze or reopening gate. No live document may record a conversational "paused", "waiting for the Architect" or "reopen before continuing" project status; implementation starts only with a newly Owner-issued order and a matching handoff.
 
-## 8. WIP pruning — mandatory on every transition
+## 7B. A1 engineering quality — permanent acceptance standard
 
-**The WIP is a live control surface, not a history library.** Maintain these three files at every accepted planning change, closure and handoff:
+**A1 is an evidence threshold, not a self-awarded label.** Every code-bearing order must implement an accepted, bounded contract and prove its correct behavior at the exact reviewed revision. The Architect must return `ACCEPT`, `REVISE` or `STOP` based on independent verification; a reported `COMPLETE` never implies acceptance. No unresolved release-blocking critical or high correctness/security defect, mandatory failing gate, untriaged consequential warning or skip, hidden fallback or architecture violation may be waved through.
 
-- **ACTIVE:** only the currently issued task (or `None`), frozen scope, concise latest evidence, blocker and disposition. The full run evidence belongs in the single report of §7A, not here. Do not accumulate past task reports or multiple work orders; after Owner-reviewed closure, reset to a neutral template and rely on Git history for the old record.
-- **NEXT:** only **one** actionable next candidate, with dependencies and a concise ready/not-ready assessment. It is a proposal, not an authorization. Replace it when completed, rejected or superseded; do not append a backlog.
-- **PLAN:** three concise horizons: **short term** (next foundational milestone), **medium term** (subsequent capability milestone) and **long term** (strategic direction). Each horizon contains outcomes, dependencies and **documentation to create/review/update/remove**. Remove completed, rejected or invalidated items; move relevant work forward as horizons shift. Never retain completed tasks as crossed-out historical rows.
+**(a) Contract fidelity.** Verify accepted one-Entity EFS identity and cardinality, stable Page identity, independently authored location, declared base URL, full region-qualified locale tags, exact visibility and public/unlisted case contracts, safe publication, graphic cascade with suppression, and the included simple contact scope. Neither new code nor a copied reference can revise an approved contract without an explicit Owner decision.
 
-After the Architect's acceptance, recommend a single coherent WIP reconciliation for Owner approval: preserve durable product facts in About/Architecture; reset ACTIVE; promote the next candidate; prune and rebase PLAN. Every transition must keep links consistent and explain what was pruned in the commit/short handoff—not by adding a history log to WIP. If WIP contents are stale or contradictory, repair WIP authority before authorizing new implementation.
+**(b) Strict Ports and Adapters.** Domain and application policy depend inward only; actual dependency and import enforcement covers aliases, re-exports and supported module-loading forms. Application use cases use explicit minimal ports; framework, request, filesystem, storage, provider and email particulars remain outside the core; the composition root wires concrete adapters. Require meaningful port tests with fakes and focused concrete-adapter proof when exercised — not merely folders named `core` or `adapters`.
+
+**(c) Security and safe authorship.** Validate all authored declarations, URLs, Markdown, assets and public-data projections; fail on ambiguous IDs, routes or sources and on unauthorized content; refuse executable authored input; never publish private or suppressed values; never advertise unlisted representations automatically. Include adversarial and refusal evidence proportional to risk.
+
+**(d) Verified behavior.** Require meaningful unit and contract tests, real-adapter integration evidence, and actual HTTP, browser or production-mode behavior where the change is user-visible. A build, a mocked suite or static inspection alone cannot prove end-to-end behavior. Include regression checks over previously accepted behavior, including accessibility and discovery where affected.
+
+**(e) Engineering hygiene.** Reproducible toolchain, pinned resolution or lockfile where applicable, justified dependencies, understandable and testable interfaces, clear failure diagnostics, no unrelated changes, and truthful reporting of errors, skips, warnings and limitations. Never improve a gate by suppressing a test, bypassing a refusal or disguising a broken production path.
+
+**(f) Accessibility and performance.** Test semantic structure, keyboard interaction, assistive-technology behavior, responsive operation and measurable performance against **Owner-approved** targets. WCAG 2.2 AA is a proposal until expressly adopted; no numeric threshold is silently promoted from an example.
+
+**(g) Repository and evidence safety.** Exact Owner-issued scope, verified Solo root, branch, HEAD, one worktree and one origin, bounded writes and temporary files, no unexplained dirty state, separate merge/release/deployment authorization, exact test outputs, and the single current GitHub-published execution report.
+
+**(h) Documentation parity.** Accepted product contracts are recorded in their one canonical About/Architecture location; author instructions and executable commands are documented only once proven. No WIP file holds permanent quality policy, a historical acceptance matrix or a status archive.
+
+**Disposition test.** Mark each required order acceptance condition `PASS`, `FAIL` or `UNVERIFIED` against direct evidence. A stage cannot be consumed by an accepted claim alone. If a check is genuinely inapplicable, the reason is documented in the work order and the review; silence is `UNVERIFIED`, never a pass.
+
+## 8. WIP lifecycle — stage, candidate, issued order and ideas
+
+**Inventory and file purity.** `.documents/WIP/` contains exactly four retained files and no others: `plan-roadmap.md`, `plan-next.md`, `workorder-active.md` and `plan-outlook.md`. Neither a subdirectory nor any additional plan, work-order, log, archive, tracker or report file is permitted. The single canonical execution report remains at `.documents/Reports/execution-report.md`, outside WIP, overwritten on every run when safe. Git history is the record of completed work.
+
+- **ROADMAP — unfinished committed stages only.** `plan-roadmap.md` contains nothing but ordered, still-pending implementation stages and their work packages, prerequisites, deliverables and acceptance gates. It contains **no** mission statement, policy, governance, quality charter, historical completion, progress diary, archive, acceptance matrix or general commentary. Stage and work-package identifiers are retained only while that work is incomplete; on acceptance remove the accepted package, and remove a stage once its remaining packages and exit gate are accepted. Never replace removed work with a "completed" summary.
+- **NEXT — one bounded candidate only.** `plan-next.md` contains at most one candidate selected from remaining ROADMAP work, with only its identifier, objective, prerequisites and readiness, proposed scope and deliverables, and verifiable exit conditions. It contains **no** planning policy, authorization explanation, work-order history, stage catalogue or unrelated ideas. A candidate is a proposal and never an implementation permission. If nothing is ready, it contains no candidate. Never work on NEXT as an active order.
+- **ACTIVE — one issued work order only.** `workorder-active.md` contains at most one exact Owner-issued `SOLO-WO-*` order with its approved scope, allowed paths and operations, exclusions, acceptance criteria, matching Owner handoff identifier, and run evidence or disposition only where the order authorizes it — never generic governance or long-range planning. The approved scope stays frozen. With no issued order it contains none. The sole implementation authority is a clearly `OWNER-ISSUED` approved scope there **plus** a matching explicit Owner handoff; no plan, stage title, proposal, candidate or empty slot confers permission.
+- **OUTLOOK — ideas only.** `plan-outlook.md` holds optional, uncommitted ambitions that may never be implemented. It is not a delivery backlog, defect register, requirement source or parking area for failed acceptance. Each idea stays speculative unless the Owner expressly accepts a scope change and promotes a concrete obligation into ROADMAP; contradictory ideas can never revise canonical architecture. OUTLOOK may remain populated after all committed work has finished.
+
+**Selection and issue.** Select the earliest dependency-ready remaining stage or package unless the Owner explicitly changes priorities. If it is too broad to execute safely, make NEXT a coherent bounded slice and leave the unresolved remainder in ROADMAP. Owner review and separate exact issuance move a candidate into ACTIVE; NEXT is then cleared as part of that specifically authorized issue transition, so it can never appear concurrently as an unissued next job. ROADMAP keeps the obligation until independent acceptance and Owner-authorized closure. The Owner controls any actual WIP write.
+
+**Execution and review.** The Implementation Agent verifies the Owner-issued scope and the Solo repository boundaries, executes only that order, and publishes factual evidence in the one current report. The Architect reviews that report first at its exact GitHub revision (§7A), independently verifies scope, diff, behavior and negative cases against §7B, and returns `ACCEPT`, `REVISE` or `STOP`. A `REVISE` or `STOP` leaves the obligation in ROADMAP and never moves the work to OUTLOOK. The Owner decides whether the same issued scope receives a bounded revision or needs replacement authority.
+
+**Accepted closure.** After independent `ACCEPT` **and** the Owner's express closure or reconciliation authorization, remove exactly the accepted portion from ROADMAP, reconcile accepted durable decisions into About/Architecture, clear ACTIVE, and populate NEXT from the next readiness-checked ROADMAP slice or leave it without a candidate. Modify OUTLOOK only for an expressly accepted idea-scope decision. Acceptance never implies an order, release, deployment or provider action, and reconciliation writes require exact Owner-authorized paths and operations rather than generic stage completion.
+
+**Final state.** All four WIP files remain present. Once every committed stage has passed independent acceptance and Owner-authorized closure, ROADMAP has zero stage entries, NEXT has zero candidate entries and ACTIVE has zero issued-order entries. A file may retain a single identifying title, but no `NONE` essay, status history, standing-policy text or completed-work summary. OUTLOOK may still hold uncommitted ideas. An empty slot is the absence of an item — never authority, and never a project-wide pause or reopening gate.
+
+**Safety.** STOP rather than silently consume an unfinished package, promote a speculative idea into a requirement, rewrite frozen scope, delete unknown material, conceal a defect, or depart from the one-root, one-worktree and no-parallel-report rules. Only a separately Owner-authorized documentation transition may change this lifecycle.
 
 ## 9. Repository, dependency and deployment controls
 **Workspace confinement:** The implementation agent may read the broader Provelopment workspace as necessary for context, subject to access permissions. All file creation, edits, deletion, writes through scripts or tools, and Git mutations must remain strictly within the verified `00.foundation-solo/` root **and only within paths permitted by the issued work order**. No parent or sibling workspace mutations. If an operation might write outside Solo (package cache, generated output, Git metadata, installer, provider integration), do not execute it without confirming safe containment and explicit Owner scope. The Owner supplies the actual operating-system/tool permission boundary; written instructions supplement rather than replace enforced restrictions.
@@ -180,6 +214,6 @@ The Architect must require the agent to establish the real Git root, ordinary wo
 
 ## 10. Stop conditions and maintenance
 
-STOP and notify Owner upon second-Entity design, disguised Spokes, routing/property coupling, unauthorized public exposure, uncontrolled unlisted discovery, ambiguous base URL semantics, a missing approved task, unrelated repo changes, destructive edits, unauthorized provider operations, incompatible requirements or unverifiable evidence.
+STOP and notify Owner upon second-Entity design, disguised Spokes, routing/property coupling, unauthorized public exposure, uncontrolled unlisted discovery, ambiguous base URL semantics, a missing approved task, a plan, candidate or idea treated as authorization, a WIP file carrying permanent policy or completed-work history, unrelated repo changes, destructive edits, unauthorized provider operations, incompatible requirements or unverifiable evidence.
 
 Review this SOP whenever the operating model changes; any revision requires Owner acceptance and corresponding updates to `AGENTS.md` / `sop-implementation.md` when needed. This charter should remain practical and finite; details specific to a single task belong in ACTIVE, not in permanent SOP.

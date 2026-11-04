@@ -1,6 +1,6 @@
 # AGENTS.md — Mandatory Foundation Solo Agent Entry Point
 
-> **Edition:** 2026-11-04 — initial Owner-review package.  
+> **Edition:** 2026-11-04, revision 2 — four-slot WIP lifecycle (ROADMAP, NEXT, ACTIVE, OUTLOOK).  
 > **Scope:** Every architect, implementation agent, reviewer and contributor in the independent `00.foundation-solo` repository.  
 > **Notice:** Reading this document or finding a proposed task is **not** authorization to edit files.
 
@@ -16,7 +16,7 @@ Foundation Solo is an independent product with **exactly one Entity** and the hi
 2. [`.documents/About/FOUNDATION-SOLO.md`](.documents/About/FOUNDATION-SOLO.md) — scope and purpose.
 3. [`.documents/Architecture/ARCHITECTURE.md`](.documents/Architecture/ARCHITECTURE.md) — settled and open architecture.
 4. [Architect SOP](.documents/SOP/sop-architect.md) and [Implementation SOP](.documents/SOP/sop-implementation.md) — mandatory role-specific procedures.
-5. [ACTIVE](.documents/WIP/workorder-active.md), [NEXT](.documents/WIP/plan-next.md), [PLAN](.documents/WIP/plan-outlook.md) — exact current authority, immediate candidate and pruned outlook.
+5. [ACTIVE](.documents/WIP/workorder-active.md), [NEXT](.documents/WIP/plan-next.md), [ROADMAP](.documents/WIP/plan-roadmap.md), [OUTLOOK](.documents/WIP/plan-outlook.md) — exact current authority, the immediate candidate, the remaining committed stages, and optional ideas.
 6. [Execution report](.documents/Reports/execution-report.md) — the **one** current run report, overwritten after every run; read it before acting.
 7. Actual code, tests, manifests and only the additional product references pertinent to the authorized task.
 
@@ -30,7 +30,7 @@ Foundation Solo is an independent product with **exactly one Entity** and the hi
 
 **Authorization has exactly two forms, and nothing else.** *Implementation* changes — source, dependencies, WIP authority, other documentation, or any Git operation beyond the report — require `.documents/WIP/workorder-active.md` labelled `OWNER-ISSUED` with a unique `SOLO-WO-*` ID **and** a matching Owner handoff. *Reporting* is the single standing exception defined below. The Owner alone installs the order; `plan-*.md` files are reference only; neither agent self-issues an order, starts the next one, or approves its own work.
 
-**Verify before you act.** Confirm the actual workspace root (not the parent workspace, a symlink or a junction), `git rev-parse --show-toplevel`, branch `main`, `HEAD`, `git status --porcelain` apart from a permitted order installation, exactly one worktree, exactly one remote `origin` = `provelopment/provelopment-foundation-solo`, exactly three WIP files, and whether `.documents/Reports/execution-report.md` exists and is current. Any unexplained mismatch is a **STOP**.
+**Verify before you act.** Confirm the actual workspace root (not the parent workspace, a symlink or a junction), `git rev-parse --show-toplevel`, branch `main`, `HEAD`, `git status --porcelain` apart from a permitted order installation, exactly one worktree, exactly one remote `origin` = `provelopment/provelopment-foundation-solo`, exactly four WIP files (`plan-roadmap.md`, `plan-next.md`, `workorder-active.md`, `plan-outlook.md`), and whether `.documents/Reports/execution-report.md` exists and is current. Any unexplained mismatch is a **STOP**.
 
 **Every run ends with the report.** Overwrite `.documents/Reports/execution-report.md` and publish it to `origin/main` when safe — including after a `STOP`, a failure, or a read-only onboarding. It is the Architect's default review source, is never duplicated, dated or archived, and never grants authority. Never embed the report's own final commit SHA inside it; give that SHA in chat after publication.
 
@@ -56,7 +56,7 @@ Foundation Solo is an independent product with **exactly one Entity** and the hi
 If any instruction conflicts with these accepted requirements, STOP and escalate to Owner/Architect rather than silently weaken them.
 
 ## 4. Role and authorization gates
-**Filename distinction and live slots:** `plan-*.md` = planning/reference, **not an instruction to execute**; `workorder-*.md` = candidate execution document, executable only when formally Owner-issued with a matching ID and handoff. The entire WIP contains exactly `workorder-active.md`, `plan-next.md` and `plan-outlook.md`; no additional plan/workorder files, task history, or report archive may accumulate.
+**Filename distinction and live slots:** `plan-*.md` = planning/reference, **not an instruction to execute**; `workorder-*.md` = candidate execution document, executable only when formally Owner-issued with a matching ID and handoff. The entire WIP contains exactly `plan-roadmap.md`, `plan-next.md`, `workorder-active.md` and `plan-outlook.md`; no additional plan/workorder files, task history, or report archive may accumulate.
 
 **Implementation-agent confinement:** The agent may read relevant files elsewhere in Provelopment but has **no write permission outside `00.foundation-solo/`**. The parent repository's `/00.foundation-solo/` ignore rule is **committed** and independently verified with `git check-ignore`; changing it remains outside Solo agent scope, and only the Owner or a separately authorized parent operator may edit/commit the parent `.gitignore`. Even within Solo it may edit only allowed work-order paths. No external writes through generated output, installers, symlinks or Git. Report any permission-boundary uncertainty before proceeding.
 
@@ -69,17 +69,20 @@ If any instruction conflicts with these accepted requirements, STOP and escalate
 
 **Reviewer:** reports evidence, discrepancies and recommendations; a comment is not authorization.
 
-## 5. Exactly three WIP files — permanent operational rule
+## 5. Exactly four WIP files — permanent operational rule
 **Owner-approved license:** Root `LICENSE` is Apache-2.0 as expressly selected by the Owner. Copyright/attribution and any required third-party `NOTICE` must still be settled before a release; GitHub **private vulnerability reporting is enabled** and verified for the public repository. Repository-standard `.github/` and root tooling metadata are narrow exceptions to `.documents/`, not alternate governance.
 
 
 `.documents/WIP/` contains **only**:
 
-1. [`workorder-active.md`](.documents/WIP/workorder-active.md): one current issued work order (or `NONE`), frozen approved scope, temporary execution evidence and independent disposition.
-2. [`plan-next.md`](.documents/WIP/plan-next.md): one candidate for next activity, no backlog or execution permission.
-3. [`plan-outlook.md`](.documents/WIP/plan-outlook.md): short-, medium- and long-term outcomes and **documentation outlook**, continuously pruned.
+1. [`plan-roadmap.md`](.documents/WIP/plan-roadmap.md): only the still-pending implementation stages with their work packages, prerequisites and gates. Never a mission statement, policy, quality charter, completion history or progress commentary.
+2. [`plan-next.md`](.documents/WIP/plan-next.md): at most one bounded candidate drawn from the remaining roadmap work, no backlog and no execution permission.
+3. [`workorder-active.md`](.documents/WIP/workorder-active.md): the one current `OWNER-ISSUED` work order (or no order), frozen approved scope, permitted execution evidence and independent disposition.
+4. [`plan-outlook.md`](.documents/WIP/plan-outlook.md): optional ideas and aspirations only, which may never be implemented and constrain nothing.
 
-Never create `WIP/Reports`, `WIP/Work-Orders`, `WIP/Archive`, per-task or dated reports, or any duplicate status folder elsewhere. The **single** exception outside WIP is `.documents/Reports/execution-report.md` — overwritten every run, never duplicated, and neither a WIP file nor a source of authority. Git history retains past versions. On Owner-approved closure, reset ACTIVE, replace NEXT and prune PLAN; permanent accepted facts go into the relevant About/Architecture authority.
+**Only ROADMAP → NEXT → ACTIVE progresses.** OUTLOOK sits outside that sequence, is never a delivery backlog, defect register or parking area for failed acceptance, and may stay populated after all committed work is finished.
+
+Never create `WIP/Reports`, `WIP/Work-Orders`, `WIP/Archive`, per-task or dated reports, or any duplicate status folder elsewhere. The **single** exception outside WIP is `.documents/Reports/execution-report.md` — overwritten every run, never duplicated, and neither a WIP file nor a source of authority. Git history retains past versions. On separate Owner-authorized closure, remove the accepted ROADMAP work, clear ACTIVE and select a new NEXT candidate; permanent accepted facts go into the relevant About/Architecture authority, not into any execution file.
 
 ## 6. Source/quality and stopping rules
 
@@ -91,4 +94,4 @@ Never create `WIP/Reports`, `WIP/Work-Orders`, `WIP/Archive`, per-task or dated 
 
 ## 7. Current state
 
-This package supplies planning and operating documents plus a published source repository — **not** verified implementation. Solo is an independent Git repository on `main`; `origin` is the public GitHub repository `provelopment/provelopment-foundation-solo`, owned by the personal `provelopment` account, with default branch `main` and GitHub private vulnerability reporting enabled. The parent `/00.foundation-solo/` ignore guard is committed and verified, so the enclosing workspace tracks no Solo files. There is **no application code, toolchain, dependency manifest, test suite, release or deployment**; do not describe any of those as existing. **No Owner-issued work order is currently active**: [`workorder-active.md`](.documents/WIP/workorder-active.md) records `NONE`, and [`plan-next.md`](.documents/WIP/plan-next.md) holds one non-executable candidate. `NONE` means only that no work is authorized — it is not a project-wide pause, freeze or reopening gate, and no live document records a conversational "waiting" status; run status lives in the [execution report](.documents/Reports/execution-report.md). Implementation requires a newly Owner-issued order with a matching handoff. Two binding contracts await implementation and are defined in [ARCHITECTURE.md](.documents/Architecture/ARCHITECTURE.md): **strict Hexagonal Architecture (Ports and Adapters)** with dependencies pointing inward — mandatory and verifiable, never aspirational — and the contact scope, where safe `mailto:` actions and a **simple** contact form are included and **advanced contact forms are explicitly excluded**. Do not select a framework or write application code before such an order exists.
+This package supplies planning and operating documents plus a published source repository — **not** verified implementation. Solo is an independent Git repository on `main`; `origin` is the public GitHub repository `provelopment/provelopment-foundation-solo`, owned by the personal `provelopment` account, with default branch `main` and GitHub private vulnerability reporting enabled. The parent `/00.foundation-solo/` ignore guard is committed and verified, so the enclosing workspace tracks no Solo files. There is **no application code, toolchain, dependency manifest, test suite, release or deployment**; do not describe any of those as existing. **Authority lives only in ACTIVE**: [`workorder-active.md`](.documents/WIP/workorder-active.md) holds the exact Owner-issued order while one is installed, and an empty slot means only that no work is authorized — it is not a project-wide pause, freeze or reopening gate. [`plan-next.md`](.documents/WIP/plan-next.md) holds at most one non-executable candidate and [`plan-roadmap.md`](.documents/WIP/plan-roadmap.md) the remaining committed stages. No live document records a conversational "waiting" status; run status lives in the [execution report](.documents/Reports/execution-report.md). Implementation requires a newly Owner-issued order with a matching handoff. Two binding contracts await implementation and are defined in [ARCHITECTURE.md](.documents/Architecture/ARCHITECTURE.md): **strict Hexagonal Architecture (Ports and Adapters)** with dependencies pointing inward — mandatory and verifiable, never aspirational — and the contact scope, where safe `mailto:` actions and a **simple** contact form are included and **advanced contact forms are explicitly excluded**. Do not select a framework or write application code before such an order exists.
