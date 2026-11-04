@@ -2,7 +2,7 @@
 
 **Document:** `.documents/SOP/sop-implementation.md`  
 **Edition:** 2026-11-04, revision 6 (four-file WIP execution discipline, reference-reuse and A1 cross-references)  
-**Authority:** Owner-issued project procedure upon acceptance and installation. Until then, a review draft; **not** an issued work order.  
+**Authority:** Owner-issued and adopted project procedure, binding on every implementation agent. Adoption is not an issued work order: work requires a complete `OWNER-ISSUED` order in `.documents/WIP/workorder-active.md` plus its matching Owner handoff.  
 **Scope:** Every implementation agent or code-modifying contributor to the independent Foundation Solo project.  
 **Companions:** [`sop-architect.md`](sop-architect.md), [`workorder-active.md`](../WIP/workorder-active.md), [`plan-next.md`](../WIP/plan-next.md), [`plan-roadmap.md`](../WIP/plan-roadmap.md), [`plan-outlook.md`](../WIP/plan-outlook.md).
 
@@ -40,7 +40,7 @@ The agent **may not** during read-only initialization create or edit files, init
 **Filename semantics:** `plan-roadmap.md`, `plan-next.md` and `plan-outlook.md` (and any `plan-*.md` reference) are non-executable. `workorder-active.md` is the single `workorder-*.md` current-execution slot. An active-looking filename does not suffice: check `OWNER-ISSUED`, the frozen exact scope, the unique `SOLO-WO-*` ID, and a matching Owner handoff. There must never be a per-task archive of `workorder-xxx.md` files in WIP or a parallel order store.
 
 
-**Only `.documents/WIP/workorder-active.md` can identify current execution authority**, and only when its **Approved Scope** is explicitly marked `OWNER-ISSUED`, names a unique `SOLO-WO-*` ID, includes the exact permitted operations, and the Owner has actually issued the matching handoff. A draft, `plan-next.md`, `plan-outlook.md`, README, GitHub issue, previous agent report or conversational idea **does not authorize writing**. This section governs **implementation** authority only: the single exception is the standing **report-only** permission in §5C, which needs no active order and reaches only `.documents/Reports/execution-report.md`.
+**Only `.documents/WIP/workorder-active.md` can identify current execution authority**, and only when its **Approved Scope** is explicitly marked `OWNER-ISSUED`, names a unique `SOLO-WO-*` ID, includes the exact permitted operations, and the Owner has actually issued the matching handoff. Any file outside that Owner-issued slot and its matching handoff — `plan-roadmap.md`, `plan-next.md`, `plan-outlook.md`, README, a GitHub issue, a previous agent report or a conversational idea — **never authorizes writing**. This section governs **implementation** authority only: the single exception is the standing **report-only** permission in §5C, which needs no active order and reaches only `.documents/Reports/execution-report.md`.
 
 On receiving a handoff:
 

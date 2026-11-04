@@ -4,7 +4,7 @@
 
 **Objective:** settle the identity and publication-declaration contract that blocks the first coherent Solo implementation, as recorded decisions only and without executable application code.
 
-**Prerequisites:** independent of any earlier implementation stage. Readiness is a property of the roadmap package, not of the current ACTIVE slot; this candidate needs its own Owner-issued order and matching handoff before any work begins.
+**Prerequisites:** no preceding implementation stage gates this package. It depends only on the accepted product and architecture decisions already recorded in [`About/FOUNDATION-SOLO.md`](../About/FOUNDATION-SOLO.md) and [`ARCHITECTURE.md`](../Architecture/ARCHITECTURE.md).
 
 **Deliverables:**
 
