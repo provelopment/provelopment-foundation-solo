@@ -1,98 +1,24 @@
 # Foundation Solo — Current Work Order
 
-**Work Order ID:** `SOLO-WO-003`  
-**Title:** Phase 0 closure — permanent execution reporting, clean Git handoff and resumable agent procedures  
-**Edition:** `R00` — Architect candidate for Owner review  
-**Approval state:** `OWNER-ISSUED` **only when** the Owner has reviewed these exact bytes, installed them as `00.foundation-solo/.documents/WIP/workorder-active.md` (replacing the previous order), and separately sent an explicit matching `SOLO-WO-003` execution handoff. Until both steps occur, this file remains an **unissued Architect candidate** regardless of its displayed label. The agent must not change the frozen scope.  
-**Repository:** `provelopment/provelopment-foundation-solo` — public, `origin`  
-**Local working root:** `C:\Users\Sean\Documents\Provelopment\00.foundation-solo` (verify actual physical root)  
-**Target branch:** `main`  
-**Expected starting HEAD:** `95b05374476cfaf93a74743af157c7144994bf09` — independently verified `SOLO-WO-002 R01` publication. Revalidate immediately before changes.  
-**Phase:** Phase 0 final governance checkpoint; **STOP / PAUSE after delivery and independent review**. No product implementation.
+**Work Order ID:** `NONE`
+**Status:** `NONE — PHASE 0 PAUSED; awaiting Architect verification`
+**Date:** 2026-11-04
 
-## 1. Objective
+No work order is currently issued. `SOLO-WO-003` was executed under Owner issuance and delivered; Phase 0 is **paused pending independent Architect review**. The full issued scope of `SOLO-WO-003`, and the preceding `SOLO-WO-002 R01` and `SOLO-WO-001` orders, remain recoverable in Git history.
 
-Implement the Owner's permanent reporting and handoff workflow so that **any new Architect or Implementation Agent can start by reading only root `README.md` and `AGENTS.md`**, follow their canonical links to the currently authorized scope and latest evidence, and continue without undocumented prior-chat context.
+## Authority
 
-After **every implementation-agent run**, including a STOP, failure, or read-only onboarding, the agent must overwrite **one** canonical report, `.documents/Reports/execution-report.md`, and publish that file to the **same GitHub Solo repository**, when safe and technically possible. The report is the Architect's default review source. All other project documentation changed by the run must also be committed and pushed. A run ends with a clean single working tree, subject only to explicitly reported safety or availability blockers; never fake cleanliness by deleting another person's work.
+This file authorizes **no** implementation, documentation, Git or GitHub write. Only a new Owner-issued `SOLO-WO-*` order, installed here by the Owner with a matching handoff, creates execution authority. `plan-next.md` and `plan-outlook.md` never authorize work.
 
-The Owner reviews and installs the Architect-authored **single** replacement `workorder-active.md` and sends its execution prompt. The agent handles routine Git mechanics without further Owner shell commands. Once the Architect reviews a run's report on GitHub, the Architect makes an `ACCEPT / REVISE / STOP` disposition and produces the next corrected order or plan, subject to Owner issuance. **For this checkpoint only, successful verification completes Phase 0 and the project pauses.** Do not start Phase 1 or draft/issue its execution order as part of this task.
+**Standing report-only exception:** without an issued order an agent may overwrite and push **only** `.documents/Reports/execution-report.md` after repository-safety checks, as defined in `README.md`, `AGENTS.md` and both SOPs.
 
-## 2. Non-negotiable rules to codify in both SOPs
+## Project state
 
-### 2.1 Single canonical report, published on every run
+- **Phase 0:** governance delivered; **paused pending independent Architect review** of the published execution report.
+- **Phase 1:** not authorized, not drafted, not started.
+- **Implementation:** no application code, toolchain, dependency manifest, test suite, release or deployment exists.
+- **Next required action:** the Chief Architect verifies the published report at <https://github.com/provelopment/provelopment-foundation-solo/blob/main/.documents/Reports/execution-report.md> and returns `ACCEPT / REVISE / STOP`.
 
-- **Exactly one report file**: `.documents/Reports/execution-report.md`. Create its containing directory in this task. Update/overwrite the same file on every later run; **no** dated reports, task-named reports, archived copies, parallel evidence folders or report queues. Git commit history retains earlier versions. `WIP/` continues to contain **exactly three files**: `workorder-active.md`, `plan-next.md`, `plan-outlook.md`.
-- A **run** means any implementation-agent work session: authorized implementation, a read-only inspection/onboarding, attempted preflight, successful execution, partial execution, or STOP/failure. The Owner establishes a **standing report-only permission** after this SOP is adopted: even without a currently issued implementation order, the agent may inspect Solo, overwrite **only** this report, and commit/push this report to the existing Solo remote **if** root, branch, credentials, privacy and Git safety checks pass. This permission is **not** authorization to perform product changes, install dependencies, alter other documentation, modify WIP authority, change other repositories, or create a second checkout.
-- A report must identify the session date in ISO format, work-order ID/edition or `NO ACTIVE ORDER`, actual status (`COMPLETE`, `STOPPED`, `FAILED`, or `READ-ONLY`), objective and scope, exact root/branch, relevant starting/source commit, changed files, commands/actions and results, checks (pass/fail/not run), limitations, any local-only commits, unexpected state, cleanup, report-publication verification and explicit next action/stop point. **No secrets, access tokens, confidential personal details, unsafe vulnerability reproduction data, or unredacted credentials** may appear in this public report. Prefer concise evidence and Git URLs over lengthy logs.
-- The report must be saved and pushed **even if the attempted work fails**, provided reporting itself is safely possible. A STOP in an implementation gate does **not** silently waive the report obligation. If a safety boundary, unavailable GitHub, missing authorization for repository access, conflicts, or unrelated dirty/Owner-owned material makes a safe report commit/push impossible, preserve everything, do not reset/clean/force, state the exact blocker in the final chat response, and leave the local report if safely writable. Never claim the remote report was updated unless independently checked.
-- Do not put a report's **own final commit hash inside its content**: that is self-referential. Report the known preceding work/content commit, publish the report and then give the resulting final report-commit SHA and clickable GitHub report URL in the final chat handoff. The Architect verifies GitHub's `main` HEAD and the file there.
+## Resume rule
 
-### 2.2 Clean Git and handling incomplete code
-
-- **Normal completion gate:** `git status --porcelain` is empty (no staged, unstaged or untracked artifacts), one verified Solo checkout/worktree, no task-created temporary files, and all changed **documentation** including the report is committed and present on GitHub. Prefer pushing finished, safe source code under the authority of the work order. A push does not authorize merge, release, or deploy.
-- **Permissible exceptional local-only code:** Unfinished or inappropriate-for-publication code may remain **only if expressly authorized by its work order**, preserved as identified **local-only commit(s) on a named local branch** within the **same single Solo checkout** (no second worktree, clone, shadow copy, stash or mystery untracked state). Return to a clean `main` checkout safely, push the documentation/report from `main`, and identify the exact local-only branch/commit and why it is not published in the public report **without disclosing sensitive code**. Never silently push unsafe content. A new agent on a different machine cannot recover a local-only branch from GitHub; the report must say so and mark handoff as partially dependent on that local workspace. Do not create an exceptional local-only branch under **this** documentation-only work order.
-- If there is unknown local content, an unsafe branch switch, an inability to preserve files, a non-fast-forward push, missing network, or any real obstacle to a clean tree, **STOP**. Do not destroy data merely to meet the clean-tree metric. Report any exception truthfully; a failed push is not success. Do not use `git clean`, destructive `reset`, force-push, history rewrite or additional worktrees.
-
-### 2.3 Handoff and Architect review
-
-- The root `README.md` and `AGENTS.md` must be sufficient **starting instructions** for an unfamiliar agent of **either role**: identify the exact GitHub repository, scope and local write boundary, then provide a short, mandatory reading sequence to the About/Architecture authorities, both SOPs, three WIP files and latest report. They must point to **one** authoritative source per subject and explicitly distinguish a `plan-*.md` reference from the sole executable Owner-issued `workorder-active.md`.
-- On the Owner saying "agent finished" or "report ready", the Architect **first reads the actual current** `.documents/Reports/execution-report.md` **directly from GitHub**, verifies its commit and relevant repository diffs/results, and gives a written `ACCEPT / REVISE / STOP` disposition. Missing, stale or unpushed reporting is a verification failure, not a reason to rely solely on pasted chat text. For claims only observable locally, distinguish agent-reported evidence from independently observed GitHub evidence.
-- Only after independent review may the Architect write a **single complete next** `workorder-active.md` candidate and matching copy-paste prompt, or a bounded Rxx correction, for Owner review. **Only the Owner installs/replaces the WIP work order and issues its handoff.** Plans never authorize execution. Neither agent self-issues or starts the next work order.
-- On the successful completion of `SOLO-WO-003`, mark Phase 0 as **delivered, pending Architect review**, make the live WIP indicate **PAUSED / no executable next task**, and do not schedule, propose as executable, or start Phase 1 while paused. After the Architect's accepted review, Phase 0 is **closed**. Resume only on a new Owner instruction.
-
-## 3. Authorized file changes — Solo only
-
-| Path | Permission and required outcome |
-| --- | --- |
-| `.documents/SOP/sop-architect.md` | **Edit:** adopt the exact Architect GitHub-first report-review procedure, single-report path, independent evidence/disposition, work-order replacement, Phase 0 pause, clean Git reporting exceptions and handoff rules. Reconcile any obsolete "no Reports" prohibition. Keep §6B as the sole version-control authority. |
-| `.documents/SOP/sop-implementation.md` | **Edit:** adopt mandatory report overwrite/push on *every* run, including STOP/read-only; report-only standing permission and limits; clean-tree/documentation gate; permissible expressly authorized local-only committed code; error/report escalation; no-worktrees/temp hygiene. Refer to Architect §6B for common Git rules rather than creating a contradictory second procedure. |
-| `README.md` | **Edit:** make it an accurate standalone starting point for either agent, with repository link, project status, mandatory orientation links, the sole GitHub report and Phase 0 pause. Product description and EFS contracts must not change. |
-| `AGENTS.md` | **Edit:** make the handoff and mandatory reading protocol unmistakable for both roles, including what the next agent verifies, where it reads the latest report, exactly how authorization works, and standing report-only authority. Preserve Solo-only write confinement. |
-| `.documents/WIP/plan-next.md` | **Edit:** upon successful Phase 0 delivery set `NONE — PAUSED; awaiting new Owner instruction`, not an executable Phase 1 task. Do not delete future architectural questions: their direction belongs in the existing short/medium/long outlook. On failure, retain an accurate one-candidate/blocker state rather than falsely declaring closure. |
-| `.documents/WIP/plan-outlook.md` | **Edit:** prune completed Phase 0 operations; record Phase 0 pause and concise future short/medium/long documentation outlook. No historical progress accumulation or extra WIP files. |
-| `.documents/WIP/workorder-active.md` | **Owner installs this entire issued order.** Agent must preserve its frozen Approved Scope during execution. **Only after successful governance delivery and report/publication preparation**, the agent may replace the file with a short neutral `NONE — PHASE 0 PAUSED, pending Architect verification` state. The previously issued bytes must remain recoverable in the preceding Git commit. On failure, do **not** falsely clear the active order; indicate STOP in the report. |
-| `.documents/Reports/execution-report.md` | **Create directory and file;** initial concise factual report for this work order, publicly safe; this is the one authoritative current report. On future runs it is **overwritten**, not duplicated. |
-| `.git/**` | Ordinary bounded staging/commits/push/ref tracking and read-only verification only. |
-
-**Do not change:** `.documents/About/FOUNDATION-SOLO.md`, `.documents/Architecture/ARCHITECTURE.md`, `LICENSE`, `.github/**`, `.gitignore`, `.gitattributes`, `.editorconfig`, source/toolchain/dependency/CI files, other repositories or any provider/deployment setting. Do not create additional permanent files/folders beyond the one report. No architecture/schema/framework decisions are authorized.
-
-## 4. Preflight and implementation sequence
-
-1. **Preflight before any changes.** Verify Owner installed `SOLO-WO-003` as the only WIP work order and sent matching handoff; verify the actual Solo Git top-level, physical root, `main`, `HEAD=95b05374476cfaf93a74743af157c7144994bf09`, one worktree, clean initial index, `origin` pointing only to `provelopment/provelopment-foundation-solo`, remote `main` matching that HEAD, parent ignore guard still effective. The **only permitted pre-run worktree modification** is the Owner-installed work-order replacement. Inspect it before proceeding. Verify the 17 tracked baseline files and exactly three WIP files. Check the report path does not already exist; if it does, **inspect** rather than overwrite unrecognized/Owner-owned material. No other dirty or unexplained files, and no tool side effects outside Solo. STOP on unsafe inconsistencies.
-2. **Implement documentation changes**, preserving all existing product requirements and the original role boundary. Remove direct contradictions such as "no report file anywhere", "execution evidence only in ACTIVE/chat", and "read-only onboarding means absolutely no report write". Preserve the three-file WIP limit, plan/workorder distinction, one-root rule and Owner issuance. Add specific mandatory startup links in `README.md` and `AGENTS.md`. Check internal relative links and text coherence.
-3. **Commit and push the issued order + durable SOP/entry-point changes.** Stage only explicitly authorized paths; do not stage the new report or neutral-close ACTIVE yet. Make one normal fast-forward commit on `main`, and push to `origin/main`; independently verify the new commit and that it contains the exact frozen Owner-installed order. This preserves the fully issued scope in Git history before neutralizing the live WIP slot. Record this **known content commit SHA** for the report.
-4. **Finalize the report and paused WIP, if the first publication and checks succeeded.** Prepare `.documents/Reports/execution-report.md` with exact observed evidence from this run, the known content-commit SHA, any failures/limitations, and report-publication reference `origin/main` (the final report commit SHA will be supplied **after** publication in chat). Replace the three WIP files only as needed: `workorder-active.md` becomes `NONE — PHASE 0 PAUSED; awaiting Architect verification`; `plan-next.md` is `NONE — PAUSED`; `plan-outlook.md` is pruned. Do not claim the Architect has already accepted the result.
-5. **Commit and push the report/closure.** Stage only `.documents/Reports/execution-report.md` and the authorized WIP closure paths. Make **one** ordinary fast-forward report/closure commit on `main` and push `origin/main`. Verify remotely that `README.md`, `AGENTS.md`, both SOPs, all WIP files, and this exact report are readable, `origin/main` matches local HEAD, report is not empty and no other report files exist. Confirm clean tracked/untracked working-tree status, one worktree, no task-created `.temp/` or cache, and no write outside Solo. Report the **final** SHA in chat, not by trying to embed it inside the file's own commit.
-6. **On a STOP/failure at any point:** do not declare Phase 0 closed or reset ACTIVE to `NONE`. Where safe, update/overwrite the single public report with status `STOPPED` or `FAILED` and publish it using an authorized bounded report-only commit, preserving all other work and explaining any unpushed code or documentation. If report publication itself is unsafe or impossible, report the exact obstacle and current local/remote state in chat. No extra work orders or automatic retries beyond safe, idempotent checks.
-7. **End.** Do not begin a new task, change application source, select a framework, publish a release, deploy, or generate a Phase 1 work order. Architect reviews GitHub report when informed by Owner; Phase 0 is closed only after that independent acceptance. Pause thereafter.
-
-## 5. Acceptance gates and report contents
-
-- Exact Owner issuance verified, allowed paths only, correct two-commit or safe partial-failure history; original `95b0537...` is ancestor of published main; no history rewrites, new worktrees, extra remotes or unrelated edits.
-- Both SOPs implement compatible obligations, the report-only standing permission and the GitHub-first Architect review; no contradiction to Owner authority, WIP limit, clean Git or restricted writes.
-- `README.md` and `AGENTS.md` independently provide the necessary **entry points and reading order** for a new agent of either role; linked files resolve in the repo. A new agent can discover full status, report and pending authorization by following only these two entry points.
-- `.documents/Reports/` contains **exactly** `execution-report.md`; WIP contains exactly three existing files, no task-log folders. The report contains actual results and clear status, not a template masquerading as evidence.
-- Published documentation and report visible on `origin/main`; normal outcome leaves a clean Git index/worktree and no task-owned temp artifacts; unfinished local-only code is **not** introduced in this task.
-- The final report records: task ID/edition and start commit, date and outcome, files changed, commands/verification evidence, first content commit, status of remote publication, exact WIP state, failures/limits, local-only state (none), temp cleanup and next required review. Final report commit SHA supplied in chat separately.
-- If any criterion fails, agent reports `STOPPED` or `FAILED`, not `COMPLETE` or `Phase 0 accepted`; partial external state is preserved.
-
-## 6. Explicit authorization ledger
-
-| Operation | Authorized? |
-| --- | --- |
-| Edit the listed Solo-only docs/SOP/WIP, create the single report, overwrite current ACTIVE to neutral **only on success** | **YES**, within exact steps above |
-| Two ordinary, explicitly scoped commits and fast-forward pushes to Solo `origin/main`, read-back verification | **YES** |
-| Publish the current/latest report even after a safe implementation STOP, as constrained in §2.1/§4.6 | **YES** |
-| Maintain standing **report-only** ability for future runs under the new SOP, with mandatory repository safety checks | **YES** — Owner-authorized procedural change |
-| Modify other repositories, GitHub account security/settings, parent ignore, scopes or secrets | **NO** |
-| Extra clone, linked worktree, stash/hidden dirty state, force-push, destructive reset/clean, rewrite published history | **NO** |
-| Application implementation, framework/dependencies/CI, PR/merge, release/deployment/DNS, Phase 1 execution | **NO** |
-
-**STOP conditions:** incorrect Owner handoff, unexpected repo/ref/dirty state, unsafe public report content, missing GitHub permission, non-fast-forward remote, uncontained tool write, unknown Owner files, inability to preserve unfinished local changes without loss, or any need to exceed authorized files/commits. Prefer safe STOP plus a factual report over a rushed completion claim.
-
-## 7. Architect review and Phase 0 stop gate
-
-When the Owner says **"report ready"** or **"agent finished"**, the Architect shall read `https://github.com/provelopment/provelopment-foundation-solo/blob/main/.documents/Reports/execution-report.md` via the connected GitHub tool, verify the exact branch/commit and changed files, judge every acceptance criterion, and return **ACCEPT / REVISE / STOP**. The Architect must not treat the agent's self-report as final acceptance.
-
-On **ACCEPT**, Phase 0 is closed and **all work pauses**. Do not issue or start the architectural implementation contracts or any Phase 1 work until the Owner expressly reopens the project. On **REVISE/STOP**, prepare a bounded replacement/correction work order and copy-paste prompt for Owner approval (never self-issue), then wait. The Owner remains the sole issuer of an executable work order.
+Do not schedule, draft or begin Phase 1 while paused. The project resumes only when the Owner issues a new work order together with a matching handoff.
