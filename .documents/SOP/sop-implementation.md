@@ -1,0 +1,162 @@
+# Foundation Solo — Implementation Agent Standard Operating Procedure
+
+**Document:** `.documents/SOP/sop-implementation.md`  
+**Edition:** 2026-11-04, revision 5 (Owner URL-case, graphic-cascade and bootstrap gates)  
+**Authority:** Owner-issued project procedure upon acceptance and installation. Until then, a review draft; **not** an issued work order.  
+**Scope:** Every implementation agent or code-modifying contributor to the independent Foundation Solo project.  
+**Companions:** [`sop-architect.md`](sop-architect.md), [`workorder-active.md`](../WIP/workorder-active.md), [`plan-next.md`](../WIP/plan-next.md), [`plan-outlook.md`](../WIP/plan-outlook.md).
+
+## 1. Agent mission and limits
+
+Implement one Owner-approved change at a time, within Solo's own repository, and provide verifiable evidence that it meets the exact accepted contract. Do not act as Chief Architect or Owner. Never choose new product architecture merely because a coding shortcut is possible.
+
+Foundation Solo serves **exactly one Entity** with the content hierarchy **Entity → Facet → Site → Page → localized representation**. One or more Facets/Sites/Pages are valid; there are no Spokes, Spoke Hubs or multi-Entity publishers. Only representations carry locales.
+
+An EFS **location property is explicitly authored and inherited/overridden within the same Entity's direct ancestry**; it is never inferred from an ID, route, domain, locale or language subtag. Routing never selects an address from location data. The Entity's **configured base URL** (valid HTTP(S) origin with optional path prefix) is a changeable public address, not identity. Public and **unlisted** representations remain distinct; an unlisted URL is directly reachable, not advertised, and not private. **Public Page-route paths are case-insensitive with lowercase canonical URLs; unlisted authored Page-route tokens are case-sensitive and never auto-lowercased.** Effective visibility controls the treatment. Refuse collisions between public case-folded aliases and unlisted exact routes. An Installation-wide generic public graphic library is available to all EFS nodes; authored graphic selections inherit by direct ancestry, override locally and support explicit suppression, with approved role-specific generic fallbacks beneath authored values.
+
+If code or a candidate design contradicts these invariants, **STOP**, report, and request Owner/Architect decision. Do not add an implicit compatibility Spoke or a magic geographic default.
+
+## 2. Required reading before activity
+
+1. Repository root `README.md` and `AGENTS.md`.
+2. `.documents/About/FOUNDATION-SOLO.md` and `.documents/Architecture/ARCHITECTURE.md`.
+3. Both SOPs in `.documents/SOP/`.
+4. Exactly three live WIP files: `.documents/WIP/workorder-active.md`, `plan-next.md` and `plan-outlook.md`.
+5. Only the directly relevant implementation files, existing tests, dependency manifests and accepted decisions described by the current authorized task.
+
+Do not depend on private Provelopment root documentation to understand Solo's authority. Historic Foundation projects are read-only references, not implementation targets or mandatory libraries. The Windows path `C:\Users\Sean\Documents\Provelopment\00.foundation-solo` describes the Owner's local directory; verify the actual workspace presented to this agent and do not assume a mount.
+
+## 3. Read-only onboarding is allowed; writing is not
+
+When initialized without a current issued task, the agent may:
+
+- Read these instructions, inspect current files and Git metadata, identify the current code/build/test state;
+- Compare the stated design with source as evidence and identify missing contracts or setup prerequisites;
+- Return a concise **read-only initialization report in the conversation**, listing actual workspace, repository/branch/HEAD if present, open questions and suggested first bounded task.
+
+The agent **may not** during read-only initialization create or edit files, initialize Git, install dependencies, alter configuration, create branches, commit/push, configure external services or claim a successful build. The Owner will issue a bounded order for any such action.
+
+## 4. The sole implementation authorization
+**Filename semantics:** `plan-next.md` and `plan-outlook.md` (and any `plan-*.md` reference) are non-executable. `workorder-active.md` is the single `workorder-*.md` current-execution slot. An active-looking filename does not suffice: check `OWNER-ISSUED`, the frozen exact scope, the unique `SOLO-WO-*` ID, and a matching Owner handoff. There must never be a per-task archive of `workorder-xxx.md` files in WIP or a parallel order store.
+
+
+**Only `.documents/WIP/workorder-active.md` can identify current execution authority**, and only when its **Approved Scope** is explicitly marked `OWNER-ISSUED`, names a unique `SOLO-WO-*` ID, includes the exact permitted operations, and the Owner has actually issued the matching handoff. A draft, `plan-next.md`, `plan-outlook.md`, README, GitHub issue, previous agent report or conversational idea **does not authorize writing**.
+
+On receiving a handoff:
+
+1. Confirm its Work Order ID matches `workorder-active.md` and approved revision/contents. If a claimed approval is unverifiable, STOP before edits.
+2. Confirm there is only **one** active work order and the agent is not being asked to take another concurrently.
+3. Read its objective, allowed paths, exclusions, exact acceptance gates, stop conditions and scope-specific permission ledger.
+4. If starting HEAD, target branch or allowed write paths are unspecified, verify whether the scope expressly authorizes a bounded initialization/creation operation. Otherwise STOP and request clarification through Owner/Architect.
+5. Treat the **Approved Scope** block as frozen. The implementation agent may fill the separate **Execution Evidence** section but must never broaden/rewrite approved scope, mark Owner approval or self-accept the result.
+
+Changes to the work order require an exact Owner-issued amendment or a replacement work order, not an agent's interpretation. A task that will need an additional design decision must return to the Architect before implementation.
+
+## 5. Repository and working-tree preflight
+**Strict workspace write confinement:** The agent may **read** the broader Provelopment workspace as authorized to inspect reference code and docs. The agent may **write only** within the resolved Solo repository root, and only to paths and operations expressly allowed in the live order. Never edit, stage, commit, install into, rename, delete, or otherwise mutate any parent/sibling repository. Tools and commands can create indirect writes: inspect install caches, generated files, symlink targets, command working directories and tool output destinations before running. If confinement cannot be confirmed, STOP and report. The Owner's sandbox/tool allowlist should enforce this restriction; the SOP is an additional check, not a substitute.
+
+
+Before every authorized edit, capture and report:
+
+- Actual filesystem root, `git rev-parse --show-toplevel` where applicable, remote URLs and repository ownership;
+- Branch/ref, `git rev-parse HEAD` where applicable, worktree status, untracked files and existing changes;
+- Approved starting revision and whether it matches the actual tree;
+- Existing code/tests and toolchain commands derived **from the repository**, not guessed from the older Foundation;
+- File ownership, generation boundaries, secrets, local-only files and any potential overwrite/collision.
+
+If repository initialization itself is the task, record that no prior HEAD exists and carry out only the expressly authorized bootstrap operations. Do not stage/delete/reset unrelated Owner files or force Git history. Do not use `git clean`, destructive checkout/reset, force-push or rewrite a shared branch without separate and specific Owner permission.
+
+**Do not write** to `provelopment-root`, `provelopment-foundation`, `provelopment-web-1` or other repositories during a Solo order. Reading reference material is allowed when useful and available.
+
+## 5A. Mandatory one-root workspace and temporary-file discipline
+
+**Owner prohibition — no worktrees or shadow checkouts:** Do not create, add, move, prune or use secondary/linked Git worktrees (`git worktree add` or equivalent), alternate working copies, nested repository clones, linked checkouts, branch-specific checkout directories or shadow source trees. The **only** editable checkout and repository working directory is the verified Solo root. Ordinary changes on a permitted branch in this one root are allowed only by work order; creating branches/commits also requires exact authorization. Do not use parent `.worktrees/` or a sibling directory as a substitute. If a task truly seems to need extra isolation, STOP and return for a redesigned single-root task.
+
+**Temporary writes:** Agent-initiated scratch files, intermediate exports, downloads, tool output, temporary test fixtures, and any tool/process-created caches that can be redirected must remain *within the Solo root* and, if ephemeral, should be directed to **`<SoloRoot>/.temp/`**. Do not create temporary folders in the parent workspace, OS `%TEMP%`, system temp, home directory, package-manager global cache, or an external workspace. Before running any installer, test runner, browser, Git helper or generator, establish whether it writes outside Solo; redirect safely inside Solo or STOP. Tools that cannot honor this confinement are not authorized for execution merely because they were preinstalled. Never use a symlink, junction, bind mount or redirect to escape Solo.
+
+**Cleanup is mandatory and immediate:** Record which ephemeral paths the task created. Delete **only those** agent-owned temporary artifacts promptly when no longer needed, preferably before ending each verification phase. At task closure, `/.temp/` must be empty or absent unless the exact Owner-issued scope explicitly authorizes a named, time-bounded exception. Inspect for leftover temporary directories elsewhere inside Solo and report any unavoidable leftovers. Never run `git clean` or broad recursive deletion to achieve this; do not remove unknown, pre-existing, Owner-owned or evidence-required files. If unexplained files remain, **STOP and report** rather than delete them. Permanent authored fixtures or committed build scripts are not classified as temporary simply because tests use them.
+
+**Preflight and evidence:** Include a before/after inventory of `/.temp/` and agent-created temporary folders, any redirected cache/output roots, proof that no secondary Git worktree or nested checkout was created, and confirmation that all writes remained within the order's allowed paths. Record cleanup exceptions as blockers. A passing test does not excuse temporary-file accumulation.
+
+## 6. Implementing a bounded task
+
+1. State the exact target behavior from accepted Solo requirements; separate **architecture/identity**, **functionality**, and **routing** in the change description.
+2. Inspect the nearest authoritative code once it exists. Prefer a single source of truth and a minimal coherent implementation with simple, typed contracts.
+3. Keep framework/provider dependencies out of pure content-identity, property and localization rules. Do not introduce another Entity scope, hidden publisher layer or provider-bound entity identifier.
+4. Implement only approved files and features, preserving approved behaviors. Avoid opportunistic refactoring, formatting changes, dependency upgrades or undocumented new features.
+5. For configurable base URL support, use authored origin and prefix; validate safe forms and route collisions. Never derive Entity identity or location from that address, and never require a source-code edit for an authorized host/prefix change.
+6. Resolve location along the explicit **Entity → Facet → Site → Page → representation** property ancestry only. For example: `Australia` at Entity, `Indonesia` at a Facet, `Bali` at one Site and `Jakarta` at another. Full locale tags `en-001`, `de-DE`, `zh-Hans-CN` and `id-ID` do not alter those values absent an explicit representation override. Do not mint language-only published keys. Suppression and privacy must follow the accepted property contract.
+7. Preserve public/unlisted URL case rules: public canonical paths lowercase and aliases resolve identically; unlisted Page-route tokens preserve exact spelling, including unpredictable mixed-case values; never apply a blanket lowercase operation before visibility selection; refuse ambiguous public/unlisted aliases. Preserve unlisted behavior: direct serving at exact authorized URL, `noindex` and exclusion from generated discovery including navigation, sitemap and `hreflang` where applicable. No unlisted page may be treated as access-controlled/private.
+8. Reject malformed input and ambiguous claims with diagnostics, not guesses. Never read from unrelated sibling content as fallback.
+9. Keep authored source, generated output and secret/server-only configuration distinct. Generated files may not silently overwrite authored material.
+10. When a new question is materially architectural, STOP and return an explicit proposal; do not fill the gap with incidental code.
+
+## 7. Tests and evidence requirements
+
+Use proportional, first-hand validation. At minimum, run the task's required focused tests, then the relevant project verification/build gates actually available. Capture command, result, revision and environment limits. Do not label an unrun or unavailable test "passed".
+
+When the task touches these subjects, verify positive and negative cases:
+
+| Area | Examples of required proof |
+| --- | --- |
+| One Entity / EFS | One valid Entity, multiple Facets/Sites/Pages; second Entity refused; duplicate IDs scoped correctly |
+| Property cascade | Nearest explicit value wins; direct ancestry only; suppression works; private fields not leaked |
+| Location independence | Changing location leaves routing, canonical and locale selection unchanged; changing base URL leaves location unchanged |
+| Base URL | Host plus optional path prefix works; valid config-only change works; public uppercase variants resolve to lowercase canonical Page, unlisted case-exact routes remain distinct, and mixed-visibility alias claims are refused |
+| Localization | Full `en-001`, `de-DE`, `zh-Hans-CN`, `id-ID` tags only; explicit URL > saved preference > browser preference > default; no inferred locations; authorized same-Page fallback or not-found |
+| Unlisted | Exact URL reachable; `noindex`; absent from navigation/sitemap/alternates; never treated as private |
+| Safe authored pages | JSON and Markdown validation, safe links, controlled assets and proper error paths |
+| Graphic library | Platform generic graphic sources reachable across all EFS levels; property cascade and explicit suppression correct; no accidental mixing of private authored and generic public graphic sources |
+| Accessibility and rendering | Browser/rendered behavior where affected, including mobile and keyboard affordances |
+| Repo/lifecycle | Only allowed paths changed, generated output handled, no unexpected deployments or dependency changes |
+
+A checked source file is not equivalent to a passing build. An agent-authored test is not independent acceptance. Real external delivery (e.g. a contact message) must not be claimed from a stub/offline result.
+
+## 8. Reporting — no report-file proliferation
+
+Place only **the current task's** compact evidence in the **Execution Evidence** area of `WIP/workorder-active.md`, if the order authorizes that WIP edit. Also report to the Owner in the conversation. Do **not** create `WIP/Reports/`, `.documents/Reports/`, one file per task, a second backlog or another status log.
+
+The current record includes:
+
+- Work Order ID and approval reference; actual repository/root, target branch, initial/final HEAD and commit/tree when available;
+- Changed files and concise description of behavior delivered;
+- Commands run, pass/fail/not-run outcomes, browser/runtime evidence and exact limitations;
+- Proof of relevant location/routing/unlisted/EFS invariants and safety refusals;
+- Scope deviation (should be none), **temporary-file cleanup and absence of secondary worktrees**, unresolved issues, stop/resume point and whether any PR/merge/deploy was **expressly** authorized and actually occurred.
+
+The Architect independently inspects the exact result and writes a separate **Architect Disposition** section in ACTIVE (or supplies that section for Owner-controlled installation). Agent may not mark `ACCEPT` for itself or represent a commit as deployed merely because CI passed.
+
+## 9. WIP updates, closure and pruning
+
+`WIP/` has exactly these three files, and no others:
+
+- `workorder-active.md` — one issued task or `None`, with temporary evidence and disposition;
+- `plan-next.md` — one candidate, non-authorizing;
+- `plan-outlook.md` — short-, medium-, long-term outcomes and **documentation outlook**.
+
+Do not append completed tasks to `workorder-active.md` or `plan-next.md`. Do not add historical chronological sections to `plan-outlook.md`. After accepted closure, **only when Owner-authorized**, reconcile durable architecture changes into About/Architecture, reset ACTIVE to its neutral template, promote or replace NEXT, and prune PLAN. Git history provides traceability of prior tasks. If the active order does not authorize WIP updates, supply proposed text to Owner instead of editing.
+
+Every task that changes a durable product contract must update its **existing authority** in the same accepted scope (or identify a separate follow-up gate). A code change that leaves current architecture docs contradicting actual accepted behavior is not fully closed.
+
+## 10. Permission, safety and stop rules
+**Public-source hygiene is governed, not assumed:** The Owner has expressly approved Apache-2.0 and the root `LICENSE` contains that license. License approval is not public-release authorization. Do not invent security response channels or maintainer contacts. Respect third-party provenance and check any code copied from the broader workspace against its original license and attribution requirements before bringing it into Solo.
+
+
+**Not authorized by default:** merge, release, deployment, DNS/domain/TLS changes, external provider/account operations, purchases or paid services, reading/using undisclosed secrets, mass migration, deleting Owner data, modifying other repositories, licensing changes, force-push or publication of private data. A successful test does not imply authorization for any of these actions.
+
+STOP immediately if: missing or contradictory approval; uncertain branch/root; unexpected dirty tree; target is another repository; additional Entity or hidden Spoke appears; site identity is inferred from URL; location is inferred from route or determines route; unlisted content is exposed in discovery; inherited private properties leak; a schema/route collision needs an architectural choice; validation cannot be evidenced; or scope changes materially.
+
+When blocked, preserve work and report exact observed state, completed subset, smallest decision needed and safe resumption point. Do not silently substitute an alternative task.
+
+## 11. Handoff completion checklist
+
+- [ ] Owner-issued ID and approved scope were confirmed before edits.
+- [ ] Correct Solo repository/branch/revision were verified.
+- [ ] Only authorized files and operations were used.
+- [ ] No secondary or linked Git worktrees, shadow checkouts or nested clones were created.
+- [ ] All agent-created temporary/cache/output paths were confined to Solo; `.temp/` and other agent-created temporary directories were cleaned or explicitly stopped/reported.
+- [ ] Identity, property, base URL, locale and unlisted constraints remain intact.
+- [ ] Relevant successful and refusal tests were run and evidenced, or named as unverified.
+- [ ] Execution Evidence is complete and exact; no self-approval is claimed.
+- [ ] No unauthorized merge, release, deploy, account or other-repository changes occurred.
+- [ ] Architect has the exact revision and findings needed for independent review.

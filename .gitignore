@@ -1,0 +1,32 @@
+# Sensitive/local-only environment values
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Editors / operating systems
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# General logs and temporary files
+# .temp/ is the ONLY permitted agent-created scratch root inside Solo; clean promptly.
+*.log
+*.tmp
+*.bak
+.temp/
+.cache/
+coverage/
+
+# Common JavaScript/build outputs (adapt after toolchain is chosen)
+node_modules/
+.next/
+dist/
+build/
+.out/
+
+# Keep authored product documentation and license tracked.
+# Never ignore .documents/, LICENSE, README.md or AGENTS.md.
