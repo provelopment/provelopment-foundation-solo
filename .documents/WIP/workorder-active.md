@@ -1,106 +1,114 @@
-# Foundation Solo — workorder-active (Current Work Order)
+# Foundation Solo — Current Work Order
 
-**Purpose:** The only live executable task slot and evidence/disposition surface.  
-**Work Order ID:** `SOLO-WO-001`  
-**Status:** **OWNER-ISSUED ONLY UPON OWNER INSTALLATION AND MATCHING HANDOFF.** This file is an issuance-ready scope, not a self-authorizing Architect instruction. It becomes effective **only when the Owner deliberately approves and installs these exact bytes** at the specified Solo path **and** sends an explicit matching handoff naming `SOLO-WO-001`. Without both acts the implementation agent must STOP.  
-**Drafted:** 2026-11-04  
-**Procedure:** [`sop-architect.md`](../SOP/sop-architect.md) · [`sop-implementation.md`](../SOP/sop-implementation.md)  
-**WIP invariant:** Exactly `workorder-active.md`, `plan-next.md`, `plan-outlook.md` in this directory. Do not create an additional work-order or report file in Solo.
+**Work Order ID:** `SOLO-WO-002`  
+**Edition:** `R01` — correction of namespace ownership after the original Gate 5 stop; **same work order ID, not a new task**  
+**Title:** Establish the public Solo GitHub repository and a self-sufficient Git workflow  
+**Approval state:** `OWNER-ISSUED` **only when** the Owner has reviewed this exact R01 document, installed it as `.documents/WIP/workorder-active.md` in the Solo working root **replacing the stopped R00 edition of `SOLO-WO-002`**, and sent an explicit matching `SOLO-WO-002 R01` re-issuance handoff. The previous R00 handoff does **not** authorize execution under R01. This downloadable candidate, by itself, is not authorization.  
+**Target repository:** Foundation Solo ONLY — `00.foundation-solo` at its independently verified local Git root  
+**Target branch:** `main`  
+**Expected starting HEAD:** `b924729c67a926ebd0f0dc19dcd4a56750a97bd5` (agent-reported `SOLO-WO-001` root commit; verify independently before changes)  
+**Authorized new GitHub repository:** **`provelopment/provelopment-foundation-solo` — PUBLIC; owned by the existing personal GitHub account `provelopment` (`owner.type: User`)**  
+**Status:** R01 correction candidate awaiting Owner review, replacement of the current WIP file, and explicit matching R01 handoff. Previous R00 execution stopped at preflight with no writes or GitHub repository creation; R01 does not expand the remaining task.
 
-## Current work
+## Correction record (R00 → R01)
 
-**Candidate objective:** Establish the existing `00.foundation-solo` folder as **one independent local Git repository** on branch `main` with **exactly one initial commit** containing the Owner-installed approved documentation/hygiene files. No application source, build system, remote, GitHub mutation, push, release or deployment. The Entity architecture is not being implemented under this order.
+The original `SOLO-WO-002` stopped correctly at Gate 5: GitHub confirmed that `provelopment` is a **personal User account**, not an organization. The Owner's intended public repository name is unchanged. **R01 expressly authorizes this account to own the repository.** No account conversion, new organization, transfer, alternate account, or new repository name is authorized. All other boundaries, seven documentation-edit targets, the single-commit rule, and evidence/STOP requirements remain intact.
 
-## Approved Scope — immutable upon Owner issuance
+The agent reported zero writes under R00. On resumption, verify this state anew: the one expected Owner-installed WIP document modification, baseline HEAD `b924729…`, no Solo remote, and no target GitHub repository. A changed state is a STOP, not permission to overwrite.
 
-| Field | Frozen scope |
+## 1. Objective and authority
+
+Turn the Owner-approved local 17-file, documentation-only Solo repository into **one public, independently managed GitHub repository** owned by the existing **`provelopment` personal GitHub account**. Preserve its original Git history, make `origin/main` track local `main`, configure a working private vulnerability-reporting channel, and make only the necessary **Solo-local documentation/SOP hygiene updates** so subsequent implementation orders can use Git and GitHub without asking the Owner to perform routine version-control commands.
+
+The Owner expressly authorizes this **public GitHub repository creation and initial push**. This is **source-repository publication**, **not** an application release, a deployed website, a DNS change, or authorization to publish confidential material. It does not authorize product implementation or decisions about frameworks, EFS schemas, or application architecture.
+
+**Role and authorization rule:** The Architect authors this order; the Owner reviews and installs it in the one WIP slot and issues the matching handoff; the Implementation Agent executes it autonomously within the frozen scope. The agent must not revise this Approved Scope. Agent reports do not constitute independent Architect acceptance.
+
+## 2. Approved Scope — frozen upon Owner issuance
+
+| Area | Authorized | Prohibited |
+| --- | --- | --- |
+| Local repository | Work inside the **existing** Solo Git repository on `main`; inspect and commit the bounded Solo documentation changes below | `git init` again; new clones; linked worktrees; nested repositories; alternate checkouts; operations in parent/sibling repositories |
+| GitHub repository | **Create exactly one** empty **public**, **personal-account-owned** repository with exact full name `provelopment/provelopment-foundation-solo` (`owner.login: provelopment`, `owner.type: User`), via authenticated GitHub CLI or installed MCP, then configure it and push Solo | Different owner/name/visibility; organization creation or account conversion; template/fork/import; remote auto-generated README/license/gitignore; deletion/transfer of repo; creating another repository |
+| Security setting | Enable **private vulnerability reporting** on the new repo and verify it is enabled **before pushing tracked content** | Inventing a confidential contact; publishing code before the private reporting channel is confirmed; broad security/configuration changes |
+| Git remote | Add a single `origin` pointing to the exact repository; push `main` and set upstream; verify local and remote commit/tree match | Force-push; history rewrite; replace/reset existing history; unknown remote; unrelated remote operations |
+| Permanent local files permitted | The Owner-installed `.documents/WIP/workorder-active.md`; bounded updates to `README.md`, `AGENTS.md`, `.documents/SOP/sop-architect.md`, `.documents/SOP/sop-implementation.md`, `.documents/WIP/plan-next.md`, `.documents/WIP/plan-outlook.md`, and `.github/SECURITY.md` **only as described below**; Git's own `.git/**` | Any other file modifications, new documentation directories, new WIP files, source/test/toolchain files, or license changes |
+| Commits | **One** new ordinary local commit on `main`, containing the Owner-installed current order plus the authorized documentation/SOP changes, then push it with the existing root commit. If a GitHub command itself requires an additional safe metadata commit, STOP and explain; don't improvise history | Amend/rebase/squash, rewriting root commit, tags, extra branches, PR creation/merge, or second commit under this order |
+| External resources | Existing GitHub CLI/MCP authentication; GitHub repo creation and the strictly specified repository settings | Provider deployment, DNS, billing, paid services, CI workflow creation, secrets rotation, account-wide settings, other repositories |
+| Evidence | Terminal/chat completion report with exact commands/results. No new log/report file | Invented passing checks, copied secret tokens, or modifications to frozen Approved Scope |
+
+**Absolute filesystem boundary:** The Implementation Agent may **read** the broader Provelopment workspace for evidence but may **write only inside the verified Solo directory**, and only to the authorized local paths. GitHub writes are limited to the new named GitHub repository and its settings. The agent must not write, commit, push, clean, reset or otherwise mutate `provelopment-root`, Foundation, Web 1, or other repositories.
+
+## 3. Mandatory preflight — STOP on any failed gate
+
+1. Read `README.md`, `AGENTS.md`, the two Solo SOPs, relevant architecture/product documents, and **all three** WIP files. Verify this **`SOLO-WO-002 R01`** order was installed by the Owner as the **only** `workorder-active.md`, the Owner's separate **matching R01 re-issuance** handoff has arrived, and WIP has exactly three filenames: `workorder-active.md`, `plan-next.md`, `plan-outlook.md`.
+2. Physically verify Solo is the Git top-level directory, not a symlink/junction and not the enclosing `provelopment-root`; branch is `main`; `HEAD` equals the expected full `b924729c67a926ebd0f0dc19dcd4a56750a97bd5`; `git rev-list --count HEAD` is 1; its tracked root inventory has the previously verified **17 paths**. No extra worktrees, clones, tags or branches. **No remote** exists at preflight.
+3. Because the Owner replaced `workorder-active.md`, the **only permitted worktree change** before agent edits is that **one tracked file**. If any other path is changed, staged, untracked (apart from an explicitly known, ignored Owner-controlled path) or unknown, STOP; never clean or overwrite it. Inspect the installed work order diff so unrelated edits cannot be slipped into the GitHub publication.
+4. Verify that the parent repository's **committed** `.gitignore` includes `/00.foundation-solo/`, that `git check-ignore` confirms protection, and that the parent tracks no Solo files. Do not require a clean parent worktree beyond the scoped ignore file; unrelated Owner data is not the Solo agent's responsibility.
+5. Verify GitHub authentication and permissions **without disclosing credentials**, and independently confirm that `provelopment/provelopment-foundation-solo` does **not** already exist. A 404 is not sufficient when authorization is uncertain; distinguish nonexistent from inaccessible. If the repo exists or the result is ambiguous, STOP before creation. Confirm the authenticated GitHub principal is **`provelopment`** and the namespace is the existing **personal account** (`type: User`); confirm permissions to create its **public** repository and administer that repository’s private vulnerability reporting. This personal namespace is **expressly permitted** by the Owner under R01, but no other namespace or account is permitted. Do not request conversion to an organization or prompt the Owner for ordinary shell commands.
+6. **Public-history and hygiene review:** inspect the full tracked tree and existing root commit, including WIP, for credentials, private data, confidential internal material, unlicensed artwork/code, and unapproved third-party content. The first root commit will also become public; fixing only the working tree cannot remove sensitive data from that history. Verify Apache-2.0 `LICENSE` is complete and Owner-approved; determine whether any third-party `NOTICE` attribution is actually required (do not invent a notice). If an actual privacy/licensing issue is found, STOP before public creation and report exact concerns without revealing secrets. Local path examples and ordinary commit-author metadata are part of the public history: flag them in the report, but do not rewrite the approved baseline.
+7. Confirm no uncontained tool side effects: no credential setup, global Git configuration writes, external scratch/cache creation, signing helper, installation, or hook can be required. Use existing authentication, GitHub CLI/MCP, and in-Solo `.temp/` for disposable scratch only if necessary. If a tool cannot comply with the Solo-only filesystem boundary, switch to an already-installed compatible tool or STOP. Never create another checkout/worktree.
+
+## 4. Authorized execution — single coherent task
+
+**Phase A — GitHub repository and security channel (authorized personal namespace)**
+
+1. **Using the existing `provelopment` personal account (not an organization),** create **one empty public** GitHub repository at exactly `https://github.com/provelopment/provelopment-foundation-solo` using an authenticated, noninteractive operation such as `gh repo create provelopment/provelopment-foundation-solo --public --description "An open-source, single-Entity EFS website foundation"`. **Do not** use `--add-readme`, `--license`, `--gitignore`, `--template`, `--clone`, `--source` or `--push` at this step. An empty public repository is intentional so its security setting can be configured before its documentation/history is pushed. If creation partially succeeds, do not create it again or delete it; inspect/report the exact state.
+2. **Immediately** enable GitHub private vulnerability reporting for this repository using the existing authenticated CLI or MCP. One documented CLI method is `gh api --method PUT repos/provelopment/provelopment-foundation-solo/private-vulnerability-reporting`. The endpoint is repository-scoped and works for a public repository owned by a personal account when the principal has admin rights; verify the actual result rather than assuming success. Independently query `gh api repos/provelopment/provelopment-foundation-solo/private-vulnerability-reporting` and require `enabled: true`. If unavailable, STOP **before any content push**; leave the remote as-is and report the precise blocker, without deleting it or claiming the security channel works. No public issue should be used for vulnerability details.
+
+**Phase B — Minimal documentation and SOP reconciliation (Solo root only)**
+
+Make limited updates **only** to the seven authorized tracked files below, preserving all product and architecture contracts:
+
+- `README.md`: replace now-false statements that the repository or Git baseline is not initialized, that the parent ignore rule remains uncommitted, or that the project has no GitHub remote. Clearly distinguish **public source repository** from **no implemented application, release or deployment**. Adjust only the repository/publication-readiness wording that this order actually resolves; retain any genuinely outstanding copyright/third-party notice and support-policy requirements.
+- `AGENTS.md`: update any stale repository status; name `origin` as the verified Solo public GitHub repository; clarify that the implementation agent performs authorized routine Git/GitHub commands itself, without asking the Owner to perform Git mechanics, while retaining the physical Solo-only write rule, no-worktrees rule and no unauthorized merge/deployment.
+- `.documents/SOP/sop-architect.md` and `.documents/SOP/sop-implementation.md`: add or reconcile a **single consistent Version Control Procedure** covering these mandatory rules: (a) the Owner approves **what may change** by one complete exact work order, not individual Git commands; (b) when a work order expressly authorizes commits/pushes, the implementation agent performs staging, commit, upstream tracking, push, remote verification and proportional checks autonomously; (c) future source tasks use one checkout, short-lived conventional branches/PRs only if authorized by the relevant order, and no linked worktrees; (d) no force-push, reset/cleanup of unknown data, history rewrite, extra clone, implicit deployment, or external repository write; (e) protected branch policies and merge permissions are respected; merges and releases remain separately Owner-authorized or **expressly delegated in the applicable work order**, not inferred from push permission; (f) exact branch/HEAD/tree/remote verification and a clean final working tree are evidence requirements; (g) completed work is pruned from the three live WIP files, with Git history retaining past orders; (h) an agent uses installed authenticated tooling and reports a real permissions failure, not a routine request for Owner to run Git commands. **Do not weaken** the two-role / Owner-approval separation or write confinement.
+- `.github/SECURITY.md`: only **after** Phase A independently confirms private vulnerability reporting is enabled, replace obsolete draft statements that it is unconfigured with accurate instructions directing reporters to GitHub's private vulnerability reporting. Clearly state that **there are no published application versions yet**; do not invent security response times, confidential email contacts or a release support commitment.
+- `.documents/WIP/plan-next.md`: replace the obsolete `SOLO-WO-001` bootstrap candidate with **one non-authorizing next candidate**: architectural acceptance of the first implementation contracts (Entity/Facet/Site/Page IDs, minimal authoring data structure, base URL/route grammar, and cascading property types), explicitly without selecting a framework or authorizing code. Do not add a second work order or planning archive.
+- `.documents/WIP/plan-outlook.md`: prune outdated pre-Git-bootstrap and parent-ignore blockers, update the short-term outlook to reflect the newly available GitHub baseline, retain concise short/medium/long horizons, and keep the documentation outlook. Do not add completed-task history.
+
+Keep `.documents/WIP/workorder-active.md` **exactly as installed by the Owner** throughout execution; it is the frozen issued order. Report execution evidence in the final agent response rather than rewriting its Approved Scope or adding report files. Do **not** modify `.documents/Architecture/ARCHITECTURE.md`, `.documents/About/FOUNDATION-SOLO.md`, `LICENSE`, other `.github/` files or any application/source code.
+
+**Phase C — Commit, publish and verify**
+
+1. Inspect the complete intended diff and require that changed paths are **only** the Owner-installed work-order replacement and the seven named files; no secrets or unrelated edits. Stage **only those exact paths**—never blind `git add -A` or broad staging. Create **one ordinary local commit** on `main` with a factual message such as `chore: publish Solo repository and align Git governance`. Preserve the `SOLO-WO-001` root commit intact.
+2. Add exactly one Git remote named `origin` pointing to `https://github.com/provelopment/provelopment-foundation-solo.git` (or the equivalent authenticated GitHub URL for this same repository). Verify that the remote has no unrelated commits; the new repo was created empty.
+3. Push local `main` to `origin/main` and set upstream. A GitHub CLI/MCP push equivalent is acceptable, but must publish the **same local commit/tree and its existing parent**, without merge, force or history replacement. Verify the GitHub repository's **actual** `nameWithOwner`, **PUBLIC** visibility, default branch `main`, `origin/main` SHA equal to local `HEAD`, readable `README.md`, `LICENSE`, and the three WIP files, plus the private vulnerability reporting state `enabled: true`. If the default branch is not `main` after a successful push, set **only this new repository's** default branch to `main`, then verify.
+4. Validate the actual Solo working tree is clean and has just its one main worktree, no added shadow directories, no extra remotes, no secret-bearing generated files, and no new WIP files. Remove only disposable files **created by this task** inside Solo `.temp/`, and remove an empty task-created `.temp/` directory; never delete pre-existing or Owner-owned material. Confirm the parent repo HEAD, ignore rule and scoped status are unchanged **during Solo execution**. End without beginning a new task.
+
+## 5. Acceptance evidence — actual outputs, not assertions
+
+The final agent response must include:
+
+1. Exact `SOLO-WO-002 R01` issuance and matching re-issuance handoff verification, with the previous R00 stop accounted for, and the preflight local baseline (`b924729…`, branch `main`, original tracked 17 files, Owner-installed work-order diff only), with any identified publication risks.
+2. Repository URL and actual GitHub **owner login/type (`provelopment`, `User`)**, visibility and default branch; how the agent verified its authority and that no existing repository was overwritten.
+3. Proof that private vulnerability reporting is enabled (API result or comparable authoritative response), and `.github/SECURITY.md` accurately describes it.
+4. Local final HEAD, parent chain (unchanged original root commit), new commit ID, `git remote -v`, `git branch -vv`, remote `main` commit ID, and direct remote file/tree verification. Confirm these agree.
+5. Exact file-diff summary; assertion backed by `git diff --name-only`/`git show --stat` that only allowed paths were modified. No code, dependency or license change.
+6. GitHub pull/push and permission results; exact documentation/SOP rules changed; status of next candidate and three WIP slots. No fabricated CI/build/test claims—there remains no runnable application under this order.
+7. Proof of clean local Solo status, single worktree, no extra branches/remotes, no surviving agent-created `.temp`/cache, no out-of-Solo file writes, and no change to parent/sibling repositories.
+8. Any deviation, failed setting, unexpected public data, permissions limitation or unfinished part reported plainly with a safe stop point. Never claim remote publication complete if it failed.
+
+**Architect review gate:** The Architect will independently inspect the new public GitHub repository, exact commits and documents, and return `ACCEPT`, `REVISE` or `STOP`. Agent self-report is not final acceptance. The next active order is written by the Architect, reviewed and **installed by the Owner as the replacement of this same `workorder-active.md` file**. Git history holds `SOLO-WO-001` and `SOLO-WO-002`; no additional WIP files are created.
+
+## 6. Stop conditions and recovery boundary
+
+STOP rather than guessing if: Owner has not installed/handed off this exact order; preflight baseline is unexpected; public-history scan finds confidential/unlicensed material; creation authority in the **approved personal `provelopment` namespace** or private vulnerability reporting permission is missing; remote name or repository conflicts; a GitHub action would create a repository under a different owner or account; a command requires an out-of-root file write; an unanticipated hook/signature/credential prompt would escape Solo; branch protection blocks the permitted push; a remote commit differs unexpectedly; the parent/sibling repo would be touched; or required temp cleanup would destroy unknown files.
+
+If a partial external state exists, **preserve and report it**: don't delete the public repo, force-push, rewrite local history, silently switch repositories, expand access or perform an unauthorized workaround. When possible, finish the remainder of this exact approved scope with the same authenticated tooling; if a material gate still fails, stop and give a concrete unblock proposal. Do not ask the Owner to run ordinary Git commands as a substitute for tools already available to the agent.
+
+## 7. Authorization ledger
+
+| Action | Approval under this exact order |
 | --- | --- |
-| Work Order ID | `SOLO-WO-001` |
-| Approval state | **`OWNER-ISSUED`**, conditional on the Owner's deliberate installation of this exact file and matching `SOLO-WO-001` handoff; an Architect's download/attachment is not approval |
-| Owner approval/handoff | An explicit Owner message naming `SOLO-WO-001` and this exact installed work order; no earlier planning message is sufficient |
-| Target working directory | `C:\Users\Sean\Documents\Provelopment\00.foundation-solo` — agent must independently verify actual path and filesystem boundary |
-| Target repository | **New, standalone, local `00.foundation-solo/.git/` only**; not the enclosing `provelopment-root` |
-| Branch | **`main`** — created by the authorized `git init -b main` |
-| Starting HEAD | **None**; the agent's read-only onboarding found no Solo `.git`; this exact work order expressly permits the no-HEAD bootstrap exception |
-| Permanent writes permitted | **Only** Git's internal `.git/**` created within the verified Solo root, including its index, object, ref and commit data; an initial commit may read/stage the 17 already Owner-installed files but must not modify their contents |
-| Source-file modifications permitted | **None** by the agent. The Owner installs/approves any replacement architecture/SOP/WIP files before execution. |
-| Commit authority | **Exactly one** local initial commit to `main`; proposed message: `chore: establish Foundation Solo documentation baseline` |
-| Remote / push / PR / merge | **Not authorized**. Do not add `origin`, create a remote repository, authenticate to GitHub, fetch, push, open PRs or merge. |
-| Dependencies / frameworks / build / deploy | **Not authorized**. No package manager, code generation, application source, test framework, provider account, release or deployment. |
-| Additional working trees / temporary files | **Forbidden**: no `git worktree add`, linked worktree, clone, shadow checkout, alternate Git directory, nested repo, `.temp/` creation, external temp/cache writes, or generated artifact. |
-| Other repositories | **Read-only** as needed for evidence. No write/commit/reset/staging anywhere in `provelopment-root` or sibling repositories. |
-| Execution evidence | **Report in the agent's chat/handoff only.** Do not edit `workorder-active.md`, `plan-next.md`, `plan-outlook.md` or other tracked files after the initial commit; preserve a clean one-commit baseline. The Owner/Architect will reconcile disposition/WIP separately after review. |
+| Create public `provelopment/provelopment-foundation-solo` in the existing personal `provelopment` account (`User`) | **YES**, after preflight |
+| Enable private vulnerability reporting in that repository | **YES** |
+| Make the seven specified Solo-document changes | **YES**, bounded by §4 |
+| Commit once on local `main`; add `origin`; push `main`; set default `main` | **YES** |
+| Create additional WIP files or revise Approved Scope | **NO** |
+| Modify any other local repository or GitHub repo | **NO** |
+| Worktree/clone, force-push, rebase, reset, amend, history rewrite | **NO** |
+| Code, dependencies, CI, branch protection, PR/merge, release, deploy, DNS | **NO** |
+| Account conversion, organization creation, paid services, account-wide settings, other secrets/security config | **NO** |
 
-### Mandatory preflight gates — fail means STOP before `git init`
-
-1. Confirm the Owner-issued `workorder-active.md` contains exactly this scope and `OWNER-ISSUED`; confirm the Owner's matching `SOLO-WO-001` handoff. Confirm exactly three WIP files.
-2. Confirm the current working directory physically resolves to the designated Solo root; inspect for junctions/symlinks/redirects that might make a Git write escape Solo. Confirm `00.foundation-solo/.git` **does not exist** and Git's current enclosing top level is the **parent** `C:/Users/Sean/Documents/Provelopment`, not a pre-existing nested Solo repository.
-3. From the parent root, verify `git check-ignore -v -- 00.foundation-solo/README.md` names the anchored `/00.foundation-solo/` rule. **Also verify `provelopment-root/.gitignore` is committed and clean** (the previous read-only report found that rule effective but uncommitted). No Solo agent is allowed to commit or edit that parent file; if still dirty or absent, STOP and report to Owner.
-4. From the parent root verify `git ls-files -- 00.foundation-solo` is empty. The parent may have unrelated untracked files; preserve them without staging, deleting, cleaning or altering them. Record the parent HEAD and parent `.gitignore` status before execution for after comparison.
-5. Verify the Solo folder contains **exactly the 17 expected approved files** in the roster below, and no other existing files, code, nested `.git`, `.temp` or unknown artifacts. This is a names-only expectation based on the updated documentation package; the actual installed bytes are the Owner-authorized baseline. Do not replace files with an older ZIP or re-run documentation generation.
-6. Verify Git is available, can initialize locally, and a usable commit author identity is already configured without modifying user/global/system configuration. Check for configured hooks, signing or helpers that could cause writes outside Solo; ensure none will run. If this cannot be ensured without an unapproved tool or identity change, STOP and report. No prompts for credentials or network actions.
-
-### Approved baseline — exact 17 pre-existing file paths
-
-Only the following existing paths may be explicitly staged, after re-enumerating and verifying them:
-
-```text
-.editorconfig
-.gitattributes
-.gitignore
-.github/CODE_OF_CONDUCT.md
-.github/CONTRIBUTING.md
-.github/PULL_REQUEST_TEMPLATE.md
-.github/SECURITY.md
-AGENTS.md
-LICENSE
-README.md
-.documents/About/FOUNDATION-SOLO.md
-.documents/Architecture/ARCHITECTURE.md
-.documents/SOP/sop-architect.md
-.documents/SOP/sop-implementation.md
-.documents/WIP/plan-next.md
-.documents/WIP/plan-outlook.md
-.documents/WIP/workorder-active.md
-```
-
-**Crucial:** Stage explicitly by this exact path list from **inside Solo**. Do not use `git add -A`, `git add .`, a wildcard, or an ambiguous parent directory; never stage anything through the parent repository. If any file is missing, additional files appear, or the Owner-installed work order differs from the handoff, STOP rather than silently substituting contents.
-
-### Authorized execution — only after all gates pass
-
-1. From the verified Solo root, run `git init -b main`. Verify `git rev-parse --show-toplevel` resolves **inside Solo**, not to the enclosing root.
-2. Inspect local Git state and effective hook/signing configuration; do not modify user/global Git config or invoke external helpers. Disable any hooks/signing for this single documentation-only commit through invocation-local `git -c` options if needed, provided those options do not write outside Solo. If a safe local-only commit cannot be made, STOP.
-3. Stage only the 17 listed files by exact path; verify the staged file list and their count (17); do **not** stage ignored/unknown material. The exact content must be the Owner-installed approved files, including the issued work order and the `plan-next.md` issuance state.
-4. Create **one** local root commit on `main`, without hooks/network activity and without a remote. Do not amend, rebase, branch, tag, push, change source documents or produce a second commit.
-5. Run read-only after-checks. Return evidence in chat to Owner; the implementation agent must **not** write back to WIP or create a report file.
-
-### Acceptance evidence — provide commands and actual outputs
-
-- Solo root and independent repository: `Get-Location`; `git rev-parse --show-toplevel`; `Test-Path .git`; `git branch --show-current`.
-- Initial history: `git rev-list --count HEAD` returns `1`; `git log -1 --format='%H%n%s%n%an <%ae>'` records exact commit, message and author; `git status --porcelain=v1` is empty.
-- Tracked inventory: `git ls-files` matches the roster above **exactly** (17 paths); report paths and count.
-- Isolation: `git remote -v` empty; `git worktree list --porcelain` reports **only the main Solo worktree**; no nested clones, linked worktrees or shadow directories.
-- Safety: parent `git check-ignore -v` still returns `/00.foundation-solo/`; parent HEAD and `.gitignore` status are unchanged **during Solo execution**; no parent/sibling writes.
-- Hygiene: no `.temp/`, `.cache/`, external temporary files, tool-generated files or new build directories; no source files, dependencies or unapproved manifests.
-- WIP: the same three WIP filenames; no extra task artifacts.
-- Proportional verification: **there is no application or test suite to run**. This task proves repository isolation and clean baseline only; do not claim application tests passed.
-
-### Stop conditions
-
-Stop **without broad cleanup, reset, reflog rewriting or alternate checkout** on any of these: approval/handoff mismatch; parent guard uncommitted/ineffective; existing Solo `.git`; unexpected Solo files; parent-tracked Solo content; uncertain physical root or symlink/junction; user/global Git writes required; enabled external hooks/signing/network; commit author identity absent; conflict or collision; any path outside Solo; extra linked worktree; inability to produce one clean commit. If an operation has already partially created Solo `.git`, preserve it, report the exact state and seek specific Owner direction—do **not** auto-delete/reinitialize it.
-
-## Execution Evidence — to be reported in chat, not edited by agent under this work order
-
-- **Agent:** Awaiting execution after Owner installation and handoff.
-- **Actual Solo/parent preflight and parent guard state:** Pending.
-- **Initial HEAD:** None, if independently confirmed.
-- **Final HEAD / one-commit evidence:** Pending.
-- **17-file inventory and clean-status evidence:** Pending.
-- **No remote, no secondary worktree, no temporary artifacts:** Pending.
-- **Deviations/stops:** Pending.
-
-## Architect Disposition — independent review required
-
-- **Disposition:** `NOT REVIEWED`.
-- **Exact revision and evidence:** Awaiting the agent's first-hand report and, if needed, Owner-supplied local verification. A later GitHub push is outside this scope.
-- **Owner closure / WIP reset:** Not authorized by this bootstrap order. The Owner reviews and separately directs WIP reconciliation after the Architect's disposition. No task-history files may be added.
+**Owner issuance record:** The Owner’s deliberate installation of this exact R01 file and a **new, explicit `SOLO-WO-002 R01` handoff** are the authority. The earlier R00 handoff does not carry over. An Architect-authored candidate, an earlier chat instruction or a GitHub issue/plan alone cannot issue it.

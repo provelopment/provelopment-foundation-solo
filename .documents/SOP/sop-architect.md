@@ -102,7 +102,29 @@ The implementation agent is **strictly confined to a single editable Solo root**
 
 An Architect work order must specify: (a) permissible permanent output paths; (b) whether/how temporary output under `.temp/` is allowed; (c) safe tool/cache controls; (d) cleanup and final proof. A bootstrap work order that only permits Git initialization must not be construed as authorizing `.temp/`, installs or other file writes. An agent must not delete unknown or Owner-controlled files to meet a cleanliness target: STOP and report instead. Independently check the absence of linked worktrees, escaped writes and leftover agent-created temp before accepting a task.
 
-The Owner's parent repository is **outside** the Solo agent's write boundary. Current agent-reported baseline: Solo has no independent Git repository; the parent **does** ignore `/00.foundation-solo/` locally, but the parent's `.gitignore` update was reported uncommitted. The guard must be committed by the Owner or a separately authorized parent-repository operator; the Solo agent must not do it. Once the guard is verified, one bounded Solo-only initial Git bootstrap can be proposed for Owner issuance. The initial commit must contain the exact then-installed Solo baseline, **not** an old, unverified 17-file byte snapshot.
+The Owner's parent repository is **outside** the Solo agent's write boundary. Verified baseline: Solo **is** an independent Git repository on `main` whose committed root is the `SOLO-WO-001` baseline; the parent's `/00.foundation-solo/` ignore rule is **committed** and confirmed by `git check-ignore`, and the parent tracks no Solo files. `origin` is the verified public GitHub repository, so ordinary authorized pushes are expected to be performed by the implementation agent under §6B. The parent guard remains Owner/parent-operator territory and the Solo agent must not modify it. Keep the existing root commit intact rather than re-baselining published history.
+
+## 6B. Version Control Procedure — Git and GitHub
+
+**This section is the single authoritative version-control procedure for Solo.** It applies to both roles and to every future order; no WIP file, task description or other document may restate, weaken or contradict it. It supplements — never replaces — the Solo-only write confinement and the Owner-approval separation.
+
+**(a) The Owner approves what may change, not individual commands.** The Owner authorizes one complete, exact work order. Individual `git` or `gh` invocations are not separately approved items, and the Owner is not expected to perform routine Git mechanics.
+
+**(b) Authorized mechanics belong to the implementation agent.** When a work order expressly authorizes committing and/or pushing, the implementation agent autonomously performs staging of only the named paths, the commit, remote configuration, upstream tracking, the push and the remote/settings verification, then reports exact results. It must not ask the Owner to run ordinary Git commands and must not treat an unverified permission assumption as a reason to defer.
+
+**(c) One checkout, deliberately short-lived branches.** Work occurs in the single verified Solo checkout. Short-lived conventional branches and pull requests are used only when the applicable order authorizes them. Linked or secondary worktrees, extra clones, nested repositories and shadow checkouts remain prohibited.
+
+**(d) Prohibited operations.** No force-push; no `reset`, `clean` or `checkout` that discards unknown or Owner-owned data; no history rewrite or amendment of published commits; no additional clone; no implicit deployment; no write to any other repository.
+
+**(e) Respect policy; keep merge separate.** Protected-branch policies and merge permissions are respected as found. Merge, release and deployment remain separately Owner-authorized, or expressly delegated in the applicable work order; push capability alone never implies them.
+
+**(f) Evidence is mandatory.** For a task to be reportable as complete, the exact branch, HEAD, tree and remote URL must be verified as agreeing with the remote-side commit, and the final working tree must be clean.
+
+**(g) Prune on closure.** Completed work is pruned from the three live WIP files; Git history retains past orders. No report archive or additional WIP file is created.
+
+**(h) Report real failures.** The agent uses installed authenticated tooling and reports an actual authentication or permissions failure with concrete evidence. It does not substitute a routine Owner-run Git command for work it was authorized to perform.
+
+**Separation preserved:** none of the above may be read to weaken the Owner's approval authority, the Architect/implementation role separation, or the write confinement described in §6A and §9.
 
 ## 7. Independent review and evidence
 

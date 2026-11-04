@@ -1,17 +1,16 @@
 # Security Policy — Foundation Solo
 
-> **Initial policy draft.** Before the repository is published, the Owner must approve supported versions and configure a **working private vulnerability-reporting channel**. Do not assume GitHub private vulnerability reporting is enabled unless verified.
+> **Status.** Foundation Solo is a **public source repository** with **no published application versions yet**. GitHub **private vulnerability reporting is enabled** for this repository and has been independently verified. No released, supported or deployed version exists to patch.
 
 ## Responsible reporting
 
-- Do **not** publish exploit details, exposed credentials, or nonpublic data in a public issue or pull request.
-- Once verified and enabled, use the repository's **private vulnerability reporting** feature (GitHub: Security → Advisories → Report a vulnerability). The Owner may designate an alternative confidential contact and update this file before publication.
-- If no verified confidential channel is available, retain sensitive details privately and request an appropriate private contact mechanism from the maintainer through a non-sensitive channel. Do not post the sensitive report publicly just to ask for one.
-- Include affected revision/version, reproduction steps, impact, and the minimum necessary evidence. Do not access third-party systems without authorization.
+- **Preferred channel:** this repository's **private vulnerability reporting** — GitHub **Security** → **Advisories** → **Report a vulnerability** (direct link: <https://github.com/provelopment/provelopment-foundation-solo/security/advisories/new>). Reports remain private between the reporter and the maintainer.
+- Do **not** publish exploit details, exposed credentials or nonpublic data in a public issue, pull request or discussion. No public issue is an appropriate place for vulnerability details.
+- Include the affected revision or commit, reproduction steps, impact, and the minimum necessary evidence. Do not access third-party systems without authorization.
 
-## Support and response
+## Supported versions
 
-Supported versions, triage owner, response expectations, advisory/release practice and disclosure coordination are **not yet adopted** and must be established prior to a public release. This file makes no promise of response times or a live contact channel that has not been configured.
+**No application version is supported yet**, because none has been released. Triage ownership, response expectations, advisory/release practice and disclosure coordination are **not yet adopted** and must be established before any release. This file deliberately states no response times, no confidential email contact and no release support commitment.
 
 ## Scope
 

@@ -2,7 +2,7 @@
 
 **Purpose:** A compact, pruned **short-, medium- and long-term outlook**, including what documentation must be maintained. This file is directional; it is **not** an implementation order or a second queue.  
 **Status:** Initial planning outlook — proposals, not Owner-approved technical contracts.  
-**Last reviewed:** 2026-11-04 (Owner URL-case/graphic decisions; parent guard locally effective but uncommitted)  
+**Last reviewed:** 2026-11-04 (Owner URL-case/graphic decisions; independent Git baseline and public GitHub repository established)  
 **Execution authority:** Only a matched Owner-issued [`workorder-active.md`](workorder-active.md) order. Immediate candidate: [`plan-next.md`](plan-next.md).
 **Filename contract:** all `plan-*.md` material is non-executable. A plan cannot be promoted into authorization by renaming it; the Architect must produce an exact approved `workorder-active.md` scope and the Owner must issue a matching handoff.
 
@@ -19,9 +19,9 @@
 
 **Intended outcomes**
 
-1. Establish the Solo independent Git baseline **after** the Owner/authorized operator has committed the already-added `/00.foundation-solo/` rule in the parent `.gitignore`; confirm agent read-only onboarding is complete and its **write confinement to Solo** and no-worktree/no-temp-junk controls are enforced.
+1. The independent Solo Git baseline and its **public GitHub repository** now exist (`origin`, default branch `main`, GitHub private vulnerability reporting enabled). Keep the single-checkout, Solo-only write confinement and no-worktree/no-temp-junk controls enforced on every subsequent task.
 2. Resolve the smallest blocking technical choices for the first cohesive implementation: project bootstrap/toolchain and test discipline; one-Entity identity and EFS hierarchy; authored base URL contract; cascading property semantics including location; and unlisted representation semantics.
-3. Apache-2.0 is Owner-approved. Verify copyright/third-party notices and establish a working confidential security reporting channel **before** public release; maintain minimal repository hygiene.
+3. Apache-2.0 is Owner-approved and the repository is published publicly with GitHub private vulnerability reporting enabled. Settle copyright/attribution and any required third-party notices, and adopt a supported-version/support policy, **before** any release; maintain minimal repository hygiene.
 4. Issue **one** bounded Owner-approved work order for the first implementation checkpoint; prove its output before proceeding.
 
 **Dependencies / gate:** Owner accepts technical contracts and exact work-order scope; agent's observed workspace state is understood; no unrelated repository is changed.
@@ -30,7 +30,7 @@
 
 - **Review/update:** `About/FOUNDATION-SOLO.md` and `Architecture/ARCHITECTURE.md` with newly accepted rules only; avoid making examples into schema decisions.
 - **Maintain:** `SOP/sop-architect.md`, `SOP/sop-implementation.md`, `AGENTS.md`, and this WIP triad for unambiguous authorization and handoff.
-- **Review:** Owner-approved Apache-2.0 `LICENSE`, `.github/` community-health files, `.gitignore`, `.gitattributes`, `.editorconfig`; ensure an actual private vulnerability intake before publication. Check the Owner/parent-operator ignore guard and inspect `.temp/` cleanup evidence in each implementation acceptance.
+- **Review:** Owner-approved Apache-2.0 `LICENSE`, `.github/` community-health files, `.gitignore`, `.gitattributes`, `.editorconfig`; the private vulnerability intake is enabled, so keep `SECURITY.md` accurate as the support policy develops. Inspect `.temp/` cleanup and no-worktree evidence in each implementation acceptance.
 - **Consolidate/remove:** obsolete or contradictory drafts once accepted facts have an authoritative home. Do not create a second work-order file.
 
 ## Medium-term outlook — prove the end-to-end EFS experience

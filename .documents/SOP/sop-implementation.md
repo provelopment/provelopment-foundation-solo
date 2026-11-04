@@ -78,6 +78,21 @@ If repository initialization itself is the task, record that no prior HEAD exist
 
 **Preflight and evidence:** Include a before/after inventory of `/.temp/` and agent-created temporary folders, any redirected cache/output roots, proof that no secondary Git worktree or nested checkout was created, and confirmation that all writes remained within the order's allowed paths. Record cleanup exceptions as blockers. A passing test does not excuse temporary-file accumulation.
 
+## 5B. Version Control Procedure — Git and GitHub
+
+**Execute the procedure defined in `sop-architect.md` §6B; it is the single authoritative version-control procedure and the rules below must be applied exactly, not restated elsewhere.** In implementation terms:
+
+1. **Authorize the change, not the commands.** The Owner issues one exact work order. You do not request approval for individual `git`/`gh` commands, and you do not ask the Owner to run them.
+2. **Perform the authorized mechanics yourself.** When the order expressly authorizes version-control work, stage only the named paths (never a blind `git add -A`), commit, configure the remote, set upstream tracking, push and verify the remote and repository settings, then report the exact results.
+3. **Stay on one checkout.** Use the single verified Solo checkout. Create branches or pull requests only if the order authorizes them; linked worktrees, extra clones and shadow checkouts remain prohibited.
+4. **Never perform** a force-push, a `reset`/`clean`/`checkout` that discards unknown or Owner-owned data, a history rewrite or amendment of published commits, an implicit deployment, or a write to another repository.
+5. **Respect policy and never infer merge.** Honour protected-branch and merge permissions as found. Merge, release and deployment require separate Owner authorization or express delegation in the applicable order; a successful push never implies them.
+6. **Prove the result.** Verify branch, HEAD, tree and remote URL against the remote-side commit and leave a clean working tree before reporting completion.
+7. **Report real failures.** If authentication or permission genuinely fails, report the exact response. Do not convert an unverified assumption into a routine request for the Owner to run Git.
+8. **Prune when the Owner closes the task.** Completed work is pruned from the three live WIP files; Git history retains past orders, and no report or extra WIP file is created.
+
+These rules supplement the Solo-only write confinement in §5/§5A and the authorization gate in §4; they never relax either.
+
 ## 6. Implementing a bounded task
 
 1. State the exact target behavior from accepted Solo requirements; separate **architecture/identity**, **functionality**, and **routing** in the change description.

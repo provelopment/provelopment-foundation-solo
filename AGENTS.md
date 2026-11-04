@@ -6,7 +6,7 @@
 
 ## 1. First: verify where you are
 
-The intended Owner-local root is `C:\Users\Sean\Documents\Provelopment\00.foundation-solo`. Verify your **actual accessible workspace**, repository boundary, branch, HEAD and worktree status if Git exists. Do not assume the Windows path is available on your runtime. Do not modify a parent workspace or sibling repository.
+The intended Owner-local root is `C:\Users\Sean\Documents\Provelopment\00.foundation-solo`. Verify your **actual accessible workspace**, repository boundary, branch, HEAD and worktree status. Solo **is** an independent Git repository on branch `main` with a single worktree and exactly one remote, `origin`, pointing at the public GitHub repository `provelopment/provelopment-foundation-solo`; confirm that URL and authorize no other remote. Do not assume the Windows path is available on your runtime. Do not modify a parent workspace or sibling repository.
 
 Foundation Solo is an independent product with **exactly one Entity** and the hierarchy **Entity → Facet → Site → Page → localized representation**. Each Entity/Facet/Site contains one or more children at the next required level; only localized representations have locales. One default Facet/Site initially; additional ones when authored. **No Spoke Hub, Spoke, hidden implicit Spoke, multi-Entity publication or tenant management.**
 
@@ -43,19 +43,19 @@ If any instruction conflicts with these accepted requirements, STOP and escalate
 ## 4. Role and authorization gates
 **Filename distinction and live slots:** `plan-*.md` = planning/reference, **not an instruction to execute**; `workorder-*.md` = candidate execution document, executable only when formally Owner-issued with a matching ID and handoff. The entire WIP contains exactly `workorder-active.md`, `plan-next.md` and `plan-outlook.md`; no additional plan/workorder files, task history, or report archive may accumulate.
 
-**Implementation-agent confinement:** The agent may read relevant files elsewhere in Provelopment but has **no write permission outside `00.foundation-solo/`**. The parent repository's `/00.foundation-solo/` ignore rule was verified locally by the agent; it was **uncommitted**, so the Owner/parent operator must durably commit and verify it before bootstrap. Only the Owner or a separately authorized parent operator may edit/commit the parent `.gitignore`. This is outside Solo agent scope. Even within Solo it may edit only allowed work-order paths. No external writes through generated output, installers, symlinks or Git. Report any permission-boundary uncertainty before proceeding.
+**Implementation-agent confinement:** The agent may read relevant files elsewhere in Provelopment but has **no write permission outside `00.foundation-solo/`**. The parent repository's `/00.foundation-solo/` ignore rule is **committed** and independently verified with `git check-ignore`; changing it remains outside Solo agent scope, and only the Owner or a separately authorized parent operator may edit/commit the parent `.gitignore`. Even within Solo it may edit only allowed work-order paths. No external writes through generated output, installers, symlinks or Git. Report any permission-boundary uncertainty before proceeding.
 
 
 **Owner:** final authority. Approves exact architecture, source scope, work orders, merge, release, deployment and provider actions separately.
 
 **Chief Architect:** designs, sequences and reviews; drafts one bounded work order and independently verifies exact implementation evidence; does not implement the same task, issue its own approval or release/deploy unilaterally. Follow [sop-architect.md](.documents/SOP/sop-architect.md).
 
-**Implementation Agent:** can perform **read-only onboarding** without an issued order. May create, modify, install, commit, push or perform external actions **only** within an exact matching Owner-issued work order in [`WIP/workorder-active.md`](.documents/WIP/workorder-active.md) and a matching Owner handoff. Cannot self-approve scope, architecture or completion. Follow [sop-implementation.md](.documents/SOP/sop-implementation.md).
+**Implementation Agent:** can perform **read-only onboarding** without an issued order. May create, modify, install, commit, push or perform external actions **only** within an exact matching Owner-issued work order in [`WIP/workorder-active.md`](.documents/WIP/workorder-active.md) and a matching Owner handoff. When an order expressly authorizes version-control work, the agent performs the routine Git/GitHub mechanics itself — staging only the named paths, committing, configuring the remote, setting upstream tracking, pushing and verifying the remote and repository settings — rather than asking the Owner to run ordinary Git commands. Push permission never implies authorization to merge, release or deploy. Cannot self-approve scope, architecture or completion. Follow [sop-implementation.md](.documents/SOP/sop-implementation.md).
 
 **Reviewer:** reports evidence, discrepancies and recommendations; a comment is not authorization.
 
 ## 5. Exactly three WIP files — permanent operational rule
-**Owner-approved license:** Root `LICENSE` is Apache-2.0 as expressly selected by the Owner. Verify copyright/attribution, third-party notices and a working private security intake before public publication. Repository-standard `.github/` and root tooling metadata are narrow exceptions to `.documents/`, not alternate governance.
+**Owner-approved license:** Root `LICENSE` is Apache-2.0 as expressly selected by the Owner. Copyright/attribution and any required third-party `NOTICE` must still be settled before a release; GitHub **private vulnerability reporting is enabled** and verified for the public repository. Repository-standard `.github/` and root tooling metadata are narrow exceptions to `.documents/`, not alternate governance.
 
 
 `.documents/WIP/` contains **only**:
@@ -76,4 +76,4 @@ Never create `WIP/Reports`, `WIP/Work-Orders`, `WIP/Archive`, per-task reports o
 
 ## 7. Current state
 
-This package supplies planning and operating documents, not verified implementation. The implementation agent has completed an initial **read-only** preflight and reported that Solo has no independent Git repo and the parent repository now ignores Solo locally, but its ignore-rule edit was reported uncommitted. Read [`plan-next.md`](.documents/WIP/plan-next.md) for the sole proposed next activity. [`workorder-active.md`](.documents/WIP/workorder-active.md) currently states `NONE`; do not make a source change until the Owner issues a specific task.
+This package supplies planning and operating documents plus a published source repository — **not** verified implementation. Solo is an independent Git repository on `main`; `origin` is the public GitHub repository `provelopment/provelopment-foundation-solo`, owned by the personal `provelopment` account, with default branch `main` and GitHub private vulnerability reporting enabled. The parent `/00.foundation-solo/` ignore guard is committed and verified, so the enclosing workspace tracks no Solo files. There is **no application code, toolchain, dependency manifest, test suite, release or deployment**; do not describe any of those as existing. Read [`plan-next.md`](.documents/WIP/plan-next.md) for the sole candidate. [`workorder-active.md`](.documents/WIP/workorder-active.md) holds the current issued order; do not make a source change until the Owner issues a specific task.
