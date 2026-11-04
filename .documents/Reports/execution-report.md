@@ -1,88 +1,77 @@
 # Foundation Solo — Execution Report
 
-**Work order:** `NO ACTIVE ORDER` — proposed `SOLO-WO-005 R01` was **not** Owner-issued
+**Work order:** `SOLO-WO-005` · edition `R01` · `OWNER-ISSUED`
+**Owner handoff:** `SOLO-WO-005 R01 — Implementation Agent Handoff` (separate message, received before any write)
 **Session date:** 2026-11-04
-**Run status:** **READ-ONLY** — stopped at the authorization gate; no documentation migration was performed
+**Run status:** `COMPLETE` — documentation migration delivered for independent review
 **Repository:** [provelopment/provelopment-foundation-solo](https://github.com/provelopment/provelopment-foundation-solo) · branch `main`
 **Working root:** `C:\Users\Sean\Documents\Provelopment\00.foundation-solo` — matched `git rev-parse --show-toplevel`
-**Starting HEAD:** `6ba853553a93ed01fabe7cf3d65a7bd31ff60aa0`
-**Final report commit:** reported in chat after publication — never embedded in this file
+**Starting revision:** `87b176a7a7cf3aa22e85d4709270e935721d0a6e` (local `HEAD` = `origin/main` = GitHub API)
+**Content commit:** `6b51484edecb7382b8de302591a523012556e159`
+**Report commit:** given in chat after publication, never embedded here
 
-## Why this run stopped
+## What changed
 
-A `SOLO-WO-005 R01` text was supplied for consideration. It declares itself **`PROPOSED — NOT OWNER-ISSUED`**, and `.documents/WIP/workorder-active.md` contains `Work Order ID: NONE` with status `NONE — no Owner-issued work order currently active`. No matching Owner handoff for `SOLO-WO-005` accompanied any installed order.
+One coherent governance migration: the four-file WIP lifecycle is installed, ROADMAP → NEXT → ACTIVE is the only progression, OUTLOOK is reserved for optional ideas, and the permanent planning, reference-only and A1 acceptance rules now live in the existing SOPs instead of in execution files.
 
-Under `AGENTS.md` §2A, implementation changes — source, documentation, WIP authority or any Git operation beyond this report — require an `OWNER-ISSUED` order installed in `workorder-active.md` **and** a matching Owner handoff. Neither exists, so the proposed four-file WIP migration, the roadmap installation and all eight governance amendments were **not** performed. Declining to act was the correct outcome, not a failure to make progress.
-
-Only the standing report-only exception was used: this one report was overwritten and published.
-
-## Read-only preflight — all safety gates passed
-
-| Gate | Evidence |
+| Path | Change |
 | --- | --- |
-| Solo root | `C:/Users/Sean/Documents/Provelopment/00.foundation-solo`, identical to the Git top level; not parent, symlink or junction |
-| Branch / revision | `main`; local `HEAD`, `origin/main` and the GitHub API ref all equaled `6ba8535…` (the pre-issuance revision named in the proposal) |
-| Checkout and remote | one worktree, one local branch, exactly one remote `origin` = the public Solo repository |
-| WIP shape on `main` | three tracked files: `workorder-active.md`, `plan-next.md`, `plan-outlook.md` |
-| Execution report | exactly one, `.documents/Reports/execution-report.md` |
-| Authority slot | `NONE` — no Owner-issued work order |
-| Temporary material | no `.temp/` present |
-| Authorization | **FAILED** — proposal only; no issuance, no handoff |
+| `README.md` | Reading order, WIP map, strict-rule count and next-action text reconciled from three slots to four; ROADMAP and OUTLOOK rows distinguished |
+| `AGENTS.md` | Edition revision 2; reading order, §2A preflight, §4 filename slots, §5 retitled **Exactly four WIP files** with four role definitions, ROADMAP → NEXT → ACTIVE rule, §7 current-state wording |
+| `.documents/About/FOUNDATION-SOLO.md` | Only the two WIP descriptions and counts corrected; product intent untouched |
+| `.documents/Architecture/ARCHITECTURE.md` | §8 naming invariant and file counts corrected; two genuinely missing durable assurance rows added to the existing single §6 matrix |
+| `.documents/SOP/sop-architect.md` | Edition revision 6; §4 reference-only engineering rule; new §7B A1 standard; §8 replaced by the four-slot lifecycle; §3 map, §6 filename rule, §6B(g), §7A, §10 stop conditions reconciled |
+| `.documents/SOP/sop-implementation.md` | Edition revision 6; §2 reading list, §4 filename semantics, §5B(8), §5C count, §6 source-reuse cross-reference, §7 A1 reference, §9 replaced by four-file execution discipline, §10 stop rules, §11 checklist |
+| `.documents/WIP/plan-roadmap.md` | **Added** — the Owner-supplied stage-only roadmap, byte-identical |
+| `.documents/WIP/plan-next.md` | Reduced to one bounded candidate, `R00.A — Identity and publishing declarations` |
+| `.documents/WIP/plan-outlook.md` | Reduced to a title only: no surviving Owner-supported optional idea is distinct from committed roadmap work |
+| `.documents/WIP/workorder-active.md` | The exact Owner-installed order published unchanged and left issued |
 
-## Working-tree state (Owner-supplied material, left untouched)
+## Input verification
 
-`git status --porcelain` was **not** clean, and the two entries are untracked Owner-supplied sources placed inside the repository rather than in an external folder:
+| Source | Required | Measured | Result |
+| --- | --- | --- | --- |
+| `.documents/WIP/plan-roadmap.md` | 17,982 B · `20378A48…F4A2E` | 17,982 B · `20378A4867E6E6816D276E6C9B8D9364230E30859C944FBD58B55F9C57FD4A2E` · regular file | PASS |
+| `.documents/SOP/planning-governance-amendments.md` | 27,684 B · `AD41144E…A9C8` | 27,684 B · `AD41144E182C65529AFF8DEEC158CA4B8E06A6A697C1ABBB64070968F4B7A9C8` · regular file, untracked, not ignored | PASS |
+| Published roadmap blob | must equal the source | `git cat-file blob` of the committed blob hashes to `20378A4867E6E6816D276E6C9B8D9364230E30859C944FBD58B55F9C57FD4A2E`, 17,982 B | PASS |
+| Frozen ACTIVE | published unchanged | worktree hash unchanged before and after editing (`F4B5A53C…72EDA`); local and remote blob `8aff506274…` identical | PASS |
 
-| Path | Size | SHA-256 |
-| --- | --- | --- |
-| `.documents/WIP/plan-roadmap.md` | 17,982 B | `20378A4867E6E6816D276E6C9B8D9364230E30859C944FBD58B55F9C57FD4A2E` |
-| `.documents/SOP/planning-governance-amendments.md` | 27,684 B | `AD41144E182C65529AFF8DEEC158CA4B8E06A6A697C1ABBB64070968F4B7A9C8` |
+## Inventory before and after
 
-Neither file was modified, moved, staged or deleted; both are Owner-owned and were treated as read-only evidence.
+**Before:** `origin/main` tracked three WIP files; the fourth existed only as an untracked Owner input. The approved dirty-tree exception was exactly the Owner-installed ACTIVE plus the two hash-locked sources, and nothing else was present.
 
-## Source documents inspected (read-only)
+**After:** exactly four tracked WIP files — `plan-next.md`, `plan-outlook.md`, `plan-roadmap.md`, `workorder-active.md` — with no subdirectory, one execution report outside WIP, and two SOP files.
 
-- `plan-roadmap.md` — 174 lines, title `# Foundation Solo — Implementation Roadmap`, stages **00–13** with no governance, quality or completed-work sections. It is already content-pure and already sits at its intended destination path.
-- `planning-governance-amendments.md` — 211 lines, sections **A–I**: permanent rule ownership, Architect SOP §4 Foundation-reference discipline, new §7B A1 engineering acceptance standard, replacement §8 four-slot planning lifecycle, replacement Implementation SOP §9 execution-document discipline, the consolidated cross-document edit list, illustrative WIP forms, a proposed handoff, and an Architect sign-off protocol.
+**Source cleanup.** After the content commit was pushed and its blobs read back, the amendment source was re-verified at its exact path, byte length, SHA-256 and regular-file type, confirmed untracked and not a symlink, and then deleted as the sole authorized cleanup. No other Owner material was touched.
+## Acceptance checks
 
-## Discrepancies for the Owner and Architect before issuance
+| # | Required condition | Result | Evidence |
+| --- | --- | --- | --- |
+| 1 | Exact `OWNER-ISSUED` order and separate handoff verified before any write; starting SHA and dirty-tree exception recorded | **PASS** | ACTIVE read at `SOLO-WO-005`/`R01`/`OWNER-ISSUED`; handoff identity matched; `87b176a` on local, remote and API; status was exactly `M workorder-active.md` + two untracked sources |
+| 2 | Both sources matched path, bytes, SHA-256 and file type; roadmap committed unchanged; cleanup matched §4 exactly | **PASS** | Tables above; published blob re-hashed after push; single-file deletion after re-verification |
+| 3 | Exactly four tracked WIP files, one report outside WIP, no duplicate logs/archives/SOP files, amendment source never published | **PASS** | Remote WIP listing shows four files and no directory; `Reports/` holds one file; `SOP/` holds two; the amendment source appears in no commit |
+| 4 | ROADMAP holds only pending Stage 00–13 with packages and gates; NEXT names only `R00.A`; ACTIVE frozen; OUTLOOK ideas-only or title-only | **PASS** | Roadmap is Stages 00–13 with no policy, matrix or history; NEXT is one candidate with objective, prerequisites, deliverables and acceptance; OUTLOOK is a title only |
+| 5 | Architect SOP owns reference-only, A1 and four-slot rules; Implementation SOP operationalizes without competing authority; references and numbering correct | **PASS** | Architect §4, §7B and §8 hold the policy; Implementation §6, §7 and §9 cross-reference them; heading sequence verified (`… §7A → §7B → §8 → §9 → §10`) |
+| 6 | All current documents consistently express the four-file lifecycle; no stale three-file count or mandatory delivery-horizon assertion | **PASS** | Whole-tree scan across every tracked file returns no such assertion outside the frozen work order, which describes the migration it authorizes |
+| 7 | Accepted one-Entity EFS, locale, route/visibility/case, cascade/graphics, Hexagonal Architecture, contact scope and licensing contracts semantically unchanged | **PASS** | Product edits were 2 lines about WIP counts; Architecture edits were 4 lines (two counts, two matrix rows that restate existing §5 and §3.4 contracts). No contract text was altered |
+| 8 | Exact patch, changed files, links and anchors, source hashes, single root/worktree/remote and parent isolation verified | **PASS** | 92 relative links and anchors resolve; 10 staged paths and no others; one worktree, one branch, one remote, zero tags; parent tracks zero Solo paths |
+| 9 | Both commits ordinary, linear and pushed; remote tree and current report read back; working tree clean | **PASS** | Fast-forward `87b176a..6b51484`; four WIP blobs matched local to remote; working tree clean after cleanup; report commit verified on GitHub and its SHA given only in chat |
+| 10 | Report distinguishes documentation checks from unperformed runtime tests; no absent test claimed green | **PASS** | See limitation below |
 
-1. **Local WIP is already four files on disk** while `main` still tracks three, because `plan-roadmap.md` is present but untracked. Any order must state how that file becomes tracked without re-performing an install, and must declare this pre-existing Owner state explicitly.
-2. **`planning-governance-amendments.md` sits in `.documents/SOP/`**, a governance-authority folder. That placement conflicts with the proposal's own exclusions — *introduce no new SOP file* and *do not commit this document as a permanent project document* — and is a live commit hazard while untracked. Consider relocating it outside the repository, or to an ignored `.temp/` path, before issuance.
-3. **Tension inside proposed operation A:** requiring a byte-identical SHA-256 copy cannot be combined with filtering content out of the source. It happens to be harmless here only because the source is already title-plus-stages; an order should say which rule wins if the source ever gains extra material.
-4. **ACTIVE disposition is contradictory.** R00 and R01 both ordered ACTIVE neutralised to `NONE` on success; this proposal instead forbids the agent from clearing the active work order. The Owner should state one rule for a four-slot model.
+## Deviations (all inside the issued scope)
 
-## Not run
-
-No roadmap copy, no governance amendment, no WIP restructuring, no file creation, deletion or relocation, and no build, test, CI, release or deployment. This documentation-only repository still has no application code, toolchain or dependency manifest.
-## Verification performed this run
-
-| Check | Result |
-| --- | --- |
-| Root, branch, revision agreement | local `HEAD` = `origin/main` = GitHub API = `6ba8535…` |
-| Checkout shape | one worktree, one branch, one remote, zero additional tags |
-| Tracked WIP / report inventory on `main` | three tracked WIP files, one execution report |
-| Untracked material identified | exactly the two Owner-supplied sources; both left byte-intact (hashes recorded above) |
-| Source read-only discipline | no write, move or rename of either source copy |
-| Publication scope | only this report file staged, committed and pushed |
-| Parent repository | unchanged; still tracks zero Solo paths |
-
-No documentation integrity, cross-reference or link checks were run against amended documents, because no amendments were applied. Earlier relative-link validation of the delivered documentation remains as recorded in the `SOLO-WO-004 R01` report.
-
-## Deviations
-
-- The run produced no documentation change by design; the only published delta is this report.
-- The working tree is left intentionally dirty with the two Owner-owned untracked sources. They were not discarded, because deleting unknown Owner work to manufacture cleanliness is prohibited; the condition is declared instead.
-
-## Note on the previous report
-
-The `SOLO-WO-004 R01` evidence was overwritten here as the reporting contract requires. It remains fully retrievable in Git history at commit `6ba853553a93ed01fabe7cf3d65a7bd31ff60aa0`, and its independent Architect disposition is **still outstanding**. Nothing in this report supersedes that review request.
+1. **Two rows added to `ARCHITECTURE.md` §6** — hexagonal-boundary and contact-scope evidence. Order §2 permits consolidating enduring acceptance criteria in the existing §6; both rows restate contracts already settled in §5 and §3.4 rather than introducing new ones.
+2. **Edition headers advanced** — Architect and Implementation SOPs to revision 6, `AGENTS.md` to revision 2 — so no header contradicts its own content.
+3. **`plan-outlook.md` is title-only.** No optional idea survived that is not already committed roadmap work, and this order forbids inventing ideas or relocating unfinished obligations.
+4. **Two wording corrections after the first scan:** a stale `three live WIP files` phrase in Implementation SOP §5B(8), and one sentence that named the earlier inventory while describing the transition, reworded to avoid an ambiguous assertion.
 
 ## Limitations
 
-- Local facts (cleanliness of specific paths, file sizes, SHA-256 values, worktree count) are first-hand agent observations; commit contents and tracked inventory are independently verifiable on GitHub.
-- This run is a governance and state check only. It proves nothing about runtime behaviour, because no application exists.
+- **No build, CI, unit, browser, release or deployment test was run or is claimed.** Solo has no application code, toolchain, dependency manifest or test suite; this run is documentation-only and none of those exist to test.
+- Verification was textual and structural: hashes, blob comparison, link and anchor resolution, heading and inventory checks, and diff inspection. Markdown rendering was not exercised in a browser.
+- Local filesystem facts (cleanliness, worktree count, file hashes) are first-hand agent observations; commit contents, tracked inventory and the published report are independently verifiable on GitHub.
+- The frozen work order still contains its own original `NOT ISSUED — OWNER REVIEW REQUIRED` label because it must be published byte-for-byte as installed. The Owner's installation plus the matching handoff are the issuing act, as the order itself states.
 
 ## Next action
 
-The smallest Owner decision needed is a single explicit choice: **issue or do not issue `SOLO-WO-005`**. Issuance means installing an `OWNER-ISSUED` `SOLO-WO-005` order in `.documents/WIP/workorder-active.md` — with the four discrepancies above resolved in its text — plus a matching handoff. Until then no roadmap installation, amendment or four-file WIP migration may occur, and this report authorizes nothing.
+The issued order remains in ACTIVE with its scope untouched. The Chief Architect independently reviews the published content commit and this report at their exact GitHub revisions and returns `ACCEPT`, `REVISE` or `STOP` against §7B. No closure, ROADMAP reduction, NEXT promotion or ACTIVE clearing is authorized or performed here.
