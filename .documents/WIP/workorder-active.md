@@ -1,367 +1,237 @@
 # Foundation Solo — Active Work Order
 
 **Work Order ID:** `SOLO-WO-009`  
-**Edition:** `R01`  
-**Title:** R00.B — Canonical address, locale and Unicode route-contract codification  
+**Edition:** `R02`  
+**Title:** R00.B corrective continuation — locale-less Page entry and documentation parity  
 **Approval marker:** `OWNER-ISSUED` **only upon exact Owner installation and separately delivered matching handoff**  
 **Repository:** `provelopment/provelopment-foundation-solo`  
 **Branch:** `main`  
-**Required starting `origin/main` HEAD:** `7d6fae688b75d39d630a7626e4183f6a3078dfcc`  
-**Matching direct handoff:** `SOLO-WO-009 R01 — Implementation Agent Handoff`  
-**Work classification:** Decisions-only canonical documentation reconciliation; no application implementation  
-**Quality standard:** A1, applied proportionately to documentary contract fidelity and verifiable publication evidence  
-**Completion authority:** Independent Chief Architect `ACCEPT / REVISE / STOP` against GitHub-published changes; Owner retains closure and further-work authorization.
+**Required starting `origin/main` HEAD:** `adaeca72be93ea612a55a99943e90b434f56c83b`  
+**Matching handoff:** `SOLO-WO-009 R02 — Implementation Agent Handoff`  
+**Preceding disposition:** Chief Architect `REVISE` for `SOLO-WO-009 R01`, reviewed at `adaeca72be93ea612a55a99943e90b434f56c83b`  
+**Work classification:** Narrow corrective documentation continuation; no application implementation  
+**Quality:** A1 documentary contract fidelity and GitHub-verifiable evidence  
+**Final authority:** Independent Chief Architect `ACCEPT / REVISE / STOP`; Owner controls closure and further issuance.
 
-> **Owner issuance boundary.** This is a prepared work order, not self-executing authorization. It becomes executable only if the Owner installs the complete approved text in `.documents/WIP/workorder-active.md` and separately delivers the matching `SOLO-WO-009 R01 — Implementation Agent Handoff`. A conversational decision, this draft, NEXT, ROADMAP, or a previous handoff is insufficient. The Implementation Agent must not interpret its own work as accepted or close R00.B.
+> **Issuance boundary.** This complete R02 replacement becomes executable only after exact Owner installation into `.documents/WIP/workorder-active.md` and a separately delivered, matching `SOLO-WO-009 R02 — Implementation Agent Handoff`. It supersedes the live R01 authorization for this correction; it does not create a second concurrent work order. A draft, a report, ROADMAP, NEXT or the previous R01 handoff is not execution authority.
 
-**Frozen Approved Scope:** §§1–9 below. Only the Owner may approve amendments. The Implementation Agent shall not silently extend or reinterpret the accepted decisions.
+**Frozen Approved Scope:** §§1–8. The Implementation Agent must not add scope, choose new product behavior, expand permitted paths or accept its own work.
 
-## 1. Objective, authority and boundaries
+## 1. Objective and exact correction findings
 
-Integrate the Owner's accepted R00.B decisions B01–B12 into Solo's existing canonical product and architecture documents, reconcile contradictory repository summaries and procedural invariants, and publish a single factual execution report.
+Correct **only** the two outstanding substantive documentation findings from the Chief Architect's R01 review:
 
-The specific architectural amendment is **B05-B**: public routes remain case-insensitive by default, but the author can deliberately select case-sensitive matching for an individual localized route claim. Validated Unicode routes, meaningful capitalization, localized slugs, explicit route ownership, strict collision refusal and visitor-controlled language selection are first-release requirements.
+**C1 — Incomplete B03 canonical contract.** The Architecture Charter records locale preference precedence and mentions locale-less entry claims for collision validation, but does not clearly state the Owner-approved capability for **optional explicitly authored locale-less deep-link entry routes**. Make the accepted behavior normative and unambiguous, with positive and refusal examples.
 
-Preserve R00.A without modification to its substance: one Entity, explicit stable EFS IDs and parent associations, versioned publication manifest as sole publication authority, real authored representations, source integrity and fail-closed refusal. Preserve strict Hexagonal Architecture, separation of address from ownership and location, Page-level `visibilityDefault`, representation-level `visibility`, exact-case unlisted behavior and the four-slot WIP lifecycle.
+**C2 — Stale open-decision wording.** The Product Definition §4A and README's configurable-base-URL paragraph still imply that normalization, aliases, redirect semantics and route/collision behavior remain undecided. Correct those descriptions to distinguish accepted B01/B04/B05/B08/B09 behavior from genuinely pending schema, toolchain and implementation details.
 
-This task **does not** create code, tests, dependency manifests, schema files, new architecture records, WIP files, releases, deployments, preview services or a new work order. It must not select a programming language, framework, hosting provider, database or implementation library.
+**C3 — Historical R01 publication deviation.** R01 published two content commits instead of the one authorized content commit. GitHub confirms:
 
-Stage 00 remains open; R00.B remains pending independent review and Owner-authorized closure. R00.C–R00.G remain pending. Do not consume the ROADMAP R00.B obligation or replace the NEXT candidate.
+- `df84dfd4e83d7984aa0c3f06497aa6d8f8e3831c` — seven authorized documentation paths.
+- `208e03d7c506be526a2492dd80d626107111b100` — additional B11 refusal-semantics text in the authorized Architecture path.
 
-## 2. Binding Owner decision ledger — B01 to B12
+This remains a disclosed procedural deviation. **Do not amend, squash, rebase, reset, erase, reclassify or retroactively self-approve it.** R02 authorization permits correction of C1 and C2; it does not automatically waive C3. Preserve an accurate record so the Owner and Chief Architect can explicitly consider it at final disposition.
 
-Treat the following outcomes as Owner-selected architecture, not options for the agent to reopen.
+No other R00.B decision is reopened.
 
-### B01 — Configurable base address
+## 2. Binding corrective contract — C1 / B03
 
-Use standards-based normalization with strict validation for one authored effective canonical HTTP(S) origin and optional path prefix.
+In `.documents/Architecture/ARCHITECTURE.md`, add precise normative text to §3.2 and/or §4.3. Integrate it with the existing route, collision, visibility and localization contracts rather than introducing a second authority.
 
-Validate scheme, host, applicable port, path boundaries and prefix safety. Normalize well-defined equivalences without guessing an intended unsafe address. Refuse credentials, query and fragment components in the configured base, malformed encodings, ambiguous separators and traversal. Preserve the prefix exactly once across routing, links, metadata and assets.
+Required meaning:
 
-A valid base-address change is configuration-only and never changes Entity/EFS identity or requires redesigning the router. Never use arbitrary incoming `Host` or forwarding headers as canonical-address authority.
+1. **Required root entry.** The configured canonical base entry supports the already accepted locale-less selection policy: supported saved preference → supported mapped `Accept-Language` → applicable authored full-locale default. This behavior is not changed.
 
-### B02 — Explicit Page routes and localized routes
+2. **Optional explicit deep links.** The author may additionally declare locale-less entry routes for individual Pages, such as `/about`, relative to the configured base prefix. These are optional, public-facing entry addresses, **not** required entries for every Page and **not** full-locale canonical representation URLs.
 
-Public routes are explicitly authored addresses, never technical IDs or permanent Page identities.
+3. **Page identity first.** Each declared locale-less entry route identifies exactly one stable language-neutral Page, including its actual Entity/Facet/Site parent scope, **before** language selection. The system must not infer Page ownership from URL spelling, translation, Site name, physical location or filesystem position.
 
-The first release supports a Page-level route/default path with optional **localized representation-specific route declarations**. The initial default may be shared across languages; authors may deliberately assign different slugs to individual localized representations.
+4. **Real destination second.** After selecting a supported locale, the entry route redirects to the selected Page's **actual authored, published, public full-locale canonical route**. Optional localized slugs may differ; the system must never construct a destination by blindly inserting a locale prefix, translating a word or guessing a matching slug.
 
-Each route claim resolves to the exact declared Entity/Facet/Site/Page ancestry and its actual representation. The same language-neutral Page may have differently spelled canonical routes in different full locales.
+5. **Missing representation.** If that Page has no representation for the selected locale, apply only its already accepted B07 same-Page, public-only fallback policy. A Page opting for strict/not-found remains strict. Never substitute a different Page or Site.
 
-No route, title, translation, Site name, Facet name, hostname or location may implicitly create, move or rename a Page. Technical IDs remain stable when routes change.
+6. **Visibility.** A locale-less entry may not expose or automatically advertise an effectively unlisted representation. It cannot select an unlisted fallback or invent a public representation. If no authorized public destination exists, return not-found.
 
-The physical JSON/Markdown manifest schema and final field placement belong to R00.D. Record the accepted logical contract without inventing a second publication authority.
+7. **Case and Unicode.** The entry route is an explicitly authored route claim subject to the accepted B04/B05 Unicode normalization, declaration-level case policy where applicable, collision checks and safe encoding rules. The Implementation Agent must not invent a new universal case rule for locale-less entries.
 
-### B03 — Locale-less entry routes
+8. **Collisions.** Every locale-less entry route is included in the complete prepublication route-claim ledger. Refuse any ambiguity between entry routes, canonical localized routes, other aliases, and public/unlisted claims. Neither declaration order nor a convenient first match can choose a destination.
 
-The Installation's configured base entry supports the already accepted locale-selection sequence:
+9. **HTTP and caching.** Locale-less entry selection uses the accepted B08 temporary redirect behavior, ordinarily `302` for appropriate safe navigation requests, and B12 protection against shared caching of preference-dependent responses. Redirect targets derive only from validated routing authority.
 
-1. Supported saved visitor preference.
-2. Supported, explicitly matched/mapped browser `Accept-Language`.
-3. Applicable authored default full locale.
+10. **Independence.** Adding a locale-less entry does not create an Entity, Facet, Site, Page, translation or new content-source authority; EFS identities and the versioned publication manifest remain decisive.
 
-Additional locale-less Page entry routes are permitted **only when explicitly declared** and validated. Each such claim must identify one specific language-neutral Page and Site before preference selection, then redirect to that Page's actual public representation in the selected or authorized fallback locale.
+**Positive conceptual example:**
 
-No locale-less route may guess a Page from its translated slug, derive geography, publish an unlisted Page, or create a locale-less canonical representation.
+A Page with stable ID `about` within one declared Site has public representations:
 
-Explicit full-locale URLs always win over preferences.
+- `en-001` at `/en-001/about`
+- `de-DE` at `/de-de/ueber-uns`
 
-### B04 — Validated Unicode routes
+The author explicitly declares the locale-less entry `/about` for that same Page.
 
-Allow intentional Unicode Page-route strings in the first release. Do not impose an ASCII-only authoring restriction.
+A visitor requesting `/about` with a supported saved preference `de-DE` receives a temporary redirect to `/de-de/ueber-uns`. The destination is looked up from the actual Page declaration; no translated slug is invented. A visitor with `en-001` preference receives `/en-001/about`.
 
-The logical route contract shall require:
+The same visitor requesting `/en-001/about` directly stays on English regardless of saved preference, browser preference or physical location.
 
-- Valid Unicode text normalized to NFC for authored route comparison and canonical output.
-- Well-defined UTF-8 URI encoding and one controlled percent-decoding boundary.
-- Separate treatment of decoded text and encoded URI delimiters.
-- Refusal of malformed encodings, encoded path separators, backslash-based ambiguity, dot-segment traversal, unsafe controls, ambiguous multiple decoding and route claims that normalize into prohibited conflicts.
-- Deliberate handling of combining marks, non-Latin scripts, meaningful Unicode capitalization and script-sensitive characters.
-- Consistent, version-controlled Unicode/casing behavior across validation, matching and URL generation.
-- Detection and actionable diagnostics for dangerous confusable route claims, without silently translating or equating words merely because they look alike.
+**Refusal conceptual examples:**
 
-Do not equate the approved EFS technical-ID grammar or its 63-character limit with the separate public-route grammar.
+- Two different Pages claim the same effective locale-less `/about` entry: refuse publication.
+- A locale-less entry claim overlaps another route or alias under its effective matching rules: refuse publication.
+- A declaration attempts to identify a Page by guessing its localized slug rather than explicit identity: refuse publication.
+- The selected Page has only an unlisted representation in the chosen locale and no authorized public fallback: not-found; do not reveal the unlisted route.
+- A locale-less entry resolves a Page in a different Facet or Site because another Page has the same ID: refuse/diagnose the invalid declaration; no sibling selection.
 
-Any lower-level Unicode data/profile selection that must be pinned to a future toolchain shall be identified as an explicit R00.E prerequisite, not guessed during this documentation run.
+Label examples as **conceptual specification cases, not executed tests**.
 
-### B05 — Author-selected case matching and strict collision refusal
+Do not select concrete manifest field placement or physical encoding; those remain R00.D.
 
-**Default public behavior:** Case-insensitive matching for each public localized route claim unless the author explicitly selects otherwise. Its canonical Page-route path uses the accepted deterministic Unicode-aware lowercase spelling.
+## 3. Binding wording correction — C2
 
-**Optional public behavior:** An author may choose case-sensitive matching for an individual localized route claim. Its canonical Page-route path preserves the authored NFC-normalized Unicode capitalization. The author may deliberately assign `About`, `about` and `aBout` to distinct public Pages when all relevant claims use sensitive matching and validation proves no conflict.
+### A. Product Definition
 
-**Unlisted behavior:** Effective unlisted representations always require exact-case authored Page-route matching; an unlisted route cannot enable case-insensitive lookup. Its exact authorized URL is directly reachable but excluded from generated discovery, with `noindex, nofollow`. Unlisted remains nonprivate.
+In `.documents/About/FOUNDATION-SOLO.md` §4A, replace the stale statement that precise normalization, aliases, redirects and public route grammar remain separately designed.
 
-**Locale handling:** Full-locale segments always normalize by Solo's accepted full BCP 47 rules, regardless of Page-route matching. Page-route matching is separate from locale-segment matching.
+The corrected wording must accurately state:
 
-**Claim-level granularity:** Matching is associated with the authored localized route claim; no automatic Site-wide, Facet-wide or locale-wide case-sensitive setting is introduced. The proposed logical setting is `caseMatching: insensitive | sensitive`, defaulting to `insensitive` for public claims. Its concrete schema representation remains R00.D.
+- **Accepted behavior:** B01 standards-based safe base URL normalization; B04 validated Unicode public routes; B05 default-insensitive and explicitly sensitive localized claims with strict collisions; B08 condition-appropriate redirects; B09 one canonical base with optional explicitly authorized aliases.
+- **Accepted address independence:** Configured origin/prefix changes do not alter EFS identity or require router redesign.
+- **Still open:** Physical declaration and manifest schema/field names (R00.D), pinned Unicode data version and toolchain choices (R00.E), concrete runtime matcher, HTTP adapters, DNS/TLS/provider wiring and deployment operations.
+- **No broad claim:** Do not say all normalization or routing mechanics are fully implemented, tested or deployed.
 
-**Unicode comparison:** Specify a single reproducible NFC-based comparison pipeline. Insensitive comparisons use full Unicode caseless behavior with explicitly documented and tested locale-specific tailoring when applicable; sensitive comparisons use NFC-normalized exact comparison, without case folding. Canonical URL construction is distinct from comparison. The chosen Unicode data version must be pinned before executable implementation.
+Keep the paragraph concise. Do not repeat the entire Architecture Charter's technical algorithm.
 
-**Publication collision rules:**
+### B. README
 
-1. Build and validate the complete set of canonical routes, permitted aliases and locale-less entry claims before publication.
-2. Route matching must never use declaration order or first-match-wins to resolve ambiguity.
-3. Identical effective claims competing for different destinations are invalid.
-4. Different sensitive public claims with distinct exact normalized keys may coexist even if their caseless keys match, provided no other claim creates ambiguity.
-5. Any insensitive public claim overlapping a sensitive or another insensitive claim is invalid when the claims cannot be resolved unambiguously; do not use hidden precedence to rescue it.
-6. Preserve the stricter existing public/unlisted **caseless-collision refusal**, including where the public route itself is sensitive.
-7. Preserve exact-case distinctness between safely normalized unlisted routes when their exact keys differ.
-8. Different full-locale namespaces may deliberately map identical route strings to different Pages.
-9. Alias and locale-less entry claims must pass equivalent overlap checks and never capture an unintended Page or reveal unlisted content.
-10. Duplicate normalized canonical addresses and nonunique canonical targets fail validation. Do not accept multiple overlapping claims merely because they happen to point to the same representation unless an explicit nonambiguous alias contract authorizes the relationship.
+Replace the last stale sentence in README's configurable-base-URL paragraph, which currently characterizes exact normalization, aliases and route-collision rules as open decisions.
 
-Never lowercase the entire incoming path before determining the effective route claim. A wrong-case sensitive request has no implicit case-based redirect.
+A concise suitable replacement is:
 
-**Illustrative expected outcomes:**
+> **R00.B now accepts** safe standards-based base-address normalization, explicitly authorized optional aliases, validated Unicode localized route claims, author-selected public case sensitivity and fail-closed collision rules. The physical schema, pinned Unicode/toolchain implementation and deployment/provider wiring remain later work; no router or deployment is yet implemented.
 
-| Case | Required behavior |
+Match the repository's established terminology and preserve the existing surrounding explanation about configuration-only base-URL changes.
+
+Do not update unrelated README content.
+
+## 4. Exact authorized path and operation ledger
+
+| Path | Permitted operation |
 |---|---|
-| Public insensitive `about`: `about`, `About`, `ABOUT` | Same Page; canonical lowercase URL |
-| Public sensitive `About`, `about`, `aBout`, three different Pages | All three may coexist and resolve separately |
-| Public sensitive `Morgen` and `morgen`, different German Pages | Both permitted when collision-free |
-| Public sensitive `MORGEN` not declared | No guessed match; not-found |
-| Public insensitive `morgen` plus public sensitive `Morgen` | Reject overlapping claims |
-| Public sensitive `Morgen` plus unlisted `morgen` | Reject under retained conservative public/unlisted collision policy |
-| Unlisted `abc` and `Abc` | Independently valid exact-case claims if otherwise unambiguous |
-| `/en-001/about` and `/de-de/about` | Can identify different authored Pages |
-| `/DE-DE/Morgen` | Normalize locale casing while preserving sensitive Page-route spelling |
-| NFC-equivalent route spellings | One normalized comparison; refuse conflicting declarations |
+| `.documents/WIP/workorder-active.md` | Owner installs the full R02 order. Agent may commit/publish those installed bytes **unchanged** in Phase A only. No further edit. |
+| `.documents/Architecture/ARCHITECTURE.md` | C1 only: integrate explicit B03 locale-less Page entry semantics and conceptual positive/refusal cases; only necessary surrounding text for consistency. |
+| `.documents/About/FOUNDATION-SOLO.md` | C2 only: correct §4A's stale accepted-versus-open classification. |
+| `README.md` | C2 only: correct the stale base-address sentence. |
+| `.documents/Reports/execution-report.md` | Overwrite the single current report with complete factual R02 evidence in Phase C only. |
+| `.git/**` | Minimal normal metadata for explicitly authorized ordinary commits and pushes, governed exclusively by Architect SOP §6B. |
 
-### B06 — Preference matching
+**All other permanent paths are read-only**, including `AGENTS.md`, both SOPs, `.documents/WIP/plan-roadmap.md`, `.documents/WIP/plan-next.md`, `.documents/WIP/plan-outlook.md`, LICENSE, `.github/**`, `.gitignore`, `.gitattributes`, all other repository files and all other repositories.
 
-Support exact published full-locale matching and only explicitly authored preference mappings for shorter or otherwise unsupported browser language ranges.
+The existing NEXT candidate still contains historical universal public-case wording. That is a **known deferred Owner-controlled WIP reconciliation item**, not permission to edit NEXT during R02. Its replacement belongs to the later separately authorized R00.B closure transition.
 
-Respect valid preference ordering and HTTP quality weights. Never infer a preferred region or translation from IP address, geographic location, Site ID, hostname, physical address or country property.
+Do not create additional WIP slots, report archives, architecture decision files, code, tests, dependencies or provider configuration.
 
-A saved preference is subordinate to an explicitly requested full-locale URL. Provide a usable account-free language-selection experience and allow a deliberate choice to persist through supported navigation without trapping visitors in a geographically selected language.
+## 5. Baseline and preflight
 
-### B07 — Missing translation
+**Exact required starting GitHub `main` HEAD:**
 
-Use a Page-controlled fallback policy, with valid public same-Page default fallback preferred.
+`adaeca72be93ea612a55a99943e90b434f56c83b`
 
-Fallback is permitted only when the source route or explicit Page entry claim identifies the intended Page unambiguously. If translated slugs differ and no declaration identifies a Page for the requested path, do not guess that Page from a similarly spelled route.
+Verify the installed R02 order, direct matching Owner handoff and repository state under the current Architect and Implementation SOPs before any write.
 
-A valid fallback redirects temporarily to the **actual canonical public representation of the same Page, Facet and Site**. Page-level strict/not-found and explicitly nominated public same-Page alternatives are permitted. Existing unlisted representations are not replaced by public content; missing translations cannot fallback to unlisted or another Page.
+Relevant required baseline Git blobs:
 
-No automatic translation or rendering of a different language beneath the originally requested locale URL.
-
-### B08 — Redirect semantics
-
-Use condition-appropriate redirects:
-
-- Stable public canonical spelling corrections: ordinarily `308`, where method/safety rules permit.
-- Preference-dependent locale-less entry: temporary, ordinarily `302`.
-- Valid missing-translation fallback: temporary, ordinarily `302`.
-- Sensitive Page-route casing differences: never silently correct them by redirecting to another sensitive claim.
-
-Keep GET/HEAD Page navigation separate from contact and other non-Page request methods. Construct redirect targets only from validated internal route authority; no open redirects or unapproved alias targets.
-
-### B09 — Canonical address and aliases
-
-One configured canonical public address is authoritative.
-
-Support optional, explicitly authorized and validated aliases, including legitimate address migration use cases. An alias never becomes another Entity, Site, location-derived route authority or automatically trusted hostname.
-
-Validate aliases against route conflicts and visibility boundaries; generated canonical, metadata and discovery URLs always use the effective canonical address. External DNS/TLS/hosting arrangements are distinct deployment responsibilities and are not performed by this order.
-
-### B10 — Unlisted Home and public entry
-
-Permit a fully unlisted Home Page.
-
-Prefer an explicitly designated **real public landing Page** for the locale-less base entry when the nominal Home is unlisted. If no public landing representation is available, the locale-less base entry does not reveal an unlisted Home and returns not-found.
-
-The landing selection must be authored, unambiguous and collision-checked. The default seeded `main/main/home` retains its stable EFS identity regardless of how the public entry is configured.
-
-### B11 — Safe failures
-
-Refuse malformed, unsupported, ambiguous and unauthorized routing without substituting a different Page.
-
-Distinguish publication-validation failures from HTTP request failures.
-
-Use accurate HTTP semantics: malformed unsafe requests may return `400`, absent routes or unsupported explicit locales return `404`, unsupported methods return `405`, unauthorized request authorities are refused appropriately (including `421` where applicable), and genuine internal failures remain server errors.
-
-Errors and diagnostics must not disclose unlisted discovery inventories, private source locations or secrets.
-
-### B12 — Cache safety
-
-Distinguish visitor-preference-dependent redirects from deterministic explicit full-locale Page responses.
-
-Prevent shared caching of personalized locale-selection responses; a conservative nonshared/no-store policy is acceptable. Do not let a visitor's cookies alter the language of an explicit full-locale response.
-
-Permit ordinary safe caching of public canonical representations where applicable. Do not conflate unlisted discovery policy with authentication or confidentiality.
-
-## 3. Explicit visitor language-control invariant
-
-Codify the Owner's stated first-release usability outcome:
-
-A visitor located anywhere—including Indonesia—must be able to select English or another actually supported public language without logging in, and then reach that representation through its explicit full-locale URL.
-
-The initial public entry may consider a supported saved preference and browser language, but never physical location.
-
-Every published public Page experience must provide an accessible, visible language-selection route where multiple real public same-Page representations exist. The selector follows the stable Page identity and the actual localized canonical URLs, not a guessed change to a slug.
-
-A visitor selecting `/en-001/...` must not be returned to Indonesian merely because their browser prefers Indonesian, their location is Indonesia, or a saved preference disagrees.
-
-Where localized slugs differ, simply replacing a locale URL segment is **not guaranteed** to find the counterpart unless an explicit validated shared-path alias exists. The supported same-Page language selector must nevertheless work without a login.
-
-Only real public representations may be offered as available language alternatives. Missing or unlisted representations cannot be invented or advertised.
-
-The user-experience outcome is binding at contract level now; actual rendered selector implementation and accessibility evidence remain scheduled for later stages.
-
-## 4. Canonical documentation edits — exact path ledger
-
-The Implementation Agent may change **only** the following permanent files for the operations stated.
-
-| Path | Authorized modification |
+| Path | Git blob SHA-1 |
 |---|---|
-| `.documents/Architecture/ARCHITECTURE.md` | Primary normative incorporation of all B01–B12 outcomes. Replace existing §3.2B universal case rule with the approved default/sensitive/unlisted contract; align §3.2, §3.2A where needed, §§4.1–4.4, verification table and §7 open/accepted decision inventory. |
-| `.documents/About/FOUNDATION-SOLO.md` | Align product-level multilingual author freedom, optional localized routes, validated Unicode, public-case exception, visitor choice, Home entry and aliases. Update the accepted-versus-open distinction, avoiding duplication of detailed routing algorithms. |
-| `README.md` | Replace outdated public-case summary and briefly describe explicit locale addresses, author-selected sensitive public routes and visitor language freedom. Retain its role as an entry point rather than a competing architectural authority. |
-| `AGENTS.md` | Replace the universal public lowercase/case-fold invariant with the accepted claim-level default/exception and strict refusal rules. Do not alter authorization or role boundaries. |
-| `.documents/SOP/sop-architect.md` | Update outdated public-case invariants and applicable independent-review examples, including Unicode and sensitive-route refusal cases. Preserve all Owner, WIP, report, A1 and Git procedures. |
-| `.documents/SOP/sop-implementation.md` | Update obsolete public routing invariants and verification cases; preserve execution authorization, preflight, reporting and cleanup governance exactly in meaning. |
-| `.documents/WIP/plan-roadmap.md` | Make **text-only precision adjustments** to the pending R00.B description and later routing/localization/visitor-navigation acceptance packages where their existing wording would falsely require unconditional case-insensitive public routing or forbid localized Unicode slugs. Keep R00.B listed as pending; preserve all stages, stage structure, prerequisites, package count and exit gates. |
-| `.documents/WIP/workorder-active.md` | Owner installs this complete issued order. Agent may stage and publish the **unchanged installed bytes** in the initial authorization-preservation phase only. No discretionary edit or completion/acceptance note. |
-| `.documents/Reports/execution-report.md` | Overwrite the single canonical report with accurate execution evidence in the reporting phase. Do not add another report. |
-| `.git/**` | Minimal ordinary Git metadata needed for the expressly authorized publication sequence, solely under Architect SOP §6B. |
-
-**Read-only:** `.documents/WIP/plan-next.md`, `.documents/WIP/plan-outlook.md`, all other permanent repository paths, `.github/**`, LICENSE, `.gitignore`, `.gitattributes`, any code/tooling/dependencies and all other repositories.
-
-Do not create a fifth WIP file, another report, a separate decision-register file, an archive, a second checkout or an implementation directory.
-
-The approved route behavior belongs durably in the Architecture Charter, with concise references elsewhere. Do not paste multiple incompatible copies of the full contract into each document.
-
-## 5. Documentation fidelity and conflict-resolution rules
-
-The documentation must clearly distinguish:
-
-1. **Accepted product and architecture outcomes:** B01–B12, including B05-B's newly authorized exception and first-release Unicode/localized-slug capability.
-2. **Physical schema details reserved to R00.D:** concrete JSON field locations, file formats, manifest version encoding and source locator syntax.
-3. **Toolchain/runtime selections reserved to R00.E:** library/runtime choice and the exact Unicode data version pinned for implementation.
-4. **Later implementation stages:** compiled validators, HTTP adapters, actual language selector, redirects, caching, accessibility tests and deployed delivery.
-
-R00.D/E may decide representation and implementation mechanics but **must not re-decide the accepted routing behavior**.
-
-The following preexisting blanket statements must be corrected consistently wherever they appear in authorized files:
-
-- All public routes are unconditionally case-insensitive.
-- All public Page-route canonicals are unconditionally lowercase.
-- Only unlisted content can use exact-case Page-route matching.
-- Public mixed-case requests always identify the same Page.
-- Public route collision checking needs only one unconditional lowercase key.
-
-The replacement must say that public routes are insensitive **by default**, sensitive **by explicit localized-route author choice**, and effectively unlisted routes remain exact-case. Canonical spelling follows the selected policy. Preserve the lowercase canonical **full-locale segment** independently.
-
-Do not change established ID grammar, visibility-field names, five-level property inheritance, one-Entity cardinality, publication authority, report procedures or Owner permissions.
-
-Where a genuinely unresolved detail could alter observable routing semantics, **STOP** and report it instead of selecting a new architectural rule. Correct ordinary grammar, cross-references and terminology within the stated document scope without inventing additional product features.
-
-## 6. Baseline and mandatory preflight
-
-All project source-of-truth inspection for Architect review is GitHub-based. The Implementation Agent must independently follow the repository's existing safety and Git procedures before executing any write.
-
-The required `main` baseline is:
-
-`7d6fae688b75d39d630a7626e4183f6a3078dfcc`
-
-Its GitHub file blobs are:
-
-| Path | Required baseline Git blob |
-|---|---|
-| `README.md` | `1294bb12aa0eed370304cbc64a829a3f32d8fcac` |
-| `AGENTS.md` | `30c5b02678d91140a1c74dc06aaefd333f42776e` |
-| `.documents/About/FOUNDATION-SOLO.md` | `3f4e557e7b5b67c544bf2ce8ce718e5aec706fe8` |
-| `.documents/Architecture/ARCHITECTURE.md` | `28c0629549259185a715d4291ea5d065cffa3ec8` |
-| `.documents/SOP/sop-architect.md` | `6bea0dbcab31995a7d3f8020e8bfde8d6c195c75` |
-| `.documents/SOP/sop-implementation.md` | `b56b14a0fec4b0b1b6342445eaa86ebf3a0d807d` |
-| `.documents/WIP/plan-roadmap.md` | `5ebb53f7444e1ad59bc81eb0358cbb408295b17c` |
+| `.documents/Architecture/ARCHITECTURE.md` | `168e858db31246927705fce038ebb4ad0b77b545` |
+| `.documents/About/FOUNDATION-SOLO.md` | `1ac9652d484473e9e15b8110458b5ba3b88d8e75` |
+| `README.md` | `9f1c9872288b4ec21340cd8b20241fd8caa7dddd` |
+| `.documents/WIP/workorder-active.md` before Owner R02 installation | `e1751601832916898afdd15085ef76c652de7621` |
+| `.documents/Reports/execution-report.md` | `4724b807185a3fc635164f6d2a75bc6c5a4d85cf` |
+| `.documents/WIP/plan-roadmap.md` | `b3aa0e52ad3383256386a938408905536bc090bb` |
 | `.documents/WIP/plan-next.md` | `375aee17fc9f8ae5355c119394fb8dca030cab23` |
 | `.documents/WIP/plan-outlook.md` | `cb9c7a610cf3c537557e060ca9656e44a053e69d` |
-| `.documents/WIP/workorder-active.md` before Owner installation | `ea5f20b736483c2e102456be1cea9104059fc81a` |
-| `.documents/Reports/execution-report.md` | `ee722cf9ca88d9a51e0bdb44e8e87efacce4678b` |
+| `AGENTS.md` | `d4a2a028e0d35852e0077bbe97c162bdfde89d2d` |
+| `.documents/SOP/sop-architect.md` | `0396251245180b40ee896b50a3456b92835f9cb1` |
+| `.documents/SOP/sop-implementation.md` | `b868faccbe73e076d207ed1c532069559ca3590a` |
 
-Verify that the actual starting repository, branch and `origin/main` match this exact approved baseline, that the installed order matches the separately issued handoff, and that the Owner-installed ACTIVE replacement is the only expected initial permanent modification. Preserve unrelated or unknown material.
+The expected initial authorized difference from the R01 baseline is **only the exact Owner-installed R02 replacement of ACTIVE**. Unexpected permanent changes, baseline mismatch or missing authority require STOP rather than guessed reconciliation.
 
-If the baseline has moved or the issuance cannot be verified, **STOP**. Do not silently rebase the order, rewrite history, use a second checkout or broaden the scope.
+Preserve all preexisting Owner material. Follow the established single-checkout, scoped-write, safe temporary-workspace, cleanup, remote verification and version-control procedures. This order does not create another Git procedure.
 
-The Implementation Agent shall follow Architect SOP §6B, Implementation SOP §§4–5C and all applicable established safety controls. This order does not replace them with an alternative procedure.
+## 6. Authorized publication sequence
 
-## 7. Authorized execution and publication sequence
+**Phase A — Publish the exact issued R02 order.**
 
-**Phase A — Preserve issued authority.**
+Verify the Owner-installed order and matching handoff. Stage and commit only `.documents/WIP/workorder-active.md`, using the exact installed bytes. Make one ordinary commit and an authorized fast-forward push to verified `origin/main`. Verify GitHub readback before continuing.
 
-After exact issuance and preflight verification, stage the unchanged Owner-installed `.documents/WIP/workorder-active.md` alone, make one ordinary commit, fast-forward push to the verified Solo `origin/main`, and verify the published blob and remote HEAD.
+**Phase B — Publish one complete corrective content commit.**
 
-Do not begin Phase B unless the exact issued order is preserved on GitHub.
+Edit **only**:
 
-**Phase B — Codify the canonical R00.B contract.**
+- `.documents/Architecture/ARCHITECTURE.md`
+- `.documents/About/FOUNDATION-SOLO.md`
+- `README.md`
 
-Edit only the seven documentation paths listed in §4: Architecture, Product, README, AGENTS, both SOPs and ROADMAP.
+Before committing, perform a complete document review against §§2–3, including all required positive/refusal examples, unchanged accepted B01–B12 policies, accurate accepted-versus-open classification and absence of unrelated edits.
 
-Check their combined consistency against §§2–5. Confirm NEXT and OUTLOOK are byte-identical to the baseline and ACTIVE remains the exact issued order.
+Stage exactly the three corrected files, make **one ordinary content commit**, fast-forward push and verify GitHub readback.
 
-Stage only those seven paths. Publish one ordinary content commit by an authorized fast-forward push, then independently read back the GitHub commit, changed paths and updated content.
+Do not split Phase B into multiple commits. Do not publish before completing the scope check. If a new omission or blocker is discovered **after** Phase B publication, STOP and report it rather than creating an unauthorized additional content commit.
 
-Do not implement source code, update schema files, close R00.B, replace NEXT, clear ACTIVE or start R00.C.
+**Phase C — Publish the canonical report.**
 
-**Phase C — Publish the canonical execution report.**
+Overwrite only `.documents/Reports/execution-report.md`. Record accurate authority, scope, baseline, commit hashes, GitHub-visible content, conceptual contract checks, any deviation, actual checks, unaffected WIP, and the retained historical R01 C3 deviation.
 
-Overwrite only `.documents/Reports/execution-report.md` with a factual summary of the issued authority, initial baseline, actual changed files, GitHub commit SHAs, documentation consistency checks, conceptual positive/refusal cases, warnings, applicable A1 gates and not-run software checks.
+Make **one separate ordinary report commit**, fast-forward push and verify its GitHub readback. Do not place the report commit's own SHA inside the report; provide it in the handback.
 
-Publish one separate ordinary report commit using the standing report-only authorization and verify its availability on GitHub. Do not include the report commit's own SHA inside the report; return it separately in the Implementation Agent handback.
+No additional content commit, branch, PR, merge, tag, release, deployment, dependency installation, external account/provider action, destructive Git operation, history rewrite, second checkout or other-repository change is authorized.
 
-Only these three scoped publication phases are authorized. No new branch, PR, merge, tag, release, deployment, dependency installation, provider operation, secrets access, history rewrite, destructive operation or other-repository write is authorized.
+If a phase cannot safely complete, STOP, preserve the last valid state and report the actual result under existing SOP permissions. Never invent completion evidence.
 
-On failure, stop safely and report the actual state; do not manufacture a three-commit success or hide a partial outcome.
+## 7. R02 A1 acceptance gates
 
-## 8. Documentary A1 acceptance gates
+The Agent records factual results; the Chief Architect independently determines disposition.
 
-The Implementation Agent reports evidence. Only the Chief Architect independently assigns disposition.
-
-| Gate | Required evidence |
+| Gate | Required proof |
 |---|---|
-| A1 — Authority | Exact `SOLO-WO-009 R01` issuance, approved source revision and matching handoff |
-| A2 — Scope integrity | Only authorized permanent paths changed; source, toolchain, NEXT and OUTLOOK unchanged |
-| A3 — Complete B01–B12 contract | Each accepted decision is represented coherently; nothing remains wrongly classified as undecided |
-| A4 — B05-B fidelity | Default insensitive; explicit sensitive; unlisted exact-case; per localized route; Unicode-sensitive canonical behavior |
-| A5 — Collision safety | Positive and refusal examples cover sensitive/sensitive, insensitive/sensitive, public/unlisted, Unicode normalization, aliases and cross-locale independence |
-| A6 — Language freedom | Explicit full-locale URLs always win; no geographic override or login requirement; real same-Page language switching with localized slugs |
-| A7 — R00.A and boundaries | EFS ownership, ID stability, manifest authority, visibility inheritance, source integrity and Hexagonal Architecture remain unchanged |
-| A8 — Documentation parity | Architecture, Product, README, AGENTS, SOPs and ROADMAP have no remaining contradictory public-case or locale policy |
-| A9 — WIP preservation | ROADMAP retains R00.B and Stage 00; NEXT stays R00.B; ACTIVE stays issued; OUTLOOK unchanged; exactly four WIP files |
-| A10 — GitHub evidence | Issued order, documentation commit and final report published in the authorized sequence with exact paths and revisions |
-| A11 — Honest verification | Conceptual cases distinguished from executed tests; no invented application, browser, CI, release or deployment proof |
-| A12 — Governance | No self-acceptance, extra WIP records, second checkout, unauthorized provider action or closure |
+| R02-1 — Authority | Exact installed R02 and matching Owner handoff; required starting revision and document blobs verified |
+| R02-2 — Path scope | Exactly three corrective content files changed; ACTIVE only installed/published unchanged; report only overwritten separately |
+| R02-3 — Complete B03 | Optional locale-less Page entry routes explicitly authorized and defined independently of root entry |
+| R02-4 — Page identity | Each locale-less route identifies one stable Page before language negotiation; no inferred translated slug or sibling fallback |
+| R02-5 — Positive and refusal cases | Preference-selected actual localized destination, direct explicit-locale precedence, ambiguous-route refusal and unlisted non-disclosure |
+| R02-6 — Product parity | §4A correctly distinguishes accepted B01/B04/B05/B08/B09 behavior from outstanding encoding/implementation |
+| R02-7 — README parity | No remaining claim that accepted normalization, aliases or collisions are undecided |
+| R02-8 — Prior contracts preserved | B01–B12, R00.A, case-sensitive Unicode routes, strict unlisted policy and Hexagonal boundaries unchanged |
+| R02-9 — WIP preservation | ROADMAP, NEXT and OUTLOOK unchanged; ACTIVE remains issued R02; exactly four WIP files and one report |
+| R02-10 — Publication discipline | Exact Phase A order commit, **one** Phase B three-file correction commit, **one** Phase C report commit; GitHub verified |
+| R02-11 — Honest reporting | C3 disclosed without rewriting or self-waiver; conceptual checks not described as executed software tests |
+| R02-12 — Governance | No unauthorized changes, self-acceptance, R00.B closure or new package issuance |
 
-For each gate, report factual `PASS`, `FAIL`, `UNVERIFIED` or genuinely `NOT APPLICABLE`, with reasons and evidence. Actual software/build/browser tests remain `NOT RUN` for this documentary task because no application implementation is authorized.
+Document checks may be marked `PASS`, `FAIL` or `UNVERIFIED`, with source evidence. Truly inapplicable gates require `NOT APPLICABLE` and a reason.
 
-The final documentation must include enough positive and refusal examples for later Stage 04 and Stage 06 work orders to implement the contract without choosing policy independently.
+Application build, unit, HTTP, browser, architecture-boundary, security, release and deployment testing are **NOT RUN**; no implementation exists and none is authorized here.
 
-## 9. STOP conditions and completion handback
+## 8. STOP and completion boundary
 
-STOP on any of these conditions:
+STOP immediately if any of these occur:
 
-- Missing Owner installation or mismatching direct handoff.
-- Baseline revision, publication authority or path inventory mismatch.
-- An unexpected modification that cannot be safely preserved under the existing SOP.
-- A need to change accepted R00.A identity/publication semantics.
-- A proposed alternative to the Owner-approved B01–B12 outcomes.
-- Inability to reconcile public/unlisted collision safety with author-selectable sensitive public routes.
-- An unresolved Unicode or locale semantic choice that materially changes the accepted observable behavior.
-- A need for code, schema, dependency, provider, release or deployment changes.
-- A request to self-accept, clear ACTIVE, prune ROADMAP R00.B or promote NEXT.
-- Any prohibited Git, repository, privacy or security operation.
+- Installed work order or handoff does not match `SOLO-WO-009 R02`.
+- `main` has moved from the approved starting revision.
+- An unanticipated permanent modification or unrelated material threatens the allowed scope.
+- C1 requires inventing a new route policy or contradicting accepted B02/B03/B05/B07.
+- C2 requires a substantive architectural change rather than correcting classification wording.
+- An authorized fix requires modifying an unlisted path, including NEXT or ROADMAP.
+- A second Phase B content commit appears necessary.
+- The Agent is asked to retrospectively waive C3, self-accept R01 or R02, remove R00.B from ROADMAP or begin R00.C.
+- Any permission, security or repository-safety condition fails.
 
-The implementation handback must contain the actual commit and report links, exact changed paths, checks and their results, any blockers, and an explicit statement that independent Chief Architect review remains outstanding.
+On successful execution:
 
-**Required terminal state on successful execution:**
+1. The C1 and C2 documentary defects are corrected.
+2. The historical R01 C3 deviation remains accurately reported and unaltered.
+3. ACTIVE contains exact issued `SOLO-WO-009 R02`.
+4. ROADMAP still lists R00.B; NEXT remains its existing candidate; OUTLOOK remains unchanged.
+5. The single current report is published to GitHub.
+6. No application implementation or release operation is claimed.
+7. The Agent stops for independent Chief Architect review.
 
-- The accepted R00.B contract is coherently incorporated into the authorized existing documents.
-- ACTIVE still contains the exact Owner-issued `SOLO-WO-009 R01`.
-- ROADMAP still lists R00.B; NEXT still proposes R00.B; OUTLOOK is unchanged.
-- The one current execution report is published on GitHub.
-- No source code or release/deployment operation has occurred.
-- The Implementation Agent stops for independent Chief Architect review.
-
-This task's success is **documentation codification**, not Stage 00 completion, implemented routing or authorization to start another work order.
+**Independent disposition remains outstanding until the Chief Architect reviews the exact published revision.** Closure, R01 deviation adjudication and progression to R00.C require separate Owner-controlled actions.
