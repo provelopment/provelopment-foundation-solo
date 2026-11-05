@@ -361,6 +361,8 @@ Canonical, Open Graph, language alternates, generated links, assets and sitemap 
 
 Only declared public representations may be advertised through generated discovery. An unlisted representation serves only at its exact authorized **case-sensitive** URL, with `noindex, nofollow`, and is absent from generated navigation, sitemap, `hreflang`, `x-default` and language-switch options; it can never be reached through an insensitive public alias. Unlisted is not a protected/private URL.
 
+**Refusal semantics (`B11`).** Malformed, unsupported, ambiguous or unauthorized routing is refused without substituting a different Page. Publication-validation failures are kept distinct from HTTP request failures, and HTTP semantics stay accurate: malformed unsafe requests may return `400`, absent routes or unsupported explicit locales `404`, unsupported methods `405`, and unauthorized request authorities are refused appropriately, including `421` where applicable, while genuine internal failures remain server errors. Errors and diagnostics never disclose unlisted discovery inventories, private source locations or secrets.
+
 Physical location properties can supply deliberate visible facts or permitted structured data, but must **never determine the base URL, canonical URL, route claim, Page selection or locale**.
 
 ## 5. Deployment, release and software boundaries — strict Hexagonal Architecture
