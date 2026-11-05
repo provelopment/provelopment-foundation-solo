@@ -79,34 +79,32 @@ A single explicit, **versioned publication manifest** is the sole authority for 
 
 ## 4. Location is an authored cascading EFS property — never routing
 
-**Owner-settled invariant:** `location` is a property of the EFS content model, available at **any of its five levels**, subject to one consistent inheritance and override rule. It is **not** a sixth ownership node, a compulsory physical address, a domain or a geographic routing convention. Explicit location data may be broad or narrow without redefining any node's identity.
+**Owner-settled invariant:** `location` is a property of the EFS content model, available at **any of its five levels**, subject to one consistent additive inheritance rule. It is **not** a sixth ownership node, a compulsory physical address, a domain or a geographic routing convention. Explicit location data may be broad or narrow without redefining any node's identity.
 
 For example, one Entity could author the following direct-ancestry location values:
 
 ```text
-Entity
-  location: Australia
-  └── Facet: hotels
-        location: Indonesia        # overrides Australia within this Facet
-        ├── Site: bali
-        │     location: Bali       # overrides Indonesia for this Site
-        │     └── Pages
-        │           └── localized representations: en-001, de-DE, zh-Hans-CN, id-ID
-        └── Site: jakarta
-              location: Jakarta   # overrides Indonesia for this Site
-              └── Pages
-                    └── localized representations: en-001, de-DE, zh-Hans-CN, id-ID
+Entity                     currentContext: one fact — Australia
+  └── Facet: hotels        inheritance: inherit   currentContext: one fact — Indonesia
+        ├── Site: bali     inheritance: suppress  currentContext: one fact — Bali
+        │     └── Pages → localized representations: en-001, de-DE, zh-Hans-CN, id-ID
+        └── Site: jakarta  inheritance: suppress  currentContext: one fact — Jakarta
+              └── Pages → localized representations: en-001, de-DE, zh-Hans-CN, id-ID
 ```
 
-The example uses **illustrative human-readable values and Site labels, not a final schema or required hierarchy**. The Entity and each Facet/Site/Page/representation may have **no location property**, inherit from its direct ancestor, explicitly override it, or—under a validated suppression rule—decline an inherited value. A representation using `zh-Hans-CN` does not create a location in China, nor does `de-DE` change the authored location to Germany. Language and place remain independent.
+The example uses **illustrative human-readable values and Site labels, not a final schema or required hierarchy**. Inheritance is **additive**: the Facet therefore carries two facts — Australia originating at the Entity and Indonesia of its own — while each Site declaring `inheritance: suppress` carries only its own. Any node may have **no location property** at all, inherit additively, add local facts, suppress inherited facts, or explicitly extend one identified inherited fact. A representation using `zh-Hans-CN` does not create a location in China, nor does `de-DE` change the authored location to Germany. Language and place remain independent.
 
-- **Nearest explicitly authored declaration on direct EFS ancestry wins.** There is no inheritance from another Site, unrelated Page or sibling representation.
+- **Inheritance is additive over direct ancestry, never "nearest wins".** A wholly absent property inherits the ancestor result; an explicit declaration combines `inheritance: inherit | suppress` with a current context of zero or more local facts, and the effective collection is inherited-first then locally authored. Nothing is inherited from another Site, unrelated Page or sibling representation.
+- **Zero or more complete structured facts.** `location` holds an optional collection of structured facts using distinct typed concepts — world region, administrative region/state, country, locality/city, district, named place, postal components, explicit coordinates — with no universally required field and no requirement for a full postal address. Several facts never imply a single implicit "primary"; a consumer requiring exactly one must select explicitly or refuse ambiguous input.
+- **Per-value provenance and exposure.** Each effective value keeps its originating EFS level and its inclusion or suppression trace, and only a validated public projection reaches HTML, metadata, feeds or client code. An internal fact — or an internal inherited field carried into an extension — is never emitted and is never replaced by a public ancestor.
+- **One identified-record extension exception.** A node may extend **exactly one** inherited fact identified by a stable reference to that fact's original authored identity, replacing it in place with explicit field additions or replacements: changed fields take local field provenance while unchanged fields keep their origin. Missing, ambiguous, suppressed, cross-branch or circular targets are refused, and matching by place name, free text or coordinates is never attempted.
+- **Authored accuracy versus structural validation.** Solo validates declared types, structure, privacy constraints and safe serialization — not real-world truth. No geocoder, external verification service or inference fills a missing value, rewrites an authored fact or selects a route.
 - **Location may be authored at any level**, including Page or localized representation; a narrower declaration does not re-identify the owner or rewrite ancestors.
 - **No inference in either direction.** A route, base URL, hostname, Site ID, Page slug, physical directory or locale must not supply or guess a location. A location value must not select a Facet, Site, Page, locale, canonical URL, navigation destination, or public base path.
 - **No implicit geolocation engine.** Explicitly authored place facts can inform a deliberate display, structured metadata or user-selected external map link, but do not automatically cause geo-IP redirect, geocoding, visitor proximity selection, timezone/DST computation, scheduling or currency detection.
 - **No forced geography.** A Site may be purely digital or address-less. An inherited value must be suppressible where inappropriate rather than mistakenly presented as that Site's own physical address.
 
-Precise property keys, value types, multiplicity, validation, suppression syntax and public/private projection remain **technical design choices requiring approval**. The location-as-cascading-data and no-routing-inference principles are **not** open choices.
+The logical contract above — governed registration, additive two-field inheritance, per-value provenance and exposure, structured zero-to-many facts, identified-record extension and fail-closed publication — is **Owner-accepted (`R00.C`)**. Precise property keys, physical value types and their encoding, the concrete field catalogue and the physical representation of both declaration elements remain **`R00.D` technical decisions**. Location-as-cascading-data and no-routing-inference are **not** open choices.
 
 ## 4A. A configurable Entity base URL
 
@@ -126,9 +124,14 @@ An unlisted representation is **directly reachable through its exact authorized 
 
 ### Cascading graphics and one generic public graphic library
 
-The public, generic graphic library is a **shared platform resource available throughout the single Entity Installation**, not a second Entity, a Facet, or a location-based resource. An authored graphic selection (e.g., logo, icon, banner, illustration, background or image reference where a role is supported) is an EFS property capable of being defined and inherited or overridden at Entity, Facet, Site, Page and localized-representation levels. Descendants may deliberately use their inherited selection, override it or suppress it.
+The public, generic graphic library is a **shared platform resource available throughout the single Entity Installation**, not a second Entity, a Facet, a location-based resource or an ownership tier. An authored graphic selection (logo, icon, banner, illustration, background or image reference where a role is supported) is an EFS property resolved under the same additive contract as every other property: `inheritance: inherit | suppress` plus zero or more local selections, at Entity, Facet, Site, Page and localized-representation levels.
 
-If a role has an approved generic-library default, this is the **lowest-priority fallback**, below the Entity/Facet/Site/Page/representation cascade; it never overrides an authored property or an explicit suppression. Generic assets can also be explicitly referenced from any level. The shared library does not make author-owned artwork globally mutable, and generated public assets do not become the source authority. The precise graphic role catalogue, asset names, formats, allowed references and fallback choices remain design contracts to establish.
+- **Registered roles.** Roles are registered with a defined purpose, accepted asset classes, effective cardinality, applicable levels and allowed contexts; the core candidates `logo`, `favicon`, `banner`, `background` and `socialPreview` are candidates only, and an unregistered role is invalid.
+- **No silent override.** For a singular role, inheriting a selection and adding a local one produces a cardinality failure instead of replacing the inherited asset, and an effective maximum always applies to the combined result.
+- **Suppression is not emptiness.** `suppress` blocks inherited graphics, while locally authored selections remain valid and effective.
+- **Default-deny fallback.** A generic-library default is **not** assumed: automatic fallback is governed per role with **zero roles approved initially**, applies only when no effective authored graphic and no relevant suppression boundary exists, and never rescues an invalid or internal value with a generic substitute.
+
+Generic assets can also be explicitly referenced from any level — that is an authored choice, not fallback. The shared library does not make author-owned artwork globally mutable, and generated public assets do not become the source authority. The finalized role catalogue, asset names, formats, references and any future per-role defaults remain design contracts to establish.
 
 ## 5. Desired retained capabilities
 
@@ -137,7 +140,7 @@ The following are **target capabilities to assess and specify for Solo**, drawin
 | Capability | Intended outcome |
 | --- | --- |
 | One-Entity EFS ownership | Exactly one Entity; flexible Facets, Sites, Pages and localized representations |
-| Cascading properties | Inheritance from Entity through localized representation, nearest explicit value wins, explicit suppression, provenance and safe public projection |
+| Cascading properties | Additive inheritance from Entity through localized representation with explicit `inherit`/`suppress` plus local values, effective-cardinality validation, per-value provenance and safe public projection |
 | Declarative Page authoring | Validated JSON Pages with a bounded catalog of reusable sections, predictable semantics and safe destinations |
 | Safe Markdown | Straightforward prose authoring without executable content |
 | Multilingual content | Declared language-specific representations, deliberate language selection, truthful fallbacks and metadata |
@@ -187,7 +190,7 @@ A Solo Installation may be deployed by many independent adopters **as separate I
 - There are **no Spoke Hubs or Spokes**.
 - Preserve the useful power of EFS while eliminating unnecessary overhead and complexity.
 - Start from a blank slate; do not preserve an architectural mechanism merely because Foundation used it.
-- **Location is a five-level cascading EFS property**. Entity `Australia` → Facet `Indonesia` → Site `Bali`/`Jakarta` illustrates nearest-declaration precedence; `en-001`, `de-DE`, `zh-Hans-CN`, `id-ID` do not imply geography. Routing and location never infer one another.
+- **Location is a five-level cascading EFS property** (`R00.C`). Entity `Australia` → Facet `Indonesia` → Site `Bali`/`Jakarta` illustrates **additive** inheritance: a Facet carries both the Entity fact and its own unless it suppresses, and a Site that suppresses carries only its own. Zero or more structured facts are permitted, exactly one inherited fact may be extended by identified reference, and `en-001`, `de-DE`, `zh-Hans-CN`, `id-ID` never imply geography. Routing and location never infer one another.
 - **Unlisted Pages are retained**, with directly reachable but undiscoverable localized representations; this does not confer privacy. A Page-wide unlisted authoring convenience is required, with per-representation exceptions retained.
 - **Strict Hexagonal Architecture (Ports and Adapters) is a binding decision**, with inward-only dependencies, a provider-independent domain core and verifiable architectural boundaries.
 - **The planned contact capability includes safe `mailto:` actions and a simple contact form**; advanced contact forms are excluded rather than optional. Exact fields, delivery adapter and abuse controls remain later technical design decisions.
@@ -206,7 +209,7 @@ A Solo Installation may be deployed by many independent adopters **as separate I
 - Concrete schema, manifest file/field and locator formats, editable source layout, JSON/Markdown authoring encoding and draft storage for the already-accepted identity, default-model and publication semantics.
 - Physical encoding of the accepted address/route/locale contract: the concrete manifest and field schema for route claims, aliases and locale preference mappings (`R00.D`), the pinned Unicode data version and toolchain (`R00.E`), and the implemented matcher, redirect and cache behaviour and rendered language selector. The configurable base URL, route-case and locale outcomes themselves are not open.
 - JSON Page section catalogue, Markdown parity, validation and versioned encoding of the approved `visibilityDefault`/`visibility` declaration, and how much of Foundation's current renderer is adopted or redesigned.
-- Property catalogue, structured/multiple location value schema, suppression syntax, publication privacy and validation. Location-as-data and inheritance across all five EFS levels are already decided.
+- Physical property catalogue and encoding, the concrete structured location record and extension-patch schema, the physical representation of the two declaration elements and the finalized graphic role catalogue with formats and defaults (`R00.D`/`R00.E`). The logical property, location and graphic contracts — governed registration, additive two-field inheritance, per-value provenance, validated public projection, structured facts and default-deny graphic fallback — are already Owner-accepted as `R00.C`.
 - The theme, asset, dictionary, integration, establishment and release contracts.
 - Chosen programming language, framework, runtime, test tooling, technical repository/release policies, copyright/attribution and third-party `NOTICE`. GitHub **private vulnerability reporting is enabled** for the public repository; triage ownership, response expectations, coordinated disclosure, a supported-version/support policy and any required third-party notice remain open. **Apache-2.0 is Owner-approved.**
 
