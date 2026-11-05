@@ -41,7 +41,7 @@ The measure of success is not merely fewer folders or configuration keys. It is 
 
 ### Entity
 
-One persistent content owner per Installation. The Entity's ID, if represented as a technical identifier, is stable and independent of display name, domain, URL, locale, physical place or filesystem path. Its exact encoding and initial-assignment mechanism have not yet been selected.
+One persistent content owner per Installation. The Entity carries an explicitly authored technical identifier that is stable and independent of display name, domain, URL, locale, physical place or filesystem path, and the author supplies that identifier at establishment — Solo never derives or guesses it. The accepted identifier grammar, the parent-scoped uniqueness rules and the durable-reference rule are recorded in [ARCHITECTURE.md](../Architecture/ARCHITECTURE.md) §1.1; concrete schema and reference formats remain open.
 
 ### Facet
 
@@ -53,11 +53,11 @@ A content context **inside one Facet**. It may concern a service, a collection, 
 
 ### Page
 
-A stable, language-neutral identity and authored route within its Site. A Page may carry several localized representations; adding a translation does not create a new Page identity. Pages can include ordinary, nested and specialized content structures, governed by a deliberately bounded schema.
+A stable, language-neutral identity and authored route within its Site. A Page ID is unique within its own Site and survives label, public-address and translation changes. A Page may carry several localized representations; adding a translation does not create a new Page identity. Pages can include ordinary, nested and specialized content structures, governed by a deliberately bounded schema.
 
 ### Localized representation
 
-The only locale-bearing node in the ownership tree. Each published Page has at least one usable representation. Locale tags communicate content language and conventions; they do **not** establish physical location, geographic coverage or Site identity.
+The only locale-bearing node in the ownership tree. Each published Page has at least one usable representation. A representation is identified **within its Page** by its explicitly authored canonical full region-qualified locale tag; it is never a second Page identity. Locale tags communicate content language and conventions; they do **not** establish physical location, geographic coverage or Site identity.
 
 **One Page, multiple full locales:** a Page such as `about` is owned once. `en-001` (international English), `de-DE` (German as used in Germany), `id-ID` (Indonesian as used in Indonesia), and `zh-Hans-CN` (Simplified Chinese under a deliberately authored locale convention) are **separate authored representations** of that Page. `zh-Hant-TW` is another legitimate deliberate locale choice. Solo does **not** use language-only identifiers such as `en`, `de`, `zh` or `id` for authored or public representations. Canonical full tags may be rendered in lowercase path form; locale keys are addresses, never Page identities or place facts. An `en-001` representation does not make a Site worldwide or change its inherited location.
 
@@ -66,6 +66,16 @@ Browser language preferences may be shorter than authored full locale identifier
 For locale-less entry, the agreed order is **supported saved preference → supported `Accept-Language` → authored full-locale default**, with an explicit full-locale URL taking precedence over both preferences. The preferred missing-translation result is a truthful **same-Page** redirect to an expressly permitted public default representation; otherwise not-found. No implicit translation, cross-Page/Site substitution, unlisted fallback or region/location inference is allowed. Precise negotiation mapping/redirect syntax remains a technical contract for approval.
 
 **Visibility and Page routes:** Public representations have lowercase canonical URL paths and accept case-insensitive spellings. Unlisted representations remain exact-case for their authored Page-route tokens, including unpredictable mixed-case route strings. For example, `SecretAb7` is distinct from `secretab7` and `SECRETAB7` when unlisted. Locale tags retain conventional canonical syntax in authored data and normalized lowercase URL syntax in all cases; case-sensitive unlisted tokens must not be altered by the public path normalizer. A conflicting public case-folded alias and unlisted exact route must be rejected, not resolved by route order. Visibility is authored as a Page-wide default with a per-representation override, including JSON and Markdown parity. Unlisted content is **not** an authentication or secrecy guarantee; high-entropy URLs alone do not make sensitive information private.
+
+### Publication declarations, identity stability and drafts
+
+**Owner-accepted (`R00.A`).** Each Entity, Facet, Site and Page carries an explicitly persisted technical ID with a canonical lowercase-token grammar (maximum 63 ASCII characters, no repair or case-folding), and identifiers are unique inside their owning scope — Facet within Entity, Site within its own Facet, Page within its own Site — so reusing the token `main` or `home` under different valid parents is legitimate. Identifiers are independent of names, routes, addresses, locales and locations, and changing any of those never mints a replacement ID.
+
+A single explicit, **versioned publication manifest** is the sole authority for the one Entity and the published EFS graph: stable IDs, direct-parent ownership, the published Page set, supported locale representations and explicit source references. Presence of a file, property or route publishes nothing by itself, and no directory scan or `draft` label admits content. Every published representation binds to exactly one permitted authored source belonging to its own Page; missing, ambiguous or duplicate-claimed sources, orphan or duplicate declarations, and a second Entity are refused with a diagnostic naming the offender rather than repaired by a default, a first match or a sibling substitution.
+
+**Incomplete drafts** may exist only *outside* the published graph. They carry no public route or discovery rights, do not count toward published cardinality and cannot be promoted implicitly; admission always requires a complete, valid declaration that passes the same validation as any other published item.
+
+**Published cardinality:** exactly one Entity, at least one Facet per Entity, at least one Site per published Facet, at least one Page per published Site, at least one valid representation per published Page, and exactly one declared direct parent per child. Declared **unlisted** representations belong to the published graph, because visibility governs discovery rather than membership. A new usable Installation is seeded with one default Facet `main`, one child Site `main` and a starter Page `home` with real authored content in an explicitly selected full locale; these are authoring defaults, never reserved words, route segments or location facts. The logical semantics are accepted here, while manifest and source formats, JSON/Markdown encoding, draft storage and schema versions remain open technical contracts. See [Architecture](../Architecture/ARCHITECTURE.md) §1.1, §1.3 and §1.4 for the recorded rules and conceptual cases.
 
 ## 4. Location is an authored cascading EFS property — never routing
 
@@ -180,6 +190,9 @@ A Solo Installation may be deployed by many independent adopters **as separate I
 - **Strict Hexagonal Architecture (Ports and Adapters) is a binding decision**, with inward-only dependencies, a provider-independent domain core and verifiable architectural boundaries.
 - **The planned contact capability includes safe `mailto:` actions and a simple contact form**; advanced contact forms are excluded rather than optional. Exact fields, delivery adapter and abuse controls remain later technical design decisions.
 - **A configurable base URL is selected at Entity creation**, including an authored origin and optional path prefix. A subsequent base URL change must not alter EFS identities or require code redesign.
+- **Entity, Facet, Site and Page carry explicitly authored technical identifiers** with a canonical lowercase-token grammar (maximum 63 ASCII characters), parent-scoped uniqueness — Facet within Entity, Site within its own Facet, Page within its own Site — and durable references that survive label, address, translation and base-URL changes; a localized representation is keyed within its Page by its full locale tag.
+- **A new Installation is seeded with the default Facet `main`, Site `main` and starter Page `home`** holding real authored content in an explicitly selected full locale; these are authoring defaults, not reserved words, route segments or location facts.
+- **One explicit, versioned publication manifest is the sole publication authority**, with explicit source-integrity binding for every published representation and fail-closed refusal of duplicate, orphan, incomplete, second-Entity and undeclared claims; incomplete drafts may exist only outside the published graph.
 - Published Page representations use full locale tags such as `en-001`, `de-DE`, `id-ID`, `zh-Hans-CN`, never bare language-only tags; locale-less entry precedence and preference for explicit same-Page default fallback are Owner-decided.
 - **Apache License 2.0 is Owner-approved** as Solo's open-source license.
 - The active work system contains exactly `plan-roadmap.md`, `plan-next.md`, `workorder-active.md` and `plan-outlook.md` inside `.documents/WIP/` — remaining committed stages, one next candidate, the sole issued order and optional ideas respectively — with only ROADMAP → NEXT → ACTIVE progressing.
@@ -187,12 +200,12 @@ A Solo Installation may be deployed by many independent adopters **as separate I
 
 ### Proposed details awaiting review
 
-- Exact identifiers, defaults and schema formats for Entity, Facet, Site, Page and representation.
+- Concrete schema, manifest file/field and locator formats, editable source layout, JSON/Markdown authoring encoding and draft storage for the already-accepted identity, default-model and publication semantics.
 - Exact base URL and route grammar, normalization, default Site treatment, canonical-host and alias behavior. The configurable base URL outcome itself is not open.
 - JSON Page section catalogue, Markdown parity, validation and versioned encoding of the approved `visibilityDefault`/`visibility` declaration, and how much of Foundation's current renderer is adopted or redesigned.
 - Property catalogue, structured/multiple location value schema, suppression syntax, publication privacy and validation. Location-as-data and inheritance across all five EFS levels are already decided.
 - The theme, asset, dictionary, integration, establishment and release contracts.
-- Chosen programming language, framework, runtime, test tooling, technical repository/release policies, copyright/attribution and private security-reporting setup. **Apache-2.0 is Owner-approved.**
+- Chosen programming language, framework, runtime, test tooling, technical repository/release policies, copyright/attribution and third-party `NOTICE`. GitHub **private vulnerability reporting is enabled** for the public repository; triage ownership, response expectations, coordinated disclosure, a supported-version/support policy and any required third-party notice remain open. **Apache-2.0 is Owner-approved.**
 
 **No source implementation, feature-completion claim, deployment or release is authorized by this document.**
 

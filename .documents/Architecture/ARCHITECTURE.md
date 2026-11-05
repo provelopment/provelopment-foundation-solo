@@ -20,7 +20,7 @@ Solo Installation (one autonomous software/deployment lifecycle)
               └── ...
 ```
 
-**Cardinality invariant:** exactly one Entity; at least one Facet, at least one Site in each Facet, at least one Page in each Site, and at least one representation for each published Page. Every child has exactly one direct parent. Published validity and authoring drafts are distinct concerns; support for temporarily incomplete drafts is not yet decided and must not weaken published validation.
+**Cardinality invariant:** exactly one Entity; at least one Facet, at least one Site in each Facet, at least one Page in each Site, and at least one representation for each published Page. Every child has exactly one direct parent. Published validity and authoring drafts are distinct concerns, and the accepted `R00.A` decision in §1.3 keeps them apart: incomplete drafts may exist **only outside** the published graph, so a draft never weakens published validation and never becomes published merely by being present.
 
 ### 1.1 Identity and ownership
 
@@ -33,7 +33,11 @@ Solo Installation (one autonomous software/deployment lifecycle)
 | Page | Language-neutral content identity; Page ID unique within Site | URL alone or a translation |
 | Localized representation | Authored content for one Page and one locale | New Page, geographic identity or market |
 
-Display labels may change without changing permanent content identity. The **technical ID grammar is open**; no route, filename, hostname or address may mint identity implicitly. Paths may be used as deliberate locators, not the definition of identity. There is exactly one owner, so no cross-Entity ownership resolution, registry, synchronization or tenancy permission model is necessary.
+**Identity, grammar and stability (`R00.A`, accepted).** Display labels may change without changing permanent content identity, and no route, filename, hostname, public address, locale or provider account may mint identity implicitly. Paths may be used as deliberate locators, never as the definition of identity. Each Entity, Facet, Site and Page carries an explicitly persisted technical ID. For these four identity-bearing levels only, an ID is a canonical lowercase ASCII token matching `^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$` with a maximum of **63 ASCII characters** — no leading or trailing hyphen, no consecutive hyphens, no whitespace, underscore, uppercase alias, non-ASCII character, slash, dot or percent escape, and no silent case-fold normalization. An invalid authored ID is refused with a specific diagnostic; it is never repaired, normalized or derived from another value. This grammar governs **IDs only**; public Page-route tokens keep their separately accepted public/unlisted casing behavior (§3.2B).
+
+**Uniqueness scope (`R00.A`, accepted).** Exactly one Entity ID exists per Installation; Facet IDs are unique within that Entity; Site IDs are unique within their **own** Facet; Page IDs are unique within their **own** Site. Reusing a token such as `main` or `home` under different valid parents is legitimate because the owning scope differs, and different levels may legitimately carry the same token. Duplicate authored IDs inside one scope are invalid. No ID-alias mechanism is established; any future aliasing needs separate Owner acceptance and must not create ambiguous identity claims. There is exactly one owner, so no cross-Entity ownership resolution, registry, synchronization or tenancy permission model is necessary.
+
+**Durable reference (`R00.A`, accepted).** Authoring and publication declarations persist those IDs together with explicit parent ownership. Changing labels, public addresses, the set of localized representations, the base URL or EFS properties never mints a replacement ID. A parent move, identity change or deletion is an explicit, later-approved migration with reference checks; no filename move, route change or implicit inference silently reparents or recreates a node. The concrete reference format and any migration tooling remain open. A localized representation is identified **within its Page** by its explicitly authored canonical full region-qualified locale tag under §3.2, and is never a second Page identity.
 
 ### 1.2 Separate concerns, always
 
@@ -42,6 +46,59 @@ Display labels may change without changing permanent content identity. The **tec
 3. **Routing:** explicit mapping of a public host/path request to a selected Facet/Site/Page/representation within the already-known Entity.
 
 An implementation design must describe and verify these independently. Public route strings are **addresses, not definitions** of identity, location or ownership.
+
+### 1.3 Publication authority, source integrity and fail-closed validation
+
+**Minimum default model (`R00.A`, accepted).** The author explicitly supplies the single Entity ID; Solo never guesses it from a name or hostname. A new usable Installation is seeded with exactly one default Facet (ID `main`, label `Main`), exactly one child Site (ID `main`, label `Main Site`) and a starter Page (ID `home`, label `Home`) carrying at least one real authored localized representation in an explicitly selected supported full locale. The repeated IDs are valid because the scopes differ. These are initial authoring defaults, **not** reserved words, required route segments, geographic labels or new ownership levels, and labels stay editable without an identity change. No locale is inferred or hardcoded here: the Site/default-locale configuration and public Home routing belong to `R00.B`. The starter Page is a usable authored Page — never an automatically published undeclared source file and never an empty placeholder — and further starter Pages are not mandated.
+
+**Published graph (`R00.A`, accepted).** The published graph holds validated, directly reachable representations, **including declared unlisted ones**, because visibility governs discovery rather than membership. Partially authored content may exist only as a non-published draft under the rule below, never as an exception to published cardinality.
+
+**Drafts outside the published set (`R00.A`, accepted).** Authors may retain incomplete content or work-in-progress declarations **outside** the authoritative published set. Such drafts do not count toward published cardinality, have no public route or discovery rights, and are never promoted implicitly by file presence, a directory scan or a label such as `draft`. Explicit admission to the published set requires a complete, valid declaration that passes exactly the same validation as any other published item. Draft storage locations and draft metadata format remain `R00.D`.
+
+**One authoritative publication declaration (`R00.A`, accepted).** A single explicit, versioned publication manifest is the **sole** authority for the one Entity and the published EFS ownership graph: stable IDs, direct-parent associations, the published Page set, supported locale representations and explicit source references. Only explicitly admitted, complete entries publish; a file, property, route declaration or a label such as `draft` never publishes anything by itself. The logical semantics are accepted here, while the physical file format, field names, locator syntax, content-section schema and manifest schema version remain for `R00.D` and adjacent contracts.
+
+**Source integrity (`R00.A`, accepted).** Every published localized representation binds explicitly to an authored content-source reference belonging to its declared Page. That reference must resolve to exactly one existing, valid and permitted authored source inside the eventual validated source boundary; implicit path matching, first-file-wins, search-order fallback and sibling source substitution are all refused. Two distinct published claims must not silently share one authored source, and any intended sharing or generated content needs its own later explicit contract. Undeclared files never publish; declared missing, unsafe or ambiguous sources fail validation; generated output and public assets never become the authored manifest authority.
+
+**Fail-closed refusal specification (`R00.A`, accepted).** Validation must reject, with an actionable diagnostic that names the affected declaration or ID and the reason: a second Entity; missing or invalid IDs; duplicate IDs in the relevant parent scope; a missing, unknown or ambiguous parent; an orphan Site, Page or representation; an illegal cross-parent binding; an empty published Facet, Site or Page; a missing published representation; a duplicate locale within one Page after canonical normalization; undeclared content publication; an absent, duplicate-claimed, unsafe or ambiguous authored source reference; and publication inferred from a directory or filename. Errors are never hidden by inventing a default parent, choosing the first match, reassigning identity or redirecting to a sibling, and no diagnostic exposes server-private paths or secrets.
+
+### 1.4 Conceptual identity and publication examples
+
+These examples are **conceptual specification evidence only**: they are not executed validation, not a manifest schema and not a final file format. Schema, locator syntax, tooling and runtime validation belong to `R00.D`, `R00.E` and Stage 02.
+
+A minimal valid default shape, with an Entity ID the author supplies explicitly:
+
+```text
+Entity  <explicitly authored id>        label: any display name
+  └── Facet main                        label: Main
+        └── Site main                   label: Main Site
+              └── Page home             label: Home
+                    └── representation <selected full locale>    e.g. en-001
+```
+
+An expanded shape that reuses tokens legitimately, because each owning scope differs:
+
+```text
+Entity acme
+  ├── Facet main
+  │     ├── Site main     → Pages home, about
+  │     └── Site bali     → Pages home, about     # same ids, own Site scope
+  └── Facet hotels
+        └── Site main     → Pages home, rooms     # same ids, own Site scope
+```
+
+Refusal examples — each states required behaviour, not a passing test:
+
+| Invalid declaration | Required refusal |
+| --- | --- |
+| A second Entity in the manifest | Exactly one Entity is permitted per Installation |
+| `Site` id `Main`, `home_page`, `-main`, `main--site`, `main site`, or a 64-character token | Not a valid identity token; no repair, case-fold or truncation is attempted |
+| Two Facets with id `main` in one Entity | Duplicate id within the same owning scope |
+| A Site whose declared Facet id does not exist | Unknown parent; no default parent is invented |
+| Two representations of one Page claiming the same source | Duplicate source claim; no first-file-wins resolution |
+| A representation whose declared source is missing or outside the permitted boundary | Declared source is absent or not permitted |
+| A published Page with no representation | A published Page requires at least one representation |
+| `de-DE` and `de-de` as two representations of one Page | Duplicate locale after canonical normalization |
+| A source file present in the tree but absent from the manifest | Undeclared source does not publish |
 
 ## 2. The property system is a core EFS capability
 
@@ -327,19 +384,19 @@ At implementation time, tests must exercise both the ordinary one-Facet/one-Site
 
 ## 7. Decisions to make before an implementation work order
 
-1. **ID and authoring contract:** Entity ID form, default Facet/Site IDs, content manifest shape, editable source layout and whether incomplete drafts can exist.
+1. **Authoring and publication contract — decided by `R00.A`, format still open:** accepted and recorded in §1.1, §1.3 and §1.4 are the technical ID grammar and 63-character limit, the parent-scoped uniqueness rules, durable references, the explicitly supplied Entity ID, the seeded `main`/`main`/`home` defaults, drafts outside the published graph, the single versioned manifest as sole publication authority, source integrity and fail-closed refusal. **Still open:** the concrete manifest file and field/locator schema, the editable source layout, JSON/Markdown authoring encoding, draft storage and the encoding of the accepted identity/publication semantics.
 2. **Route grammar and base URL validation:** single authored base URL at establishment (origin + optional prefix), safe normalization, config-only changes, default Site paths, full-locale path segment and preference negotiation per §3.2, alias policy, discovery metadata and multi-Site collisions. **Owner accepted:** public paths are case-insensitive with lowercase canonicals; unlisted Page-route tokens remain exact-case; collisions must fail; short browser preference tokens require explicit mappings; same-Page default fallback is preferred. **Still technical:** specific URL grammar, redirect codes, path encoding, mapping storage and collision algorithm.
 3. **Typed property contract:** exact schema, explicit suppression, safe projection and structured/multiple location facts. **Location as a five-level cascade** is already Owner-decided; its encoding is not.
 4. **Page formats, visibility and presentation:** approved section catalog, JSON/Markdown precedence, **Owner-approved Page-level `visibilityDefault` with representation-level `visibility` override**, design tokens, shared generic public library, cascading graphic roles and dictionary precedence. Field placement and behavior are decided; schema encoding, valid graphic roles and defaults remain technical choices. Unlisted serving/discovery behavior itself is Owner-accepted.
 5. **Integration scope:** the **included** contact scope is the safe `mailto:` action and the **simple** contact form; **advanced contact forms are excluded** (see §3.4). Remaining technical choices are the field set, delivery adapter/provider, anti-abuse controls, retention, and the booking/map-link and analytics defaults.
-6. **Tooling/lifecycle:** framework, runtime, validation/test gates, release/upgrade strategy, **Apache-2.0 (Owner approved), copyright/attribution, third-party notices, private vulnerability intake**, and independent Solo repo setup (the parent `/00.foundation-solo/` ignore rule is **committed and verified effective** in the enclosing repository at its recorded local revision, which tracks no Solo paths; the parent remains outside the Solo agent's write boundary, and its remote publication is a separate Owner/parent-operator concern, not a Solo bootstrap gate).
+6. **Tooling/lifecycle:** framework, runtime, validation/test gates, release/upgrade strategy, **Apache-2.0 (Owner approved), copyright/attribution, third-party notices, and the release/support policy around the already-enabled GitHub private vulnerability reporting channel** — intake is enabled for the public repository, while triage ownership, response expectations, coordinated disclosure, a supported-version/support policy and any required third-party notice remain open — and independent Solo repo setup (the parent `/00.foundation-solo/` ignore rule is **committed and verified effective** in the enclosing repository at its recorded local revision, which tracks no Solo paths; the parent remains outside the Solo agent's write boundary, and its remote publication is a separate Owner/parent-operator concern, not a Solo bootstrap gate).
 
 **No undefined implementation mechanism should be treated as approved merely because it appears as an example in this document.**
 
 ## 8. Governance, repository and evidence boundary
 **New document naming invariant:** the only live WIP files are `plan-roadmap.md`, `plan-next.md`, `workorder-active.md`, and `plan-outlook.md`. Files beginning `plan-` can inform decisions but never authorize source work; `workorder-active.md` only authorizes changes with an exact Owner-issued scope and matching handoff. Do not generate task-specific plan or workorder files to accumulate history.
 
-**Repository standard files:** The Owner-approved Apache-2.0 `LICENSE`, Git hygiene dotfiles, and recognized `.github/` community files are narrow publishing/tooling placement exceptions to `.documents/`. They contain no second source of architectural or operational authority. Copyright/attribution, third-party notices and private disclosure channel must be verified before publication.
+**Repository standard files:** The Owner-approved Apache-2.0 `LICENSE`, Git hygiene dotfiles, and recognized `.github/` community files are narrow publishing/tooling placement exceptions to `.documents/`. They contain no second source of architectural or operational authority. GitHub **private vulnerability reporting is enabled** for this public repository; copyright/attribution, third-party notices, triage ownership, response expectations, coordinated disclosure and a supported-version/support policy remain outstanding and must be settled before any release.
 
 
 The Solo repository and its own source are the future first-hand implementation evidence. All standalone Solo documentation belongs under `00.foundation-solo/.documents/`, except the required root `README.md` and `AGENTS.md`. Decisions and approved execution tasks must be recorded in that same project, not delegated to historical Foundation or Provelopment root documentation.
