@@ -6,7 +6,6 @@
 
 **Remaining packages**
 
-- **R00.A — Identity and publishing declarations:** settle stable Entity/Facet/Site/Page IDs and their scope, default Facet/Site names, whether incomplete drafts can exist outside the publishable model, authoritative manifest/content boundaries, source-to-declaration integrity and fail-closed duplicate/orphan detection.
 - **R00.B — Address/locale contract:** settle configured HTTP(S) origin and optional base-path normalization, path/segment encoding, Site/Page routing and Home conventions, redirect status and aliases, route collisions, locale preference mapping, error representation and full-locale URL construction; preserve the settled public case-insensitivity and exact-case unlisted Page-token distinction.
 - **R00.C — Property/graphic contract:** settle typed values, property declaration/suppression/public projection and provenance encoding; the five-level location cascade; graphic-role catalogue, authored/generic asset references and fallback safety.
 - **R00.D — Content and publication contract:** settle versioned JSON/Markdown declarations, `visibilityDefault`/representation `visibility` placement, bounded Page sections, Markdown safety, author link classification, content source precedence and asset path authority.
