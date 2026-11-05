@@ -6,7 +6,7 @@
 
 **Remaining packages**
 
-- **R00.B — Address/locale contract:** settle configured HTTP(S) origin and optional base-path normalization, path/segment encoding, Site/Page routing and Home conventions, redirect status and aliases, route collisions, locale preference mapping, error representation and full-locale URL construction; preserve the settled public case-insensitivity and exact-case unlisted Page-token distinction.
+- **R00.B — Address/locale contract:** settle configured HTTP(S) origin and optional base-path normalization, path/segment encoding, Site/Page and localized route declarations including validated Unicode route text, default-insensitive versus author-selected sensitive public claims, Home/landing entry conventions, redirect status and aliases, route-collision refusal, locale preference mapping, error representation and full-locale URL construction; preserve the settled exact-case unlisted Page-token distinction and independent locale-segment normalization.
 - **R00.C — Property/graphic contract:** settle typed values, property declaration/suppression/public projection and provenance encoding; the five-level location cascade; graphic-role catalogue, authored/generic asset references and fallback safety.
 - **R00.D — Content and publication contract:** settle versioned JSON/Markdown declarations, `visibilityDefault`/representation `visibility` placement, bounded Page sections, Markdown safety, author link classification, content source precedence and asset path authority.
 - **R00.E — Software structure and toolchain:** compare credible framework/language/build/testing choices, choose simplest verifiably strict Ports-and-Adapters design, dependency/port catalogue, composition root, boundary test method, CI and browser proof architecture. Do not inherit Foundation's Next.js/pnpm choice by default.
@@ -57,12 +57,12 @@
 
 **Remaining packages**
 
-- **R04.A:** implement safe configurable public base origin/prefix, route claim validation, public lowercase canonical paths, case-insensitive public lookup and exact-case unlisted Page-route tokens; reject mixed public/unlisted collision and encoded-path ambiguity *before* serving content.
+- **R04.A:** implement safe configurable public base origin/prefix, route claim validation, per-claim matching policy (insensitive by default, author-selected sensitive preserving authored capitalisation), NFC-normalized Unicode route text with controlled decoding, canonical spelling per claim, independent full-locale segment normalization and exact-case unlisted Page-route tokens; reject ambiguous claim overlaps, mixed public/unlisted collisions and encoded-path ambiguity *before* serving content.
 - **R04.B:** implement full canonical BCP 47 with regions (`en-001`, `de-DE`, `id-ID`, `zh-Hans-CN`), locale-less selection by supported saved preference → mapped `Accept-Language` → authored default, explicit full-locale preference precedence and truthful same-Page public-only fallback.
 - **R04.C:** implement Page `visibilityDefault` (default public) plus representation `visibility`, per-representation effective state, direct exact unlisted access and noindex/nofollow; refuse unlisted fallback/discovery and invalid mixed claims.
 - **R04.D:** deliver **one genuine production-mode vertical slice** from configured HTTP(S) base URL and request through route resolution, Page/representation validation, public output, error/not-found and canonical response. Do not postpone this proof to a future front-end migration.
 
-**Exit gate:** browser/HTTP positive and negative matrix for base URLs with/without prefixes, config-only URL change, full-locale variants, unknown paths, missing representations, public case aliases, mixed visibility, exact-case unlisted tokens, no locale/location inference, and 404 versus 500 correctness. Tests use the real request path, not a legacy fixture fallback.
+**Exit gate:** browser/HTTP positive and negative matrix for base URLs with/without prefixes, config-only URL change, full-locale variants, unknown paths, missing representations, insensitive public case aliases resolving to one canonical Page, distinct author-selected sensitive Pages, Unicode/NFC route handling, mixed visibility, exact-case unlisted tokens, no locale/location inference, and 404 versus 500 correctness. Tests use the real request path, not a legacy fixture fallback.
 
 ## Stage 05 — Safe authoring and complete Page rendering
 
@@ -83,7 +83,7 @@
 **Remaining packages**
 
 - **R06.A:** implement coherent theme/brand/layout primitives, accessible responsive shell and configured headers/footers, using composable design tokens and EFS graphic inheritance.
-- **R06.B:** implement authored navigation, Site/Page selection and true same-Page language switching; do not invent links to unavailable variants or infer destination from place/locale.
+- **R06.B:** implement authored navigation, Site/Page selection and true same-Page language switching using each representation's actual authored localized canonical route; do not invent links to unavailable variants, guess a counterpart by swapping a locale segment, or infer destination from place/locale.
 - **R06.C:** implement mobile/keyboard/assistive-tech control behavior, loading/error/not-found presentation and no-JavaScript/limited-adapter graceful behavior where applicable.
 
 **Exit gate:** desktop and mobile real-browser evidence; keyboard traversal, focus, accessible labels/headings and representative manual accessibility checks; multi-Facet/multi-Site and multilingual navigation; no Spoke or geographic selector. Authoring normal Page content does not require application code changes.

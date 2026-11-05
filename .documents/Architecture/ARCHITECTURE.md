@@ -197,7 +197,7 @@ These tags specify an **authored linguistic/formatting convention**, not the Ent
 
 **Owner-accepted fallback behavior, with exact configuration keys and redirect-status implementation pending:** Define a full-locale default for the applicable Site; a Page may explicitly opt out with a strict/not-found policy or nominate another *public* same-Page fallback. If a requested representation is missing, perform a **temporary redirect** to the actual authorized fallback representation's canonical full-locale URL; do not render a language other than the one in the URL. If no acceptable public representation exists, return not-found with a diagnostic. A public representation must never be silently replaced with a different existing representation. Validation should refuse a declared fallback target that does not exist or is unlisted.
 
-**Owner-accepted addressing distinction:** Full locale tags are authored with canonical casing (e.g., `zh-Hans-CN`), and the public locale path segment uses a deterministic lowercase representation of that full tag (e.g., `zh-hans-cn`). The URL segment is an address, **not** Page identity or a location. Example configured bases:
+**Owner-accepted addressing distinction:** Full locale tags are authored with canonical casing (e.g., `zh-Hans-CN`), and the public locale path segment uses a deterministic lowercase representation of that full tag (e.g., `zh-hans-cn`). The URL segment is an address, **not** Page identity or a location, and locale-segment normalization is deliberately independent of the Page-route case policy (§3.2B): a case-sensitive Page route is never lowercased by it. Example configured bases:
 
 ```text
 https://a.abc.com/something/en-001/about
@@ -206,7 +206,7 @@ https://a.abc.com/something/id-id/about
 https://a.abc.com/something/zh-hans-cn/about
 ```
 
-**For implementation contract acceptance:** The exact route grammar, normalization/error handling, locale preference storage and temporary redirect status are still open technical choices. The principles above are not permission to start source work.
+**For implementation contract acceptance:** The route-case, Unicode, collision, redirect and locale-selection behaviour above is now Owner-accepted (`R00.B`, recorded in §3.2B). What remains open is technical encoding rather than policy: the physical manifest and field schema (`R00.D`), the pinned Unicode data version and toolchain (`R00.E`), and the compiled validators, HTTP adapters, redirect/cache behaviour and rendered language selector (later implementation stages). None of this is permission to start source work.
 
 - Language switching stays on the exact same Page and Site; unavailable variants are not advertised as available.
 - A declared default locale must be a supported full tag. Missing fallbacks never promote an unlisted representation.
@@ -228,26 +228,52 @@ https://a.abc.com/something/zh-hans-cn/about
 
 An unlisted representation serves at its **exact authorized URL** and carries `robots: noindex, nofollow`; it is absent from generated navigation, sitemap, `hreflang`, language-switch options, `x-default` and any other automatic discovery. It is **not private**: no secrets or access-controlled material may rely on `unlisted`. An explicitly authored direct link can intentionally point to a known unlisted URL only under the eventual safe-link contract; the platform does not automatically advertise it. Missing-translation fallback must never select an unlisted representation. Behavior must be equivalent for JSON and Markdown content.
 
-**Open implementation details:** The versioned JSON/Markdown declaration schema, whether a fully unlisted Home Page is allowed when the public base has no other entry, route-token grammar, and source validation behavior remain to be designed and separately authorized. The visibility field placement and override precedence above are approved.
+**Owner-accepted Home entry, and remaining implementation details:** a fully unlisted Home Page is permitted. The locale-less base entry prefers an explicitly designated **real public landing Page**; where no public landing representation is available it returns not-found rather than revealing an unlisted Home, and the landing selection must be authored, unambiguous and collision-checked (`B10`). The default seeded `main`/`main`/`home` Page retains its stable EFS identity regardless of how the public entry is configured. Still open: the versioned JSON/Markdown declaration schema and source-validation encoding (`R00.D`); the public route-token grammar itself is accepted in §3.2B (`B04`). The visibility field placement and override precedence above are approved.
 
 
-### 3.2B Owner-accepted URL case policy: public versus unlisted
+### 3.2B Owner-accepted public route-case, Unicode and collision contract
 
-**Visible/public representations:** Path matching for publicly listed Pages is **case-insensitive** for the supported route character set. Canonical public URLs use lowercase path segments, including normalized full-locale tags (`de-DE` in authoring becomes `/de-de/`). Alternate spellings such as `/DE-DE/ABOUT`, `/de-DE/About` and `/de-de/about` must identify the **same public representation** and use the same canonical URL. The recommended mechanism is to redirect noncanonical public spellings to the lowercase canonical address; the specific safe redirect status and encoded-path rules are open technical details. This applies after the configured public base URL is resolved; the base-path canonicalization policy must be deterministic and consistent with public links, sitemap and metadata.
+**Default public behaviour (`B05-B`).** Matching for a public localized route claim is **case-insensitive by default**, and its canonical Page-route spelling is the deterministic Unicode-aware lowercase form of that authored claim, normalized to NFC. Case-insensitivity is a default property of the claim, not a universal law that every public URL must obey.
 
-**Unlisted representations:** Authored **Page-route tokens** are case-sensitive and case-preserving, so an unlisted token `xY7AbC` is not equivalent to `xy7abc` or `XY7ABC`. These characters must never be lowercased or case-folded as part of route matching, redirects, source lookup or URL generation. Full-locale identifiers, including unlisted URLs' locale segments, remain normalized by the same BCP 47 locale rules, so case sensitivity applies to the unpredictable Page-route part rather than treating `de-DE` as a different language from `de-de`. All variants of an unlisted route must remain outside automatic navigation, sitemap, language-alternate and other generated discovery. An unlisted URL is not secret or protected simply because it is hard to guess.
+**Author-selected case-sensitive public behaviour (`B05-B`).** An author may explicitly choose **case-sensitive** matching for an individual localized route claim. The proposed logical setting is `caseMatching: insensitive | sensitive`, defaulting to `insensitive` for public claims; its concrete schema representation belongs to `R00.D`. A sensitive claim's canonical Page-route spelling **preserves the authored NFC-normalized Unicode capitalization**. Because the setting is attached to the authored localized route claim, `About`, `about` and `aBout` may deliberately identify **three distinct public Pages** in one locale, and German `Morgen` and `morgen` may remain distinct, provided every relevant claim is sensitive and validation proves no conflict. No Site-wide, Facet-wide or locale-wide case-sensitive switch exists, and there is no hidden global mode.
 
-**Mixed visibility:** A Page's `visibilityDefault` and a representation's `visibility` override determine the **effective visibility of that representation**. Case-insensitive public matching must not run as a blanket whole-path lowercase step before visibility is resolved. The route validator must refuse any public case-folded alias that could capture an unlisted exact-case path in the same effective route/locale scope, and it must refuse ambiguous public/public or unlisted/unlisted claims. No manifest ordering or fallback may decide such a collision. Public aliases must never accidentally serve or disclose unlisted content.
+**Unlisted representations.** Effective unlisted representations always require **exact-case** authored Page-route matching; an unlisted claim can never be matched case-insensitively, so `xY7AbC` is not equivalent to `xy7abc` or `XY7ABC`, while two unlisted claims such as `abc` and `Abc` remain independently valid when their exact keys differ and nothing else is ambiguous. These characters are never lowercased or case-folded during matching, redirects, source lookup or URL generation. All variants of an unlisted route stay outside generated navigation, sitemap, language alternates and every other automatic discovery, and serve `noindex, nofollow`. An unlisted URL is not secret or access-controlled merely because it is hard to guess.
 
-**Illustrative cases, not an adopted path grammar:**
+**Locale handling is independent.** Full-locale segments always normalize by the accepted full BCP 47 rules regardless of Page-route matching policy, so `/DE-DE/Morgen` normalizes its locale segment while a sensitive Page route keeps `Morgen`; a case-sensitive Page slug is never lowercased by locale normalization. Page-route matching and locale-segment matching are separate operations, and a wrong-case sensitive request produces no implicit case-based redirect to another claim.
 
-```text
-Public:   /something/DE-DE/About     -> /something/de-de/about (same public Page)
-Public:   /something/de-de/about     -> /something/de-de/about
-Unlisted: /something/de-de/Xa9B2     -> exact authored unlisted Page
-Unlisted: /something/de-de/xa9b2     -> not the same Page; reject or 404 unless independently declared
-```
+**Validated Unicode routes (`B04`).** Intentional Unicode Page-route text and optional localized representation slugs are first-release capabilities, not a later enhancement: there is no ASCII-only authoring restriction. The logical contract requires valid Unicode text normalized to NFC for comparison and canonical output; well-defined UTF-8 URI encoding with one controlled percent-decoding boundary; separate treatment of decoded text and encoded delimiters; refusal of malformed encodings, encoded path separators, backslash ambiguity, dot-segment traversal, unsafe control characters, ambiguous multiple decoding and claims that normalize into prohibited conflicts; deliberate handling of combining marks, non-Latin scripts, meaningful Unicode capitalization and script-sensitive characters; consistent version-controlled Unicode/casing behaviour across validation, matching and URL generation; and actionable diagnostics for dangerous confusable claims without silently translating or equating lookalike words. The public-route grammar is deliberately distinct from the accepted EFS technical-ID grammar and its 63-character limit. Any Unicode data/profile version that must be pinned belongs to `R00.E`.
 
+**One comparison pipeline.** Comparisons use a single reproducible NFC-based pipeline: insensitive comparisons apply full Unicode caseless behaviour with explicitly documented and tested locale-specific tailoring where applicable, while sensitive comparisons apply NFC-normalized exact comparison without case folding. Canonical URL construction is a distinct step from comparison.
+
+**Publication collision rules (accepted):**
+
+1. Build and validate the complete set of canonical routes, permitted aliases and locale-less entry claims before publication.
+2. Route matching must never use declaration order or first-match-wins to resolve ambiguity.
+3. Identical effective claims competing for different destinations are invalid.
+4. Different sensitive public claims with distinct exact normalized keys may coexist even if their caseless keys match, provided no other claim creates ambiguity.
+5. Any insensitive public claim overlapping a sensitive or another insensitive claim is invalid when the claims cannot be resolved unambiguously; hidden precedence must never rescue it.
+6. The stricter public/unlisted **caseless-collision refusal** is preserved, including where the public route itself is sensitive.
+7. Exact-case distinctness between safely normalized unlisted routes is preserved whenever their exact keys differ.
+8. Different full-locale namespaces may deliberately map identical route strings to different Pages.
+9. Alias and locale-less entry claims pass equivalent overlap checks and never capture an unintended Page or reveal unlisted content.
+10. Duplicate normalized canonical addresses and nonunique canonical targets fail validation; overlapping claims pointing at the same representation are not accepted merely because they agree, unless an explicit nonambiguous alias contract authorizes the relationship.
+
+**Redirect semantics (`B08`) and caching (`B12`).** A stable public canonical spelling correction is ordinarily a `308` where method and safety rules permit; a preference-dependent locale-less entry and a valid missing-translation fallback are temporary, ordinarily `302`; sensitive Page-route casing differences are never silently corrected by redirecting to another sensitive claim. Redirect targets are constructed only from validated internal route authority, never from request data. Preference-dependent locale-selection responses must not be shared-cached (a conservative nonshared/no-store policy is acceptable), while explicit full-locale public responses stay deterministic, unaffected by visitor cookies and ordinarily cacheable.
+
+**Illustrative outcomes — conceptual contract cases, not executed tests:**
+
+| Case | Required behaviour |
+| --- | --- |
+| Insensitive public `about`; requests `about`, `About`, `ABOUT` | Same Page; lowercase canonical URL |
+| Sensitive public `About`, `about`, `aBout` on three different Pages | All three may coexist and resolve separately |
+| Sensitive `Morgen` and `morgen` on different German Pages | Both permitted when collision-free |
+| Sensitive `Morgen`; request `MORGEN` undeclared | No guessed match; not-found |
+| Insensitive `morgen` plus sensitive `Morgen` | Reject the overlapping claims |
+| Sensitive public `Morgen` plus unlisted `morgen` | Reject under the retained public/unlisted collision policy |
+| Unlisted `abc` and `Abc` | Independently valid exact-case claims when otherwise unambiguous |
+| `/en-001/about` and `/de-de/about` | May identify different authored Pages |
+| `/DE-DE/Morgen` | Locale casing normalized; sensitive Page-route spelling preserved |
+| NFC-equivalent route spellings | One normalized comparison; conflicting declarations refused |
 ### 3.3 Present one coherent public website
 
 A configurable presentation shell should provide accessible header/navigation/footer, branding, a responsive design system, language controls, internal links, optional Site navigation, content sections and appropriate asset handling. Additional Facets or Sites are *content organization*, not automatic visitor-facing switchers. Public navigation must be authored or explicitly derived under a defined, opted-in policy.
@@ -292,7 +318,7 @@ https://www.abc.com/another-something
 
 Both are valid *forms* for discussion; no particular hostname or prefix is baked into the product. The chosen base URL is a **public addressing configuration**, not a permanent EntityID, a Facet/Site identity, a location or a localization rule. A later legitimate base URL change must be possible by editing this configuration **without moving authored content, minting another Entity, changing its EFS IDs or restructuring routing code**. The router must work for a bare origin and a prefixed origin through the same implementation.
 
-The URL contract must validate scheme, hostname, port when applicable, normalized and safe prefix segments, reserved namespaces, collisions with Page routes, relative/absolute link handling and correct path boundary matching. Exact aliases, redirects, canonical origin and environment/preview behavior still require accepted technical contracts. External DNS, host verification and provider routing are deployment operations, separate from configuring Solo's public-address model.
+The URL contract must validate scheme, host, applicable port, normalized and safe prefix segments, reserved namespaces, collisions with Page routes, relative/absolute link handling and correct path boundary matching, and must refuse credentials, query and fragment components, malformed encodings, ambiguous separators and traversal (`B01`). One configured canonical public address is authoritative; optional, explicitly authorized and validated **aliases** are supported, including legitimate address-migration cases, and an alias never becomes another Entity, a Site, a location-derived route authority or an automatically trusted hostname (`B09`). Generated canonical, metadata and discovery URLs always use the effective canonical address, and a configured prefix is preserved **exactly once** across routing, links, metadata and assets. Redirect status and caching behaviour are accepted in §3.2B (`B08`, `B12`), and arbitrary incoming `Host` or forwarding headers are never canonical-address authority. External DNS, TLS, host verification and provider routing remain deployment operations, separate from configuring Solo's public-address model.
 
 ### 4.2 Proposed request-resolution pipeline
 
@@ -300,14 +326,16 @@ The URL contract must validate scheme, hostname, port when applicable, normalize
 incoming request URL (host + path)
   → validate the configured public base URL / separately approved aliases
   → remove exactly the configured safe base-path prefix (if any)
-  → match one explicit content route within this one Entity
+  → normalize the full-locale segment per the accepted BCP 47 rules
+  → resolve each candidate claim's declared matching policy and effective visibility
+  → match one explicit route claim (insensitive by default, sensitive by author choice, exact-case when unlisted)
   → identify authored Facet + Site + language-neutral Page
   → select or resolve an authorized localized representation
   → read and validate its authored source and effective EFS properties
   → render content, links and metadata using the effective canonical base URL
 ```
 
-No Spoke or Spoke Hub resolution exists. The Entity is already known by the Installation; **neither location properties nor Entity/Site names** are router selectors. Route declarations are validated, not discovered by arbitrary file iteration or first matching array entry.
+No Spoke or Spoke Hub resolution exists. The Entity is already known by the Installation; **neither location properties nor Entity/Site names** are router selectors. Route declarations are validated, not discovered by arbitrary file iteration or first matching array entry, and matching never lowercases the entire incoming path before the effective claim policy and visibility are resolved (§3.2B).
 
 ### 4.3 Simple defaults, explicit expansion
 
@@ -325,13 +353,13 @@ base = https://www.abc.com/another-something
   /id-id/contact      → https://www.abc.com/another-something/id-id/contact
 ```
 
-The same Page/representation IDs may be published at either chosen base URL without identity changes. Locale placement and representation fallback are independent technical decisions. Unknown/conflicting routes must fail clearly, never borrow another Site or guess from `location`.
+The same Page/representation IDs may be published at either chosen base URL without identity changes. A language-neutral Page may carry **different canonical route spellings in different full locales**, and one identical route string used in two different full-locale namespaces may deliberately identify two different Pages (`B02`, §3.2B). Unknown, conflicting or ambiguous route claims must fail clearly, never borrow another Site or guess from `location`.
 
 ### 4.4 Canonical URLs, asset addresses and unlisted discovery
 
 Canonical, Open Graph, language alternates, generated links, assets and sitemap entries must be composed with the **configured effective base URL**. A configured path prefix must be preserved **exactly once**; it must not be accidentally dropped or doubled. Server routing and generated metadata must use the same public-address authority.
 
-Only declared public representations may be advertised through generated discovery. An unlisted representation still serves on its exact authorized URL, with `noindex`, but is absent from generated navigation, sitemap and `hreflang`. Unlisted is not a protected/private URL.
+Only declared public representations may be advertised through generated discovery. An unlisted representation serves only at its exact authorized **case-sensitive** URL, with `noindex, nofollow`, and is absent from generated navigation, sitemap, `hreflang`, `x-default` and language-switch options; it can never be reached through an insensitive public alias. Unlisted is not a protected/private URL.
 
 Physical location properties can supply deliberate visible facts or permitted structured data, but must **never determine the base URL, canonical URL, route claim, Page selection or locale**.
 
@@ -370,7 +398,7 @@ These are **proposed verification obligations**, not passing tests:
 | Page/locale integrity | One Page has multiple real representations; no cross-Page/Site fallback |
 | Property cascade | Nearest declaration wins; absence inherits; explicit suppression works; provenance is correct |
 | Location independence | Route results unchanged when place properties change; locale and location never determine each other; Australia → Indonesia → Bali/Jakarta cascade demonstrated |
-| Routing integrity | Host-only and prefixed base URLs configured at creation, later config-only URL change, correct prefix handling/canonicals; unknown/colliding claims fail; public mixed-case requests identify one lowercase canonical Page, and case aliases cannot capture an unlisted route |
+| Routing integrity | Host-only and prefixed base URLs configured at creation, later config-only URL change, correct prefix handling/canonicals; unknown/colliding claims fail; an insensitive public claim resolves mixed-case requests to one lowercase canonical Page while a sensitive claim preserves authored capitalization and distinct Pages; sensitive/insensitive overlap, public/unlisted and Unicode-normalization collisions are refused; locale segments normalize independently of Page-route case |
 | Safe authoring | Malformed JSON/Markdown, unsafe URLs and invalid assets are refused or safely rendered |
 | Public projection | Private or suppressed inherited facts never leak into HTML, metadata, scripts or indexes |
 | SEO and discovery | Canonicals, sitemap, unlisted `noindex` and `hreflang` reflect real published representations; no unlisted discovery leakage |
@@ -385,7 +413,7 @@ At implementation time, tests must exercise both the ordinary one-Facet/one-Site
 ## 7. Decisions to make before an implementation work order
 
 1. **Authoring and publication contract — decided by `R00.A`, format still open:** accepted and recorded in §1.1, §1.3 and §1.4 are the technical ID grammar and 63-character limit, the parent-scoped uniqueness rules, durable references, the explicitly supplied Entity ID, the seeded `main`/`main`/`home` defaults, drafts outside the published graph, the single versioned manifest as sole publication authority, source integrity and fail-closed refusal. **Still open:** the concrete manifest file and field/locator schema, the editable source layout, JSON/Markdown authoring encoding, draft storage and the encoding of the accepted identity/publication semantics.
-2. **Route grammar and base URL validation:** single authored base URL at establishment (origin + optional prefix), safe normalization, config-only changes, default Site paths, full-locale path segment and preference negotiation per §3.2, alias policy, discovery metadata and multi-Site collisions. **Owner accepted:** public paths are case-insensitive with lowercase canonicals; unlisted Page-route tokens remain exact-case; collisions must fail; short browser preference tokens require explicit mappings; same-Page default fallback is preferred. **Still technical:** specific URL grammar, redirect codes, path encoding, mapping storage and collision algorithm.
+2. **Address, route and locale contract — decided by `R00.B`, encoding still open:** recorded in §3.2, §3.2B and §4.1–§4.4 are one configured canonical HTTP(S) origin with optional prefix and optional authorized aliases, explicit Page and optional localized routes, validated Unicode route text, default-insensitive public matching with author-selected case-sensitive claims, exact-case unlisted matching, independent full-locale normalization, the ten publication collision rules, `308`/`302` redirect semantics, cache safety and locale-less entry/fallback behaviour. **Still technical:** the physical declaration schema and field placement (`R00.D`), the pinned Unicode data version and toolchain (`R00.E`), and the implemented matcher, HTTP adapter, redirect/cache behaviour and rendered language selector (later stages).
 3. **Typed property contract:** exact schema, explicit suppression, safe projection and structured/multiple location facts. **Location as a five-level cascade** is already Owner-decided; its encoding is not.
 4. **Page formats, visibility and presentation:** approved section catalog, JSON/Markdown precedence, **Owner-approved Page-level `visibilityDefault` with representation-level `visibility` override**, design tokens, shared generic public library, cascading graphic roles and dictionary precedence. Field placement and behavior are decided; schema encoding, valid graphic roles and defaults remain technical choices. Unlisted serving/discovery behavior itself is Owner-accepted.
 5. **Integration scope:** the **included** contact scope is the safe `mailto:` action and the **simple** contact form; **advanced contact forms are excluded** (see §3.4). Remaining technical choices are the field set, delivery adapter/provider, anti-abuse controls, retention, and the booking/map-link and analytics defaults.
