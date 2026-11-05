@@ -1,13 +1,15 @@
 # Foundation Solo — plan-next (Next Candidate)
 
-## R00.B — Address/locale contract
+## R00.C — Property/graphic contract
 
-**Objective:** Prepare an Owner-reviewable decision set for Solo's configured public addresses, routing and full-locale behavior without changing the accepted R00.A identity/publication contract.
+**Objective:** Prepare an Owner-reviewable logical contract for authored EFS properties, inheritance and suppression, safe public/private projection, authored location facts and cascading graphics, without revising the accepted R00.A identity/publication or R00.B address/locale contracts.
 
-**Prerequisites and readiness:** R00.A independently accepted and Owner-authorized for closure; applicable Product and Architecture rules available. R00.B remains pending in Stage 00. This is a decisions-only candidate, not an implementation task.
+**Prerequisites and readiness:** R00.A and R00.B architectural contract packages are accepted and Owner-authorized for closure. Applicable Product and Architecture invariants are available. R00.C remains pending in Stage 00. This is a decisions-only candidate, not an implementation task.
 
-**Proposed scope:** Specify HTTP(S) origin and optional base-path normalization; path/segment encoding; Site, Page and Home routing; redirect status and aliases; route collision refusal; locale preference mapping; error representations; and construction of full-locale URLs. Preserve the already settled public lowercase canonical/case-insensitive behavior, exact-case unlisted Page tokens, full region-qualified locales, same-Page fallback, and location/routing independence.
+**Proposed scope:** Settle the typed property-value model, authoring declarations, absence versus override versus explicit suppression, direct-ancestry inheritance and provenance, public/private projection and validation; structured location facts across Entity, Facet, Site, Page and representation, without any routing or locale inference; graphic-role catalogue, authored asset references, the generic public graphic library, role-specific fallback and suppression/refusal behavior. Preserve one-Entity ownership and the distinction between logical property contracts and later physical schema/implementation choices.
 
-**Proposed deliverables:** A bounded R00.B Owner decision proposal, precise proposed updates to the existing canonical Architecture/Product authorities where needed, and conceptual positive/refusal cases identifying accepted rules versus still-open design choices. Do not select a framework, write code or portray proposals as approved decisions.
+**Proposed deliverables:** A bounded R00.C Owner decision proposal with explicit credible options and recommendations; precise proposed amendments to existing canonical Product/Architecture authorities where needed; a conceptual positive/refusal matrix for inheritance, suppression, location independence, privacy and graphic fallback. Distinguish accepted principles from open technical decisions. Do not select a framework, write executable code, or claim an unapproved physical schema.
 
-**Verifiable exit conditions:** Each R00.B issue has an explicit Owner decision or a clearly named blocker; the resulting accepted address/locale contract is consistent with R00.A and existing Solo invariants; public/unlisted collision and locale/route negative cases are specified; Stage 00 remains open until its other packages and exit gate are accepted.
+**Verifiable exit conditions:** Each blocking R00.C issue has an explicit Owner decision or clearly identified blocker; decisions preserve R00.A/R00.B and Solo's five-level EFS property cascade; public/private projection, explicit suppression, direct-ancestor inheritance, independent authored location and graphic fallback have testable positive/refusal semantics; Stage 00 remains open until its remaining packages and exit gate are accepted.
+
+This NEXT candidate is **non-executable**. No R00.C implementation or document amendment is authorized by its presence.

@@ -6,7 +6,6 @@
 
 **Remaining packages**
 
-- **R00.B — Address/locale contract:** settle configured HTTP(S) origin and optional base-path normalization, path/segment encoding, Site/Page and localized route declarations including validated Unicode route text, default-insensitive versus author-selected sensitive public claims, Home/landing entry conventions, redirect status and aliases, route-collision refusal, locale preference mapping, error representation and full-locale URL construction; preserve the settled exact-case unlisted Page-token distinction and independent locale-segment normalization.
 - **R00.C — Property/graphic contract:** settle typed values, property declaration/suppression/public projection and provenance encoding; the five-level location cascade; graphic-role catalogue, authored/generic asset references and fallback safety.
 - **R00.D — Content and publication contract:** settle versioned JSON/Markdown declarations, `visibilityDefault`/representation `visibility` placement, bounded Page sections, Markdown safety, author link classification, content source precedence and asset path authority.
 - **R00.E — Software structure and toolchain:** compare credible framework/language/build/testing choices, choose simplest verifiably strict Ports-and-Adapters design, dependency/port catalogue, composition root, boundary test method, CI and browser proof architecture. Do not inherit Foundation's Next.js/pnpm choice by default.
