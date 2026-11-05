@@ -2,143 +2,117 @@
 
 | Field | Value |
 | --- | --- |
-| Work order | `SOLO-WO-008` |
+| Work order | `SOLO-WO-009` |
 | Edition | `R01` |
-| Handoff | `SOLO-WO-008 R01 — Implementation Agent Handoff` |
+| Handoff | `SOLO-WO-009 R01 — Implementation Agent Handoff` |
 | Repository / branch | `provelopment/provelopment-foundation-solo` / `main` |
 | Run date | 2026-11-05 |
-| Required starting HEAD | `c32393511f9ac33fa068ecff74e4b0656da8026e` |
-| Installed closure order | 20,107 bytes, SHA-256 `ce975be97c07fa5d3c3fd2c14da2d837bcd374a1df14466ef64fb9ed6c283d23` |
-| Phase A commit (order preserved) | `2f2e7929ad8e86dac34d76f84740d024552a023d` |
-| Phase B commit (WIP closure) | `f63ab176c6795398aba295f636d992a902404541` |
-| Phase C report commit | Supplied in the Implementation Agent chat handback only; deliberately absent from this file. |
-| Status | R00.A closure executed and published; independent Chief Architect review pending. Stage 00 remains open. No self-acceptance. |
+| Required starting HEAD | `7d6fae688b75d39d630a7626e4183f6a3078dfcc` |
+| Phase A commit (issued order preserved) | `2872ce4f20b308ad682d09fb61906cbb88bb5254` |
+| Phase B commit (canonical R00.B codification) | `df84dfd4e83d7984aa0c3f06497aa6d8f8e3831c` |
+| Phase C report commit | Supplied in the chat handback only; deliberately absent from this file. |
+| Status | Documentation codification published; independent Chief Architect `ACCEPT / REVISE / STOP` outstanding. R00.B is **not** closed and Stage 00 remains open. |
 
-## 1. Authority and independence of the acceptance basis
+## 1. Issued authority and baseline verification
 
-This run executes an Owner-authorized **administrative closure** of a package that had already been independently accepted. It does not create, extend or re-judge the underlying technical decisions.
-
-| Item | Value |
-| --- | --- |
-| Independent acceptance for prior work | Chief Architect `ACCEPT` for `SOLO-WO-007 R08` |
-| Accepted content commit | `78c1a27dd058b81ec387d60ade8979a7f5aa3c95` |
-| Accepted canonical report commit | `c32393511f9ac33fa068ecff74e4b0656da8026e` |
-| Scope closed by this run | `R00.A — Identity and publishing declarations` only |
-| Scope explicitly NOT closed | Stage 00, which retains R00.B to R00.G and its exit gate |
-
-The accepted durable R00.A decisions were confirmed already present in the canonical authorities rather than restated here: term presence in `.documents/Architecture/ARCHITECTURE.md` and `.documents/About/FOUNDATION-SOLO.md` for `visibilityDefault` (3/3), `fail-closed` (3/1), `publication declaration` (2/1), `default Facet` (2/4) and `Entity` (52/40). No canonical document required, and none received, a change in this closure.
-
-## 2. Preflight — eight required checks
-
-| # | Check | Observed | Result |
-| --- | --- | --- | --- |
-| 1 | Physical root equals Git toplevel | Solo root, identical | PASS |
-| 2 | Branch, worktrees, remote | `main`; exactly one worktree; one `origin` with the expected Solo URL and no credentials | PASS |
-| 3 | Revision parity | local `HEAD` = `origin/main` = GitHub API `main` = `c323935…` | PASS |
-| 4 | Initial dirty paths | ` M .documents/WIP/workorder-active.md` only; 0 untracked | PASS |
-| 5 | Baseline blobs | all twelve matched exactly (see §3) | PASS |
-| 6 | WIP / report inventory | exactly four WIP files; exactly one canonical report | PASS |
-| 7 | R00.A decisions canonical | present in Product and Architecture; no new decision needed | PASS |
-| 8 | `.temp/` containment | ignored at `.gitignore:20`; 0 tracked; 0 staged; 0 items | PASS |
-
-## 3. Baseline blob parity (twelve required)
-
-| Path | Required | Observed |
+| Check | Observed | Result |
 | --- | --- | --- |
-| `.documents/WIP/plan-roadmap.md` | `84f428b8…` | match |
-| `.documents/WIP/plan-next.md` | `92fa562b…` | match |
-| `.documents/WIP/plan-outlook.md` | `cb9c7a61…` | match |
-| `.documents/WIP/workorder-active.md` (pre-installation) | `bb7e42fc…` | match |
-| `.documents/Reports/execution-report.md` (R08) | `7c2b378f…` | match |
-| `.documents/About/FOUNDATION-SOLO.md` | `3f4e557e…` | match |
-| `.documents/Architecture/ARCHITECTURE.md` | `28c06295…` | match |
-| `.documents/SOP/sop-architect.md` | `6bea0dbc…` | match |
-| `.documents/SOP/sop-implementation.md` | `b56b14a0…` | match |
-| `AGENTS.md` | `30c5b026…` | match |
-| `README.md` | `1294bb12…` | match |
-| `.gitignore` | `f51cc530…` | match |
+| Installed order | `SOLO-WO-009`, `R01`, `OWNER-ISSUED`, 31,346 bytes, SHA-256 `1f663b2b…962fd1` | matches the delivered handoff |
+| Required starting revision | local `HEAD` = `origin/main` = `ls-remote` = GitHub API `main` = `7d6fae68…` | PASS |
+| Repository safety | one physical root equal to the Git toplevel, branch `main`, exactly one worktree, exactly one `origin` with the expected Solo URL, no tags | PASS |
+| Initial dirty paths | ` M .documents/WIP/workorder-active.md` only (the Owner installation); 0 untracked | PASS |
+| WIP and report inventory | exactly four WIP files and exactly one canonical report | PASS |
+| Temporary workspace | Solo `.temp/` ignored at `.gitignore:20`, 0 tracked, 0 staged, 0 items | PASS |
 
-## 4. Phase A — issued closure authority preserved first
+All eleven required baseline blobs matched exactly before any write: README `1294bb12…`, AGENTS `30c5b026…`, Product `3f4e557e…`, Architecture `28c06295…`, Architect SOP `6bea0dbc…`, Implementation SOP `b56b14a0…`, ROADMAP `5ebb53f7…`, NEXT `375aee17…`, OUTLOOK `cb9c7a61…`, ACTIVE before installation `ea5f20b7…`, report `ee722cf9…`.
 
-The complete `SOLO-WO-008 R01` order was staged **unchanged** and published before ACTIVE was touched, so the closure authorization is retrievable from immutable history independently of the live slot.
+## 2. Phase A — issued authority preserved first
 
 | Evidence | Value |
 | --- | --- |
-| Commit | `2f2e7929ad8e86dac34d76f84740d024552a023d` |
-| Files | `.documents/WIP/workorder-active.md` only, `+93 −108` |
-| Order Git blob | `eeaf3769c4bdc2a7dd5b0aafc671d25de489698c` |
-| Installed bytes re-hashed after commit | SHA-256 still `ce975be9…c283d23` (unchanged) |
-| Push | `c323935..2f2e792`, linear fast-forward |
-| Readback | local `HEAD` = `origin/main` = `ls-remote` = GitHub commit `2f2e792…` |
+| Commit | `2872ce4f20b308ad682d09fb61906cbb88bb5254` |
+| Contents | `.documents/WIP/workorder-active.md` only, `+366` |
+| Order Git blob | `e1751601832916898afdd15085ef76c652de7621` |
+| Bytes re-hashed after commit | SHA-256 still `1f663b2b…962fd1`, unchanged |
+| Push | `7d6fae6..2872ce4`, linear fast-forward |
+| Readback | local `HEAD` = `origin/main` = `ls-remote` = GitHub commit `2872ce4…` (`+366`, single file) |
 
-## 5. Phase B — exact WIP reconciliation
+Phase B was not started until that publication was verified.
 
-| File | Operation | Evidence |
+## 3. Phase B — canonical R00.B codification
+
+| Path | Change | Evidence |
 | --- | --- | --- |
-| `.documents/WIP/plan-roadmap.md` | delete exactly one package line | exact-bullet matches before edit = 1; `R00.A` occurrences after = 0; `R00.B`–`R00.G` = 6; GitHub shows **deletions only, −1, zero additions**; blob `5ebb53f7…` |
-| `.documents/WIP/plan-next.md` | replace stub with exact §2.B | `NEXT_EXACT=True` against order bytes; 13 lines; exactly one candidate heading; `OWNER-ISSUED` occurrences = 0; blob `375aee17…` |
-| `.documents/WIP/workorder-active.md` | replace with exact §2.C | `ACTIVE_EXACT=True`; 1 line; 40 bytes; `SOLO-WO` occurrences = 0; blob `ea5f20b7…` |
-| `.documents/WIP/plan-outlook.md` | none | worktree blob `cb9c7a61…` identical to baseline; absent from the commit |
-| `.documents/Reports/execution-report.md` | Phase C only | deferred to the third commit |
+| `.documents/Architecture/ARCHITECTURE.md` | primary normative incorporation | `+51 −21` across two content commits |
+| `.documents/About/FOUNDATION-SOLO.md` | product-level alignment | `+3 −2` |
+| `README.md` | entry-point summary replaced | `+1 −1` |
+| `AGENTS.md` | invariant replaced; authorization/role text untouched | `+1 −1` |
+| `.documents/SOP/sop-architect.md` | invariants and review examples | `+2 −2` |
+| `.documents/SOP/sop-implementation.md` | invariants and verification cases | `+3 −3` |
+| `.documents/WIP/plan-roadmap.md` | text-only precision; R00.B still pending | `+4 −4` |
 
-Structural preservation after the deletion: 14 `## Stage ` headings (Stage 00 through Stage 13) still present, and the Stage 00 exit-gate wording `No code exists solely because this stage is accepted` still present exactly once. The `**Remaining packages**` label, Stage 00 outcome, and every later stage, prerequisite and gate were untouched, and no completed-work narrative, `Closed`/`Accepted` section or progress diary was added.
+Nothing else changed: NEXT, OUTLOOK and ACTIVE were byte-identical to the Phase A state at the point of publication — NEXT `375aee17…`, OUTLOOK `cb9c7a61…`, ACTIVE `e1751601…` — and `.documents/WIP` still contains exactly four files with one canonical report outside it. The remote per-file statistics confirm exactly these seven paths and no eighth.
 
-| Phase B evidence | Value |
+**Stale blanket statements removed (all nine target phrases scanned to zero across the seven files):** unconditional public case-insensitivity, unconditional lowercase public canonicals, "only unlisted content may use exact-case matching", "public mixed-case requests always identify the same Page", and the single-unconditional-lowercase-key collision assumption, together with the five documents' older wordings of them.
+
+**Replacement contract (now canonical in §3.2B):** public localized route claims are insensitive **by default**, sensitive **when the author selects it per claim**, unlisted claims are **always exact-case**, canonical spelling follows the selected policy, and the lowercase **full-locale segment** normalization stays independent.
+
+## 4. Where each accepted decision now lives
+
+| Decision | Canonical location |
 | --- | --- |
-| Commit | `f63ab176c6795398aba295f636d992a902404541` |
-| Files | exactly three, `+12 −147` |
-| Push | `2f2e792..f63ab17`, linear fast-forward |
-| Readback | local `HEAD` = `origin/main` = `ls-remote` = GitHub commit `f63ab17…`; per-file remote stats match local |
-| Working tree after commit | clean |
+| `B01` configurable base address | §4.1 (with §3.2B for redirect/cache cross-reference) |
+| `B02` explicit and localized Page routes | §4.3, §3.2B (locale independence) |
+| `B03` locale-less entry | §3.2 (selection order), §3.2A (`B10` landing) |
+| `B04` validated Unicode routes | §3.2B |
+| `B05`/`B05-B` default-insensitive, author-selected sensitive, exact-case unlisted, ten collision rules | §3.2B, §3.2A (unlisted) |
+| `B06` preference matching | §3.2 |
+| `B07` missing translation | §3.2 |
+| `B08` redirect semantics | §3.2B |
+| `B09` canonical address and aliases | §4.1 |
+| `B10` unlisted Home and public entry | §3.2A |
+| `B11` safe failures | §4.4 |
+| `B12` cache safety | §3.2B |
+| Visitor language-control invariant | §3.2, Product accepted list, README summary |
 
-## 6. R00.A closure without closing Stage 00
+R00.A substance was preserved deliberately and not re-decided: one Entity, the persisted ID grammar and 63-character limit, parent-scoped uniqueness, the seeded `main`/`main`/`home` defaults, drafts outside the published graph, the versioned manifest as sole publication authority, source integrity and fail-closed refusal, Page-level `visibilityDefault` with representation-level `visibility`, and strict Hexagonal Architecture all remain intact. The public-route grammar is explicitly distinguished from the technical-ID grammar so the route work cannot erode identity rules.
 
-- R00.A is no longer a pending ROADMAP package: the obligation line is absent, and history retains what it said.
-- Stage 00 remains **open**, retaining R00.B, R00.C, R00.D, R00.E, R00.F and R00.G as pending packages plus its unchanged outcome and exit gate. Stage 00 completion is not claimed anywhere.
-- The new NEXT entry is a **proposal with no execution authority**: it carries no `OWNER-ISSUED` marker, no work-order ID, accepts no open technical choice, and cannot be executed by an agent.
-- ACTIVE holds the neutral title with no order, no ID, no approval text, no closure narrative and no permission. The file was retained, not deleted, so the four-filename WIP shape is unchanged.
-- No further implementation activity was performed after Phase B; only this report remained authorized.
+## 5. Conceptual contract cases recorded (specification, not executed tests)
 
-## 7. Canonical and read-only preservation
+Positive and refusal cases now written into §3.2B so later Stage 04 and Stage 06 orders need not choose policy: insensitive `about`/`About`/`ABOUT` resolve to one Page with a lowercase canonical; sensitive `About`, `about` and `aBout` may be three distinct Pages; sensitive German `Morgen` and `morgen` may remain distinct while an undeclared `MORGEN` is a plain not-found with no guessed case redirect; insensitive plus sensitive overlap is refused; sensitive public plus unlisted caseless conflict is refused; unlisted `abc` and `Abc` may coexist; `/en-001/about` and `/de-de/about` may identify different Pages; `/DE-DE/Morgen` normalizes the locale segment while preserving the sensitive route; NFC-equivalent spellings compare once and conflicting declarations are refused.
 
-Product, Architecture, both SOPs, `README.md`, `AGENTS.md`, `.gitignore`, `.gitattributes`, `.github/**`, LICENSE, `.documents/WIP/plan-outlook.md` and every other read-only path are byte-identical to the starting baseline. This is evidenced three ways: all twelve required preflight blobs matched, each of the three published commits touches only its authorized paths, and the remote per-file statistics show no fourth file. No acceptance record, `STOP` finding or historical disposition was rewritten, and no tag, release, deployment, merge, branch, clone or worktree was created.
+No runtime, build or browser evidence accompanies these cases, and none is claimed.
 
-## 8. Temporary workspaces, cleanup and retention
-
-| Area | Observation | Action |
-| --- | --- | --- |
-| Solo `.temp/` | 0 items throughout; Git-ignored at `.gitignore:20`; 0 tracked; 0 staged | nothing created, nothing retained |
-| Cline task temp area | 0 files at run start (the prior run had already cleared its captures) | used only for host-managed command capture during this run |
-| Final pass | capture files written by this run's own commands were deleted as the last shell action | see residual note below |
-| Protected | Cline application data, all other OS temp content, unknown and Owner-owned material | untouched; no broad or recursive temp deletion; no `git clean` |
-
-No repository file, deliverable or fixture was intentionally held in either temporary area, so there is nothing retained on grounds of continuing need. The one honest caveat: Cline can write a capture file only after a command returns, so a final cleanup action cannot delete the record of itself. Any such file is the single bounded residual of this run, disclosed rather than presented as clean, with the cleanup trigger being the next Solo run's preflight inspection.
-
-## 9. Gate results (facts only; the Chief Architect assigns the verdict)
+## 6. Gate evidence (facts; the Chief Architect assigns disposition)
 
 | Gate | Result | Evidence |
 | --- | --- | --- |
-| 1. Authority and baseline | PASS | Exact issued R01 + matching handoff + SHA-256 parity; `c323935…` at local, `origin/main` and GitHub API; one root/checkout/remote; sole Owner-installed dirty path; twelve baseline blobs; four WIP files; one report; R00.A acceptance basis recorded. |
-| 2. Historical authorization proof | PASS | Phase A committed only the unchanged order (`eeaf3769…`) and was pushed and read back **before** Phase B cleared ACTIVE. |
-| 3. ROADMAP precision | PASS | One line deleted; remote shows deletions only; `R00.A` = 0, `R00.B`–`R00.G` = 6, 14 stage headings, exit gate intact; no completion narrative. |
-| 4. NEXT precision | PASS | Byte-exact against §2.B; one candidate; no `OWNER-ISSUED`, no work-order ID, no accepted technical choice. |
-| 5. ACTIVE/OUTLOOK and authority purity | PASS | ACTIVE is exactly the §2.C title (1 line, 40 bytes) and was not deleted; OUTLOOK byte-identical; four WIP files; one report; no new task begun. |
-| 6. Canonical preservation | PASS | All read-only paths byte-identical; R00.A decisions already canonical; no Stage 00 closure, application, toolchain, release or deployment claimed. |
-| 7. Git and cleanup hygiene | PASS | Exactly three ordinary commits in the required order; linear fast-forward on the correct `origin/main`; verified blobs and readbacks; clean final tree; one checkout; temp evidence reported separately from `git status`. |
-| 8. Evidence and separation | PASS | This report states provenance, operations, GitHub-versus-local distinction, the residual caveat, and omits its own commit SHA; no fabricated runtime proof; no self-acceptance; no R00.B execution. |
+| A1 Authority | PASS | Exact `SOLO-WO-009 R01` issuance, matching handoff, `7d6fae68…` baseline verified in all three places |
+| A2 Scope integrity | PASS | Only the seven authorized permanent paths changed; NEXT, OUTLOOK, ACTIVE, `.gitignore`, LICENSE and all other paths untouched |
+| A3 Complete B01–B12 | PASS | All thirteen rows mapped in §4 above; `B11` was missing from the first content commit and was recorded in `208e03d…` |
+| A4 `B05-B` fidelity | PASS | §3.2B: default insensitive, explicit sensitive, unlisted exact-case, per localized claim, capitalization-preserving canonicals |
+| A5 Collision safety | PASS | Ten numbered rules plus ten conceptual positive/refusal cases, including public/unlisted and NFC cases |
+| A6 Language freedom | PASS | Explicit full-locale URL wins; no geography or login; same-Page switching via actual authored localized routes (Product, README, §3.2) |
+| A7 R00.A and boundaries | PASS | Identity grammar, manifest authority, visibility inheritance, source integrity, Hexagonal Architecture unchanged |
+| A8 Documentation parity | PASS | Nine stale blanket phrases scanned to zero across all seven files; `case-sensitive`/`Unicode`/`exact-case` markers present in each |
+| A9 WIP preservation | PASS | ROADMAP still lists R00.B; NEXT still the R00.B candidate (`375aee17…`); ACTIVE still the issued order (`e1751601…`); OUTLOOK unchanged (`cb9c7a61…`); four WIP files |
+| A10 GitHub evidence | PASS with deviation | Three phases published and read back; the content phase required two commits instead of one — see §7 |
+| A11 Honest verification | PASS | Conceptual cases labelled as specification; all software checks reported `NOT RUN` |
+| A12 Governance | PASS | No self-acceptance, no extra WIP or report file, no second checkout, no provider action, no closure of R00.B or Stage 00 |
 
-## 10. Software verification status
+## 7. Deviations and limitations — disclosed, not absorbed
 
-- **`NOT RUN`:** no build, unit, integration, architecture, browser, CI, security, release or deployment verification was executed or implied. Solo still contains no application code, toolchain, dependency manifest or test suite, and this order is a documentary closure.
-- **`NOT APPLICABLE` (with reasons):** routing/canonicalisation, locale representation handling, property and graphic cascade, unlisted-representation discovery, contact, accessibility and performance checks — there is no implementation in this repository for them to exercise, and evaluating R00.B's open questions is expressly out of scope.
+1. **Two content commits instead of one.** After publishing `df84dfd…` I audited the documents against the ledger and found `B11` (refusal semantics, HTTP status accuracy, non-disclosure) had no canonical home, which would have failed A3. I recorded it in `208e03d…` on the same authorized path rather than leave the accepted contract incomplete. This exceeds the order's "one ordinary content commit" expectation and is a procedural deviation for the Architect to judge.
+2. **Pager deadlock.** A `git diff --cached` invoked the configured `less` pager and stalled the shell for about five minutes. I terminated the two task-owned `git` processes and the pager; the stalled shell then completed commit `df84dfd…` and pushed it. Afterwards I confirmed HEAD, the committed file list, the remote head and a clean index — no lock, no duplicate commit, no amend and no history rewrite. Every later Git command used `--no-pager` with `GIT_PAGER=cat`.
+3. **Two malformed tool invocations** sent a JSON wrapper into the shell; both failed at PowerShell parse time and executed nothing.
+4. **Capture-file residual.** Cline may write a command-capture log after a command returns, so the final cleanup cannot delete the record of itself. Any such file is the single bounded residual, with the next run's preflight as its cleanup trigger.
+5. This codification is documentary. It does not assert an implemented router, a validated schema, a chosen Unicode data version or any runtime behaviour.
 
-## 11. Limitations and warnings
+## 8. Software verification status
 
-- Locally observed facts derive from this agent's own commands; the independently GitHub-readable subset is commits `2f2e792…` and `f63ab17…` with their file lists, per-file line counts and blobs.
-- Two invocations reported that command completion could not be observed through shell integration while the write nevertheless succeeded; byte counts were verified afterwards, so neither is treated as a silent success or as a failure.
-- The temporary-capture residual in §8 is genuinely bounded but not measurable from within the same run; it is disclosed with a trigger instead of declared clean.
-- This closure is administrative. It does not assert that R00.A's decisions are implemented, that Stage 00 is finished, or that R00.B has been decided.
+- `NOT RUN`: build, unit, integration, architecture-boundary, browser, CI, security, release and deployment checks. No application code, toolchain, dependency manifest or test suite exists in Solo.
+- `NOT APPLICABLE`: the runtime routing, locale-negotiation, language-selector, caching and redirect behaviours described are unimplemented contracts; the physical schema (`R00.D`) and toolchain/Unicode pin (`R00.E`) are explicitly out of this order's scope.
 
-## 12. Disposition boundary
+## 9. Final repository state and boundary
 
-No acceptance is claimed for this closure execution. ACTIVE is neutral and contains no issued order; ROADMAP no longer lists R00.A; NEXT proposes R00.B without authority; Stage 00 remains open with R00.B to R00.G pending; Stages 01 to 13 are unchanged. Only an independent Chief Architect review of this published evidence, followed by separate Owner authorization, can establish closure acceptance or authorize any further package.
+ACTIVE still contains the exact issued `SOLO-WO-009 R01`; ROADMAP still lists R00.B among the pending Stage 00 packages; NEXT remains the single non-executable R00.B candidate; OUTLOOK is byte-identical; exactly four WIP files and one canonical report exist; no branch, tag, worktree, clone, dependency, release or deployment was created. R00.B is **not** accepted or closed, Stage 00 remains open with R00.B to R00.G pending, and no agent self-acceptance is claimed. Independent Chief Architect review of the published documents, this report and the disclosed deviations is the next required step.
