@@ -58,7 +58,7 @@ All authoritative Solo documentation resides in **`.documents/`**, except the tw
 | [AGENTS.md](AGENTS.md) | Mandatory entry-point instructions for every agent and contributor |
 | [Execution report](.documents/Reports/execution-report.md) | **One** current run report, overwritten every run; the Architect's default review source |
 
-**Strict single-root discipline:** Implementation agents may not use additional Git worktrees, shadow checkouts, nested clones or temporary directories outside Solo. Agent-created scratch and redirectable caches belong under Solo `.temp/` and must be promptly cleaned; the SOP forbids deleting pre-existing unknown files. Parent-repository `.gitignore` changes are outside Solo agent permissions.
+**Strict one-checkout discipline:** No additional Git worktrees, shadow checkouts, nested clones or alternate source trees, including within temporary folders. For otherwise authorized work, Implementation Agents may use **both** Solo's Git-ignored `.temp/` and Cline's own task temporary workspace without separate per-file permission. Disposable, identifiable task-owned files and folders must be removed when no longer needed, ordinarily by the end of the run; never accumulate garbage or delete unfamiliar/Owner-owned material. Permanent project writes remain confined to approved Solo paths. See both SOPs for cleanup and evidence rules; the parent `.gitignore` remains outside Solo agent authority.
 
 **Graphics and assets:** A generic, public, platform-provided graphic library is available to the whole Installation. Authored Entity graphic roles and selections cascade through all five EFS levels; optional generic role fallbacks are beneath the authored cascade. Explicit suppression must not silently re-enable a generic default.
 
