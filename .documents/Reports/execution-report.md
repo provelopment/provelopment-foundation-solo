@@ -6,142 +6,175 @@
 
 | Field | Value |
 | --- | --- |
-| Work order / edition | `SOLO-WO-015` / `R01` — R00.D administrative closure and R00.E NEXT selection |
+| Work order / edition | `SOLO-WO-016` / `R02` — R00.E software structure and toolchain, Stage 00 decisions/documentation only |
 | Session date | 2026-11-06 |
+| Classification | Documentary architectural codification. No code, manifest, lockfile, schema artefact, asset, test harness, CI workflow, dependency install, build or deployment. |
 | Status | **COMPLETE** |
-| Classification | Stage 00 administrative documentation transition only. No application, schema, dependency, test harness, asset, release or deployment. |
-| Role | Implementation Agent. No Chief Architect `ACCEPT`, no Stage 00 closure, no R00.E acceptance. |
+| Role | Implementation Agent. No Chief Architect acceptance, no R00.E closure, no R00.F selection, no Stage 00 closure. |
 
-Application code, builds, tests, browsers, HTTP behaviour and deployment are **NOT APPLICABLE** to this administrative document transition and are not claimed as run or passing.
+Executable tests, builds and browser evidence are **NOT APPLICABLE** to this documentary run and are never claimed. C1 runtime conformance is **UNVERIFIED / NOT RUN**.
 
 ## 1. Preflight (observed)
 
 | Check | Observed |
 | --- | --- |
-| Local root | `C:/Users/Sean/Documents/Provelopment/00.foundation-solo` (`git rev-parse --show-toplevel`) |
-| Branch / tracking / remote | `main`, upstream `origin/main`, exactly one remote `origin` = `https://github.com/provelopment/provelopment-foundation-solo.git` |
+| Physical root | `C:/Users/Sean/Documents/Provelopment/00.foundation-solo` (`git rev-parse --show-toplevel`) |
+| Branch / upstream / remote | `main`, upstream `origin/main`, exactly one remote `origin` = `https://github.com/provelopment/provelopment-foundation-solo.git` |
 | Worktrees | 1 |
-| Required starting revision | `126d8fa64334d77e039061aa79a182e3ad7173d9` |
-| Actual HEAD / `origin/main` / `git ls-remote` | all three `126d8fa64334d77e039061aa79a182e3ad7173d9` — agreed |
+| Required baseline | `0ba4de65694065ccecb2b1f417122fd4c4dead5a` |
+| Actual `HEAD` / `origin/main` / `git ls-remote` | all three `0ba4de65694065ccecb2b1f417122fd4c4dead5a` — agreed |
 | WIP inventory | exactly `plan-roadmap.md`, `plan-next.md`, `workorder-active.md`, `plan-outlook.md` |
-| Pre-run dirty state | only `M .documents/WIP/workorder-active.md` — the expected Owner-installed input, not a blocker |
-| Installed ACTIVE | `SOLO-WO-015 R01`, 14,513 bytes, 98 lines, SHA-256 `AA485276F9BF152F3A971A0793EC8855D541253256EAB0FC6ABD5FBA726518C6`, worktree blob `93957814e90b25f9513b4eb2fc4762ab3acd8ea3` against committed `6a4e7646534ef15011ea771036961b80e0f36e30` |
-| Edition verification | title, field table, sections 1-6 and the G01-G08 literals read in full; edition is `SOLO-WO-015` `R01` |
-| Baseline canonical blobs | Architecture Charter `0e82502540383defb9f3a619ef43c46700ca7159` and Product Definition `5e7a9a80f6f477e1e17d06074224a2a27fa2603e`, both matching the order |
-| ROADMAP precondition | 171 lines, exactly one remaining-package bullet beginning `- **R00.D — Content and publication contract:**` at line 9 |
-| NEXT precondition | exactly `# Foundation Solo — plan-next (Next Candidate)` plus one LF (49 bytes) |
-| Stage 00 precondition | heading, outcome, `R00.E`, `R00.F`, `R00.G` and the Stage 00 exit gate all present; 14 stage headings in total |
-| Governing documents read | `README.md`, `AGENTS.md`, `.documents/SOP/sop-architect.md` (including 6A, 6B, 7, 7A, 8), `.documents/SOP/sop-implementation.md`, all four WIP files and the previous canonical report (R03, 176 lines / 20,299 bytes) |
+| Pre-run dirty state | only `M .documents/WIP/workorder-active.md` — the expected Owner-installed order |
+| Installed order | `SOLO-WO-016` / `R02`, marked `OWNER-ISSUED`; 85,976 bytes, 402 lines, SHA-256 `BC57D10B0ACC99FA6B06B24DABC9DD2156FD9D670496BE122EF84E897A295CD1`, worktree blob `f4c9cdeb45e5fa5e75f6bc22f161cdd5c11e52b8` against committed `ea5f20b736483c2e102456be1cea9104059fc81a` |
+| Edition / handoff match | installed title, edition line and full `§0`–`§13` scope read; matches the Owner handoff for R02. No R01 text is installed and R01 was not executed. |
+| Baseline canonical blobs | Charter `0e82502540383defb9f3a619ef43c46700ca7159`, Product Definition `5e7a9a80f6f477e1e17d06074224a2a27fa2603e` — both matching the order |
+| NEXT precondition | exactly the verified R00.E issuance candidate, blob `0f667ae8a7de10a34ad87bbd9f0e2de45c3e013a`, 2,872 bytes, first line `# Foundation Solo — plan-next (Next Candidate)` |
+| Other baseline blobs | ROADMAP `ab382665a82ce9a280b47f5561dc1b0c36542667`, OUTLOOK `cb9c7a610cf3c537557e060ca9656e44a053e69d`, report `66901a365f566220ef3c4b4dce5d2318b75f4444` |
+| Governing documents read | `README.md`, `AGENTS.md`, `sop-architect.md` (§§6, 6A, 6B, 7, 7A, 7B, 8), `sop-implementation.md` (§§4–11), Charter, Product Definition, all four WIP files, previous canonical report |
 
-No unrelated dirty path, revision divergence, wrong checkout/remote or missing edition was found, so no STOP condition arose.
+No unrelated dirty path, revision divergence, wrong checkout or remote, or missing/mismatched authority was found, so no STOP condition arose.
 
-## 2. Commits and publication
+## 2. Commits, trees and publication
 
 | Step | Commit | Tree | Published evidence |
 | --- | --- | --- | --- |
-| Baseline | `126d8fa64334d77e039061aa79a182e3ad7173d9` | — | starting `origin/main` |
-| **A** — frozen issued order | `67da4e2f27cdd4331d7c4210f937a6bf314116dd` | `e6227e87ff291b9e590efb634c24ce52788de48d` | [commit](https://github.com/provelopment/provelopment-foundation-solo/commit/67da4e2f27cdd4331d7c4210f937a6bf314116dd) — one file, ACTIVE blob `93957814`, byte-identical to the installed file |
-| **B** — WIP closure transition | `e5d9bfe977d6ec852c790d91054f5c81aded6270` | `3ea13928e41ab25a1ea42530e06cf3bb180f83c6` | [commit](https://github.com/provelopment/provelopment-foundation-solo/commit/e5d9bfe977d6ec852c790d91054f5c81aded6270) — exactly three WIP files, `+12/-98` (NEXT `+12`, ROADMAP `-1`, ACTIVE `-97`) |
-| **C** — this report-only commit | supplied in the chat handback, never embedded here | — | — |
+| Baseline | `0ba4de65694065ccecb2b1f417122fd4c4dead5a` | — | starting `origin/main` |
+| **A** — frozen order + cleared NEXT | `ef8274977d3bf0c93d388daad0879641d7d8dbfc` | `74163bbabbd5cfea3d3ba56ef941d2cb4061c3c7` | [commit](https://github.com/provelopment/provelopment-foundation-solo/commit/ef8274977d3bf0c93d388daad0879641d7d8dbfc) — two WIP files; ACTIVE blob `f4c9cdeb` (frozen byte-identically), NEXT back to 49 bytes / blob `92fa562b` |
+| **B** — Charter §6A codification | `4785ae0d4ea397e672cf8ad09b2df0631218644d` | `56b1ea11bbbe7e8dc4f6582f71504ccfdd7c9d5b` | [commit](https://github.com/provelopment/provelopment-foundation-solo/commit/4785ae0d4ea397e672cf8ad09b2df0631218644d) — one file, `+412/−6`, Charter blob `7b6414659e293e6f196f9750544f1434b0cab34a`, 295,725 bytes |
+| **C** — this report | supplied in the chat handback, never embedded here | — | — |
 
-- Pushes: `126d8fa..67da4e2` then `67da4e2..e5d9bfe`, both `main -> main`. No force push, rewrite, branch, clone, extra worktree, PR, merge, tag, release or deployment.
-- Remote readback at B: `plan-next.md` `0f667ae8a7de10a34ad87bbd9f0e2de45c3e013a` at 2,872 bytes, `plan-roadmap.md` `ab382665a82ce9a280b47f5561dc1b0c36542667` at 17,205 bytes, `workorder-active.md` `ea5f20b736483c2e102456be1cea9104059fc81a` at 40 bytes, `plan-outlook.md` `cb9c7a610cf3c537557e060ca9656e44a053e69d` at 52 bytes — every local blob confirmed on GitHub, exactly four WIP files, no extra file.
-- The frozen `SOLO-WO-015 R01` remains retrievable from commit A, which is the immediately preceding commit to B.
+Pushes `0ba4de6..ef82749` then `ef82749..4785ae0`, both `main -> main`. No force push, rewrite, amend, branch, clone, extra worktree, PR, merge, tag, release, deployment or provider action.
+
+**Remote readback at B.** `.documents/WIP` returns exactly four files: `workorder-active.md` `f4c9cdeb` 85,976 B, `plan-next.md` `92fa562b` 49 B, `plan-roadmap.md` `ab382665` 17,205 B, `plan-outlook.md` `cb9c7a61` 52 B. `.documents/Architecture/ARCHITECTURE.md` returns blob `7b641465`, 295,725 B, identical to the local working blob. Commit B reports one changed file with 412 additions and 6 deletions.
 
 ## 3. Changed-path ledger
 
 | Path | Operation |
 | --- | --- |
-| `.documents/WIP/workorder-active.md` | preserved byte-for-byte in A (blob `93957814`), then reduced in B to exactly `# Foundation Solo — Active Work Order` plus one LF (blob `ea5f20b7`, 40 bytes) |
-| `.documents/WIP/plan-roadmap.md` | one line removed, 17,479 to 17,205 bytes (blob `ab382665`) |
-| `.documents/WIP/plan-next.md` | neutral header replaced by the single R00.E candidate, 49 to 2,872 bytes (blob `0f667ae8`) |
-| `.documents/Reports/execution-report.md` | this overwrite |
+| `.documents/WIP/workorder-active.md` | preserved byte-for-byte and published as frozen issuance evidence (commit A); **not** cleared, revised or self-approved |
+| `.documents/WIP/plan-next.md` | the verified R00.E issuance candidate replaced by exactly its identifying title plus one newline (commit A), as expressly authorised |
+| `.documents/Architecture/ARCHITECTURE.md` | new `## 6A` section (404 lines, single insertion hunk) plus six one-line consistency repairs (commit B) |
+| `.documents/Reports/execution-report.md` | this overwrite (commit C) |
 
-No other path changed.
-## 4. ROADMAP closure — exact deletion and preserved remainder
+No other path changed. ROADMAP still lists `R00.E`, `R00.F`, `R00.G` and the Stage 00 exit gate; OUTLOOK, Product Definition, README, AGENTS, both SOPs, `.github/**` and all other paths are untouched.
+## 4. Objective and what was written
 
-| Check | Evidence |
+Record the Owner-issued **conditional** R00.E software structure and toolchain as a normative, internally consistent Charter section without altering the accepted `R00.D` contracts, and disclose every remaining executable obligation honestly. The result is `## 6A` in `.documents/Architecture/ARCHITECTURE.md` (295,725-byte file, 1,585 lines), containing sixteen subsections:
+
+| Subsection | Content written |
 | --- | --- |
-| Removed text | ``- **R00.D — Content and publication contract:** settle versioned JSON/Markdown declarations, `visibilityDefault`/representation `visibility` placement, bounded Page sections, Markdown safety, author link classification, content source precedence and asset path authority.`` — the complete line, 272 characters plus its terminating LF, 274 UTF-8 bytes |
-| Where | former line 9, the only R00.D remaining-package bullet; Git recorded a single hunk `@@ -9 +8,0 @@` with no added line |
-| Size arithmetic | 17,479 minus 274 = 17,205 bytes, which is the resulting file size |
-| Byte-level proof | the frozen ROADMAP blob `70b63ae2` was read as raw bytes, the single target line plus LF removed, and the result compared with the working file: **byte-identical = True** |
-| Stage 00 preserved | heading `## Stage 00 — Architectural contract dossier (decisions only)` present once, its outcome paragraph intact |
-| Preserved packages | `R00.E` 1, `R00.F` 1, `R00.G` 1 remaining-package bullets still present |
-| Stage 00 exit gate | `**Exit gate:** documented, consistent Owner-approved contracts in canonical About/Architecture documents ...` still present, unchanged |
-| Later stages | 14 stage headings retained in order (`Stage 00` through `Stage 13`), 170 lines against 171 before |
-| No history added | the transition inserted no completed-work record, acceptance log or commentary; only a deletion |
-| Remaining R00.D mentions | 0 in the live ROADMAP |
+| 6A header + 6A.0 | status/authority, what the section may not do, the four Owner hold points `C1`–`C4`, prohibited claims |
+| 6A.1 | `E01` architectural shape, one validated snapshot, resolver-mandatory rule, presentation split, five-alternative comparison |
+| 6A.2 | `E01` frozen package/version plan (19 rows), conditional-compatibility rule, reproducibility and supply chain |
+| 6A.3 | `E02` four-package source tree, allowed/forbidden Cargo edges, layered enforcement, negative meta-tests |
+| 6A.4 | `E02` six inbound ports, twelve outbound ports, single composition root, delivery independence |
+| 6A.5 | `E02` `BrowserEnhancementV1` wire contract, generation drift control, attribute-only serialisation, mandatory runtime decoding, no-JS baseline |
+| 6A.6 | `E03`/`E04` canonical authority, C1-a strict parser, C1-b Draft 2020-12 proof, C1-c schema/domain split, generation truth, diagnostics, non-waivable unsupported-keyword rule |
+| 6A.7 | `E05` Unicode 18 mapping profile, golden conformance set, locale binding, URL/IDNA, C1-e route oracle |
+| 6A.8 | `E06` source confinement, bounded asset pipeline, single portable sealed artefact |
+| 6A.9 | `E06` compare-and-swap activation, three interchangeable adapters, Mode A/B delivery, delivery proof |
+| 6A.10 | `E07` Comrak profile, C1 Markdown proof, AST refusal before render, link/media/anchor rules, rendering safety |
+| 6A.11 | `E08` registry identity and the fixed server-render/client-controller decision plus the 21-row behaviour table |
+| 6A.12 | `E08`/C4 21-row module port/validator/negative-case register, boundary assertions, O05.2 binding |
+| 6A.13 | `E09` C1–C4 proof assignment table, runtime-PASS rule, chosen test stack |
+| 6A.14 | `E09` twelve-row D/O coverage map, `P01`–`P14` and `V01`–`V28` individual assignments |
+| 6A.15 | `E10` fourteen future command contracts, source-of-truth hierarchy, CI platform |
+| 6A.16 | preservation, exclusions, reserved `R00.F`/`R00.G` matters, three disclosed pre-existing wording mismatches, future-proof summary |
 
-## 5. NEXT — exact candidate comparison
+Six one-line consistency repairs accompany the insertion, and nothing else in the file changed: the header status line (revision 8 plus the §6A pointer), a new `R00.E` codification-status line, §5's "does not select a framework…" sentence, §6.1's "remain `R00.E`/Stage 02" sentence, §6.2L item 2's "not settled by R00.D" list, §6.5's `R00.E` obligation bullet and §7 item 6. Every other byte is the accepted baseline.
 
-The live `plan-next.md` is byte-identical to the 13-line `§4` candidate block inside the frozen issued order (first line `# Foundation Solo — plan-next (Next Candidate)`, sections `## R00.E — Software structure and toolchain`, Objective, Prerequisites and readiness, Proposed scope, Proposed deliverables, Verifiable exit conditions, terminal LF):
+## 5. E01–E10 outcomes (documentary)
 
-| Check | Result |
-| --- | --- |
-| Character-exact comparison against the frozen `§4` block | **True** |
-| Lines / bytes | 13 / 2,872 |
-| Candidate count | exactly one bounded R00.E decision candidate; no second candidate, work order, authority paragraph or decision history |
-| Dependency readiness | R00.E is stated as the earliest unfinished Stage 00 package after the R00.D closure, which matches the ROADMAP that still lists R00.E, `R00.F` and `R00.G` |
-| No preselected toolchain | the candidate explicitly treats language, framework, runtime, dependency selection and toolchain as decisions still to obtain |
-| No code authority | it excludes application code, dependencies, executable schemas, CI workflows and alternate documentation authorities during Stage 00 |
-
-## 6. ACTIVE — neutral closure
-
-- Final live ACTIVE content is exactly `# Foundation Solo — Active Work Order` followed by one LF: 40 bytes, blob `ea5f20b736483c2e102456be1cea9104059fc81a`, matching an exact string comparison rather than a visual check.
-- No second active order, status line, accepted-work summary or hidden content remains; the issued `SOLO-WO-015 R01` is preserved only in Git history at commit A.
-
-## 7. Canonical preservation
-
-| Path | Blob at B |
-| --- | --- |
-| `.documents/Architecture/ARCHITECTURE.md` | `0e82502540383defb9f3a619ef43c46700ca7159` (unchanged) |
-| `.documents/About/FOUNDATION-SOLO.md` | `5e7a9a80f6f477e1e17d06074224a2a27fa2603e` (unchanged) |
-| `.documents/WIP/plan-outlook.md` | `cb9c7a610cf3c537557e060ca9656e44a053e69d` (unchanged) |
-| `README.md` | `ab8aa7bf5f8e6a9b21d7472d42a9c619f31bbc17` (unchanged) |
-| `AGENTS.md` | `97c372e49b0ea1e279efe35ab8dac8c2ff2a6267` (unchanged) |
-| `.documents/SOP/sop-architect.md` / `sop-implementation.md` | unchanged |
-
-All `D01`-`D12` and `O01`-`O12` accepted contracts remain canonically recorded in the untouched Charter and Product Definition; this run deleted no decision text, because the closed contract lives there and not in the ROADMAP. No schema artifact, source file, asset, workflow, dependency manifest or other repository was touched.
-
-## 8. Acceptance gates G01-G08
-
-| Gate | Evidence | Status |
+| Decision | Recorded selection | Outcome |
 | --- | --- | --- |
-| G01 — authority/baseline | `SOLO-WO-015 R01` verified, correct root, one worktree, one `origin`, `HEAD = origin/main = ls-remote = 126d8fa`, only the expected ACTIVE modification; ACTIVE 14,513 bytes, SHA-256 `AA485276…18C6`, blob `93957814`. | **PASS** |
-| G02 — frozen scope | Commit A preserves the installed R01 byte-for-byte (blob `93957814`, one file), pushed and confirmed by GitHub commit readback and by the file remaining retrievable in history. | **PASS** |
-| G03 — ROADMAP purity | One bullet removed, single-deletion hunk, byte-identical remainder proved against the frozen blob; Stage 00, `R00.E`/`R00.F`/`R00.G`, the exit gate and all 14 stages retained; no history added. | **PASS** |
-| G04 — NEXT readiness | Character-exact `§4` match, one bounded R00.E decision candidate, dependency-ready earliest package, no toolchain preselection, no code authority. | **PASS** |
-| G05 — ACTIVE closure | Live ACTIVE is exactly the neutral header plus one LF (40 bytes, blob `ea5f20b7`); issued edition preserved in Git history. | **PASS** |
-| G06 — canonical preservation | Charter `0e82502`, Product `5e7a9a80`, OUTLOOK, README, AGENTS and both SOPs unchanged; WIP inventory stays exactly four files. | **PASS** |
-| G07 — Git/report evidence | A/B/C commits local and pushed, changed-path ledger, GitHub readback of every blob, report published separately, truthful worktree/temp inventory in section 10. | **PASS** |
-| G08 — no premature work | Only R00.D consumed; Stage 00 open with `R00.E`/`R00.F`/`R00.G`; no implementation, schema, dependency, test claim, release, deployment or self-awarded acceptance. | **PASS** |
-## 9. Verification method, and a corrected false negative
+| `E01` | Rust 2024; publish-time validated content-addressed artefact pipeline plus optional request-time transport-neutral resolver; exact pins; no mandatory always-on process | **recorded**; no toolchain installed |
+| `E02` | four Cargo packages with inward-only edges, one composition root, layered enforcement, `BrowserEnhancementV1` Rust→TS contract | **recorded**; `check-architecture` does not exist yet |
+| `E03` | strict duplicate-aware streaming JSON parse with bounded input | **recorded**; parser not implemented |
+| `E04` | `jsonschema 0.60.2` Draft 2020-12 with `unevaluatedProperties` proof, offline registry, asserted formats, generation truth | **recorded**; keyword support explicitly incomplete upstream and unproven here |
+| `E05` | ICU4X 2.4.0 Unicode 18 / CLDR 49, three distinct mapping operations, UTS #39 oracle, full route-case contract | **recorded**; conformance corpora not run |
+| `E06` | `cap-std` confinement, bounded codecs, sealed content-addressed artefact, compare-and-swap activation, three adapters, Mode A/B | **recorded**; no provider or host tested |
+| `E07` | Comrak 0.56.0 with CommonMark 0.31.2 plus GFM 0.29-gfm and AST refusal before render | **recorded**; grammar conformance not run |
+| `E08` | 21 exact `1.0.0` modules with server-render plus client controllers, full port/validator/negative register | **recorded**; no renderer or module exists |
+| `E09` | `cargo test`, `proptest`, `syn` architecture check, Playwright and axe, adversarial meta-gates, staged implementation | **recorded**; no test suite exists |
+| `E10` | fourteen future CLI/npm commands, generated-truth hierarchy, GitHub Actions matrix | **recorded**; **no command has been executed** |
+## 6. Owner conditions C1–C4
 
-Reported because the intermediate results were real, even though the published files are correct:
+The distinction below is deliberate: **upstream documentation evidence** is recorded separately from **executed proof**, which is absent. No condition is waived.
 
-1. A first comparison of the ROADMAP remainder ran `git show` through a PowerShell pipeline into `Set-Content`. It reported a difference at line 1 only, where the em dash had become `ΓÇö`. That was **console decoding of the piped text**, not file content: the working file itself holds the correct character.
-2. A second attempt removed the target line using a **byte** count inside `String.Remove`, which expects a **character** count, produced a two-byte shortfall (17,203 against 17,205) and reported `False`. The mismatch was my arithmetic, not the file.
-3. The definitive check bypassed the console completely: the frozen blob was read as raw bytes with `git cat-file` redirected to a file, the single target line plus LF removed in character units, and the re-encoded bytes compared with the working file by Base64 equality. Result: **byte-identical = True** at 17,205 bytes on both sides, which is also the exact 17,479 - 274 arithmetic.
+| Condition | Recorded documentary solution | Upstream evidence recorded | Executed proof | Status |
+| --- | --- | --- | --- | --- |
+| **C1** parser / JSON Schema / Unicode / Markdown | strict streaming duplicate-aware parser with bounded input; Draft 2020-12 with `unevaluatedProperties` after `$ref`/composition, offline pinned registry and asserted formats; ICU4X 2.4.0 Unicode 18 with three distinct mapping operations; Comrak 0.31.2 + GFM 0.29-gfm with AST refusal before render; explicit STOP rule for any unsupported required keyword | ICU4X 2.4 release notes identify Unicode 18 / CLDR 49; Comrak documents CommonMark and GFM support; `jsonschema` documents Draft 2020-12 **with incomplete support for some keywords** | **none** | **`UNVERIFIED` / NOT RUN** |
+| **C2** provider-neutral delivery, no mandatory always-on process | sealed content-addressed artefact; compare-and-swap on a single atomic pointer; three interchangeable activation adapters; Mode A static serving only after full route proof for that host; Mode B request-aware resolver where required | none claimed | **none** | **specified; no provider tested** |
+| **C3** enforceable inward direction + safe wire format | four-package Cargo graph as primary enforcement, `syn` checker with alias/re-export/dynamic negative fixtures, one composition root; `BrowserEnhancementV1` generated TypeScript plus mandatory runtime decoding over an attribute-only envelope | none claimed | **none** | **specified; not executed** |
+| **C4** requirement → port/adapter/validator/test ledger | twelve-row D/O map, `P01`–`P14` and `V01`–`V28` individual assignments, 21-row module register, eight adversarial meta-test gates | none claimed | **none** | **mapped; not executed** |
 
-No file was changed to make a check pass, and no check was reported as passing before it was understood.
+**Axum is not a production prerequisite.** §6A.9 records explicitly that neither Node nor Axum is required to host an already sealed static file set and that no always-on Rust process is mandated; static exact-route delivery is permitted **only** where the real hosting configuration passes every accepted route, alias, canonical, cache, not-found and exact-case unlisted test, otherwise a request-aware resolver is required. A provider that cannot meet the route contract must fail rather than simulate conformance.
 
-## 10. Limits, worktree and temporary cleanup
+**Unsupported-keyword rule.** §6A.6 states that an unsupported required keyword is never waived, approximated, downgraded or silently replaced; it is a refusal and a STOP pending an Owner-reviewed decision.
 
-- **Not applicable and not claimed:** application tests, unit/contract/integration suites, schema validation runs, builds, browser or visual checks, HTTP behaviour, accessibility audits, performance measurements, CI and deployment. This run edited three WIP documents and one report.
-- Working tree clean after commits A and B; one checkout, one worktree, one `origin`, branch `main` tracking `origin/main`.
-- Temporary task files used: a byte-exact copy of the installed order and two read-only ROADMAP extractions in the agent-provided temporary directory. All were task-owned and were deleted before the handback; no Owner or unknown material was removed, and Solo `.temp/` remained empty throughout.
-- `R00.D` is administratively closed **only**: the accepted `D01`-`D12` and `O01`-`O12` contracts remain in the untouched canonical documents, Stage 00 remains open with `R00.E`, `R00.F` and `R00.G`, and no further work order exists or was created.
-- `R00.E` is a candidate awaiting an Owner decision and an Owner-issued order; it is not authority to select a framework or write code. No acceptance of this closure or of R00.E is claimed here.
+## 7. Gates G01–G12
 
-## 11. Live state after this run
+| Gate | Evidence | Outcome |
+| --- | --- | --- |
+| G01 | Baseline `0ba4de6` agreed across `HEAD`, `origin/main` and `ls-remote`; correct root, `main`, one worktree, one `origin`; only the installed ACTIVE dirty; `SOLO-WO-016 R02` read in full with SHA-256 and blob recorded; Charter `0e82502` and Product `5e7a9a80` confirmed; four WIP files. | **PASS** |
+| G02 | Commit A publishes ACTIVE blob `f4c9cdeb` byte-identically and reduces NEXT to exactly 49 bytes / blob `92fa562b`; ROADMAP stays `ab382665` with `R00.E`/`R00.F`/`R00.G`; OUTLOOK stays `cb9c7a61`; remote readback confirms all four. | **PASS** |
+| G03 | §6A records `E01`–`E10` with 19 exact pins, the five-alternative comparison and the `C1`–`C4` hold points; every status distinguishes upstream documentation from unrun tests (six `UNVERIFIED` and ten not-executed statements inside §6A). | **PASS** |
+| G04 | §6A.3–§6A.5 codify the four-package graph, allowed/forbidden edges, layered enforcement with injected alias/re-export/dynamic negatives, the port matrix, one composition root and `BrowserEnhancementV1` schema + typegen + runtime guards with no private leakage. | **PASS** |
+| G05 | §6A.7 codifies Unicode 18 / CLDR 49, three distinct mapping operations, the official corpus with independent expected-value derivation, hash-pinned UTS #39 data, BCP 47 identity, IDNA, and the complete route-case, exposure, collision, redirect and cache contract with no older-data fallback. | **PASS** |
+| G06 | §6A.6 and §6A.10 codify the duplicate-aware parser, the acknowledged `jsonschema` keyword limitation with the exact STOP rule, asserted formats, offline registry, schema provenance and generation drift control, Comrak AST refusal with GFM conformance, and the closed diagnostics of §6.2K. | **PASS** |
+| G07 | §6A.8–§6A.9 codify no-follow/hardlink/junction/race refusal, bounded codecs, the immutable content-addressed artefact, compare-and-swap activation, three adapters and honest Mode A/B delivery with no forced always-on server. | **PASS** |
+| G08 | Both 21-row tables enumerate the same exact IDs; accessible event/focus/reduced-motion semantics and the exact §6.2E.2 defaults are recorded, and the Rust/TS public projection is fixed by contract design. | **PASS** |
+| G09 | §6A.13–§6A.14 map `D01`–`D12`, `O01`–`O12`, `P01`–`P14` and `V01`–`V28` to stages, ports, adapters, validators and tests, including all `C1`–`C4` hold points and the eight adversarial meta-test gates. | **PASS** |
+| G10 | §6A.15 records the source-of-truth hierarchy, the fourteen future commands, lock/licence and CI rules, and the Stage 01–13 staging; no executed test or premature compatibility claim is made anywhere. | **PASS** |
+| G11 | Charter changed by one 404-line insertion plus six one-line repairs and nothing else (`+412/−6`, single-file diff); Product Definition, ROADMAP, OUTLOOK, SOPs, README and AGENTS unchanged; no new scope, provider, Spoke, advanced form or `R00.F`/`R00.G` decision introduced. | **PASS** |
+| G12 | Changed-path ledger is exact, commits A and B are published with verified remote blobs, the report is published separately, the tree is clean with one checkout, and task-owned temporary material was removed; no forbidden operation occurred. | **PASS** |
 
-| Slot | Content |
+Code-execution gates are **NOT APPLICABLE** to this documentary run, not fake PASS.
+## 8. Actions actually performed
+
+Documentary and version-control actions only. No dependency was installed, no compiler or Node tool ran, no schema was generated, no test was executed and nothing was built.
+
+| # | Action | Result |
+| --- | --- | --- |
+| 1 | `git rev-parse`, `ls-remote`, `worktree list`, `remote -v`, `status --porcelain`, blob lookups | baseline, root, branch, remote and WIP inventory established as recorded in §1 |
+| 2 | Read the installed 402-line order in full, plus README, AGENTS, both SOPs, Charter, Product Definition, all four WIP files and the previous report | complete governing context before any edit |
+| 3 | Byte-exact preservation of ACTIVE and write of the 49-byte neutral NEXT | verified by blob identity `f4c9cdeb` and `92fa562b` |
+| 4 | Drafted §6A in nineteen scratch parts, assembled them, and spliced the 80,005-byte section at offset 204,715 before `## 7.` | `git diff --numstat` reported `404 0` with a single hunk `@@ -1157,0 +1158,404 @@` — a pure insertion |
+| 5 | Six one-line consistency repairs applied individually | each matched exactly once; final diff `+412/−6` in one file |
+| 6 | Documentary audit: heading sequence, `E01`–`E10` labels, `C1`–`C4` labels, 21 behaviour rows, 21 register rows, 14 `P` rows, 28 `V` rows, 19 pin rows, and a false-claim scan for executed-test language | all counts correct; the only `PASS`/`pass` matches are prohibition or negation statements |
+| 7 | Commit A, push, GitHub commit and file readback | `ef82749`, `0ba4de6..ef82749`, four WIP files confirmed remote |
+| 8 | Commit B, push, GitHub commit and file readback | `4785ae0`, `ef82749..4785ae0`, one file `+412/−6`, Charter blob `7b641465` at 295,725 bytes |
+| 9 | Report overwrite and separate report-only commit | this file; its commit is published separately and its SHA appears only in the chat handback |
+
+## 9. Documentation-only versus unexecuted executable proof
+
+| Item | Status |
 | --- | --- |
-| ROADMAP | Stage 00 with `R00.E`, `R00.F`, `R00.G` and its exit gate, then Stages 01-13; `R00.D` no longer listed |
-| NEXT | one bounded R00.E software-structure-and-toolchain candidate, decisions only |
-| ACTIVE | neutral header only — `# Foundation Solo — Active Work Order`, 40 bytes |
-| OUTLOOK | unchanged, `cb9c7a61` |
-| Report | this file, the single canonical execution report |
+| Charter §6A documentary codification | **complete** |
+| Parser, schema, Unicode, Markdown conformance suites | **NOT RUN — `UNVERIFIED`** |
+| `check-architecture` and its injected negative fixtures | **NOT RUN — `UNVERIFIED`** |
+| Generated schema / TypeScript drift checks | **NOT RUN — `UNVERIFIED`** |
+| Sealed artefact, compare-and-swap, HTTP and browser proof | **NOT RUN — `UNVERIFIED`** |
+| Unit, contract, integration, property and adversarial suites | **NOT RUN — `UNVERIFIED`** |
+| Build, install, CI, release, deployment | **NOT APPLICABLE** to this order and not performed |
 
-**Resumption point:** the Chief Architect reads this report and the closure revision on GitHub first, then reviews commits `67da4e2f27cdd4331d7c4210f937a6bf314116dd` and `e5d9bfe977d6ec852c790d91054f5c81aded6270` against gates G01-G08, and independently returns `ACCEPT`, `REVISE` or `STOP`. Only a separate Owner decision can open R00.E.
+## 10. Warnings, limitations and disclosed mismatches
+
+1. **`C1` is not proven and is not waived.** Documentary completeness is not conformance; §6A.13 and this report keep C1 `UNVERIFIED` until the corpora actually run, and any unsupported required keyword is a STOP.
+2. **Two shell commands exceeded the terminal observation window.** Each produced a Cline `proceed-while-running-*.log` capture; both commands completed, their written files were verified by direct byte inspection, and all such logs plus every `.temp` scratch part were deleted at run end.
+3. **Two tool-level rejections caused no state change:** a PowerShell parse error aborted one command before execution, and one editor call exceeded the 6,000-character input limit and was retried in smaller parts.
+4. **Accepted prose left untouched where it is broader than the selection.** §3.2B retains its parenthetical permission for "explicitly documented and tested locale-specific tailoring where applicable", while §6A.7 records that the first profile selects **no** locale-specific route tailoring. The first profile is unambiguous, so no contradiction is introduced for it, but the broader sentence is flagged rather than rewritten.
+5. **Three pre-existing lower-authority mismatches are disclosed in §6A.16 and not repaired:** ROADMAP `R03.C`/`R07.C` generic-fallback wording against `O07`/`O09` zero fallback; ROADMAP `R05.B` "discovery" against the manifest-only selector; and the `R00.F`/`R00.G` label split between Charter §6.5 and ROADMAP. The set of reserved matters is identical under either labelling, and the accepted §6.2 literals govern all code-stage behaviour. ROADMAP is read-only in this order.
+6. **`R00.E` is not accepted and Stage 00 is not closed.** `ROADMAP` still lists `R00.E`, `R00.F`, `R00.G` and the Stage 00 exit gate; `NEXT` is the neutral header because the candidate was issued, not accepted.
+
+## 11. Repository, worktree and cleanup
+
+- Final tree clean: empty `git status --porcelain`; branch `main` tracking `origin/main`; one worktree; one remote `origin`.
+- WIP holds exactly four files; no additional WIP file, report, archive, dossier or evidence bundle was created.
+- Task-owned temporary material — nineteen section parts, one assembled section file and the Cline capture logs — was deleted. Solo `.temp/` is empty and no unknown or Owner-owned material was removed.
+- Justified retention: none.
+
+## 12. Publication result and next action
+
+- Content commit A `ef8274977d3bf0c93d388daad0879641d7d8dbfc` published and verified; content commit B `4785ae0d4ea397e672cf8ad09b2df0631218644d` published and verified; the report is committed and pushed separately and verified by remote readback.
+- **Next action: the Chief Architect retrieves this report from GitHub first and independently reviews the exact revision against gates G01–G12 and conditions C1–C4, then returns `ACCEPT`, `REVISE` or `STOP`.** `R00.E` remains ROADMAP-pending; only a separate Owner-issued administrative closure order after an independent ACCEPT may clear ACTIVE, remove `R00.E` from ROADMAP or advance NEXT. No agent may install an `R00.F` candidate, close Stage 00 or begin implementation.
