@@ -6,7 +6,6 @@
 
 **Remaining packages**
 
-- **R00.E — Software structure and toolchain:** compare credible framework/language/build/testing choices, choose simplest verifiably strict Ports-and-Adapters design, dependency/port catalogue, composition root, boundary test method, CI and browser proof architecture. Do not inherit Foundation's Next.js/pnpm choice by default.
 - **R00.F — Contact and integrations:** specify safe `mailto:`; simple form field set, validation, consent/privacy, rate/abuse policy, delivery-failure behavior, storage/retention and port responsibilities. Explicitly exclude advanced contact forms. Define whether and how static booking/directions links and privacy-respecting analytics meet the first release.
 - **R00.G — Lifecycle and nonfunctional standards:** settle initial setup/preview/content-update/upgrade/recovery responsibilities, immutable release identity, deployment portability, supported versions and security response, accessibility/performance targets and precise acceptance matrix.
 
