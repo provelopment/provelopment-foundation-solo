@@ -6,20 +6,15 @@
 
 | Field | Value |
 | --- | --- |
-| Work order | `SOLO-WO-013` |
-| Edition | `R02` |
+| Work order / edition | `SOLO-WO-013` / `R03` — bounded correction of the R02 codification |
 | Session date | 2026-11-06 |
 | Status | **COMPLETE** |
-| Classification | Documentation-only architecture codification. No application implementation. |
-| Role | Implementation Agent. No Architect acceptance, per-decision sign-off or Owner closure is claimed. |
+| Classification | Documentation-only correction and review evidence. No application implementation. |
+| Role | Implementation Agent. No Architect `ACCEPT`, per-decision sign-off or `R00.D` closure is claimed. |
 
-**No implementation or runtime tests were performed; this was architecture documentation only.**
+**No implementation or runtime tests were performed; this was architecture documentation only.** Tests, builds, HTTP and browser proof are `NOT APPLICABLE` to a documentation-only repository.
 
-## 1. Authorization
-
-Owner-issued `SOLO-WO-013 R02` installed in `.documents/WIP/workorder-active.md`, accompanied by the matching direct Owner execution handoff naming that exact installed path. The installed order is the sole task authority; no second order, draft or self-issued scope was used.
-
-## 2. Preflight (observed, local)
+## 1. Preflight (observed)
 
 | Check | Observed |
 | --- | --- |
@@ -27,108 +22,160 @@ Owner-issued `SOLO-WO-013 R02` installed in `.documents/WIP/workorder-active.md`
 | Branch / tracking | `main`, upstream `origin/main` |
 | Worktrees | 1 |
 | Remotes | exactly 1: `origin` = `https://github.com/provelopment/provelopment-foundation-solo.git` |
-| Expected starting `HEAD` | `0dcf5b38a934eb7ba6f83d00bca6042a015a2ab2` |
-| Actual starting `HEAD` | `0dcf5b38a934eb7ba6f83d00bca6042a015a2ab2` — agreed |
-| `origin/main` and `git ls-remote` | both `0dcf5b38a934eb7ba6f83d00bca6042a015a2ab2` — agreed |
+| Expected starting `HEAD` | `34a7df1b669925145755339d004ecd22fb7da9e8` |
+| Actual starting `HEAD` / `origin/main` / `ls-remote` | all three `34a7df1b669925145755339d004ecd22fb7da9e8` — agreed |
 | WIP inventory | exactly `plan-roadmap.md`, `plan-next.md`, `workorder-active.md`, `plan-outlook.md` |
-| Pre-run dirty state | only `M .documents/WIP/workorder-active.md` — the expected Owner installation |
-| Installed ACTIVE | `SOLO-WO-013 R02`, 56,008 bytes, 276 lines, SHA-256 `2D2F8724DF55A3B703379BBE4E299B6B223CBD9D59D8ED0D50C9CD9A2A971F19`, worktree blob `bdc6b75772d3ac202cf74d7824d778cd50d300c3` against committed `ea5f20b736483c2e102456be1cea9104059fc81a` |
+| Pre-run dirty state | only `M .documents/WIP/workorder-active.md` — the expected Owner-installed input |
+| Installed ACTIVE | `SOLO-WO-013 R03`, 21,445 bytes, 137 lines, SHA-256 `DA9241A1289F71E8A62AFF58E1989DB2AF8AFB44256945B6998A24A39B1C946A`, worktree blob `0dda756cd771c681c884a4d37c89e070299cce41` against committed `bdc6b75772d3ac202cf74d7824d778cd50d300c3` |
+| NEXT state | one line, already the neutral heading — not reset, no candidate selected |
 
-The Owner-installed ACTIVE difference was treated as expected, never as unrelated dirty state.
+The expected Owner-installed ACTIVE difference was treated as the assigned input, never as unrelated dirty state.
 
-## 3. Commits and publication
+## 2. Commits and publication
 
-| Step | Commit | Tree | Content |
+| Step | Commit | Tree | Remote readback |
 | --- | --- | --- | --- |
-| Baseline | `0dcf5b38a934eb7ba6f83d00bca6042a015a2ab2` | — | starting `origin/main` |
-| A — order preservation + NEXT issue transition | `c7674f56860c49d356177c0784fdad9ce6d36b97` | `f56d988353ffd73b6e905affb8533613649b6116` | [commit](https://github.com/provelopment/provelopment-foundation-solo/commit/c7674f56860c49d356177c0784fdad9ce6d36b97) |
-| B — architecture codification | `38f65e35e63fb25d1fc5e4e02d2f5201c0280065` | `d3da1066cabc2b399021faa40529c013fa69dace` | [commit](https://github.com/provelopment/provelopment-foundation-solo/commit/38f65e35e63fb25d1fc5e4e02d2f5201c0280065) |
-| C — this report-only commit | supplied in chat, never self-referenced here | — | — |
+| Baseline | `34a7df1b669925145755339d004ecd22fb7da9e8` | — | starting `origin/main` |
+| **A** — preserved R03 ACTIVE | `d15e77ab483caad6bee54f93a339de1be2123161` | `5ee76395264a52f1c6317aca8365ba8ce0f14dbc` | [commit](https://github.com/provelopment/provelopment-foundation-solo/commit/d15e77ab483caad6bee54f93a339de1be2123161) |
+| **B** — F01–F04 corrections | `8b3ad6c0c60c65e93938cb30e9f17bf6906c15c8` | `e0c6bc51057e7afd05c6c3fef303a09fb9bc77c5` | [commit](https://github.com/provelopment/provelopment-foundation-solo/commit/8b3ad6c0c60c65e93938cb30e9f17bf6906c15c8) |
+| **C** — this report-only commit | supplied in the chat handback, never self-referenced here | — | — |
 
-- Push A: `0dcf5b3..c7674f5  main -> main`. Push B: `c7674f5..38f65e3  main -> main`. No force-push, no history rewrite, no branch, no PR, no merge, no tag, no release.
-- Step A committed the installed order **byte-for-byte**: committed blob `bdc6b75772d3ac202cf74d7824d778cd50d300c3` equals the installed worktree blob; no approved scope was edited, annotated, cleared or self-certified.
-- Step A NEXT result: `plan-next.md` reduced to exactly `# Foundation Solo — plan-next (Next Candidate)` plus one terminal LF (49 bytes, 1 line, blob `92fa562b1af0c54391851aa5c79deb1631127069`). No new candidate was populated.
+- Pushes: `34a7df1..d15e77a  main -> main`, then `d15e77a..8b3ad6c  main -> main`. No force-push, rewrite, branch, PR, merge, tag, release or deployment.
+- Step A: committed blob `0dda756c` equals the installed worktree blob — the R03 scope was preserved byte-for-byte and never edited, cleared, annotated or self-certified. NEXT was not touched.
+- Step B: GitHub commit readback reports **exactly two files**, 8 insertions and 8 deletions — `.documents/Architecture/ARCHITECTURE.md` (+6/−6) and `.documents/About/FOUNDATION-SOLO.md` (+2/−2). Remote `ARCHITECTURE.md` blob `ef4533e4b09946645808658290d5975229a962b2` equals the local committed blob.
+- Ending `HEAD` after B: `8b3ad6c0c60c65e93938cb30e9f17bf6906c15c8`, equal to `git ls-remote`. Working tree clean after each commit.
 
-## 4. Changed-path ledger (whole run)
+## 3. Changed-path ledger (whole run)
 
 | Path | Operation |
 | --- | --- |
-| `.documents/WIP/workorder-active.md` | preserved and committed unchanged as the frozen issued order |
-| `.documents/WIP/plan-next.md` | single authorized issue-transition reset to the neutral heading |
-| `.documents/Architecture/ARCHITECTURE.md` | codification target, +246/−18 lines (689 lines total) |
-| `.documents/About/FOUNDATION-SOLO.md` | three narrow product-intent parity lines, +3/−3 (220 lines) |
+| `.documents/WIP/workorder-active.md` | preserved and committed unchanged as the frozen R03 scope |
+| `.documents/Architecture/ARCHITECTURE.md` | six corrected lines: §1.3 (L59, L61, L63), §1.5 (L109), §2.3 (L221), §3.2A (L350) |
+| `.documents/About/FOUNDATION-SOLO.md` | two corrected lines: §3 (L74), §4B (L118) |
 | `.documents/Reports/execution-report.md` | this overwrite |
 
-Byte-identical to `HEAD` before their own commits: `plan-roadmap.md`, `plan-outlook.md`, `README.md`, `AGENTS.md`, both SOPs, `LICENSE`, `.github/`, `.gitignore`. `plan-roadmap.md` still records `R00.D` as pending.
-## 5. `D01`–`D12` codification evidence map
+No other path changed. Line counts after correction: `ARCHITECTURE.md` 689 (unchanged), `FOUNDATION-SOLO.md` 220 (unchanged).
+## 4. F01–F04 — corrections as published
 
-Anchors are the actual canonical headings in published commit B (`ARCHITECTURE.md`, 689 lines). Status is this agent's own documentary self-check; Chief Architect disposition is independent.
+Line references are the final spans in commit B. Status is this agent's documentary self-check only.
 
-| Decision | Canonical home | Positive rule codified | Refusal codified | Status |
-| --- | --- | --- | --- | --- |
-| `D01` | §1.5, L104 | one authored strict-JSON manifest is sole publication authority; root schema version independent of product release, schema and module versions | malformed JSON, duplicate members, unsupported version and unsupported fields refused; no auto-discovery, overlay or secondary authority | PASS |
-| `D02` | §1.5, L112 (with §1.1 L36–L40) | nested Entity→Facet→Site→Page→representation; immediate containment is parentage; qualified references; R00.A ID grammar unchanged | competing parent fields, orphans, cross-parent claims, invalid IDs refused; no normalization or derivation; movement is not migration | PASS |
-| `D03` | §1.6, L116; reconciled in §1.3 L61 | at most two explicit JSON/Markdown candidates, JSON-first, exactly one effective source; seven-case truth table L129–L137 | invalid or unreadable JSON refuses, both absent refuses, duplicate candidate including an absent one refused, no body merge | PASS |
-| `D04` | §1.7, L141 | one effective body per representation; shared typed model; manifest alone owns identity, locale, route, visibility and property authority | source-level override refused; no merge, overlay or first/last-wins precedence | PASS |
-| `D05` | §3.1A L251, §3.1B L263 | CommonMark plus recognized mainstream extensions; expansive named/versioned trusted modules; seven design references at L274 | no Solo directives, MDX, active HTML or arbitrary JS; a module cannot add EFS nodes, routes, exposure bypass or excluded forms | PASS |
-| `D06` | §3.2A, L346 (matrix L352–L357) | representation `visibility` wins, else Page `visibilityDefault`; manifest declaration is sole authority for both body formats | invalid visibility fails closed; unlisted is exact-case, `noindex, nofollow`, undiscoverable and never a fallback target | PASS |
-| `D07` | §3.2C, L407 (policy §3.2, §3.2B, §4.1–§4.4) | declarations scoped per level; derived claim ledger validated before publication; base change never remints identity | no Host/header authority; unknown explicit locale is not silently mapped; every alias, entry and route claim collision-checked | PASS |
-| `D08` | §2.3, L219 (semantics §2 L149–L170) | keyed declarations over the governed registry; two independent elements; effective cardinality applies to the resolved collection | unknown or conflicting definitions refuse publication; no nearest-value-wins, deduplication, merge or internal leak | PASS |
-| `D09` | §2.4, L231 (invariants §2.1 L172–L214) | zero-or-more typed facts; `add` creates independently; `extend` updates exactly one identified record in place | missing, cross-branch, ambiguous, suppressed or circular targets refused; no promotion to public; no route or locale authority | PASS |
-| `D10` | §3.3B, L440 (policy §3.3A L425) | role-governed cascading selections sharing property semantics; typed Entity versus generic namespaces; direct typed module media | unregistered, unsafe, wrong-class or missing assets fail; singular collision fails; zero automatic fallback approved | PASS |
-| `D11` | §3.1C, L278 | three distinct contracts for source locators, typed asset references and public links; resolved containment; portable relative locators | absolute, UNC, traversal, symlink, unsafe-scheme and arbitrary-fetch cases refused; secrets, drafts and generated output excluded | PASS |
-| `D12` | §6.1, L577 (validation groups L589) | one coordinating validator over versioned contracts; module-contract record; separate version identities; atomic all-or-nothing publication | unknown module, incompatible version, undeclared field or unsupported schema fails closed; breaking change requires migration | PASS |
+### F01 — D03 candidate absence is permitted, not refused
 
-## 6. `V01`–`V28` conceptual coverage
-
-All 28 cases are codified as normative positive/refusal specifications with a named governing contract in **§6.3, L614** (index header L618, rows L620–L647): V01–V09 → §1.5/§1.6/§1.7/§3.1A/§3.1B; V10 → §3.2A; V11 → §4.1/§4.4; V12–V15 → §3.2/§3.2B/§3.2C; V16–V17 → §2/§2.3; V18–V19 → §2.1/§2.4; V20–V21 → §3.3A/§3.3B; V22–V23 → §3.1C; V24–V25 → §6.1; V26 → §5; V27 → §3.1B; V28 → §1/§3.4/Product.
-
-**No row is an executed test.** No schema validator, browser, runtime or publication run exists in this documentation-only repository, and none is claimed. Row counts were machine-checked (`V` rows = 28, `O` rows = 12, `D` index rows = 12, duplicate headings = 0).
-## 7. Remaining OPEN physical-specification gates
-
-Recorded as an explicitly titled register at **§6.2, L593**, with twelve rows **O01–O12** (L599–L610) and a stated consequence each: O01 manifest file/path inventory, initial versions, JSON Schema artifacts and dialect; O02 canonical field paths plus one minimal and one complex worked example; O03 cross-platform path/profile, casing, symlink/hardlink/alias and race-safe read semantics; O04 exact CommonMark/GFM profile, raw-HTML policy, title/heading contract, link resolution and media base; O05 initial installed module set, module identifier grammar, input schemas, composition limits and interaction policy; O06 module installation, registration, version pinning and compatibility algorithm; O07 typed property registry catalogue, exposure enum, equality/cardinality limits and serialized provenance; O08 location field catalogue, record identifier grammar, `add`/`extend` patch schema, exposure/provenance handling and coordinate profile; O09 admitted graphic roles, cardinality, source class, format allowlist, image processing and library versioning; O10 base/alias/route keys, Unicode and casing dataset pinning, routing grammar, locale mapping, fallback and link schema; O11 version-range syntax, migration refusal/rollback, diagnostic codes and publication snapshot atomicity; O12 proof that each finalized literal is Owner-accepted or purely mechanical.
-
-The Charter header states plainly that the document is **not yet a complete executable physical schema**, and that no framework, language, storage, schema artifact, module, version value, media policy or deployment provider is selected. §6.2's disposition rule forbids certifying implementation-readiness or declaring `R00.D` fully complete while any gate lacks an approved specification.
-
-## 8. `R00.A` / `R00.B` / `R00.C` preservation
-
-- **R00.A** — ID grammar and 63-character limit, parent-scoped uniqueness, durable references, seeded `main`/`main`/`home`, drafts outside the published graph, single manifest authority and fail-closed refusal are unchanged (§1.1, §1.3, §1.5). The one superseded element is the single-source **wording** in §1.3, explicitly labelled as superseded by the Owner-amended `D03` and re-expressed as two declared candidates with one effective source; the refusal list gained the corresponding candidate and no-effective-source cases. Nothing else in R00.A was reworded.
-- **R00.B** — configured base with optional prefix and aliases, locale entry precedence, same-Page public-only fallback, public insensitive by default with author-selected sensitive claims, unlisted exact-case matching, independent full-locale normalization, the ten collision rules, `308`/`302` and cache safety are unchanged (§3.2, §3.2A, §3.2B, §4.1–§4.4). Only forward references gained the new declaration direction (§3.2C).
-- **R00.C** — governed registry, additive `inheritance`/`currentContext`, direct-ancestry-only resolution, effective cardinality, per-value provenance, restricted public projection, structured location facts with identified-record extension, registered roles, typed Entity versus generic sources and default-deny fallback are unchanged (§2, §2.1, §3.3A); physical directions were added alongside without altering logical rules.
-- **Product exclusions preserved** — advanced contact forms remain explicitly excluded (§3.4 and Product §6); no hidden Spoke, no geography-derived routing and no multi-Entity tenancy appears anywhere in the codified text.
-
-## 9. Checks performed (documentary only)
-
-| Check | Result |
+| Aspect | Evidence |
 | --- | --- |
-| Duplicate Charter headings | 0 |
-| `V` rows / `O` rows / `D` index rows | 28 / 12 / 12 |
-| Seven design references, each exactly once | 7/7 (`swiftguest.com`, `sitelings.ai`, `untilnow.com.au`, `vectapp.io`, `northfoundry.co`, `siftp.com`, `myumbrella.ai`) |
-| Superseded-wording sweep (`single source reference`, `bounded catalog`, `final section vocabulary`, `17 sections`, `section families from EFS`, `exactly one permitted authored source`) | 0 hits in Architecture |
-| Restricted paths byte-identical to `HEAD` before their commits | `plan-roadmap.md`, `plan-outlook.md`, `README.md`, `AGENTS.md`, both SOPs, this report |
-| Final worktree after each commit | `git status --porcelain` empty |
+| Canonical locations | Architecture §1.3 **L61** (source integrity) and **L63** (fail-closed list); Product §3 **L74** |
+| Positive rule now stated | "a genuinely absent preferred JSON candidate is permitted whenever a valid declared Markdown candidate can be selected; candidate absence is never itself a refusal" (Arch L61); "a genuinely absent JSON candidate is permitted when a valid declared Markdown candidate can be selected" (Product L74) |
+| Refusal rule now stated | "an unsafe, ambiguous or duplicate-claimed candidate, an invalid or inaccessible selected or preferred resource, and any failure to select exactly one valid effective source all fail validation" (Arch L61); Arch L63 lists "a duplicate-claimed, unsafe or ambiguous declared source candidate, or any failure to select exactly one valid effective source" |
+| Absolutes removed | both former phrases — `declared missing, unsafe or ambiguous sources fail validation` and `an absent, duplicate-claimed, unsafe or ambiguous declared source candidate` — no longer appear anywhere |
+| §1.6 seven-case table | inspected, **unchanged**, no conflict with the corrected §1.3 (L129–L137) |
+| Status | PASS (documentary) |
 
-## 10. Remote readback, independent of local refs
+| Required case | Normative location | Documented outcome |
+| --- | --- | --- |
+| (a) JSON declared but absent + valid declared Markdown | Arch L61; §1.6 row L131 | ACCEPT Markdown |
+| (b) both candidates valid | §1.6 L121 and row L133 | ACCEPT JSON only, no merge |
+| (c) JSON present but invalid, unreadable or inaccessible + valid Markdown | Arch L61; §1.6 L122, rows L134–L135 | REFUSE |
+| (d) both candidates absent | §1.6 row L136 | REFUSE |
+| (e) an absent candidate also claimed by another representation | Arch L61; §1.6 L123, row L137; V06 L625 | REFUSE duplicate claim |
 
-- `git ls-remote origin refs/heads/main` = `38f65e35e63fb25d1fc5e4e02d2f5201c0280065`, equal to local `HEAD` and `origin/main`.
-- GitHub readback of commit `38f65e3` reports exactly two changed files — `.documents/Architecture/ARCHITECTURE.md` (+246/−18) and `.documents/About/FOUNDATION-SOLO.md` (+3/−3) — and no unexpected path.
-- Remote `ARCHITECTURE.md` blob `c2b14972070e8ce1309f4c0ee48086261f1c8646` equals the local committed blob.
+### F02 — mandatory root `schemaVersion` is settled
 
-## 11. Limitations and unverified items
+| Aspect | Evidence |
+| --- | --- |
+| Canonical locations | Architecture §1.5 **L109** (versioning bullet, now titled "Mandatory root `schemaVersion`"); §1.3 **L59** |
+| Positive rule | "strict UTF-8 JSON with a **mandatory root field named literally `schemaVersion`** — an accepted field name, not an illustrative suggestion" |
+| Refusal rule | "Unsupported version values, unknown fields, duplicate keys and malformed JSON fail closed" |
+| Settled versus OPEN | settled: one strict-JSON manifest, mandatory `schemaVersion`, and its independence from product release, content schema, JSON Schema dialect and module contracts (L109, L59). Still OPEN per §6.2: manifest filename and location, exact subordinate field layout, initial `schemaVersion` **value**, source-locator serialization, JSON Schema implementation and dialect (O01, O02) |
+| Stale wording removed | §1.3 no longer says the physical **file format** remains undecided; it now says the strict-JSON manifest format is settled and lists only the OPEN literals |
+| Status | PASS (documentary) |
 
-- No code, dependency, toolchain, build, test suite, schema artifact, validator run, browser check, provider call or deployment exists; none was executed and none is claimed.
-- No physical literal is settled: the twelve §6.2 gates remain open and each needs separate Owner-reviewed acceptance.
-- No module identifier, module version, media limit or file-size limit is approved by appearing in the Charter.
-- Architect `ACCEPT`, individual decision sign-off and Owner closure of `R00.D` are **not** claimed by this run.
+### F03 — D08 accepted inline object key is `properties`
 
-## 12. Temporary workspace and cleanup
+| Aspect | Evidence |
+| --- | --- |
+| Canonical location | Architecture §2.3 **L221** |
+| Positive rule | each of Entity, Facet, Site, Page and localized representation may carry an optional **directly inline `properties` object** attached to that EFS node itself; "`properties` is the accepted exact key name"; the object belongs to its owner, never to a central authoritative property ledger or separate publishing structure |
+| Preserved semantics | absent property inherits (L223); explicit `inherit`/`suppress` with valid local values (L224); inherited-first then local ordering, effective cardinality, registered definitions, provenance and public-only projection (L225–L227) |
+| Refusal rule | "Unknown properties and conflicting or incompatible definitions refuse publication" |
+| Not inferred | registry catalogue, value envelopes, exact local-value serialization and exposure enumeration remain **OPEN** (§6.2 O07) |
+| Status | PASS (documentary) |
 
-No task-owned scratch was created in Solo `.temp/` (empty at end). One Cline task log outside the repository was produced while capturing a long command; it is task-owned, contains no repository content, and is deleted before this run closes. No justified retention is requested and no cleanup failure is known. Git cleanliness is not offered as proof of temporary cleanliness.
+### F04 — D06 field placement is decided, not OPEN
 
-## 13. Permission boundaries observed
+| Aspect | Evidence |
+| --- | --- |
+| Canonical locations | Product §4B **L118**; Architecture §3.2A **L350** (parity clarification) |
+| Positive rule | both are **direct inline fields of their own manifest declarations** — `visibilityDefault` on the Page, `visibility` on each localized representation — with `visibilityDefault` defaulting to `public` |
+| Negative rule | never a setting inside content JSON or Markdown, a central override table or a `publication` wrapper; only `public` and `unlisted` are valid states |
+| Removed | Product §4B no longer says **field placement** remains open; only "versioned schema encoding and validation mechanics" remain open |
+| Preserved | four-case matrix (L352–L357), exact-case unlisted serving, `noindex, nofollow`, complete discovery exclusion, unlisted-is-not-private and no unlisted fallback (L359, §4.4 L524) |
+| Status | PASS (documentary) |
 
-Local documentation edits were confined to the §3 ledger paths. No branch, PR, merge, force-push, history rewrite, tag, release, deployment, dependency install, application code, provider call or other-repository write occurred. `ROADMAP`, `OUTLOOK`, `README.md`, `AGENTS.md` and both SOPs were untouched. `ACTIVE` was neither cleared nor self-certified, and no next candidate was selected.
+| Required case | Normative location | Documented outcome |
+| --- | --- | --- |
+| (a) absent Page and representation fields | matrix L352–L357 row 1 | `public` |
+| (b) Page `unlisted`, representation omitted | matrix row 3 | `unlisted` |
+| (c) Page `unlisted`, representation explicit `public` | matrix row 4 | `public` |
+| (d) Page-level visibility declared in a body source | Arch L350; Product L118 | refused as a contradictory second setting |
+| (e) unlisted content | Arch L359 | published and reachable, undiscoverable, **not** private |
+## 5. Regression rechecks
 
-## 14. State and resumption point
+| Decision | Anchor in commit B | Recheck | Status |
+| --- | --- | --- | --- |
+| `D01` | §1.5, L104 | sole strict-JSON manifest authority and strict refusal intact; the only change in §1.5 is the accepted `schemaVersion` naming at L109 | PASS |
+| `D03` | §1.6, L116 | §1.6 body and its seven-case table **unmodified**; §1.3 now agrees with it instead of contradicting it | PASS |
+| `D06` | §3.2A, L346 | matrix L352–L357, unlisted serving and discovery exclusion unmodified; only L350 gained the direct-placement clarification | PASS |
+| `D08` | §2.3, L219 | `properties` key named at L221; inheritance, ordering, cardinality, provenance and projection paragraphs L223–L227 unmodified | PASS |
+| `D02`, `D04`, `D05`, `D07`, `D09`, `D10`, `D11`, `D12` | §1.5 L112 · §1.7 L141 · §3.1A L251, §3.1B L263 · §3.2C L407 · §2.4 L231 · §3.3B L440 · §3.1C L278 · §6.1 L577 | anchors present and bodies untouched — the commit touches only the six lines named in §3 | PASS |
 
-`R00.D` codification is published but **not closed**; it remains pending in `plan-roadmap.md`. `workorder-active.md` still holds the accepted R02 scope and awaits a separate Owner-accepted closure order. `plan-next.md` is neutral with no candidate. The resumption point is the Chief Architect's independent GitHub-first review of this report and commit `38f65e3`, with per-decision `PASS`/`FAIL`/`UNVERIFIED` and overall `ACCEPT`/`REVISE`/`STOP`.
+## 6. Targeted contradiction search (both documents)
+
+| Term | Hits | Inspection outcome |
+| --- | --- | --- |
+| `missing` | Architecture 17, Product 3 | remaining uses concern IDs, parents, published representations, location values, translations or discovery absence; none prohibits an absent **unselected** JSON candidate |
+| `absent` | Architecture 18, Product 2 | the corrected permissive rule (L61), the §1.6 table rows, property and visibility inheritance, the §3.1C genuine-absence rule (L284), V05/V06 and discovery absence — all consistent |
+| `source reference` | Architecture 1, Product 0 | the single hit is the §3.3B **graphic** asset source-reference grammar (L452), an OPEN literal unrelated to body-source selection |
+| `source references` | Architecture 0, Product 0 | the former Product phrase is gone |
+| `source candidate` | Architecture 4, Product 0 | L63 refusal list (corrected), §1.6 heading, §1.7 manifest-authority list, §6.1 validation group — all consistent |
+| `field placement` | Architecture 2, Product 0 | L361 says visibility field placement **is approved**; L673 says it **is decided** — both agree with F04, and Product no longer claims it is open |
+| `schemaVersion` | Architecture 2 | L59 and L109 only, both stating the mandatory accepted key |
+| `properties` | Architecture 13 | L221 names the accepted inline object; the other hits are ordinary English uses of the property system, router prohibitions and module migration |
+| `visibilityDefault` / `visibility` | §1.7 L145, §3.2A L350–L359, §4.4, Product §4B | consistently authoritative in the manifest, never in a body source |
+
+## 7. Preservation evidence
+
+Structural counts after correction: `D01–D12` index **12** rows, `V01–V28` ledger **28** rows, `O01–O12` register **12** rows, duplicate headings **0**, design references **7/7** present exactly once. `ARCHITECTURE.md` remains 689 lines and `FOUNDATION-SOLO.md` 220 lines.
+
+| Read-only path | Preserved blob (identical before and after) |
+| --- | --- |
+| `.documents/WIP/plan-roadmap.md` | `70b63ae220e010ecb3d68833632c26fd1e7778d5` |
+| `.documents/WIP/plan-next.md` | `92fa562b1af0c54391851aa5c79deb1631127069` |
+| `.documents/WIP/plan-outlook.md` | `cb9c7a610cf3c537557e060ca9656e44a053e69d` |
+| `README.md` | `ab8aa7bf5f8e6a9b21d7472d42a9c619f31bbc17` |
+| `AGENTS.md` | `97c372e49b0ea1e279efe35ab8dac8c2ff2a6267` |
+| `.documents/SOP/sop-architect.md` | `0396251245180b40ee896b50a3456b92835f9cb1` |
+| `.documents/SOP/sop-implementation.md` | `ef616745ee5ad3e01ec8b3b62ac99d3d29b24893` |
+
+Committed content blobs after step B: `ARCHITECTURE.md` `ef4533e4b09946645808658290d5975229a962b2`, `FOUNDATION-SOLO.md` `64a13d45f59933d286bff2f79c87be743099ab43`, preserved `workorder-active.md` `0dda756cd771c681c884a4d37c89e070299cce41`.
+
+## 8. Checks and non-applicable verification
+
+Actually executed: root, branch, remote and worktree inspection; `git ls-remote`; porcelain status before and after each commit; `git hash-object` comparison for every read-only path; `git diff --stat` (8 insertions, 8 deletions); GitHub commit readback (two files only); remote blob comparison; heading outline; duplicate-heading count; row counts; reference-URL counts; and the targeted searches in §6.
+
+**Tests, builds, HTTP and browser proof are `NOT APPLICABLE`** — this repository contains no application code, toolchain, dependency manifest or test suite, and none was run or claimed.
+
+## 9. Limitations
+
+The twelve physical specification gates `O01–O12` **remain OPEN**, and the corrected Charter is explicitly not an implementation-ready schema. `R00.D` remains pending in ROADMAP, NEXT remains neutral and ACTIVE still holds R03. No Architect `ACCEPT`, per-decision sign-off, package closure, Stage 00 completion, release or deployment is claimed. Product §8's proposed-details lists were left untouched because they sit outside this order's two permitted Product paragraphs and do not contend that the manifest format is undecided.
+
+## 10. Temporary workspace and cleanup
+
+No task-owned scratch was created in Solo `.temp/`, which is empty at the end. Cline task logs produced by long-command capture outside the repository are task-owned, contain no repository content and are removed before this run closes. No justified retention is requested and no cleanup failure is known. A clean Git tree is not offered as proof of temporary cleanliness.
+
+## 11. Permission boundaries observed
+
+Permanent edits were confined to the four paths in §2 of the order. No branch, PR, merge, force-push, history rewrite, tag, release, deployment, dependency install, application code, schema artifact, provider call or other-repository write occurred. ROADMAP, NEXT, OUTLOOK, README, AGENTS and both SOPs were untouched; ACTIVE was neither edited nor cleared and no candidate was selected.
+
+## 12. State and resumption point
+
+Ending `HEAD` after step B is `8b3ad6c0c60c65e93938cb30e9f17bf6906c15c8`; step C adds only this report. `R00.D` stays unresolved and unclosed. The resumption point is the Chief Architect's independent GitHub-first review of this report and commits `d15e77a` and `8b3ad6c`, verifying F01–F04 line by line and returning `ACCEPT`, `REVISE` or `STOP`.
