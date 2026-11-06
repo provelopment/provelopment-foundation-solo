@@ -1,198 +1,234 @@
 # Foundation Solo — Active Work Order
 
 **Work Order ID:** `SOLO-WO-011`  
-**Edition:** `R01`  
-**Title:** R00.C — Canonical codification of Owner-accepted property/location/graphic contract  
+**Edition:** `R02`  
+**Title:** R00.C — Narrow documentary consistency correction following independent R01 review  
 **Approval marker:** `OWNER-ISSUED`  
 **Repository:** `provelopment/provelopment-foundation-solo`  
 **Target branch:** `main`  
-**Required starting `origin/main` HEAD:** `f787203859d419081065cb7cb9175d131a0d6bd0`  
-**Matching handoff:** `SOLO-WO-011 R01 — Implementation Agent Handoff`  
-**Classification:** Documentation-only architectural codification  
-**Quality standard:** A1 documentary consistency, exact scope confinement and GitHub-verifiable evidence  
+**Required starting `origin/main` HEAD:** `fb78dc5ccf65580e145f73cd174ba1144a4664d1`  
+**Matching handoff:** `SOLO-WO-011 R02 — Implementation Agent Handoff`  
+**Classification:** Corrective documentation-only scope; no application implementation  
+**Quality:** A1 documentary correctness, strict scope confinement and GitHub-verifiable evidence  
 **Independent review:** Chief Architect `ACCEPT / REVISE / STOP`  
-**Closure and NEXT transition:** Owner, through a separate subsequent order
+**Closure / NEXT transition:** Separate subsequent Owner-issued order only
 
 ## Frozen Approved Scope — Sections 1–9
 
-The following is the complete, single-task Approved Scope. The Implementation Agent must verify the exact `OWNER-ISSUED` file installed by the Owner in this canonical ACTIVE slot **and** its separately delivered matching direct Owner handoff before edits. The Agent must then **execute the authorized work**; routine Git mechanics do not require a separate Owner request. The scope is frozen at issuance. Do not rely on another attachment or companion file for task authority or required decision detail; everything required to codify R00.C is below.
+This complete Approved Scope is executable **only** when the Owner installs its exact full text in `.documents/WIP/workorder-active.md` and directly delivers the matching `SOLO-WO-011 R02 — Implementation Agent Handoff`. After verifying both and the repository preflight, the Implementation Agent **executes** all authorized phases. No supplementary proposal or attachment is necessary; do not request separate Owner Git-command approvals. Do not act outside the exact scope.
 
-## 1. Objective, authority and deliverable
+## 1. Objective and independent R01 disposition
 
-Codify **all ten accepted C01–C10 R00.C logical decisions** in the **existing** Foundation Solo Architecture Charter and Product Definition. The current canonical files contain nearest-explicit-declaration wording that must be reconciled with the accepted additive `inheritance` / `currentContext` model and its location-specific identified-record extension. This is documentation codification, **not product implementation, schema selection, application development, or administrative closure of R00.C**.
+Correct the finite stale inheritance/graphics statements left after `SOLO-WO-011 R01` without revising any C01–C10 decision. The Chief Architect independently reviewed the published R01 execution report at `fb78dc5ccf65580e145f73cd174ba1144a4664d1` (R01 content commit `ccec99462b6a1bf37c30594b51879b4cfe909123`) and returned **REVISE**: R01 G03 fails whole-document consistency, although publication path/commit evidence was verified. R01's report itself disclosed stale Architecture §6 and Product §2 wording. Additional read-only entry-point/procedural material also contains stale nearest-value or loose override wording: root README, AGENTS, and Implementation SOP. R01's reference to a bounded command-capture log also omitted its final cleanup disposition. This R02 order is the bounded corrective action; it does not retroactively modify or relabel R01 evidence.
 
-The Owner has accepted: C01 governed extensible property registration; C02 absence and explicit state separation; C03 the Owner-designed two-field additive/blocked inheritance contract; C04 per-value provenance; C05 per-value public/internal projection; C06 zero-to-many structured location facts with explicit identified-record extension; C07 extensible role catalogue; C08 typed Entity and platform generic asset references; C09 default-deny role fallback; C10 incomplete drafts outside strictly valid published graph. The normative details and refusal cases are **integral to this Approved Scope** in §§4–6; they are not delegated to another document.
+The Owner-accepted logical contract remains:
 
-**Keep separate:** (a) EFS identity/ownership, (b) functionality and property/graphic semantics, and (c) routing/locale/public address. Location and graphics never create another EFS owner node or choose a route. All accepted R00.A and B01–B12 remain binding.
+- C01 registered typed property core with governed extensions; C02 absent/value/suppressed distinctions; C03 two-element `inheritance: inherit | suppress` plus `currentContext: none | zero-or-more typed local values`, direct ancestry, deterministic inherited-first additive resolution, effective cardinality validation. `none` belongs only to current context. Suppression blocks inherited contributions but permits valid local values. No sibling inheritance or silent nearest/last-value selection.
+- C04 per-value/field provenance; C05 registry-restricted per-value public/internal projection; C06 zero-or-more structured location facts, whole-record additive inheritance by default, explicit extension of one uniquely identified inherited record, no implicit field merging, no geographic inference or routing authority.
+- C07 extensible registered graphic roles with per-role cardinality; C08 typed Entity-owned and generic-platform source asset references; C09 governed role-specific generic fallback disabled for every role initially, with suppression/invalid/privacy boundaries respected; C10 incomplete drafts only outside the strictly valid published graph.
+- R00.A/R00.B identity, publication, route, full-locale, visibility and unlisted contracts, one Entity/Installation and strict Hexagonal Architecture remain unchanged. Public `mailto:` requires an address exposed to the browser; internal simple-form recipients are server-resolved under later `R00.F`. No new technical or physical schema decision is authorized.
 
-## 2. Exact permanent-path and permission ledger
+## 2. Exact permitted permanent paths and operations
 
 | Path | Permitted operation |
 | --- | --- |
-| `.documents/WIP/workorder-active.md` | Owner installs this exact Approved Scope. Implementation Agent publishes the **installed bytes unchanged** in a separate Phase A order-only commit; leaves them unchanged for review. |
-| `.documents/Architecture/ARCHITECTURE.md` | Phase B: narrowly update §2, §2.1, §3.3A, short §3.4 cross-reference and §7 open/accepted status; protect §2.2 and R00.A/R00.B content. |
-| `.documents/About/FOUNDATION-SOLO.md` | Phase B: narrowly update §4, its §4B graphics subsection, and only obsolete R00.C statements in §5 and §8. |
-| `.documents/Reports/execution-report.md` | Phase C: overwrite the **single** canonical report, then publish as one separate report-only commit. |
-| `.git/**` | Ordinary metadata for the three authorized commits and fast-forward pushes under Architect SOP §6B. |
+| `.documents/WIP/workorder-active.md` | Owner installs the exact R02 order; agent preserves and publishes **unchanged** in separate Phase A; keeps it installed after execution. |
+| `.documents/Architecture/ARCHITECTURE.md` | Phase B: replace **only the two obsolete verification-table rows** in §6 identified in §4. |
+| `.documents/About/FOUNDATION-SOLO.md` | Phase B: replace **only §2 item 4** identified in §4. |
+| `README.md` | Phase B: replace **only the EFS location-summary paragraph** identified in §4. |
+| `AGENTS.md` | Phase B: replace **only the two §3 bullets** for cascading location and graphics identified in §4. |
+| `.documents/SOP/sop-implementation.md` | Phase B: replace **only §6 item 6 and the §7 Property cascade table row** identified in §4. |
+| `.documents/Reports/execution-report.md` | Phase C: overwrite sole canonical report with factual R02 evidence, separate commit. |
+| `.git/**` | Ordinary version-control metadata for expressly authorized phases under Architect SOP §6B. |
 
-**All other permanent paths are read-only**, including `.documents/WIP/plan-roadmap.md`, `plan-next.md`, `plan-outlook.md`, root `README.md` and `AGENTS.md`, both SOPs, `.github/**`, license, tooling, schemas, source and all other repositories. No new document, WIP slot, report/archive, checkout/worktree, nested clone, or shadow source tree.
+All remaining permanent paths are **read-only**, including ROADMAP, NEXT, OUTLOOK, Architect SOP, `.github/**`, license, application code, toolchain, tests, and all other repositories. The other paragraphs and rows of the six edited documents are read-only. No additional checkout/worktree/clone, parallel report, new WIP file, other repository write, or source tree.
 
-**Authorization ledger:** ordinary commits and fast-forward pushes of exactly the three phases to verified Solo `origin/main` are **authorized**. Authenticated GitHub readback is **authorized**. Creating branches/PRs, merging, dependency installs/updates, code/test-tool changes, external provider calls, secrets access, paid services, release, deployment, DNS/TLS edits, destructive Git commands and history rewrite/force-push are **not authorized**. No other remote may be modified. SOP §6B is the single Git procedure; this scope does not replace it.
+**Separate permissions:** Three ordinary commits and verified fast-forward pushes to Solo `origin/main` are authorized: Phase A order-only, Phase B exactly five correction-document paths, Phase C report-only. Authenticated GitHub readback is authorized. Branch/PR creation, merging, release, deployment, tooling/dependency operations, provider/account operations, secrets, destructive Git actions, force-push or rewriting history are **not** authorized. Architect SOP §6B is the sole Git procedure.
 
-## 3. Baseline and preflight
+## 3. Exact preflight and required baseline
 
-- Confirm actual Solo checkout root, single worktree, Git toplevel, branch `main`, one expected Solo `origin`, `git status`, HEAD and remote-side `main` HEAD. The required starting HEAD before publication is exactly `f787203859d419081065cb7cb9175d131a0d6bd0`. Do not guess from an enclosing/parent repository or create a checkout.
-- Verify baseline Git blobs: Architecture `5ebabc7e056c582035f357e28015f9dc8333d39d`; Product `95b8fd753dc90834811d5050c62a1c5c7a30ef2a`; NEXT `7996a1e568f076062a0030ca7bdc8b97c5674f9f`; ROADMAP `05feb2e30cada5cf013b08b1daf7011ed504eaa4`; OUTLOOK `cb9c7a610cf3c537557e060ca9656e44a053e69d`; pre-install ACTIVE `ea5f20b736483c2e102456be1cea9104059fc81a`; current prior report `1d5874367e1c608f46162d3d28a73dcf7ffe5716`.
-- The only allowed initial working-tree edit is the Owner's **exact installed ACTIVE** file. All other unexpected changes are STOP until separately adjudicated. Verify exact work-order ID/edition, `OWNER-ISSUED`, whole installed text, and matching direct Owner handoff.
-- Read `README.md`, `AGENTS.md`, both SOPs, all four WIP slots, current report, Product and Architecture. Verify WIP exactly four files, one canonical report, correct one-checkout boundary and temporary areas. Follow temporary cleanup/reporting obligations in SOP §6A and §5A; do not delete unfamiliar or Owner-owned files.
-- If installed content, handoff, baseline or scope conflicts, STOP *that unsafe action* and publish a truthful `STOPPED` report **only if safe** under the standing report-only exception. Do not treat a correctly matched issued order as tentative or ask Owner to perform routine Git operations.
+- Verify the one actual Solo checkout/toplevel, branch `main`, one expected Solo `origin`, one worktree, HEAD and remote-side `main`, safe clean status except **only** the Owner-installed exact R02 ACTIVE replacement. No assumed local path, secondary checkout or parent workspace authority.
+- Verify remote starting HEAD exactly `fb78dc5ccf65580e145f73cd174ba1144a4664d1` and these **Git blob SHAs** before edits:
 
-## 4. Accepted logical R00.C contract — binding codification text
-
-
-The following is the **Owner-accepted logical R00.C contract** to codify in the two existing canonical documents. It does not approve physical JSON/YAML encoding, filesystem layout, framework, provider or executable implementation. `inheritance` and `currentContext` describe accepted logical fields; exact schema representation remains R00.D.
-
-### 1. Single governed property system
-
-- The property registry supplies built-in and explicitly registered custom property definitions. Each definition has a stable property identity, type, allowed EFS levels, cardinality, validation, visibility ceiling, and permitted specialized operations. Unknown or conflicting definitions fail validation. Extensions cannot bypass the platform's mandatory safety, publication or ownership invariants.
-- The cascade remains **Entity → Facet → Site → Page → localized representation** within one Entity; inheritance traverses only the selected node's direct parent chain, never siblings or a geographic/route-derived hierarchy.
-- A wholly absent property declaration at a node implicitly inherits the effective ancestor result. An explicitly declared property has two independent logical elements: `inheritance: inherit | suppress` and `currentContext: none | zero-or-more typed local values`. `none` belongs **only** to current context, not inheritance. A declaration of inherit+none differs in provenance from total absence but yields the same values.
-- An explicit declaration resolves as: effective = (the direct ancestor's effective values when inheritance is `inherit`; otherwise an empty inherited set) plus the current local contributions. At the Entity root, inherited input is empty. A narrower valid declaration can add local values after a higher-level suppression. No automatic cross-branch fallback.
-- Collections have a deterministic **inherited-first, then locally-authored** order. Registry-defined maximum cardinality applies to the **effective** collection, not merely local contributions. Duplicate equality and uniqueness are defined per registered property; invalid ambiguity or uniqueness conflict fails validation, never silent first/last wins or silent deduplication. Ordered effective values retain their original declaration identity and origin. Do not arbitrarily perform recursive object merging.
-- The domain-resolved result preserves per-value EFS origin, inclusion/suppression decisions and optional permitted record-field provenance. Private source locations, author-only metadata, and sensitive value contents must not leak through public diagnostics.
-- Each value has an exposure classification within its registered type's maximum public exposure. Inheritance preserves the classification. Public renderers, metadata, generated feeds and client serialization must consume a validated **public projection**, never an unfiltered internal property result. An internal value is not emitted or replaced by a public ancestor simply because the projection omitted it. The platform does not treat `internal` as secrecy for material in a public Git repository or for delivery infrastructure configuration.
-- A failed property, cross-property, security or publication check is a blocking error for any published graph; incomplete drafts can exist only outside it. No automatic correction, fallback, ignoring unknown fields, or publishing partial invalid state. Unlisted representations are still published, directly reachable, and subject to the complete validation gate; they are not secrets.
-
-### 2. Structured location fact contract
-
-- `location` is an ordinary registered EFS property whose **current context is a collection of zero or more complete structured location facts**. Every fact has enough authored information to be meaningful but no universally required country, city, street, postal code or coordinates. Supported optional concepts can include world region, administrative region/state/province, country, locality/city, district/local area, named place/area, postal components and explicit coordinates; define these as distinct semantic types, not one ambiguous universal `region` field. Governed custom typed location metadata is allowed under C01.
-- Individual records may describe a geographic association or a physical premises; do not infer either from address detail. Never infer missing values from URL, route, EFS ID, locale, hostname, country, coordinates, neighbouring records or another language representation. No hidden geographic ownership level or automatic geocoder/verification service.
-- The ordinary C03 rule carries **whole records** unchanged from ancestors, and local records are added as independent entries. A descendant wishing to use only its authored location records selects `inheritance: suppress`. Merely authoring `city: Perth` must not silently add `country: Australia` from an unrelated ancestor record.
-- **Location-specific explicit extension exception:** A current-context location operation may identify **exactly one accessible inherited record** via a stable, unambiguous reference to its original authored identity, plus explicitly specified field additions/replacements. It replaces that specific inherited record **in place** in the effective ordered collection, rather than appending a duplicate. The original record identity remains the target reference; changed fields receive local field provenance and unchanged fields retain original origin. The reference must resolve through the selected direct ancestry only. Missing, ambiguous, suppressed, cross-branch or circular extension targets are invalid; if `inheritance: suppress` excludes the target, an extension of it is invalid. No automatic matching by geographic name/text/coordinates.
-- The physical record-ID/ref format, allowed extension patch encoding and exact registry field catalogue are **R00.D schema choices**, but the resolution and refusal semantics above are R00.C normative contracts. A logical record reference must remain stable across routing and location-text changes.
-- Whole-record exposure classification applies initially to each structured location value. Any internal record, including an inherited internal field in an explicit extension, remains absent from public projection. Do **not** silently make an internal field public by extending or relabelling the record; a newly authored, independently validated public fact or a future expressly accepted fine-grained projection contract is required. Do not assume per-field visibility from per-value C05.
-- Authors take responsibility for factual geographic correctness. Solo validates declared types, structural integrity, privacy constraints and safe serialization, **not** real-world truth. A future optional external location-verification module needs a separate Owner decision and replaceable port; it may not determine public routes or silently rewrite authored facts.
-- Do not produce a single implicit “primary” location from a multi-record collection. A downstream output requiring exactly one location must use an explicitly governed selection or refuse ambiguous input.
-
-### 3. Graphic role, source and fallback contract
-
-- Each registered graphic role has defined purpose, accepted asset classes, effective cardinality, applicable EFS levels and allowed use contexts. Initial **candidate** core roles: `logo`, `favicon`, `banner`, `background`, `socialPreview`. Their physical names, precise cardinality and formats are not already approved by listing these candidates. Role extensions require governed registration; arbitrary unregistered roles are invalid. Ordinary inline Page media need not be global cascading roles.
-- All graphic-role declarations obey C03's inheritance/current-context collection semantics. For a singular role, `inherit` plus a local asset selection producing two effective entries **fails cardinality validation**; no silent last/first wins. `suppress` blocks inherited graphics but may accompany valid locally authored assets; it does not mean “must display nothing” regardless of local values.
-- Graphic values refer to explicit, safe, typed source-asset references. Distinguish **Entity-authored source assets** owned within the sole Entity Installation from read-only **generic-platform public library assets**. These are logical source namespaces, not alternate EFS identity nodes. Do not infer ownership from a URL, filesystem path, route, locale or generated output. Missing/ambiguous/unsafe/unapproved sources fail validation; no arbitrary remote fetching. Physical syntax/paths/file types/processing controls remain to R00.D/R00.E.
-- Explicitly choosing a generic-platform asset is a normal authored value, not fallback. Generic **automatic fallback** is separately governed **per role**, with zero roles approved for a fallback initially. Fallback is eligible only if there is no effective authored graphic and no inherited/local suppression boundary relevant to that resolution, no invalid declaration, and no private value omitted by public projection. Any invalid reference or cardinality/visibility violation is a refusal, never a fallback trigger. Do not infer a fallback from geography, locale, route, asset filename or provider.
-- Source assets remain authoritative; transformed/optimized/public files are derived outputs. Public discovery, including unlisted-content handling, must not expose private asset metadata or unrelated unpublished assets.
-
-### 4. Contact action/publication boundary (cross-reference only; R00.F owns its final contract)
-
-- An intentionally public, author-approved email address may support safe `mailto:` rendering. A `mailto:` destination **is visible to the browser** and cannot truthfully be described as secret merely because the link is initially labelled “Email us” or revealed after interaction.
-- An internal recipient address must never be serialized into the public property projection or embedded in public HTML/JS/JSON/URL parameters. A future basic contact form may show a public purpose/recipient alias while a server-side application use case resolves the actual delivery destination through a validated configuration/port. This is a **requirement to address in R00.F**, not authorization to implement or specify a new form system in R00.C.
-- Internal-property classification does not hide material already present in a public Git repository. Delivery recipient configuration, email header disclosure, abuse controls, truthful receipt, privacy and retention remain explicit R00.F concerns. Do not introduce a contact/form builder, dynamic workflow, CRM or mail provider in R00.C.
-
-## 5. Exact canonical-document amendment instructions
-
-
-### A. `.documents/Architecture/ARCHITECTURE.md`
-
-**§2, immediately after the EFS cascade diagram and existing property-resolution text:** Replace the legacy first-declaration-wins paragraph and its bullets governing `Absent key`, `Explicit suppression`, `Composite property`, `Provenance`, and `Public projection` with compact authoritative text matching §II.1 above. Keep the five-level ownership diagram and scope separation. Mark historical `null` suppression wording only as an unapproved physical-syntax example if it remains; do not present `null` as the chosen encoding.
-
-**§2.1 location rule:** Keep the entire accepted no-inference/no-routing invariant and language-independence §2.2. Reconcile the nearest-location-example narration to show two-field, additive collection semantics: Entity Australia; Facet Indonesia via `inherit`+local gives [Australia, Indonesia], or via `suppress` gives [Indonesia]; Sites Bali/Jakarta using `suppress`+local produce only their own location. Explain how a location fact can explicitly extend a specifically referenced inherited fact as §II.2; examples remain conceptual and not physical schema. Avoid claiming an implicit geographic hierarchy or address completeness.
-
-**§3.3A graphics:** Replace legacy one-nearest-asset/suppression-implies-no-asset algorithm with §II.3 semantics. Preserve one shared generic library, Entity ownership, read-only platform assets, safe references and publication controls. Add the candidate-role list clearly labelled candidates, not finalized schema/role contracts, and state that no initial automatic defaults are approved.
-
-**§3.4 contact:** Retain the preexisting accepted simple `mailto:` + simple form (not advanced forms). Insert a small cross-reference that `mailto:` requires public recipient disclosure, while internal destinations must remain server-only and may be addressed by a server-resolved simple form subject to future R00.F approval. Do not preempt R00.F decisions.
-
-**§7 open decisions:** Adjust only descriptions that incorrectly call the **logical R00.C contracts** open; keep the actual physical schema, formats, role-specific finalized catalogue, stack, and R00.D–G issues expressly open. Preserve accepted B01–B12 text, identity/publication and route sections unchanged.
-
-### B. `.documents/About/FOUNDATION-SOLO.md`
-
-**§4 location:** Replace or annotate the existing nearest-explicit-value-wins and overrides examples to reflect additive C03 semantics, optional structured zero-to-many location facts, explicit suppression, explicit identified record extension and public/internal projection; preserve the no-geographic-routing/location-identity rules word-for-word in meaning. Distinguish authored factual accuracy from structural validation.
-
-**§4B graphics subsection:** Retain the shared platform generic library and five-level cascade; align the resolution and suppress/fallback wording with C03/C07–C09: suppress blocks inheritance, local values remain permitted, no automatic fallback without role-specific approval, invalid assets never get substituted.
-
-**§5 and §8:** Where they describe the old nearest-wins cascade or the R00.C logical decisions as still proposed, update only those descriptions to accepted logical outcomes while retaining all implementation/capability disclaimers. Do not claim production assets, a form, a resolver, a published site or a selected framework exist.
-
-### C. All other paths and contracts
-
-Do **not** change README, AGENTS, either SOP, WIP roadmap/next/outlook, or the Owner-issued ACTIVE as part of the content-codification commit, license, `.github`, application code, tooling, or other repositories. The canonical execution report is the sole separate mandatory report-only exception, governed by the SOP.
-
-## 6. Conceptual positive and refusal acceptance matrix
-
-These scenarios are **documentary contract examples and gates**, not tests already run on application software. Verify both canonical documents express the required results and do not contradict any accepted R00.A or R00.B behavior.
-
-
-| ID | Scenario | Required result |
-| --- | --- | --- |
-| P01 | Property absent at Site, Entity has two values | Both inherited; origin Entity preserved |
-| P02 | `inherit` plus one local value | Inherited-first collection plus local; local origin preserved |
-| P03 | `suppress` plus one local value | Ancestor contributions excluded, local value retained |
-| P04 | `suppress` plus `none` | Zero values; suppression trace preserved |
-| P05 | Inherit from sibling Site | Refuse/no inheritance; only direct ancestry is eligible |
-| P06 | Effective cardinality exceeded | Block publication; do not choose first/last |
-| P07 | Duplicate/invalid custom declaration | Fail against registered property contract |
-| P08 | Inherited internal email plus public local email | Only permitted public value projected; internal still traceable internally |
-| P09 | Public client serialization includes internal value/provenance | Refuse; fail public projection gate |
-| L01 | Entity Australia, Facet Indonesia via inherit | Two separate records; no automatic country merge |
-| L02 | Site Bali via suppress+local | Only Bali record; no inherited Australia/Indonesia |
-| L03 | Site extends uniquely identified inherited Perth record | One updated record in same position; per-field provenance |
-| L04 | Extension target missing/ambiguous or excluded by suppression | Validation failure, no nearest-name guess |
-| L05 | Extension attempts to expose previously internal field | Refuse public exposure |
-| L06 | Locale, URL or Site ID suggests a location | No inferred location or route selection |
-| L07 | Zero locations or partial meaningful authored metadata | Valid; do not require a full postal address |
-| L08 | Several eligible locations where one is required | No implicit primary; explicit selection or refusal |
-| G01 | One Entity logo, Site inherits | Exact Entity selection inherited |
-| G02 | Singular role inherited logo plus local logo | Effective cardinality failure, not silent override |
-| G03 | Site suppresses inherited logo and selects local | Local logo effective |
-| G04 | Suppress+none for banner | No generic default despite otherwise approved role fallback |
-| G05 | No authored/suppression plus approved role default | Exactly approved generic source selected |
-| G06 | No role default approved | No fallback |
-| G07 | Invalid source/unknown role/private graphical value | Refuse/omit according to hard validation/privacy contract; no generic rescue |
-| G08 | Shared platform asset selected by two Sites | Both valid within one Entity; no duplicate ownership node |
-| V01 | Draft has missing required property | Draft may remain outside publication authority |
-| V02 | Same invalid draft is published or made unlisted | Refused; unlisted remains published, not draft/private |
-| C01 | Public `mailto:` selected | Address necessarily exposed to client when link is delivered |
-| C02 | Internal email used as public `mailto:` | Refused; R00.F may define server-side simple-form recipient mapping |
-
-## 7. Authorized publication sequence
-
-**Phase A — Preserve and publish exact Owner issuance**
-
-1. Validate Owner installation and handoff under §3.
-2. Stage only `.documents/WIP/workorder-active.md`; make one ordinary order-preservation commit with its **exact installed bytes**; fast-forward push to verified `origin/main`.
-3. Independently read back order bytes, commit changed-path ledger and remote HEAD. Do not start Phase B until these match.
-
-**Phase B — Publish canonical Product and Architecture codification**
-
-1. Update exactly the authorized sections of `.documents/Architecture/ARCHITECTURE.md` and `.documents/About/FOUNDATION-SOLO.md`, implementing §§4–6 **as normative architectural prose**. Preserve R00.A/B and all read-only paths.
-2. Inspect full diff and cross-file consistency; search for stale nearest-wins/property/suppression assertions in the authorized affected sections and correct contradictions. Record the section-level positive and refusal matrix. No physical schema, runtime or independent new design is permitted.
-3. Stage **only** those two documents, make one ordinary documentation-content commit, fast-forward push and verify GitHub readback of exact committed content and changed paths.
-
-**Phase C — Publish mandatory canonical report**
-
-1. Overwrite only `.documents/Reports/execution-report.md` with this run's factual evidence: work-order ID/edition, Owner handoff, local baseline/preflight, exact Phases A and B SHAs, changed path ledger, blob/readback evidence, G01–G12 results, commands/checks actually run, limitations, cleanup and next review step.
-2. Create one **report-only** commit; fast-forward push and verify remote readback. Never embed that report commit's own SHA inside its contents. Give its SHA and GitHub URL in the chat handback.
-3. Leave issued ACTIVE unchanged; leave ROADMAP, NEXT and OUTLOOK unchanged. No R00.C closure or R00.D promotion in this run. Finish with clean Git tree and truthful temp-cleanup evidence.
-
-## 8. Acceptance gates (A1 documentary scope)
-
-| Gate | Required direct evidence |
+| Path | Required blob SHA |
 | --- | --- |
-| G01 — Authority/baseline | Exact issued ACTIVE, matching direct Owner handoff, expected HEAD and original blobs; actual Solo root/branch/worktree verified |
-| G02 — Phase A | One order-only commit, unchanged Owner-installed bytes, GitHub readback |
-| G03 — C01/C02/C03 | Governed registry, independent declaration states, two-field inherit/suppress + current 0…N, direct ancestry and effective cardinality; no stale nearest-wins contradiction |
-| G04 — C04/C05 | Per-value provenance, suppression trace and validated, restricted public projection including privacy refusal |
-| G05 — C06 | Structured optional 0…N location, typed fields, explicit identified-record extension and field provenance, no inference/routing; old illustrative examples reconciled |
-| G06 — C07/C08/C09 | Extensible registered roles, validated Entity/generic references, per-role cardinality, explicit suppress+local and default-deny generic fallback |
-| G07 — C10 | Draft/published distinction, unlisted still published, fail-closed validation, no silent repair or publication fallback |
-| G08 — Contact boundary | Public `mailto:` address disclosure truthful; server-resolved internal simple-form recipient explicitly deferred to R00.F; no advanced forms or email provider added |
-| G09 — Preserved contracts | R00.A/B identity/publication/locale/routes, single-Entity, graphic ownership, Hexagonal Architecture and other accepted invariants unaffected |
-| G10 — Scope and publication | Exactly one two-document-only Phase B commit; one separate report-only Phase C commit; expected GitHub remote revisions and no other tracked path changes |
-| G11 — Repo hygiene | WIP four files, ACTIVE still exact issued order, no second checkout, clean tree and truthful temp cleanup report |
-| G12 — Honest evidence | One current report; reviewable gate evidence, no application implementation, schema, tests/build/deploy or R00.C administrative closure claimed |
+| `.documents/WIP/workorder-active.md` before Owner R02 installation | `006d45ef22dbaa34e0cad9a2ca8eea5d10dd7ea9` |
+| `.documents/Reports/execution-report.md` | `a47b1b73a74d08b165248bb7cf2648b1e1948588` |
+| `.documents/Architecture/ARCHITECTURE.md` | `ff18a3fc8b54b4bfce53272368a73a64a5edafb7` |
+| `.documents/About/FOUNDATION-SOLO.md` | `be0ff7faf23f141e7732a7101b514dabbcc8c6b5` |
+| `README.md` | `572121c54b1ac91ac6b5f36515ce0b959f79d6c9` |
+| `AGENTS.md` | `d4a2a028e0d35852e0077bbe97c162bdfde89d2d` |
+| `.documents/SOP/sop-implementation.md` | `b868faccbe73e076d207ed1c532069559ca3590a` |
+| `.documents/SOP/sop-architect.md` | `0396251245180b40ee896b50a3456b92835f9cb1` |
+| `.documents/WIP/plan-roadmap.md` | `05feb2e30cada5cf013b08b1daf7011ed504eaa4` |
+| `.documents/WIP/plan-next.md` | `7996a1e568f076062a0030ca7bdc8b97c5674f9f` |
+| `.documents/WIP/plan-outlook.md` | `cb9c7a610cf3c537557e060ca9656e44a053e69d` |
 
-For **every** gate record `PASS`, `FAIL`, `UNVERIFIED`, or `NOT APPLICABLE`, plus direct evidence and reasons. Review documentary examples in §6 but do not present them as actual runtime tests. Software build/unit/integration/browser tests are `NOT APPLICABLE` to this documentation-only task with an explanation; documentary consistency and Git proof remain applicable.
+- Read README, AGENTS, both SOPs, the two canonical authorities, all four WIP files and the current report. Verify exact `SOLO-WO-011 R02` installed bytes, `OWNER-ISSUED`, and matching direct Owner handoff; inventory exactly four WIP files and one report.
+- If the baseline, installed scope, other dirty files, remote, or safety cannot be established, STOP and publish a truthful report only when safe. Do not substitute a different checkout, infer approval from a file name, or ask the Owner to perform authorized routine Git commands.
 
-## 9. STOP conditions, exclusions and required handback
+## 4. Exact Phase B text substitutions (eight occurrences only)
 
-STOP if the exact Owner-issued order and direct matching handoff cannot be verified, local tree/remote baseline mismatches, unknown dirty paths or worktree are present, a required change would exceed the exact file ledger, an accepted contract would be overridden, a material new architectural decision would be needed, unsafe publication cannot be verified, or the authorized Git mechanics actually fail. Do not solve by self-issuing, self-accepting, selecting R00.D, creating a second repo, ignoring failures or asking Owner to perform normal authorized Git commands.
+For each target below, find exactly **one** occurrence of the specified old text inside its specified section, replace only that occurrence with the new text, and preserve every other byte of that file. Refuse a missing or nonunique match. The replacement wording codifies existing accepted decisions, not new architecture.
 
-On success provide: exact Phases A/B/C commits and GitHub URLs, initial/final HEAD, full diff/path verification, gate-by-gate results, one canonical report URL, honest local/remote verification and cleanup, and a clear statement that **independent Chief Architect review remains outstanding**. On failure report completed subset, blocker and safe resumption point, publishing the canonical STOP report when safely possible. Do not modify ACTIVE, NEXT or ROADMAP for closure; that requires a later expressly Owner-issued order after `ACCEPT`.
+### 4.1 Architecture Charter §6 — Property cascade table row
+
+**Old:**
+
+```text
+| Property cascade | Nearest declaration wins; absence inherits; explicit suppression works; provenance is correct |
+```
+
+**New:**
+
+```text
+| Property cascade | Direct-ancestry additive `inheritance`/`currentContext` resolution; absent declaration inherits; `suppress` blocks inherited contributions but retains valid local values; per-value provenance, effective cardinality and invalid-declaration refusal verified |
+```
+
+### 4.2 Architecture Charter §6 — Graphic cascade and shared library row
+
+**Old:**
+
+```text
+| Graphic cascade and shared library | One platform public graphic asset is reachable throughout Solo; local/inherited graphic properties override appropriately; explicit suppression prevents fallback; content owner assets remain correctly sourced |
+```
+
+**New:**
+
+```text
+| Graphic cascade and shared library | Shared generic assets are available throughout one Installation; graphic roles use additive direct-ancestry resolution with effective role cardinality; `suppress` may retain valid local selections but blocks inherited values and automatic fallback; typed Entity/generic sources remain distinct |
+```
+
+### 4.3 Product Definition §2 — Outcome item 4
+
+**Old:**
+
+```text
+4. **Reuse without duplication:** permit shared Entity-level facts and narrower overrides via a predictable property cascade.
+```
+
+**New:**
+
+```text
+4. **Reuse without duplication:** permit additive direct-ancestry inheritance of shared Entity-level property values, explicit suppression of inherited contributions, and registered local additions; identified location-record extension is deliberate, not implicit geographic merging.
+```
+
+### 4.4 Root README — EFS location paragraph
+
+**Old:**
+
+```text
+**Location is an explicitly authored cascading EFS property, not a routing input.** Entity location `Australia` can be overridden by Facet `Indonesia` and then by Sites `Bali` or `Jakarta`; their `en-001`, `de-DE`, `zh-Hans-CN` and `id-ID` localized Page representations do not infer or alter location.
+```
+
+**New:**
+
+```text
+**Location is explicitly authored EFS property metadata, never a routing input.** Direct-ancestry inheritance is additive: an Entity fact `Australia` and a Facet fact `Indonesia` can both remain effective when the Facet selects `inherit`; a Site may select `suppress` and contribute `Bali` or `Jakarta` alone. Structured location records may be explicitly extended by identified reference, never implicitly completed from a route, locale, name or geography; `en-001`, `de-DE`, `zh-Hans-CN` and `id-ID` do not alter authored location.
+```
+
+### 4.5 Root AGENTS §3 — Cascading location bullet
+
+**Old:**
+
+```text
+- **Cascading location:** an explicitly authored EFS property at Entity, Facet, Site, Page or representation level, with nearest direct-ancestor declaration taking precedence. A location may be Australia at Entity, Indonesia at Facet, Bali or Jakarta at different Sites. No location is inferred from a URL, ID, locale, hostname or route. Location never selects a route, canonical, language or Page.
+```
+
+**New:**
+
+```text
+- **Cascading location:** explicitly authored at Entity, Facet, Site, Page or representation level, with additive values along direct ancestry under `inheritance: inherit | suppress` and `currentContext: none | zero-or-more local facts`. A Fact at Entity (Australia) can combine with a Facet fact (Indonesia), or a Site can suppress inherited facts and contribute Bali/Jakarta; explicit identified-record extension is the only permitted field-level location-merging operation. No location is inferred from URL, ID, locale, hostname or route; location never selects a route, canonical, language or Page.
+```
+
+### 4.6 Root AGENTS §3 — Graphics bullet
+
+**Old:**
+
+```text
+- **Graphics:** a generic public graphic library is available across the single Installation; authored graphic roles cascade through Entity, Facet, Site, Page and representation; explicit suppression prevents inherited and generic fallbacks.
+```
+
+**New:**
+
+```text
+- **Graphics:** one shared generic public graphic library serves the Installation; registered role selections use additive direct-ancestry EFS inheritance with validated effective cardinality. `suppress` excludes inherited selections but permits valid local selections; it never independently authorizes an automatic generic fallback. All automatic role defaults are disabled unless expressly approved.
+```
+
+### 4.7 Implementation SOP §6 — Item 6
+
+**Old:**
+
+```text
+6. Resolve location along the explicit **Entity → Facet → Site → Page → representation** property ancestry only. For example: `Australia` at Entity, `Indonesia` at a Facet, `Bali` at one Site and `Jakarta` at another. Full locale tags `en-001`, `de-DE`, `zh-Hans-CN` and `id-ID` do not alter those values absent an explicit representation override. Do not mint language-only published keys. Suppression and privacy must follow the accepted property contract.
+```
+
+**New:**
+
+```text
+6. Resolve location solely through the direct **Entity → Facet → Site → Page → representation** ancestry using accepted additive `inheritance`/`currentContext` semantics: a Facet can inherit the Entity's Australia fact and add Indonesia; a Site can explicitly suppress inherited facts and contribute Bali or Jakarta; an identified inherited record may be extended only under its accepted validated extension rule. Full locale tags `en-001`, `de-DE`, `zh-Hans-CN` and `id-ID` never infer or modify location. Do not mint language-only published keys or use location to determine routes. Public/internal projection and suppression must follow the accepted property contract.
+```
+
+### 4.8 Implementation SOP §7 — Property cascade row
+
+**Old:**
+
+```text
+| Property cascade | Nearest explicit value wins; direct ancestry only; suppression works; private fields not leaked |
+```
+
+**New:**
+
+```text
+| Property cascade | Additive direct-ancestry inheritance and valid local values; `suppress` excludes inherited contributions but permits local ones; effective collection cardinality and duplicate/refusal cases verified; per-value provenance and restricted public projection do not leak internal facts |
+```
+
+## 5. Independent evidence and consistency checks
+
+The Agent must directly verify the **eight exact replacements** and no other textual changes in the five Phase B documents, including exact `git diff --check` or equivalent checks and hunk/content review. Confirm:
+
+- Neither canonical file contains the stale nearest-value-wins acceptance requirement; Architecture §2 and Product §4 remain the existing R00.C Owner-accepted source of truth.
+- README, AGENTS and Implementation SOP now summarize additive inheritance without contradicting the canonical contract; the Owner-decided `inheritance`/`currentContext` and location-extension semantics remain unchanged.
+- No change to R00.A/B ID, publication, locale, route, case, Unicode, unlisted, base URL, one Entity or Hexagonal boundaries; no new approved role names, generic fallbacks, physical schema or provider choice.
+- No extra WIP files, report archives, source artifacts or unauthorized edits. ROADMAP/NEXT/OUTLOOK remain exactly the baseline blobs.
+- Document positive/refusal matrix for: inherit+none; inherit+local; suppress+none; suppress+local; effective singular graphic cardinality failure; a location extension with existing target and rejection of missing/suppressed target; internal-to-public leakage refusal; invalid draft outside published graph; location/route and locale independence. These are **documentary assertions only**, not executed software tests.
+- Evidence should distinguish GitHub-observed commits/paths from locally observed worktree/cleanup. No software build, browser, unit, integration, provider-delivery or deployment results are to be invented.
+
+**Cleanup follow-up:** R01's report mentioned a bounded command-capture log but did not establish its cleanup/disposition. At R02 preflight, inventory safe, accessible task-owned Cline/command-capture files and Solo `.temp/`. Remove only positively identified obsolete task-owned files where permitted and safe; do not delete unknown, inaccessible, unrelated or Owner-owned items. Report the R02 preflight observation, scope of accessible checks, any actual cleanup, unverifiable R01 historical state, and justified retention/cleanup trigger. A new empty temp area does not retrospectively prove R01 cleanup. At R02 run end leave no unnecessary R02 temp garbage and explicitly report both temporary-area categories.
+
+## 6. Authorized publication phases
+
+**Phase A — Issued R02 order:** Preserve the Owner-installed R02 ACTIVE bytes exactly; stage only ACTIVE, make one ordinary order-only commit, fast-forward push to verified `origin/main`, and read back order/commit paths/HEAD before Phase B.
+
+**Phase B — Five-document correction:** Perform §4's eight substitutions only. Stage only Architecture, Product, README, AGENTS, Implementation SOP. Validate exact old/new matches, complete diff, no unintended changes and §5 matrix. Make one ordinary five-file content commit, fast-forward push, verify remote readback and exact changed paths. Do not touch ACTIVE, NEXT, ROADMAP or OUTLOOK.
+
+**Phase C — One report:** Overwrite only `.documents/Reports/execution-report.md` with the R02 factual report; include phases A/B SHAs, GitHub verification, positive/refusal and gates, scopes and limitations, current cleanup evidence, old gap disposition and next Architect review. Make a separate report-only ordinary commit, fast-forward push and read back GitHub. Do not embed the Phase C commit's own SHA in its content; return SHA/URL in chat.
+
+**Required end state:** ACTIVE is still the exact issued R02 order. WIP remains four files. One current canonical report. Clean tree and safe temporary cleanup as observed. R00.C remains administratively open; this task is corrective codification only.
+
+## 7. Acceptance gates
+
+| Gate | Requirement |
+| --- | --- |
+| G01 — Authority/baseline | Exact Owner-issued `SOLO-WO-011 R02`, matching direct handoff, correct baseline, single Solo checkout/worktree and expected only Owner-installed ACTIVE modification |
+| G02 — Phase A | Exact R02 order preserved alone in one pushed commit, unchanged bytes and remote readback |
+| G03 — Canonical correction | Architecture §6 two rows and Product §2 item 4 exactly corrected, while §2/§4 detailed contracts remain intact |
+| G04 — Root entry points | README EFS location paragraph and AGENTS two §3 bullets exactly corrected |
+| G05 — Implementation SOP | Only §6 item 6 and §7 Property cascade row corrected; Architect SOP unaffected |
+| G06 — Owner contract fidelity | C01–C10 unchanged; additive property, explicit suppression, located-record extension, privacy and graphics meaning consistent across the documents |
+| G07 — R00.A/B preservation | ID/publication/routing/locale/unlisted/Hexagonal and other accepted contracts unchanged; no schema/code/provider selected |
+| G08 — Exact Phase B scope | Only the five authorized correction documents, exactly eight replacements, one content commit; GitHub readback |
+| G09 — Phase C report | One current report, separate report-only commit, remote readback and proper no-self-SHA convention |
+| G10 — WIP hygiene | Four WIP files, issued ACTIVE unchanged after Phase A, ROADMAP/NEXT/OUTLOOK preserved |
+| G11 — Worktree and temporary cleanup | Actual clean tree, one worktree, no unreported obsolete task-owned files; honest Cline/Solo-temp inventory and R01 gap handling, no blanket deletion |
+| G12 — Honest evidence and exclusions | Direct document/diff/gate evidence; documentary positive/refusal scenarios not mislabeled runtime tests; no premature closure or unauthorized implementation |
+
+For every gate give `PASS`, `FAIL`, `UNVERIFIED`, or `NOT APPLICABLE`, with direct evidence/reason. Software builds, app tests, HTTP/browser, contact-delivery and deployment checks are `NOT APPLICABLE` to this documentation-only correction, not fabricated PASS results.
+
+## 8. STOP and escalation
+
+STOP if installed authority/handoff is unverifiable; baseline/remote/branch diverges; unknown dirty content or second worktree is present; one of §4's exact old texts is absent/nonunique; correction requires an unlisted path/paragraph; the accepted contract cannot be preserved within eight substitutions; a safety/temporary-cleanup problem needs destructive handling; or authorized publication is unsafe. Do not expand scope or change approved R00.C decisions. Preserve evidence and publish a truthful STOP report only when safe under the standing report-only exception.
+
+## 9. Completion handback and independence
+
+Return exact Phase A, B and C GitHub SHAs/links, starting/final HEAD, verified path inventory, eight replacement checks, full G01–G12 matrix, canonical report URL, actual local status, cleanup outcome and all limitations. The Agent must not self-accept, close `R00.C`, edit ROADMAP/NEXT/OUTLOOK, clear ACTIVE, start R00.D, merge, release or deploy. Independent Chief Architect review determines `ACCEPT / REVISE / STOP` against the exact published Phase C report revision. Separate subsequent Owner authorization is required for R00.C administrative closure and NEXT transition.
