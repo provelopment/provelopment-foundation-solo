@@ -1,10 +1,10 @@
 # Foundation Solo — Architecture Charter
 
-> **Status:** Owner-aligned architecture, 2026-11-04 revision 6. Explicit Owner choices are accepted; remaining mechanisms marked **recommended** or **open** are not implementation authority.  
+> **Status:** Owner-aligned architecture, 2026-11-06 revision 7. The Owner-accepted physical publication profile (`O01`–`O12`, Appendix-A literals) is integrated in §6.2–§6.2N and supersedes the previous OPEN register. Explicit Owner choices are accepted; remaining mechanisms marked **recommended**, **proposed** or deferred to a named later stage are not implementation authority.  
 > **Relationship:** [Product definition](../About/FOUNDATION-SOLO.md) is the purpose and scope authority; this document defines the architectural model and invariant boundaries.  
 > **Approval:** Only the explicitly identified Owner-stated constraints are settled. Specific mechanisms labeled **proposed** or **open** require a recorded decision before implementation.  
 > **Scope:** Product architecture, conceptual functionality, public routing, data ownership, validation and verification approach. This is not a work order.
-> **`R00.D` codification status:** the Owner-accepted physical content and publication contract (`D01`–`D12`, including the later `D03` dual-candidate and `D05` standard-Markdown/expandable-module amendments) is recorded in §1.5–§1.7, §2.3–§2.4, §3.1–§3.2C, §3.3B and §6.1–§6.4. **This Charter is therefore not yet a complete executable physical schema:** every literal mechanism named in §6.2 remains an **OPEN** specification gate requiring its own Owner-reviewed decision before any source code depends on it. No framework, language, storage, schema artifact, module, version value, media policy or deployment provider is selected here.
+> **`R00.D` codification status:** the Owner-accepted physical content and publication contract (`D01`–`D12`, including the later `D03` dual-candidate and `D05` standard-Markdown/expandable-module amendments) is recorded in §1.5–§1.7, §2.3–§2.4, §3.1–§3.2C, §3.3B and §6.1–§6.5. The twelve former physical gates `O01`–`O12` are now **settled** by the accepted first physical profile in §6.2–§6.2N, so this Charter is a **complete physical publication specification**: it states every authoring key, type, enum, bound, reference rule, refusal and module contract the future implementation must satisfy. It is **not** executable code: the `.schema.json` artifacts, validators, media pipeline, module implementations, assets and every framework, provider and toolchain choice belong to `R00.E`, `R00.F`, `R00.G` and later implementation packages (§6.5).
 
 ## 1. Primary architectural decision
 
@@ -64,7 +64,7 @@ An implementation design must describe and verify these independently. Public ro
 
 ### 1.4 Conceptual identity and publication examples
 
-These examples are **conceptual specification evidence only**: they are not executed validation, not a manifest schema and not a final file format. The accepted declaration pattern is codified in §1.5–§1.7; its concrete schema and locator literals remain **OPEN** (`R00.D`, §6.2), with tooling and runtime validation deferred to `R00.E` and Stage 02.
+These examples are **conceptual specification evidence only**: they are not executed validation, and no file is claimed to exist. Their concrete schema, locator and version literals are now settled by the accepted first physical profile (§6.2A–§6.2C), and complete worked manifest, Markdown and JSON examples appear in §6.2M; tooling and runtime validation are deferred to `R00.E` and Stage 02.
 
 A minimal valid default shape, with an Entity ID the author supplies explicitly:
 
@@ -111,7 +111,7 @@ Refusal examples — each states required behaviour, not a passing test:
 
 **Declared EFS declarations and identities (`D02`).** The manifest expresses the ownership tree physically as one nested structure: the Entity contains its Facets, each Facet its Sites, each Site its Pages, and each Page its localized representation declarations. Immediate containment **is** the direct-parent association; competing parent fields, orphan relationships and cross-parent claims are invalid. The accepted `R00.A` ID grammar, 63-character limit and parent-scoped uniqueness are unchanged (§1.1), and invalid authored IDs are refused rather than normalized, repaired or derived. A usable starter Installation still consists of an Owner-supplied Entity ID, a `main` Facet, a `main` Site, a `home` Page and real content in an explicitly chosen supported full locale. In-memory indexes, derived registries and generated output are never authoritative, and cross-node references use complete qualified EFS ownership lineage rather than an ambiguous short ID. Physical movement of a declaration is not an implicit migration; reparenting, ID change and deletion require explicit, later-approved migrations with reference integrity.
 
-**Remaining physical literals — see §6.2.** The literal manifest filename and location, the initial schema-version value, the exact top-level key layout, the JSON Schema implementation and dialect, maximum file sizes, collection key names, the representation container shape, qualified-reference serialization and the precise migration workflow are **not** settled by `D01`/`D02`, and no illustrative sample in this Charter authorizes them.
+**Physical literals — settled by the accepted first profile (`O01`/`O02`; §6.2A–§6.2B).** The manifest is exactly `content/publication.json`: strict UTF-8 JSON without BOM, mandatory root `schemaVersion: "1.0.0"`, the closed five-key root of §6.2B, maximum 2 MiB, unknown fields refused. The JSON Schema dialect is Draft 2020-12 with `unevaluatedProperties: false` and asserted formats, and the future artifact is `contracts/publication/1.0.0.schema.json`. The EFS container shape, representation container and qualified-reference object serialization are fixed in §6.2B, and migration semantics in §6.2K. These are accepted literals, not installed code.
 
 ### 1.6 Declared source candidates and exactly one effective source (Owner-amended `D03`)
 
@@ -136,7 +136,7 @@ Refusal examples — each states required behaviour, not a passing test:
 | Neither candidate present or declared | Publication refused |
 | Two representations reserving the same candidate, including an absent one | Publication refused as a duplicate source claim |
 
-**Remaining physical literals — see §6.2.** The final key names for the candidate declaration, the candidate-locator syntax, whether omission versus explicit null is permitted, existence-check atomicity and time-of-check/time-of-use policy, hash or canonical-alias detection, and race-safe publication snapshot handling are **not** settled by `D03`. Hash pins are not required, implicit scanning is never permitted, and `null` is never an unreviewed wildcard.
+**Physical literals — settled by the accepted first profile (`O03`; §6.2C).** The declaration key is `sourceCandidates` with optional string members `json` and `markdown`, never `null`, never an empty object and no additional keys; locators are portable `pages/…` paths relative to `content/` with exact lowercase extensions; existence is a first-class safely confirmed result; an absent candidate is expressed by omission only and `null` is refused; hash pinning is not required; duplicate, alias and hardlink claims refuse even when the path is absent; and validation runs against an immutable snapshot whose change invalidates the candidate.
 
 ### 1.7 Authoring responsibilities: JSON and Markdown bodies under manifest authority (`D04`)
 
@@ -144,7 +144,7 @@ Refusal examples — each states required behaviour, not a passing test:
 
 **Manifest authority is not negotiable by a content file.** The manifest declarations alone own EFS identity, locale, membership, source candidates, Page `visibilityDefault`, representation `visibility`, public route and alias claims, locale fallback and property publication authority (§3.2, §3.2A, §3.2C, §2.3). A source file cannot override or contradict that authority through front matter, YAML or JSON fields, and there is no content-source merging, overlay, first/last-wins precedence or secondary publication setting. JSON-first selection decides **which body** is effective; it never transfers metadata authority to that body.
 
-**Remaining physical literals — see §6.2.** The exact schema of the common normalized content model and the exact recognized content-only metadata, if any, still require formal specification. Conflicting publication metadata inside a source must be refused rather than quietly ignored as an override.
+**Physical literals — settled by the accepted first profile (`O04`/`O05`; §6.2D–§6.2E).** A JSON body is strict UTF-8 with mandatory `contentVersion: "1.0.0"`, a mandatory `title` and a mandatory `blocks` node array; a Markdown body is CommonMark 0.31.2 plus GFM 0.29-gfm with raw HTML refused. The common normalized content model is exactly the closed body grammar of §6.2E, and there is **no** content-only metadata channel: any body attempt to set publication metadata is refused, never silently ignored as an override.
 
 ## 2. The property system is a core EFS capability
 
@@ -226,7 +226,7 @@ Entity, Facet, Site and Page are language-neutral. The localized representation 
 - **Provenance and projection.** Resolved values retain their per-value EFS origin, inclusion or suppression decision and any permitted field provenance, each with an explicit exposure classification inside the registered maximum. Only the validated public projection feeds public HTML, scripts, JSON, metadata, feeds and presentation modules, and omitting an internal value never causes an arbitrary public ancestor to substitute for it.
 - **Fail closed.** Every invalid or effectively unlisted property declaration still blocks complete publication; `internal` exposure is not secrecy for material in a public repository or delivery configuration.
 
-**Remaining physical literals — see §6.2.** The physical registry catalogue and its value envelopes, the exact encoding of `none`, the enumeration spelling, cross-type uniqueness and equality rules and the exposure-classification set are **not** settled by `D08`. An illustrative key name appearing anywhere in this Charter is not an automatically accepted built-in property.
+**Physical literals — settled by the accepted first profile (`O07`; §6.2G).** `properties` is the exact inline key on all five levels; every declaration is the closed `{ "inheritance": "inherit"|"suppress", "currentContext": "none" | [ … ] }`; `propertyRegistryVersion: "1.0.0"` is mandatory at manifest root; exposure is exactly `public|internal`; and the initial nine-key catalogue, effective cardinalities, uniqueness rules and the derived provenance record are fixed in §6.2G. No unlisted key becomes a built-in property by appearing anywhere in this Charter.
 
 ### 2.4 Structured location facts and identified-record extension (`R00.D` `D09`)
 
@@ -240,7 +240,7 @@ Entity, Facet, Site and Page are language-neutral. The localized representation 
 - **No implicit primary.** Several facts create no implicit primary record; any one-record consumer requires an explicit governed selection. Geographic correctness is authored responsibility — Solo validates types and safe serialization but neither geocodes nor claims external verification.
 - **No inference either way.** Neither URL, Site ID, hostname, language, region tag nor coordinates may infer or modify a location, and location may never infer or modify a route (§2.1).
 
-**Remaining physical literals — see §6.2.** The complete field and type catalogue, the fact-identity grammar, the typed coordinate profile, qualified-target encoding, the operation patch grammar, whole-record origin uniqueness and the field provenance and visibility rules all require finalized schemas. Sample key names used in discussion (fact identity, `operation`, `target`, `set`) remain proposed and do not become canonical syntax by appearing here.
+**Physical literals — settled by the accepted first profile (`O08`; §6.2H).** The `add` and `extend` envelopes, the `factId` grammar, the closed `LocationFields` catalogue with WGS84 coordinates object `{ "latitude": number, "longitude": number }`, `QualifiedOwner` contiguous lineage, whole-record exposure, in-place field provenance and the one-`extend`-per-target-per-node rule are fixed in §6.2H. The previously proposed key names are confirmed there as canonical syntax.
 
 ## 3. Conceptual functionality — what Solo must be able to do
 
@@ -258,7 +258,7 @@ Offer two complementary authored Page formats under one manifest authority (§1.
 - **Safety and accessibility are content rules, not renderer preferences.** Heading structure, link text, image alternatives, page language and any motion behaviour follow the same accessible and safe-authoring obligations as JSON content.
 - **Links and media** resolve under the separate locator, link and resource contract in §3.1C, not through Markdown-specific indirection.
 
-**Remaining physical literals — see §6.2.** The exact supported extension list with profile versions, the title and heading contract, the precise refusal-versus-inert-escaping policy for raw HTML, and the safe link-resolution and media-base semantics are not settled by `D05`.
+**Physical literals — settled by the accepted first profile (`O04`; §6.2D).** CommonMark 0.31.2 plus GFM 0.29-gfm; raw HTML blocks and inline nodes are refused rather than sanitized; exactly one H1 as the first semantic block; heading levels may not skip; anchors derive from visible heading text under the pinned Unicode profile with `section` fallback and `-2`, `-3` suffixes; links resolve against the current canonical Page URL; the Markdown image base is `content/assets/`; and permitted click-through schemes are exactly `https`, `http` and `mailto`.
 
 ### 3.1B Advanced modular JSON design library (`D05`)
 
@@ -273,7 +273,7 @@ Offer two complementary authored Page formats under one manifest authority (§1.
 
 **Owner-approved design reference register — all seven retained:** <https://swiftguest.com/> , <https://sitelings.ai> , <https://www.untilnow.com.au/> , <https://www.vectapp.io/> , <https://northfoundry.co/> , <https://siftp.com/> , <https://www.myumbrella.ai/> . They inform the flexibility of design capability. No exact design replication, copyrighted content reuse, proprietary code reuse or automatic feature extraction is claimed or authorized, and this register lives here rather than in a parallel ungoverned requirements queue.
 
-**Remaining physical literals — see §6.2.** The final extension and profile list, each module's identifier, input schema, child constraints and accessibility contract, the initial installed module catalogue, and maximum nesting, depth, size, performance and animation limits all require Owner-reviewed specification before code. Naming a capability family never proves a module is available.
+**Physical literals — settled by the accepted first profile (`O05`; §6.2E).** The first installed registry is exactly the twenty-one `1.0.0` module contracts tabulated in §6.2E.2, each with closed `props`, defaults only where enumerated, and an explicit child policy; node depth ≤12, ≤250 nodes per body, child arrays ≤24, and `span` permitted only under `layout.grid`/`layout.bento`; `presentation` tokens and their CSS-pixel distances are fixed in §6.2E.1. Naming a future capability family still installs nothing.
 
 ### 3.1C Safe locators, links and resource separation (`D11`)
 
@@ -288,7 +288,7 @@ Offer two complementary authored Page formats under one manifest authority (§1.
 - **Refusals.** Unsafe schemes (for example `javascript:`), ambiguous targets, unapproved remote image loading and arbitrary server-side fetching fail. An intentionally authored direct link to a known unlisted URL may be permitted under the classified safe-link rules, but it never creates automatic discovery (§3.2A, §4.4).
 - **Identity and ports.** Changing a source path never changes EFS identity. Modules reach resources only through approved application ports, and external provider retrieval requires separate permission and a bounded adapter (§5).
 
-**Remaining physical literals — see §6.2.** The final locator and namespace literals, the portable permitted filename and Unicode grammar, the symlink, mount and hardlink ambiguity profile, the case-insensitive filesystem collision policy, link-base semantics, fragment identifier policy, permitted external schemes and hosts and the trusted media reference grammar are not closed by `D11`.
+**Physical literals — settled by the accepted first profile (`O03`/`O11`; §6.2C, §6.2K).** Locators are portable lowercase-ASCII relative paths of ≤240 bytes and ≤8 segments with no escapes, traversal or reserved names; namespaces are `content/pages/`, `content/assets/`, `content/drafts/`, read-only `platform/assets/` and product `contracts/`; containment is proven by atomic no-follow traversal and a string prefix never proves it; permitted external schemes and `mailto` limits are fixed in §6.2D.7 and §6.2J.9; and the typed media reference grammar is §6.2I.
 
 ### 3.2 Localize only what is localized
 
@@ -336,7 +336,7 @@ https://a.abc.com/something/id-id/about
 https://a.abc.com/something/zh-hans-cn/about
 ```
 
-**For implementation contract acceptance:** The route-case, Unicode, collision, redirect and locale-selection behaviour above is now Owner-accepted (`R00.B`, recorded in §3.2B). What remains open is technical encoding rather than policy: the physical manifest and field schema literals (`R00.D`; direction in §3.2C, gates in §6.2), the pinned Unicode data version and toolchain (`R00.E`), and the compiled validators, HTTP adapters, redirect/cache behaviour and rendered language selector (later implementation stages). None of this is permission to start source work.
+**For implementation contract acceptance:** The route-case, Unicode, collision, redirect and locale-selection behaviour above is Owner-accepted (`R00.B`, recorded in §3.2B), and its physical encoding — the manifest and field schema literals, the pinned Unicode 18.0.0 profile and the collision ledger — is now settled (`R00.D`, §3.2C and §6.2J). What remains is implementation rather than policy: the toolchain that binds that Unicode data (`R00.E`) and the compiled validators, HTTP adapters, redirect/cache behaviour and rendered language selector of later implementation stages. None of this is permission to start source work.
 
 - Language switching stays on the exact same Page and Site; unavailable variants are not advertised as available.
 - A declared default locale must be a supported full tag. Missing fallbacks never promote an unlisted representation.
@@ -358,14 +358,14 @@ https://a.abc.com/something/zh-hans-cn/about
 
 An unlisted representation serves at its **exact authorized URL** and carries `robots: noindex, nofollow`; it is absent from generated navigation, sitemap, `hreflang`, language-switch options, `x-default` and any other automatic discovery. It is **not private**: no secrets or access-controlled material may rely on `unlisted`. An explicitly authored direct link can intentionally point to a known unlisted URL only under the eventual safe-link contract; the platform does not automatically advertise it. Missing-translation fallback must never select an unlisted representation. Behavior must be equivalent for JSON and Markdown content.
 
-**Owner-accepted Home entry, and remaining implementation details:** a fully unlisted Home Page is permitted. The locale-less base entry prefers an explicitly designated **real public landing Page**; where no public landing representation is available it returns not-found rather than revealing an unlisted Home, and the landing selection must be authored, unambiguous and collision-checked (`B10`). The default seeded `main`/`main`/`home` Page retains its stable EFS identity regardless of how the public entry is configured. The physical declaration direction is now recorded (manifest authority §1.5 and §1.7, declared addressing §3.2C) while its literals remain **OPEN** (`R00.D`, §6.2); the public route-token grammar itself is accepted in §3.2B (`B04`). The visibility field placement and override precedence above are approved.
+**Owner-accepted Home entry, and remaining implementation details:** a fully unlisted Home Page is permitted. The locale-less base entry prefers an explicitly designated **real public landing Page**; where no public landing representation is available it returns not-found rather than revealing an unlisted Home, and the landing selection must be authored, unambiguous and collision-checked (`B10`). The default seeded `main`/`main`/`home` Page retains its stable EFS identity regardless of how the public entry is configured. The physical declaration is settled: `visibilityDefault` is a direct Page field and `visibility` a direct representation field, each `public|unlisted` with `public` as the Page default (§6.2B, §6.2J), while the public route-token grammar is accepted in §3.2B (`B04`) and restated physically in §6.2J.3. The visibility field placement and override precedence above are approved.
 
 
 ### 3.2B Owner-accepted public route-case, Unicode and collision contract
 
 **Default public behaviour (`B05-B`).** Matching for a public localized route claim is **case-insensitive by default**, and its canonical Page-route spelling is the deterministic Unicode-aware lowercase form of that authored claim, normalized to NFC. Case-insensitivity is a default property of the claim, not a universal law that every public URL must obey.
 
-**Author-selected case-sensitive public behaviour (`B05-B`).** An author may explicitly choose **case-sensitive** matching for an individual localized route claim. The proposed logical setting is `caseMatching: insensitive | sensitive`, defaulting to `insensitive` for public claims; its concrete schema representation belongs to the `R00.D` declaration direction (§3.2C), with its literals still **OPEN** (§6.2). A sensitive claim's canonical Page-route spelling **preserves the authored NFC-normalized Unicode capitalization**. Because the setting is attached to the authored localized route claim, `About`, `about` and `aBout` may deliberately identify **three distinct public Pages** in one locale, and German `Morgen` and `morgen` may remain distinct, provided every relevant claim is sensitive and validation proves no conflict. No Site-wide, Facet-wide or locale-wide case-sensitive switch exists, and there is no hidden global mode.
+**Author-selected case-sensitive public behaviour (`B05-B`).** An author may explicitly choose **case-sensitive** matching for an individual localized route claim. The setting is `caseMatching: "insensitive" | "sensitive"`, optional on public claims and defaulting to `insensitive`; it must be **omitted** on an effectively unlisted representation, whose matching is always the exact authored NFC spelling (§6.2J.5). A sensitive claim's canonical Page-route spelling **preserves the authored NFC-normalized Unicode capitalization**. Because the setting is attached to the authored localized route claim, `About`, `about` and `aBout` may deliberately identify **three distinct public Pages** in one locale, and German `Morgen` and `morgen` may remain distinct, provided every relevant claim is sensitive and validation proves no conflict. No Site-wide, Facet-wide or locale-wide case-sensitive switch exists, and there is no hidden global mode.
 
 **Unlisted representations.** Effective unlisted representations always require **exact-case** authored Page-route matching; an unlisted claim can never be matched case-insensitively, so `xY7AbC` is not equivalent to `xy7abc` or `XY7ABC`, while two unlisted claims such as `abc` and `Abc` remain independently valid when their exact keys differ and nothing else is ambiguous. These characters are never lowercased or case-folded during matching, redirects, source lookup or URL generation. All variants of an unlisted route stay outside generated navigation, sitemap, language alternates and every other automatic discovery, and serve `noindex, nofollow`. An unlisted URL is not secret or access-controlled merely because it is hard to guess.
 
@@ -416,7 +416,7 @@ An unlisted representation serves at its **exact authorized URL** and carries `r
 
 **Policy is unchanged by `D07`.** Full-locale representation identity, locale-less entry precedence, explicit full-locale precedence over preferences, same-Page public-only fallback, the public/unlisted case contract, Unicode route handling, collision refusal, redirect status and cache safety, and base-prefix-once addressing are exactly as accepted in §3.2, §3.2A, §3.2B and §4.1–§4.4. Nothing here revises them, and no declaration may contradict them.
 
-**Remaining physical literals — see §6.2.** The final top-level, Site, Page and representation field layout, the alias schema, the locale-preference mapping format, qualified landing-reference syntax, the route-token lexical grammar, Unicode and casing dataset and profile pinning, and implementation-specific adapter details are not approved by `D07`.
+**Physical literals — settled by the accepted first profile (`O10`; §6.2J).** The closed `base` object, `Site.defaultLocale`, `languagePreferences`, Page `entryPaths`, `missingTranslation`, the representation `route` object with `path`/`caseMatching`/`aliases`, the route-token lexical grammar, the pinned Unicode 18.0.0 profile, base-prefix-once composition and the four typed link variants are all fixed in §6.2J. Adapter, matcher and framework choices remain `R00.E`.
 
 ### 3.3 Present one coherent public website
 
@@ -449,7 +449,7 @@ Generic-library files may also be referenced deliberately by any node without du
 - **Derived output.** Source assets are authoritative; transformed and optimized public files are derived outputs carrying no authorship authority.
 - **Direct module media.** Advanced JSON modules may accept **direct typed media asset references** — for watermarks, backgrounds, galleries, carousels and layered heroes — without turning every media item into a cascading graphic property. Module inputs remain validated, and no arbitrary file or remote fetch is allowed.
 
-**Remaining physical literals — see §6.2.** Registry role identifiers, the source reference grammar, MIME and media allowlists, asset format handling (including potentially active SVG), maximum bytes and dimensions, the transformation lifecycle and generic library version compatibility are not finalized by accepting `D10`.
+**Physical literals — settled by the accepted first profile (`O09`; §6.2I).** The role cardinalities, the `{ "namespace": "entity"|"platform", "reference": "…" }` asset reference, the platform library pinned by `platformAssetLibraryVersion: "1.0.0"`, the image and video allowlists with byte, dimension and duration bounds, required WebVTT captions, and the refusal of active SVG, GIF and remote fetch are fixed in §6.2I. **No artwork, codec bundle or asset filename is mandated here**, and no automatic generic fallback exists.
 
 ### 3.4 Support useful public functionality
 
@@ -588,32 +588,481 @@ At implementation time, tests must exercise both the ordinary one-Facet/one-Site
 
 **Mandatory validation groups:** (1) strict UTF-8 JSON and a supported schema; (2) one valid published EFS ownership graph; (3) explicit, collision-free JSON and Markdown source candidates with exactly one selected safe source; (4) a safe validated body with registered modules; (5) additive property cascade, location facts, graphics and public-only projection; (6) locale, base, alias and all route collision checks; (7) safe public assets, links, metadata and discovery; (8) atomic all-or-nothing candidate disposition. Diagnostics identify the affected EFS node or field and the reason, never a sensitive path. The exact ordering may be optimized only while preserving full coverage.
 
-**Remaining physical literals — see §6.2.** Registry and manifest version matching, pinned dependencies, the installation and module lifecycle, semantic-version ranges, format assertion mode, the exact diagnostic shape and the migration command interface must all be made normative before application code.
+**Physical literals — settled by the accepted first profile (`O06`/`O11`; §6.2F, §6.2K).** Version matching is an exact enumerated tuple with no ranges, wildcards or `latest`; the registry is product-distributed, read-only and deny-by-default; the mandatory validation stages, the closed diagnostic envelope, the enumerated mandatory diagnostic codes with family fallbacks, the immutable candidate snapshot, atomic activation and the Owner-reviewed migration procedure are fixed in §6.2K. Implemented validators and test gates remain `R00.E`/Stage 02.
 
-### 6.2 OPEN physical-specification gates — not decided, do not guess
+### 6.2 Accepted first physical publication profile — `O01`–`O12` settled
 
-**This is the Charter's single register of unresolved physical specification.** The twelve Owner decisions select the *architectural pattern*; they do **not** supply every implementable literal field, type, key or limit. Each item below is an **OPEN** gate: it requires its own Owner-reviewed physical-specification acceptance before any source-code implementation may choose it. A documentation codifier must name a gate and its consequence — never invent a default and present it as decided, and never promote an illustrative example into settled syntax.
+**Register status.** Each of the twelve former OPEN gates is **settled** by the Owner-accepted first physical profile in §6.2A–§6.2N. This table is the single index of those decisions; the normative keys, types, enumerations, bounds, refusals and module contracts live in the referenced subsections. No residual gate below refers to a physical choice that Appendix A settles, and no other document restates these literals.
 
-| # | OPEN gate | Consequence if invented rather than decided |
+| # | Accepted contract (settled) | Normative home |
 | --- | --- | --- |
-| O01 | Canonical file and path inventory: the actual manifest filename, file layouts, initial version values, complete JSON Schema artifacts and schema-dialect enforcement. | An agent-chosen filename or dialect would silently become publication authority and break every installation written against it. |
-| O02 | Canonical field paths for every manifest section and published representation — including the JSON and Markdown candidate keys and their optionality — plus one valid minimal and one complex worked example. | Invented key names would define a de-facto schema that no Owner reviewed. |
-| O03 | Cross-platform path and profile rules: permitted filename characters, casing, symlink, hardlink and alias policy, race-safe reads and ownership-binding semantics. | Ad-hoc containment checks would create traversal and case-collision holes. |
-| O04 | The exact Markdown profile (CommonMark and GFM versions and extensions), raw-HTML handling (reject or inert-escaped), title and heading contract, safe link resolution and media base. | Guessing would either under-render authored Pages or admit active HTML. |
-| O05 | The advanced JSON **initial module set** (not mere capability aspirations), module identifier grammar, input schemas, composition depth and limits, accessibility and interaction policies. | Capability families would be mistaken for shipped modules. |
-| O06 | Module installation, registration and version pinning, the compatibility algorithm, trusted add-on boundaries and missing-module failure behaviour. | Unbounded compatibility guessing would break unrelated installations. |
-| O07 | The typed property registry catalogue, exposure enumeration, effective equality and cardinality limits, serialized provenance and custom-registration restrictions. | An invented catalogue would freeze unreviewed property semantics. |
-| O08 | The location fact field catalogue, record identifier and reference grammar, `add`/`extend` patch schema, exact exposure and provenance handling and the coordinate reference standard. | Patch grammar invented in code would be unversionable and unsafe. |
-| O09 | Graphic roles admitted in the first release, each role's cardinality, source class, format allowlist, image processing and generic library versioning. | Naming a role here never approves its physical identity or formats. |
-| O10 | Exact base, alias and route keys, Unicode and casing dataset pinning, RFC-safe routing grammar, locale mapping keys, the fallback schema and the public link schema. | Unpinned Unicode data would make matching non-reproducible. |
-| O11 | Schema compatibility version-range syntax, migration refusal and rollback requirements, diagnostic codes and publication snapshot and atomicity expectations. | Without it, "all-or-nothing" publication cannot be verified. |
-| O12 | Proof that each finalized literal is explicitly Owner-accepted, or is a purely mechanical implementation detail that genuinely fits the accepted constraints. | An unproved literal is an unauthorised decision, and code must STOP rather than proceed. |
+| O01 | `content/publication.json`, strict UTF-8 JSON without BOM, exact `schemaVersion: "1.0.0"`, separate `1.0.0` content/registry/module versions, JSON Schema Draft 2020-12, 2 MiB manifest and per-source bounds, resource limits. | §6.2A |
+| O02 | Closed five-key manifest root, closed nested Entity → Facet → Site → Page → representation grammar, `id`/`label` grammar, `sourceCandidates`, `missingTranslation`, `route`, structured qualified targets. | §6.2B |
+| O03 | Portable lowercase-ASCII locators ≤240 bytes/≤8 segments, namespace roots, reserved-name refusal, no-follow containment, immutable validated snapshot, candidate and asset collision safety. | §6.2C |
+| O04 | CommonMark 0.31.2 + GFM 0.29-gfm, raw HTML refused, single H1 and heading rules, deterministic anchors, link resolution against canonical URL, `content/assets/` image base, safe scheme allowlist. | §6.2D |
+| O05 | Closed JSON body grammar, `presentation` envelope and tokens, node depth/count/child limits, and the exact twenty-one `1.0.0` module contracts with closed `props` and child policy. | §6.2E |
+| O06 | Product-distributed read-only module registry, dotted module-ID grammar, exact installed contract versions, deny-by-default, no remote/eval/custom module, additive updates and new-major migration. | §6.2F |
+| O07 | `properties` inline on all five levels, closed two-element declaration envelope, `propertyRegistryVersion: "1.0.0"`, `public|internal` exposure, nine-key initial catalogue with cardinalities, derived provenance record. | §6.2G |
+| O08 | `add`/`extend` envelopes, `factId` identity, closed `LocationFields` catalogue, WGS84 coordinates, contiguous `QualifiedOwner` lineage, whole-record exposure, per-node single extension. | §6.2H |
+| O09 | `{ namespace, reference }` asset references, `platformAssetLibraryVersion: "1.0.0"`, PNG/JPEG/WebP/AVIF and MP4/WebM allowlists with byte/dimension/duration bounds, WebVTT captions, no SVG/GIF/remote fetch, zero automatic fallback. | §6.2I |
+| O10 | Closed `base`/`defaultLocale`/`languagePreferences`/`entryPaths`/`route` declarations, Unicode 18.0.0 profile, case-insensitive default with opt-in sensitive claims, exact-case unlisted, derived collision ledger, typed links, derived metadata. | §6.2J |
+| O11 | Exact compatibility tuple, ordered fail-closed validation stages, closed diagnostic envelope with enumerated codes and family fallbacks, immutable candidate snapshot, atomic activation, Owner-reviewed migration. | §6.2K |
+| O12 | One-to-one D/O/`V`/`P` traceability, worked examples with deliberate refusals, and explicit separation of R00.D literals from `R00.E`/`R00.F`/`R00.G` obligations. | §6.2L, §6.2M, §6.2N, §6.5 |
 
-**Disposition rule (`R00.D`).** It is valid to accept the codification of the selected `D01`–`D12` architecture while explicitly recording these remaining gates. It is **not** valid to certify the resulting physical schema as implementation-ready, or to declare `R00.D` fully complete, while any gate above lacks an approved specification. Gates are never replaced with fabricated decisions, and none of them may be inferred from a sample in this Charter, this work order or an illustration in conversation.
+**Disposition rule (`R00.D`).** The R00.D physical specification is now **complete and ready for administrative closure review**, not closed: closure requires the Chief Architect's independent `ACCEPT` of this revision and a separate Owner-issued administrative order. Completeness here means every authoring key, type, bound, refusal and module contract a future implementation must satisfy is written down in this Charter. It does **not** mean that schemas, validators, modules, assets, media processing, framework selection, provider accounts or tests exist; those are `R00.E`, `R00.F`, `R00.G` and later implementation packages (§6.5), and no implementation-readiness claim may exceed this paragraph.
+
+### 6.2A Files, schema identities, encoding and resource limits (`O01`)
+
+1. **Manifest.** The sole publication authority is exactly `content/publication.json`, a single slash-separated relative location under the Installation root. No second manifest, directory-discovery path, link or alias may serve that role. The file is UTF-8 without BOM and RFC 8259 strict: duplicate keys, `NaN`/`Infinity`, invalid UTF-8 and non-JSON syntax are refused, as are unknown fields; the root must be a non-null object and the file may not exceed **2 MiB**. Parser recovery, duplicate-key overwrite and YAML are refused. Manifest UTF-8 normalization is not implied — authored IDs, paths and locales are validated by their own rules.
+2. **Bodies.** A JSON Page body is strict UTF-8 JSON with mandatory root `contentVersion: "1.0.0"`, **maximum 2 MiB** per selected source, unknown fields refused and no execution. A Markdown body is UTF-8 without BOM, **maximum 1 MiB**. Authored data and delivered assets live under different roots and can never override one another.
+3. **Namespace roots**, relative to the verified Installation or product package: `content/pages/` for Page candidate bodies; `content/assets/` for Entity-owned assets; `content/drafts/` for drafts that are never scanned or published; product-distributed read-only `platform/assets/` for shared generic public assets; product-distributed `contracts/` for validated schemas and module registries — never publication manifests. Generated immutable outputs live in a separate output namespace that is never an input root, and secrets or server-only configuration live outside all of them.
+4. **Candidate locators** are relative to `content/`, must begin `pages/` and must carry the selected extension: `pages/main-home.en-001.md` resolves to `content/pages/main-home.en-001.md`, and no candidate may reference the manifest itself. Entity asset `reference` strings are relative to `content/assets/` and platform asset `reference` strings to product `platform/assets/`. Physical mapping never guesses a suffix and never scans a directory.
+5. **Future artifacts and dialect.** The first implementation must supply `contracts/publication/1.0.0.schema.json`, `contracts/content/1.0.0.schema.json`, `contracts/properties/1.0.0.schema.json` and one registry/schema per named module at `contracts/modules/<module-id>/1.0.0.schema.json`. These are future code-stage paths and **are not created by this Charter**. The dialect is **JSON Schema Draft 2020-12**; a conforming validator must enforce `unevaluatedProperties: false` (or an equivalent complete closed evaluated shape) and asserted formats through explicit domain checks or format assertion, because a keyword silently treated as an annotation never satisfies a security assertion.
+6. **Version strings.** Every schema-version value is `MAJOR.MINOR.PATCH` with three decimal numeric components, no prefix, no leading zero and no range expression in authored data. Manifest, content, property-registry, module and platform-library versions are independent. `1.0.0` is the first exact supported baseline and implies no installed software; code generation, validator dependency and build tooling belong to `R00.E`/Stage 02.
+7. **Resource limits** for contract validation: ≤10,000 EFS nodes including representations, ≤500 Pages, ≤100 representations per Page; ≤250 module nodes per JSON body, module nesting depth ≤12 and ≤100 entries per property across an effective direct-ancestry result unless a narrower registered bound applies. A refusal uses exact constrained field or path diagnostics with no partial publication, automatic source rewrite or lossy truncation.
+8. **No implied publication.** A data file not referenced by a validated manifest declaration has **zero** publication effect even when it sits inside the content tree, and the platform generic library never becomes a second authoring or publishing authority.
+
+### 6.2B Manifest grammar, EFS identity, publication and source declarations (`O02`)
+
+**Root.** Exactly five required keys and nothing else: `schemaVersion` (string), `propertyRegistryVersion` (string), `platformAssetLibraryVersion` (string), `base` (object), `entity` (object).
+
+**`base`.** `canonical` is required: an absolute HTTPS URL, or HTTP loopback solely for explicitly approved local development. `aliases` is optional (default `[]`) and holds distinct canonical URL bases. `landing` is an optional qualified Page reference; omitting it makes the base entry return not-found. Canonical and alias processing is §6.2J.1.
+
+**Nested EFS nodes.** `entity` has required `id`, required `label` (non-empty plain display string), required `facets` (non-empty array) and optional `properties`. A Facet has required `id`, `label`, `sites` (non-empty array) and optional `properties`. A Site has required `id`, `label`, `defaultLocale` (full region-qualified tag), required `pages` (non-empty array), optional `languagePreferences` (object mapping accepted request-preference strings to authored full locales) and optional `properties`. A Page has required `id`, `label`, `representations` (non-empty array), optional `visibilityDefault` (`public|unlisted`, default `public`), optional `entryPaths` (array of authored locale-less paths, default empty), optional `missingTranslation` (policy object) and optional `properties`. A representation has required `locale`, required `route` (object), required `sourceCandidates` (object), optional `visibility` (`public|unlisted`) and optional `properties`. **Direct node containment is parentage:** a `parentId`, ancestor pointer, type discriminator or secondary linked graph is forbidden.
+
+**Identity.** `id` matches `^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$` and is 1–63 ASCII characters. `label` is plain Unicode text of 1–120 scalar values after NFC normalization; labels never create identity, route, locale or location. Facet IDs are unique in the Entity, Site IDs unique within their Facet, Page IDs unique within their Site, with exactly one Entity. Representation locales are unique per Page after canonical BCP47 normalization, and every child has exactly one containing parent.
+
+**Qualified targets** (`landing` or a typed link target) are an object `{ "entity": "<id>", "facet": "<id>", "site": "<id>", "page": "<id>" }` with all four fields required and no shorthand; `entity` must equal root `entity.id` and the full lineage must resolve exactly. A qualified representation target adds required `locale`. Bare Page IDs and guessed Site selection are refused.
+
+**`sourceCandidates`.** One or both optional members `json` and `markdown`, string locators, never `null`, never an empty object, no additional keys. `json` must end `.json` and `markdown` must end `.md`, and both must point beneath `pages/`. JSON-present wins even when Markdown is valid; only genuine JSON absence selects the declared Markdown. Any existent invalid JSON rejects; unselected Markdown contents are not parsed, although its locator declaration and uniqueness claim are still validated. Neither candidate existing rejects. The same canonical candidate claimed by distinct representations rejects, including an absent path, and case-folded, alias or hardlink collisions refuse. Candidate selection never moves EFS identity, routes or properties and never confers publication on a draft or unlisted representation. A generated or remote source can never be designated.
+
+**`missingTranslation`.** Exactly one of `{ "mode": "default" }` (also the default when the field is absent), `{ "mode": "strict" }`, or `{ "mode": "locale", "fallbackLocale": "<full locale>" }`. In `default` the Site default representation of the **same Page** must exist and be public for a fallback to succeed; otherwise the request is not-found and an authored fallback that cannot be satisfied is refused. In `locale` the `fallbackLocale` must be an existing public representation of the same Page, validated at publish time. In `strict` a missing representation is not-found. An actually present public representation always wins, and missing or unlisted content never silently swaps in another Page or Site. Redirect statuses are §6.2J.8.
+
+**`route`.** Required `path` (full locale-qualified canonical path relative to the configured base); optional `caseMatching` (`insensitive|sensitive`, allowed only on public claims and **required to be omitted** on effectively unlisted ones); optional `aliases` (array of `{ "path": "…", "caseMatching": "insensitive|sensitive" }`, empty by default). `entryPaths` are authored locale-less public route strings and may be empty even for a Home Page. An effectively unlisted representation may not author route aliases — only its exact canonical route stays directly reachable — and no public entry path may expose it.
+
+**Closed keys everywhere.** Every object key not enumerated here, or not expressly registered for the corresponding property or module `props`, is refused — including `draft`, a file-level `visibility`, a source-level `locale`, meta-overrides and unregistered section types. Array order is authored and is **never** a collision-resolution priority; every acceptance or refusal decision is deterministic and independent of directory order.
+
+### 6.2C Portable sources, asset paths, snapshots and collision safety (`O03`)
+
+1. **Locator form.** A locator or reference is a **single unescaped logical path string**, never a URL: relative slash-separated segments with no leading or trailing slash, no consecutive slashes, no backslash, no `.`/`..` segment, no colon, tilde expansion, query, fragment, percent escape, NUL, control character, encoded separator or absolute/drive/UNC path. Source components are **lowercase portable ASCII** matching `[a-z][a-z0-9._-]*`, 1–80 bytes, no trailing dot or space, no consecutive dots, at least one letter; a full reference is ≤240 bytes with depth ≤8. `.json`, `.md`, image and video extensions are lowercase, exact and dot-prefixed. Unicode is supported in **public routes and displayed content**, not in source filenames for this first portable profile.
+2. **Reserved and aliasing forms.** Windows reserved basenames/stems (`con`, `prn`, `aux`, `nul`, `com1`–`com9`, `lpt1`–`lpt9`) are refused even with extensions, as are platform-specific aliases and case-insensitive equivalences. A logical path claims exactly one canonical resource, and an invalid path is never normalized into validity.
+3. **Containment and snapshots.** The source adapter must use an atomic, no-follow, directory-confined traversal under the correct root: symlinks, junctions and reparse points are refused along every component and at the leaf, together with mount/root escapes, directory aliasing, unintended hardlink identity-sharing and race/TOCTOU uncertainty. When containment or canonical ownership cannot be proven the adapter refuses; **a string-prefix test never proves containment**. Source validation operates on one consistent snapshot — immutable byte copies or file-descriptor-backed reads with verified metadata and content hash — before activation, and a source changing during validation invalidates that candidate snapshot and requires a new full attempt.
+4. **Claim uniqueness.** Canonical candidate claims are compared by root namespace, exact portable path and underlying filesystem identity/alias/case equivalence; two distinct published representations can never reserve one file, present or absent. Absence is a first-class, safely confirmed result and never a catch-all for permission or I/O errors. Unselected Markdown body contents are not parsed when valid JSON is effective, but its declared locator and ownership are validated even when absent.
+5. **Namespaces never overlap.** Entity and platform namespaces are disjoint. A graphic or media `reference` includes the **full relative filename with extension** and resolves without globbing, inferred suffixes, MIME-only substitution or remote fetching. All authoring and discovery output derives from declared, validated references and routes; generated outputs are never read back as original sources.
+
+### 6.2D Versioned Markdown, HTML policy, headings, anchors and author links (`O04`)
+
+1. **Profile.** CommonMark 0.31.2 core plus the GitHub Flavored Markdown 0.29-gfm extension grammar for tables, strikethrough, autolinks, task-list markers and raw-HTML rejection as below. The profile is pinned so behaviour cannot drift with whatever parser an implementation happens to install. No footnotes, math, diagrams, directives, MDX, Solo-specific block syntax or front-matter publication controls in the first profile; standard blockquotes, lists, code fences, headings, emphasis, links and images remain fully supported.
+2. **Raw HTML is refused as content** — not interpreted, sanitized or passed through: a parser-recognized raw-HTML block or inline raw-HTML node is an authoring diagnostic that blocks publication, so literal HTML examples must sit in fenced or inline code to render as escaped text. Parser HTML output is disabled and plain text is escaped in the final renderer. No executable code in fenced code blocks. Task-list checkboxes are read-only accessible presentation, never form controls with submission or persisted state.
+3. **Heads and titles.** Standalone Markdown must contain exactly one non-empty H1 providing the body display title, and it must be the first non-blank semantic block (a comment is raw HTML and therefore invalid). H2–H6 may follow with no jump greater than one level; a second H1 refuses. JSON content uses its mandatory root display title and may use H2–H6 modules beneath it, and no renderer may mint a duplicate visible H1. This title is content display text, never EFS identity or canonical-URL authority, and no front matter may override plain summary or SEO properties, which are governed separately by §6.2G.
+4. **Anchors.** A heading anchor derives solely from visible heading text: NFC normalize, lowercase under the pinned §6.2J.4 profile, keep Unicode letters and numbers plus hyphens, collapse each whitespace run to one `-`, strip other punctuation and trim hyphens; an empty result becomes `section`, and repeats take `-2`, `-3`, … in document order. Every `#fragment` target must equal one generated real anchor, and an empty or missing target refuses. Renderer IDs stay safe and unique, and unlisted fragment links never create discovery inventory.
+
+5. **Links.** An ordinary `[text](reference)` resolves under RFC 3986 URI-relative rules against the **current canonical Page URL**, never against a disk source path. A leading `/` is origin-root relative and must resolve inside the configured approved base prefix; a plain relative reference follows standard URL resolution and then passes the D07 ledger and target-visibility classification. Internal targets must be authorized published routes — an explicit safe link to a known unlisted route is permitted but never auto-generated — and unknown, ambiguous or out-of-base internal targets refuse. Fragment-only references are same-Page. There is no automatic locale switching and no guessed same-Site slug, and URLs inside code spans stay inert.
+6. **Images.** An ordinary `![meaningful alt](images/example.webp)` refers **only** to the Entity asset `content/assets/images/example.webp`, whatever directory the `.md` source sits in: the author-friendly Markdown image base is exactly `content/assets/`. An image reference is a safe slash-separated portable path with no leading `/`, no `..` and no scheme, and it is validated as a typed Entity asset with known MIME and use rights. A purely decorative image may be explicitly marked with empty alt, which the renderer must then mark decorative; otherwise alt text is required. Server-side remote image fetching is forbidden and an external HTTP image in Markdown is refused.
+7. **External targets.** Only safe absolute `https://`, `http://` and `mailto:` schemes are accepted as click-through navigation or action, never as server fetch. Userinfo credentials, protocol-relative `//`, `javascript:`, `data:`, `file:`, `blob:`, `vbscript:` and unsafe or malformed control/percent encodings are refused. `mailto:` permits one validated addr-spec recipient and an optional governed `subject` parameter only, with no CR/LF injection, no secrets and no auto-send; no send result is claimed. `tel:` and custom schemes are not approved in this profile. An external `target=_blank`, if used, requires `rel="noopener noreferrer"`, and nothing implies an external destination is trusted.
+8. **Diagnostics.** A Markdown diagnostic carries the safe EFS lineage, the source locator and the line and column of the actually selected content, and never a raw server-private root, a secret or untrusted HTML in an error page.
+
+### 6.2E Advanced JSON body grammar, module envelopes and the first installed module catalogue (`O05`)
+
+#### 6.2E.1 Body, node and presentation grammar
+
+**Body root** — exactly: mandatory `contentVersion: "1.0.0"`; mandatory non-empty plain-string `title` (1–140 Unicode scalar values); optional plain-string `summary` (≤500 scalar values); mandatory `blocks` array of **1–250** nodes. The single visible H1 comes from `title`: when the first block is `content.hero` the renderer places that root H1 inside the hero, otherwise it places it once before the first block. A hero never declares a second H1, and `summary` is body copy that never changes manifest-owned metadata, routing, publication, locale or visibility. All authored text is inert escaped data — no interpolation, HTML execution, JS/CSS injection, remote include or template evaluation. The node count includes nodes nested in tabs, accordion and modal items.
+
+**Node** — a closed object with mandatory `module` (registered dotted lowercase ID), mandatory `contractVersion` (exact version string), mandatory `props` (closed typed object), optional `children` (only where the registry type expressly permits child nodes), optional `presentation`, and optional `span` (only as a child of `layout.grid` or `layout.bento`). `children` is an ordered array of registered nodes and is forbidden for leaf modules. Maximum node depth **12**, ≤**250** nodes in total, maximum child-array length **24**, and no node may refer to itself cyclically. A missing module is never inferred from a filename or component name. Unknown node fields, unknown props, an unknown module version, forbidden children or a version mismatch refuse publication of the **whole** proposed graph.
+
+**`presentation`** — a closed optional object: `foreground` optional `#RRGGBB` or `#RRGGBBAA`; `background` optional typed fill; `padding` optional `none|xs|sm|md|lg|xl`; `radius` optional `none|sm|md|lg`; `textAlign` optional `start|center|end`. No arbitrary CSS property, selector, `url(...)`, class name, expression or inherited unvalidated script. A fill is exactly one of `{ "kind": "solid", "color": "#RRGGBB" }`; `{ "kind": "linearGradient", "angle": 0..360, "stops": [ { "color": "#RRGGBB", "position": 0..100 }, … ] }` with 2–5 strictly increasing ordered stops starting at `0` and ending at `100`; or `{ "kind": "image", "asset": <typed asset>, "overlay": "#RRGGBBAA" }` with optional overlay. The renderer must enforce meaningful contrast and overlay/focus visibility and **may refuse** an unsafe combination rather than silently change colours. Token distances in CSS pixels are `none`=0, `xs`=4, `sm`=8, `md`=16, `lg`=24, `xl`=40; radius values are `none`=0, `sm`=4, `md`=10, `lg`=20. These remain semantic inputs, never author-supplied CSS.
+
+**`span`** — a closed `{ "columns": { "base": 1..4, "md": 1..4, "lg": 1..4 }, "rows": 1..3 }`; at each breakpoint the requested column span must not exceed its containing grid or bento column count and may not introduce unbounded overlap. Absent `span` defaults to one column and one row per breakpoint. A responsive-columns object is a closed `{ "base": 1..4, "md": 1..4, "lg": 1..4 }` with `base ≤ md ≤ lg`; breakpoints are `md` ≥768 CSS px and `lg` ≥1200 CSS px, below `md` uses `base`, and no author-supplied CSS media query exists.
+
+**`props`** are independently schema-closed and bounded. **R** marks a required field and every unmentioned field is rejected. "Text" means an inert string of 1–500 scalar values unless a narrower bound is stated, non-empty when required; `asset` always means a typed §6.2I reference and `link` a classified §6.2J.9 link. Arrays preserve authored order and never trigger automatic source lookup.
+
+#### 6.2E.2 Initially registered Solo modules (`1.0.0`, exact names)
+
+Each row's closed `props`, defaults, child policy and effects are binding; the first installed registry contains **only** these twenty-one IDs.
+
+| Module ID | Closed typed `props` (R = required) | Child policy and effects |
+| --- | --- | --- |
+| `layout.stack` | `direction` optional `vertical\|horizontal` (default `vertical`); `gap` optional spacing token (default `md`); `align` optional `start\|center\|end\|stretch` | **R** `children` 1–24 registered nodes; a horizontal stack must wrap safely on small viewports. |
+| `layout.grid` | `columns` **R** responsive-columns object; `gap` optional spacing token (default `md`) | **R** `children` 1–24 with an optional `span` per direct child bounded to the active column count; an overflowing span refuses rather than overflowing focus or reading order. |
+| `layout.bento` | `columns` **R** responsive-columns object; `gap` optional spacing token (default `md`) | **R** `children` 1–16 with optional `span` per child; auto-flow follows document order and visual placement never reorders semantics or keyboard order. |
+| `layout.layers` | `minHeight` optional `sm\|md\|lg` (default `md`); `align` optional `start\|center\|end` | **R** `children` 1–12; layers follow authored order and an overlay may not obscure mandatory controls or content. |
+| `content.heading` | `text` **R**; `level` **R** integer 2–6 | Leaf; no second H1 and no heading-level jump greater than one in actual document order. |
+| `content.prose` | `markdown` **R** UTF-8 text of 1–20,000 scalars, parsed as §6.2D safe Markdown **without headings or active HTML** | Leaf; no front matter, no route or visibility metadata and no module directives. |
+| `content.actions` | `items` **R** array 1–8 of `{ "label": text, "link": <§6.2J.9 link> }`; optional per-item `variant` `primary\|secondary\|text` | Leaf; links are navigational or actions, never POST/transaction/remote-fetch commands. |
+| `content.hero` | `eyebrow` optional text; `tagline` optional text (≤500); `action` optional closed `{ "label": text, "link": <link> }` | Leaf; the root Page `title` supplies the visible H1. `presentation.background` accepts hero fills including validated media assets. |
+| `media.image` | `asset` **R** §6.2I image reference; `alt` **R** 0–300 (empty only for a purely decorative image); `fit` optional `contain\|cover` (default `cover`); `caption` optional text | Leaf; responsive delivery derives from the validated source with no layout shift lacking dimensions. |
+| `media.video` | `asset` **R** video reference; `poster` **R** image reference; `captions` **R** WebVTT reference; `captionsLocale` **R** full BCP47 region-qualified locale; `caption` optional visible text; `controls` **R** literal `true`; `autoplay` optional literal `false` only; `loop` optional boolean (default `false`) | Leaf; playback is an explicit visitor action with validated captions, keyboard controls and accessible fallback, and no external embed or remote URL. |
+| `media.gallery` | `items` **R** array 1–24 of `{ "asset": <image>, "alt": 0–300, "caption": optional text }`; `columns` optional 1–4 (default 3) | Leaf; responsive presentation that never navigates automatically into unlisted content. |
+
+| `media.carousel` | `slides` **R** array 2–12 of `{ "asset": <image>, "alt": 0–300, "caption": optional text }`; `controls` literal `true` (default); `autoplay` optional boolean (default `false`); `intervalMs` only when `autoplay` is true, integer 6000–20000 | Leaf; always-visible pause/previous/next controls, pause on focus or hover, reduced motion disables autoplay and transitions, and no script from Page data. |
+| `design.watermark` | exactly one of `text` (1–80) or `asset` (image), `opacity` **R** number 0.05–0.4, `position` optional `center\|topLeft\|topRight\|bottomLeft\|bottomRight` | Leaf decorative layer ignored by screen-reader content; never the sole source of essential text and never a contrast break. |
+| `design.motion` | `effect` **R** `fade\|slide\|reveal\|marquee\|parallax`; `durationMs` optional integer 100–3000; `direction` optional `up\|down\|left\|right` (only for `slide`/`marquee`) | **R** `children` 1–8; all content present without animation, reduced motion disables visual motion, and a marquee pauses on focus and is never essential. |
+| `interaction.tabs` | `tabs` **R** array 2–8 of `{ "id": <technical ID>, "label": text, "content": [1..12 nodes] }`; `initialTab` **R** one exact member ID | No top-level `children`; nested nodes live only in each tab's `content`. Real keyboard tablist with roving focus and visible labels/panels; each tab ID unique within the node. |
+| `interaction.accordion` | `items` **R** array 1–12 of `{ "id": <technical ID>, "title": text, "content": [1..12 nodes] }`; `singleOpen` optional boolean (default `true`); `initialOpen` optional one valid ID | No top-level `children`; correct disclosure/ARIA and keyboard behaviour; hidden panels never hide public Pages from discovery. |
+| `interaction.modal` | `triggerLabel` **R** text; `content` **R** array 1–12 nodes; `closeLabel` optional text (default `Close`) | No top-level `children`; the dialog traps focus while open, closes by Escape and a visible close control, restores focus, and never overlays an authentication gate. |
+| `content.stats` | `items` **R** array 1–12 of `{ "label": text, "value": text }` | Leaf; static authored facts only — no unapproved analytics, timer or network call. |
+| `content.testimonials` | `items` **R** array 1–12 of `{ "quote": text ≤1000, "attribution": text ≤160 }` | Leaf; attributed authored content only — no inferred reviews and no fetched third-party claims. |
+| `content.pricing` | `plans` **R** array 1–6 of `{ "name": text, "priceText": text, "features": [1..15 text], "action": optional { "label": text, "link": <link> } }` | Leaf; presentation only — never checkout, billing or payments. |
+| `content.timeline` | `items` **R** array 1–24 of `{ "label": text, "description": text ≤1000, "when": optional text }` | Leaf; chronological display exactly as authored, never a location or timezone engine. |
+
+A future module expands the library **only by a new registered contract** — richer comparisons, advanced layered heroes, filters, video variants, responsive art direction and new interaction patterns included — without imposing a ceiling on JSON's design vocabulary, but the first `1.0.0` installed registry holds **only** the twenty-one IDs above. Listing a future capability is not installing it. Module inputs can never express an arbitrary plugin, dynamic HTML/JS/CSS, server-side fetch, custom event handler, query execution, form builder, CRM, commerce or unapproved provider integration.
+
+#### 6.2E.3 Accessibility and performance refusal boundaries
+
+Exactly one visible H1, meaningful heading order, keyboard operability, visible focus, declared alternative text and captions, reduced-motion respect, explicit user control over animated modules, accessible tab/accordion/modal semantics, no essential content reachable only by hover, no auto-playing audio or video and no off-screen focus traps. Contrast must meet the project-approved accessibility target when `R00.G` specifies one; until then the renderer must refuse a **known unsafe** presentation rather than claim that a numeric WCAG threshold has been adopted. The eventual module implementation requires proportional per-module browser, keyboard and assistive-technology tests plus layout-shift and resource tests — this Charter produces specifications, never claims of passing them.
+
+### 6.2F Module trust, installation, contract pinning and upgrade behaviour (`O06`)
+
+1. **Eligible modules only.** Only **product-distributed, explicitly registered Solo modules** are eligible. The registry is a read-only product component whose built-in IDs and versions are declared in the published product contract and which **never** publishes Pages. No remote npm-style URL, package path, runtime `eval`/`import`, authored source code, network-fetched module or user-authored JS module declaration is accepted; custom modules require a separate Owner-reviewed code-bearing extension policy, never an implicit `custom` field.
+2. **Identity and versions.** Module IDs are lowercase dotted technical names matching `^[a-z][a-z0-9]*(?:-[a-z0-9]+)*(?:\.[a-z][a-z0-9]*(?:-[a-z0-9]+)*)+$`, maximum 80 ASCII characters. Contract versions are exact three-component strings per §6.2A.6, and every module node must name an **installed compatible exact version**; wildcards, `latest`, semver ranges, silent major upgrades and nearest-version guessing are refused. A product may support several exact module contract versions concurrently with version-specific validators and adapters, and a required version that is unavailable fails publication.
+3. **Registry entry content.** Each entry binds an ID plus exact contract version to its **closed props schema**, default values, child and nesting rules, `presentation` and media capabilities, required application ports, public projection and accessibility/security contract. Only defaults expressly listed in §6.2E.2 exist; otherwise a missing required prop refuses. A registry entry can never alter EFS identity, routes, property inheritance, source choice or visibility.
+4. **Product updates.** An update may add optional modules or a new compatible contract without changing the published behaviour of an installation that does not select them, and a compatible minor or patch release is not authorized to reinterpret existing serialized inputs, default values or security posture. An incompatible input or behaviour change requires a **new major** contract, the preserved old decoder where supported, and an explicit Owner-reviewed migration that revalidates the manifest and every affected content file before activation. A removed required contract causes refusal, never substitution.
+5. **Dependency rule.** The domain core and application use cases define EFS and validation policy, public projection and named ports; read-only source adapters, asset adapters, module renderer adapters and request adapters implement those ports and are composed at a single root. Modules receive only validated, public-projected props and can never reach filesystem, network or secret stores by escaping the module port. A module needing a newly privileged external integration cannot ship by adding a JSON ID; it needs its own approved product, port and security contract.
+6. **Release honesty.** §6.2E.2 is the exact first built-in `1.0.0` catalogue and §6.2K is manifest/content/registry compatibility. A product release may implement that catalogue incrementally in later authorized packages, but it **cannot claim a complete R00.D-conformant public JSON authoring implementation while any mandatory declared module lacks its contract or fails the accepted tests**. A deliberately smaller release needs a newly Owner-accepted supported-capabilities profile, never silent omission.
+
+### 6.2G Governed property catalogue, envelopes, exposure and provenance (`O07`)
+
+1. **Registry pin.** Manifest root requires `propertyRegistryVersion: "1.0.0"`, versioned independently of `schemaVersion`, and the installed product must register that exact contract. Every Entity, Facet, Site, Page and representation may carry an optional direct `properties` object; property names are exact registered keys and an unknown key rejects the whole publication.
+2. **Declaration envelope.** Each property declaration is a **closed** `{ "inheritance": "inherit"|"suppress", "currentContext": "none" | [ <typed values/operations> ] }`; both fields are required whenever the property is declared. An array must have length ≥1, and the literal string `"none"` expresses no local contribution —an empty array and `null` are invalid. Absence of the whole property key implicitly inherits. `inherit` takes prior effective values in stable inherited-first then local order; `suppress` drops inherited values but **may** add local values. Domain validation applies the registry's effective maximum and uniqueness rules after resolution, and there is no nearest-value-wins, silent de-duplication, merge or post-filter fallback.
+3. **Exposure.** Exactly two exposure values exist: `public` and `internal`. Every **new independently authored** property value or fact carries an explicit `exposure`. A registry entry declares its maximum allowed exposure (`public` or `internal`) and its permitted EFS levels, and data can never elevate from `internal` to `public` through inheritance, extension, module, renderer, alias or omission. `internal` describes **runtime output projection**, not secrecy of public source files, and no per-field public-visibility exception exists for location in this profile.
+4. **Initial catalogue** — exact keys, entry value shapes, effective cardinalities and allowed levels:
+
+| Key | New local entry value | Effective cardinality | Allowed levels / notes |
+| --- | --- | --- | --- |
+| `location` | §6.2H typed `add` or `extend` operation envelope | 0–16 distinct effective facts | All five; an `extend` updates an identified inherited fact in place and never becomes a seventeenth fact |
+| `graphic.logo` | `{ "source": <§6.2I image asset>, "exposure": "public"|"internal" }` | 0–1 | All five; inherited plus local without `suppress` refuses |
+| `graphic.favicon` | Same envelope, favicon-permitted format | 0–1 | All five; never an unverified remote image |
+| `graphic.banner` | Same envelope | 0–1 | All five |
+| `graphic.background` | Same envelope | 0–4 | All five; inherited-first layered order |
+| `graphic.social-preview` | Same envelope | 0–1 | All five; safe public metadata projection only |
+| `seo.title` | `{ "text": <plain text 1–140>, "exposure": "public"|"internal" }` | 0–1 | Site, Page, representation only |
+| `seo.description` | `{ "text": <plain text 1–300>, "exposure": "public"|"internal" }` | 0–1 | Site, Page, representation only |
+| `contact.email` | `{ "address": <valid mailbox>, "exposure": "public"|"internal" }` | 0–1 | All five; implies no contact submission endpoint |
+
+Every other property name is unregistered in the first release. The catalogue expands only by explicit versioned registry approval, never by adding an implicit manifest publisher. A registered exposure maximum controls which projection may contain a value; for the types above both `public` and `internal` are permitted, and `internal` values stay out of all publicly rendered HTML, JSON, metadata, feeds, scripts and module props. `location` follows whole-record exposure (§6.2H.6), and a private graphic selection can never be resurrected by a public fallback.
+
+5. **Equality and uniqueness.** Each effective location `factId` is unique per original qualified owner and ancestry, and repeated identical facts or duplicate extensions violating §6.2H reject. For graphic, SEO and contact values, local and inherited records are counted **before** public projection, the maximum is enforced on the full effective collection, and duplicates refuse where the registry marks uniqueness — removing private values from public output must never mask a cardinality error. `graphic.background` permits up to four ordered layers, but a duplicate exact source reference inside one effective background collection refuses as authoring ambiguity.
+
+6. **Derived provenance (internal only).** A resolved property result is a closed derived record `{ "property": <registered key>, "values": [ <ProvenanceValue>… ], "resolutionEvents": [ <ResolutionEvent>… ] }`. `ProvenanceValue` has exactly `data` (the fully resolved typed value), `exposure` (`public|internal`), `originOwner` (the original complete qualified EFS owner), `originLocalIndex` (the zero-based original local-array index) and, **for `location` only**, optional `fieldOrigins` mapping each currently set location field name to `{ "owner": <QualifiedOwner>, "localIndex": non-negative integer }`. `ResolutionEvent` has exactly `owner` (<QualifiedOwner>), `operation` (`inherited|added|suppressed|extended`), `localIndex` (non-negative integer, or `null` for implicit inheritance) and optional `targetFactId` for `extended`; events are ordered by direct ancestry then local declaration order. An empty effective result may retain suppression events with no values. This record is a read-only diagnostic model: it is never a manifest-authored field and never exposed directly in a public response. The only renderer input is an explicit validated safe public projection that preserves authorized order and never substitutes arbitrary ancestor values after filtering. A registry maximum of `public` allows an explicitly authored `public` or `internal`; a maximum of `internal` permits only `internal`. All first built-ins permit both classifications, but `internal` values never enter public output.
+7. **Closed entries.** All property entry objects are closed and type-checked. `seo.*` values never override the Page's identity, route, locale or visibility; they are ordinary authorized property values. A JSON or Markdown body may not declare authoritative SEO metadata to override the registry or the manifest. Direct media inside module props need not be a graphic role (§6.2I.5).
+
+### 6.2H Location fact fields, stable identity, `add`/`extend` and safe geometry (`O08`)
+
+1. **Never a place tier.** `location` is a §6.2G property and **never** an EFS node, mandatory place tier, route, locale-selection signal or geocoding input. A property `currentContext` array may contain `add` or `extend` operations. The Entity root cannot `extend` because it has no inherited value. No location fact is ever generated from a hostname, ID, route, locale or coordinates, and several facts never yield a guessed primary.
+2. **`add` envelope** — exactly `{ "operation": "add", "factId": "<technical-id>", "kind": "association"|"premises", "fields": <LocationFields>, "exposure": "public"|"internal" }`. `factId` uses the accepted technical-ID grammar (1–63 characters) and is stable within its original owner. The **full original owner** — the node's complete EFS lineage, derived from containment and the representation locale where applicable — is never authored a second time. Identity is the pair `(origin qualified EFS lineage, factId)` and no different record may reuse that exact pair. `kind` distinguishes a conceptual association from premises and never implies a complete street address.
+3. **`LocationFields`** is a **closed typed non-empty** object whose allowed optional members are `worldRegion` (plain text ≤80), `countryCode` (ISO 3166-1 alpha-2, uppercase ASCII, never inferred), `administrativeArea` (≤120), `locality` (≤120), `district` (≤120), `namedPlace` (≤160), `addressLine1` and `addressLine2` (≤200 each), `postalCode` (≤32) and `coordinates` (closed `{ "latitude": number in [-90,90], "longitude": number in [-180,180] }` with finite decimal WGS84 values, no elevation or accuracy inferred). For `association` every field is allowed with no postal or coordinate requirement; for `premises` a partial address is allowed and no country, postal code or coordinate is compulsory. An empty fields object refuses, and omitted geographic levels are never auto-filled.
+4. **`extend` envelope** — exactly `{ "operation": "extend", "target": { "owner": <QualifiedOwner>, "factId": "<id>" }, "set": <NonemptyPartialLocationFields> }`. `QualifiedOwner` is a closed object with required `entity` technical ID and optional subsequent **contiguous** lineage `facet`, `site`, `page`, `locale` — `site` requires `facet`, `page` requires `facet` and `site`, and `locale` requires every ancestor plus a full region-qualified tag. The target must be an accessible **direct ancestor**, never the current node or a sibling, and must identify exactly one presently inherited unsuppressed location fact. `set` carries only allowed typed `LocationFields` members and may modify or append those member values; it may never remove fields, change `factId`, `kind`, origin owner or `exposure`, or append a duplicate fact.
+
+5. **Application order.** A node's local `currentContext` operations apply in authored array order **only after** the inherited effective location result is established. At most one `extend` per target fact is allowed **at one node**, and two conflicting same-node extensions refuse rather than last-wins. A node may add independent facts and extend inherited ones, but cannot extend a fact it has just added at the same node — use a single `add` with the complete intended fields instead. A target suppressed by a local `inheritance: suppress` cannot be extended. Across descendants an already-extended inherited fact keeps its original identity, and its effective fields and field provenance follow the path without duplication. A missing, cross-branch, circular or suppressed target fails. Output order stays inherited-first with in-place updated records, followed by new `add` facts.
+6. **Exposure is whole-record.** An `extend` can never supply a new `exposure`; an inherited `internal` fact stays `internal` even when the changed fields look harmless. Public projection omits whole internal facts and there is no field-level publication exception. Internal field provenance records `(qualified owner, operation)` at the latest explicit author while the origin owner stays original, and an `extend` never erases the origins of untouched fields. A consumer needing one specific fact must use an explicit fully qualified identified selector or fail as ambiguous: there is no declaration-order "primary" and no geographic-correctness claim.
+7. **Geometry.** Validation accepts only finite WGS84 latitude and longitude inside the ranges above; **no** reprojection, reverse geocoding, distance calculation, geofence, physical-presence verification or visitor-location lookup is implied, and unknown data is never synthesized. `null`, arbitrary custom geographic keys, nested unregistered metadata, unsupported units and fabricated defaults refuse. Future custom metadata requires a separately registered typed extension; no open map is approved.
+
+### 6.2I Graphic roles, asset source grammar, initial media formats and platform library (`O09`)
+
+1. **Roles and reference shape.** Every graphic role of §6.2G uses D08 additive inheritance and suppression, with the §6.2G cardinalities and **no** automatic platform fallback for any role. An authored `source` is a required closed typed asset reference `{ "namespace": "entity"|"platform", "reference": "<portable-relative-file-with-extension>" }` with no `url` or external-fetch field. Module media uses the **same** typed reference directly without coercion into a cascading graphic role. The generic library is one installed read-only namespace — never an EFS node, alternate Entity or publisher.
+2. **Library pin.** Manifest root requires `platformAssetLibraryVersion: "1.0.0"`, independent of manifest, registry and product versions. A platform asset resolves only inside the **exact pinned** `platform/assets/` catalogue of the running compatible product version, whose immutable catalogue must enumerate every available asset ID (the exact portable relative filename), hash, media class, dimensions and licensing/provenance; it cannot discover arbitrary files or substitute an "equivalent" generic asset. **No asset filename or artwork is mandated by this Charter:** the implementer must supply a lawful initial read-only library and publish its complete version-pinned catalogue under an Owner-reviewed asset delivery package before claiming the library is usable, and an Installation selecting an absent library version or asset is invalid rather than silently upgraded. That delivery is a later code-bearing package gate, not permission to invent artwork.
+3. **Formats.** Images admitted initially are `.png` (`image/png`), `.jpg`/`.jpeg` (`image/jpeg`), `.webp` (`image/webp`) and `.avif` (`image/avif`) — no active SVG, GIF, external URL, script, HTML, font or unapproved container. `graphic.favicon` permits PNG only; logo, banner, background, social-preview, gallery, watermark, poster and ordinary inline media permit the approved images. Video modules permit `.mp4` (`video/mp4`) with H.264/AVC video plus optional AAC-LC audio, or `.webm` (`video/webm`) with VP9 video plus optional Opus audio, each verified by bounded media inspection with no inferred alternative codec. Required timed captions are `.vtt` (`text/vtt`, UTF-8 without BOM, ≤500 KiB) in the same validated asset namespace with safe WebVTT cue/timestamp parsing and no active HTML/script, CSS, remote reference or unsupported cue command. No remote embedded video, executable media or unapproved third-party iframe exists.
+4. **Bounds.** Maximum source image 20 MiB with width and height 1–8192 pixels and ≤32,000,000 decoded pixels; maximum source video 200 MiB and ≤180 seconds, with metadata and decoding verified. A product may apply stricter operational limits **only** if expressly documented and compatible with this contract. Mismatched extension/MIME/magic, malformed media, decompression bombs, active payloads and unsafe dimensions are refused, and acceptance is by authoritative source bytes inspected through a bounded media adapter, never by extension alone. A corrupted **declared** asset rejects publication even when its declaring representation is unlisted, while an unreferenced asset never publishes by presence.
+
+5. **Derived outputs and exposure.** Derived responsive variants, resized images and output URLs are generated from validated source bytes and manifest authority; they are immutable and cache-safe, provenance-linked, never overwrite input and never become new authored source or a fallback for a missing original. No unlisted or internal media gains an automatic sitemap or navigation entry. Public use of a **cascading graphic property** requires its `exposure: "public"`, while a **direct module media reference** carries no property-value exposure and becomes public-eligible only through a validated, explicitly authored public Page or module input. A module never gains access to an internal or suppressed property value, or to an unreferenced file. The platform library is globally reusable without copying its bytes into Entity-owned source directories, and the namespace distinction is never inferred from filenames or public addresses.
+6. **Refusals.** A failed singular graphic cardinality, an invalid `exposure`, a wrong asset class, a missing or unsafe source, an unsupported format, an unknown role, a duplicate background source or a forbidden namespace **blocks the entire candidate publication**. `suppress` plus one local value legitimately replaces a singular inherited selection, explicitly authored platform asset usage is not automatic fallback, and direct module images carry their own alt/decorative policy under §6.2E.
+
+### 6.2J Base addresses, routes, locale selection, Unicode, link targets and discovery (`O10`)
+
+1. **Base.** `base.canonical` is one absolute `http:` or `https:` URL with a DNS hostname or IP and an optional safe prefix, no credentials, query, fragment, control character or encoded separator; a trailing slash normalizes to a canonical no-trailing-slash base except at the origin root. HTTPS production is strongly recommended, but **HTTP remains a valid declared R00.B address** subject to separately approved deployment security. Host syntax and port are validated, the canonical host is lowercase IDNA-conformant ASCII with default ports normalized, and no `Host` header, forwarding header, geo-IP or provider account ever creates authority. `base.aliases` is an array of 0–8 distinct fully declared bases with equivalent safe structure, none equal to the canonical base after normalization; aliases redirect only to the authoritative canonical origin and prefix and never select a second Entity or Page. Base prefixes have 0–5 strict ASCII-safe segments matching `[a-z][a-z0-9-]*`, never `.` or `..`, with no percent escapes, and canonical output includes the prefix **exactly once**.
+2. **Locales.** `Site.defaultLocale` and every representation `locale` are canonical BCP47 tags with a **mandatory region subtag** and optional script — `en-001`, `id-ID`, `de-DE`, `zh-Hans-CN` — and bare `en` or `de` are never publication keys. Canonical authored case is language lowercase, script title-case and region uppercase, while the public locale path uses the **lowercase full tag** including hyphen separators. Locale identity and path case are independent of Unicode Page-route case. On one Site, `languagePreferences` maps a request preference tag to an **already supported full locale**; map keys may be bare languages or canonical full tags, canonicalized without ambiguity, values must be supported full tags within that Site, nothing is inferred from physical location, and duplicate normalized keys with conflicting targets refuse.
+3. **Route paths.** A representation `route.path` is an authored base-relative path beginning with exactly `/<lowercase-full-locale-segment>/` followed by 1–8 Page-route segments, with no trailing slash other than a deliberately authored root-like special entry (which a representation may not use). The first segment after the leading `/` must be the normalization of that representation's declared `locale`. Page-route segments permit NFC Unicode letters, marks and decimal digits plus internal `-` and `_`, and may not be empty, `.`/`..`, leading or trailing hyphen, control or bidi control, slash or backslash, undecodable URI data or an encoded delimiter. Locale segments are never inferred from location. The Page-route token portion is ≤160 Unicode scalars with each segment ≤60, and unsafe HTML/JS URI parsing or ambiguous double decoding rejects before matching.
+
+4. **Unicode profile.** Authored route-text normalization and case comparison use **Unicode 18.0.0**, with NFC and full Unicode Default Case Folding (not ASCII-only lowercasing) for insensitive comparison, then NFC again. A public-insensitive canonical Page-route spelling is NFC followed by Unicode 18 lowercase mapping, while a sensitive claim preserves its authored NFC exact case. No locale-specific tailoring is enabled in this first global route-comparison profile — that is an explicit deterministic choice, not an unreviewed implicit default — and a future change to Unicode data or tailoring requires collision-regression tests over every authored route claim plus a versioned migration and revalidation. The toolchain binding that produces exactly these results is selected in `R00.E`, which may not silently pick a different Unicode version. Confusable lookalikes are diagnosed with explicit UTS #39-style checks without inventing alias equivalence, and dangerous control or bidi ambiguity rejects.
+5. **Case policy.** An authored `route.caseMatching` on a **public** representation is optional, defaults to `insensitive`, and may be explicitly `sensitive`; a sensitive path preserves case as canonical and a wrong-case request returns not-found, never a guessed redirect. An effectively **unlisted** representation ignores public match modes and **always** matches the authored NFC Unicode Page-route spelling exactly, so `caseMatching` must be omitted for it. Unlisted variants have no route aliases in this first profile. Locale-segment normalization stays independent and lowercase even on unlisted or sensitive Pages. Public aliases use the authored case policy and may never point at, collide caselessly with or reveal an unlisted representation.
+6. **Collision ledger.** Validation derives a **complete route ledger** over canonical localized claims, every alias, all Page `entryPaths`, the configured base entry and base aliases. Alias objects have only `path` and optional `caseMatching`, and an alias path must be a full matching locale path targeting its owning representation. `entryPaths` are base-relative locale-less public entry paths of 1–8 Page-route segments, never a segment reserved as a full representation locale, belonging to their containing qualified Page rather than a guessed ID. Every accepted R00.B collision rule is enforced — insensitive versus sensitive overlap, public versus unlisted caseless overlap, Unicode normalization equivalence, alias collisions, locale-less entry conflicts, base-prefix preservation and no first-match priority. Two distinct sensitive public paths differing only in case may coexist when neither overlaps an insensitive claim, and two distinct unlisted paths differing only in exact case may coexist when neither collides with a public claim. An invalid claim blocks **whole publication** before any HTTP serving.
+7. **Entry and landing.** An optional `base.landing` qualified Page reference selects only an authored Page with an eligible public localized representation; a fully unlisted Home may exist but must not be exposed, and an absent or unavailable public landing makes the base entry return not-found. Base landing and Page `entryPaths` are locale-less **temporary preference-dependent redirect entry points**, never alternate canonical Pages. Selection order is: explicit full-locale URL wins; else a supported saved full-locale preference; else a supported exact or mapped `Accept-Language` match; else the authored Site default. A missing translation applies the same Page's validated `missingTranslation` policy only and redirects to an actual public authored canonical route, while a strict policy or no valid target yields not-found. There is no cross-Site, cross-Facet or cross-Page substitution, and the current request Host or remote source can never select a different Entity, locale or Page by inference.
+
+8. **Statuses.** A safe canonical correction and base-alias normalization use a permanent canonical redirect (normally `308`) only when semantically stable; preference-dependent locale-less entry and permitted missing-translation fallback use temporary redirects (normally `302`) with `Vary` or equivalent no-shared-cache protection for the inputs actually consulted. A malformed or unsafe URI returns `400`; an unknown route, locale or representation returns `404`; a wrong method returns `405` where applicable; an untrusted or invalid host is refused with an appropriate `421`/`400` and never derives canonical authority; an unexpected server failure returns `5xx` with no silent sibling fallback. This states the HTTP contract, not a requirement to choose a framework before `R00.E`.
+9. **Typed links.** JSON links use one **closed** object of these variants: `{ "kind": "page", "target": <QualifiedRepresentation> }`; `{ "kind": "external", "url": "https://…" | "http://…" }`; `{ "kind": "email", "address": "<addr-spec>", "subject": optional plain text ≤160 }`; `{ "kind": "fragment", "id": "<existing same-Page anchor>" }`. Each link is validated before output; a `page` link requires the full four-level qualified Page lineage plus an explicit full target `locale` and an actually published representation. An explicit Page link may point at an intentionally known unlisted representation but is never auto-discovered, and automatic navigation, locale switch, sitemap, `hreflang` and `x-default` **never** include unlisted content. An `external` link can never trigger a server-side fetch, forward a redirect from arbitrary request input or acquire publication-metadata authority. Markdown link forms map onto these classified destinations through §6.2D without any new Markdown syntax.
+10. **Derived metadata.** Public metadata (`canonical`, alternates, `hreflang`, `x-default`, sitemap, robots, Open Graph and assets) derives **only** from the validated effective public representation and approved public projection — never from body front matter, a guessed counterpart, unlisted content or arbitrary source paths. Unlisted direct responses always carry `noindex, nofollow`, are excluded from every generated discovery surface and are **not** access control. The public `lang` is the actual full authored locale, the canonical base prefix is applied exactly once to every generated URL, and source paths or asset ownership never determine EFS identity or public address.
+
+### 6.2K Validation ordering, compatibility, diagnostics, snapshots and migration (`O11`)
+
+1. **Compatibility tuple.** Version compatibility is an explicit tuple of `manifest.schemaVersion`, `manifest.propertyRegistryVersion`, `manifest.platformAssetLibraryVersion`, each selected JSON `contentVersion`, each node's `contractVersion` and the product release's advertised supported-contract matrix; the first profile expects the exact `1.0.0` of each independent contract. No automatically widened semver range, `latest` or implicit default version exists. A product may support additional **enumerated exact versions** only when their compatibility and migration behaviour is explicitly documented and tested; any unknown value is a refusal.
+2. **Validation stages**, all fail-closed and never reordered to skip a later check: strict JSON parsing, schema version and exact keys; EFS identity and nested cardinality; candidate declaration and canonical ownership; one JSON-first selected safe body; Markdown or JSON content profile and module registry; effective properties including location and graphics with per-value provenance; asset safety and exposure; complete routing, locale, visibility and link-ledger collisions; public projection; final immutable candidate snapshot and atomic activation. No stage may permit partially published output.
+
+3. **Candidate snapshot and activation.** A proposed publication is one immutable **candidate snapshot** of validated manifest bytes, source and asset content identities and the complete derived model. If any referenced resource changes while validation runs, that candidate is invalidated and revalidated. Only a fully validated candidate may activate, in one atomic step; a failed candidate cannot remove unaffected published Pages from the currently active validated snapshot, and a previously deployed snapshot may keep serving unchanged without that being called acceptance of the invalid candidate. Cache metadata and URLs correspond to the exact activated snapshot and configured base.
+4. **Diagnostics.** Every validator error has the closed envelope `{ "code": <registered code>, "severity": "error", "node": <qualified EFS reference or null>, "fieldPath": "<JSON Pointer or declared source offset>", "message": "<safe short explanation>" }` in internal author tooling; a public response uses a generic error status and leaks no hidden path, secret, private content or serialized internal property fact. Code families are `MANIFEST_*`, `EFS_*`, `SOURCE_*`, `CONTENT_*`, `MODULE_*`, `PROPERTY_*`, `LOCATION_*`, `ASSET_*`, `ROUTE_*`, `LOCALE_*`, `LINK_*`, `EXPOSURE_*`, `COMPAT_*` and `SNAPSHOT_*`. The exact mandatory codes are `MANIFEST_VERSION`, `MANIFEST_UNKNOWN_FIELD`, `MANIFEST_DUPLICATE_KEY`, `EFS_DUPLICATE_ID`, `SOURCE_NONE_EFFECTIVE`, `SOURCE_INVALID_PREFERRED_JSON`, `SOURCE_COLLISION`, `SOURCE_UNSAFE_PATH`, `MODULE_UNAVAILABLE`, `MODULE_INVALID_PROPS`, `PROPERTY_CARDINALITY`, `LOCATION_INVALID_EXTEND`, `ASSET_INVALID`, `ROUTE_COLLISION`, `ROUTE_INVALID_ENCODING`, `LOCALE_INVALID`, `LINK_UNSAFE`, `EXPOSURE_LEAK`, `COMPAT_UNSUPPORTED` and `SNAPSHOT_CHANGED`. Every refusal maps to one stable code; a refusal not more narrowly classified by a named mandatory code uses exactly that family's `<FAMILY>_INVALID` code (`MANIFEST_INVALID`, `EFS_INVALID`, `SOURCE_INVALID`, `CONTENT_INVALID`, `MODULE_INVALID`, `PROPERTY_INVALID`, `LOCATION_INVALID`, `ASSET_INVALID`, `ROUTE_INVALID`, `LOCALE_INVALID`, `LINK_INVALID`, `EXPOSURE_INVALID`, `COMPAT_INVALID`, `SNAPSHOT_INVALID`), with family selection determined by the first invalid governing contract — never by first-match routing or publication fallback. New narrower codes require an explicitly versioned registry extension and no unregistered `GENERIC_ERROR` exists. Aggregation may report several independent errors, but it can never select a convenient first source or route as recovery.
+5. **Compatible extension and migration.** A compatible extension adds a **new versioned optional** module or property contract without reinterpreting previously valid values, and no existing manifest silently changes meaning. If a manifest, property registry, module contract or library version becomes unsupported, validation refuses before public activation rather than upgrading implicitly. A breaking change requires a new major version and an Owner-reviewed deterministic migration: read the previous immutable manifest and source snapshot, write a separate non-authoritative migration candidate, report the exact identity, path, route, source and property changes, obtain deliberate acceptance, run complete validation and only then activate. The original is preserved until an explicitly accepted replacement exists, with no silent EFS ID reminting, Page reparenting, route renaming, asset substitution or selected-source fallback.
+6. **Ports and adapters.** Strict Hexagonal Architecture holds: domain and application contracts import no framework, persistence, HTTP, filesystem or provider module; parsing, source, asset, module, render and HTTP delivery are replaceable adapters wired by a composition root; import constraints and tests include aliases, re-exports and dynamic module loading. Every module or external integration is deny-by-default until approved by the Owner's scope and validated ports. Later application tests must prove full candidate verification and rollback against fake and real adapters, and documentation-only runs report `NOT APPLICABLE` for them.
+
+### 6.2L Traceability and what "R00.D specification complete" means (`O12`)
+
+1. **Decided and binding:** `O01`–`O11` as the exact first profile; `D01`–`D12` as previously accepted; §6.2B's literal keys; §6.2E.2's twenty-one module contracts; §6.2G's property catalogue; §6.2H's identified location operations; §6.2I's asset namespaces and media profile; §6.2J's Unicode and route policy; and §6.2K's version and snapshot semantics. `O12` is the check that every such choice has a reviewed canonical paragraph here and no contradictory OPEN claim survives. Future code must implement this profile rather than interpolate a preferred framework convention.
+2. **Not settled by R00.D — implementation or later product decisions:** language, framework, build, test and CI toolchain; provider account, DNS, TLS and deployment; concrete library artwork, provenance and codecs supplied as released assets; browser implementation detail and actual code artifacts; full lifecycle and upgrade-support commitments; and numerical WCAG or performance release targets. These belong to `R00.E`, `R00.F`, `R00.G` and subsequent implementation packages and may not change the exact physical publication schema, URL, case or locale outcomes, permissions or module contract without new Owner approval. They must never be confused with a missing R00.D literal — the latter blocks acceptance.
+3. **One-to-one index.** Every `D01`–`D12` and `O01`–`O12` has a canonical requirement entry with accepted behaviour, invalid or negative case, exact field or schema anchor and the future test or evidence gate, as tabulated in §6.3 (conceptual cases `V01`–`V28` plus `P01`–`P14` in §6.2N) and §6.5 (D/O matrix). All twenty-one initial modules appear with ID, fields, types, defaults, child and interaction rules and reference behaviour in the same authority. None of these rows is a claim that a test has run.
+4. **No implementer guesswork.** Any unmentioned or unknown data field fails, any absent required field fails, and optional defaults exist **only** where §6.2E.2 enumerates them. Unknown module, role or version fails. No module may infer Page publication, routes, exposure, fallback, geometry, locale, current host or filesystem source. No generic `metadata`, `custom`, `rawHtml`, `script`, `sourceUrl` or `pluginConfig` escape hatch is approved.
+5. **Approval meaning.** Documentary acceptance of this profile means the R00.D physical specification is **ready for administrative closure review**; it does not mean application code exists or a product release is accepted. A separate Owner-directed closure order clears ACTIVE and advances NEXT to the earliest dependency-ready `R00.E` candidate after the Chief Architect's independent `ACCEPT`, and ROADMAP is never consumed inside this specification work.
+
+### 6.2M Normative syntax examples (`O05`, `O09`, `O10`)
+
+**These are normative syntax examples, not installed files.** They fix key names, types and the structural relationship between contracts; every referenced body and asset must exist, pass strict validation and sit in its correct namespace before anything publishes. No file here is claimed to exist in this repository.
+
+#### 6.2M.1 Minimal starter installation — one Facet, one Site, one Page, dual candidates
+
+`content/publication.json`:
+
+```json
+{
+  "schemaVersion": "1.0.0",
+  "propertyRegistryVersion": "1.0.0",
+  "platformAssetLibraryVersion": "1.0.0",
+  "base": {
+    "canonical": "https://example.org/site",
+    "aliases": [],
+    "landing": { "entity": "example", "facet": "main", "site": "main", "page": "home" }
+  },
+  "entity": {
+    "id": "example",
+    "label": "Example Entity",
+    "facets": [{
+      "id": "main",
+      "label": "Main",
+      "sites": [{
+        "id": "main",
+        "label": "Main Site",
+        "defaultLocale": "en-001",
+        "languagePreferences": { "en": "en-001" },
+        "pages": [{
+          "id": "home",
+          "label": "Home",
+          "representations": [{
+            "locale": "en-001",
+            "route": { "path": "/en-001/home" },
+            "sourceCandidates": {
+              "json": "pages/main-home.en-001.json",
+              "markdown": "pages/main-home.en-001.md"
+            }
+          }]
+        }]
+      }]
+    }]
+  }
+}
+```
+
+Valid initial state: the declared JSON file is genuinely **absent**, and `content/pages/main-home.en-001.md` contains:
+
+```markdown
+# Welcome to Example
+
+This is a real authored Home Page with **safe Markdown**.
+
+[Contact the team](mailto:hello@example.org)
+
+![Project image](images/project.webp)
+```
+
+Publishing additionally requires a valid `content/assets/images/project.webp` while that image reference is present. Adding a valid JSON body at the **already-declared** `content/pages/main-home.en-001.json` changes the effective source to JSON only, leaving Page identity, public address, locale and visibility unchanged. If that newly present JSON is malformed, publication **refuses** and the Markdown file is never used to conceal the error.
+
+#### 6.2M.2 Expanded installation — two Facets, three Sites, four Pages, locations, graphic suppression, aliases, locales and unlisted variant
+
+```json
+{
+  "schemaVersion": "1.0.0",
+  "propertyRegistryVersion": "1.0.0",
+  "platformAssetLibraryVersion": "1.0.0",
+  "base": {
+    "canonical": "https://example.org/foundation",
+    "aliases": ["https://old.example.org/foundation"],
+    "landing": { "entity": "example", "facet": "visitors", "site": "bali", "page": "home" }
+  },
+  "entity": {
+    "id": "example",
+    "label": "Example Entity",
+    "properties": {
+      "location": {
+        "inheritance": "inherit",
+        "currentContext": [{
+          "operation": "add", "factId": "indonesia", "kind": "association",
+          "fields": { "countryCode": "ID" }, "exposure": "public"
+        }]
+      },
+      "graphic.logo": {
+        "inheritance": "inherit",
+        "currentContext": [{
+          "source": { "namespace": "entity", "reference": "branding/default-logo.png" },
+          "exposure": "public"
+        }]
+      }
+    },
+    "facets": [
+      {
+        "id": "visitors", "label": "Visitors",
+        "properties": {
+          "location": {
+            "inheritance": "inherit",
+            "currentContext": [{
+              "operation": "extend",
+              "target": { "owner": { "entity": "example" }, "factId": "indonesia" },
+              "set": { "namedPlace": "Bali" }
+            }]
+          },
+          "graphic.logo": {
+            "inheritance": "suppress",
+            "currentContext": [{
+              "source": { "namespace": "entity", "reference": "branding/visitor-logo.webp" },
+              "exposure": "public"
+            }]
+          }
+        },
+        "sites": [
+          {
+            "id": "bali", "label": "Bali Site", "defaultLocale": "en-001",
+            "languagePreferences": { "en": "en-001", "id": "id-ID" },
+            "pages": [
+              {
+                "id": "home", "label": "Home", "visibilityDefault": "public",
+                "representations": [
+                  {
+                    "locale": "en-001", "route": { "path": "/en-001/home" },
+                    "sourceCandidates": { "json": "pages/bali-home.en-001.json", "markdown": "pages/bali-home.en-001.md" }
+                  },
+                  {
+                    "locale": "id-ID", "visibility": "unlisted",
+                    "route": { "path": "/id-id/Hidden7A" },
+                    "sourceCandidates": { "markdown": "pages/bali-home.id-id.md" }
+                  }
+                ]
+              },
+              {
+                "id": "about", "label": "About", "entryPaths": ["/about"],
+                "missingTranslation": { "mode": "default" },
+                "representations": [
+                  {
+                    "locale": "en-001", "route": { "path": "/en-001/about" },
+                    "sourceCandidates": { "markdown": "pages/bali-about.en-001.md" }
+                  },
+                  {
+                    "locale": "id-ID",
+                    "route": { "path": "/id-id/TentangKami", "caseMatching": "sensitive" },
+                    "sourceCandidates": { "json": "pages/bali-about.id-id.json" }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "jakarta", "label": "Jakarta Site", "defaultLocale": "en-001",
+            "pages": [{
+              "id": "home", "label": "Jakarta Home",
+              "representations": [{
+                "locale": "en-001", "route": { "path": "/en-001/jakarta" },
+                "sourceCandidates": { "markdown": "pages/jakarta-home.en-001.md" }
+              }]
+            }]
+          }
+        ]
+      },
+      {
+        "id": "company", "label": "Company",
+        "sites": [{
+          "id": "global", "label": "Global Site", "defaultLocale": "de-DE",
+          "pages": [{
+            "id": "home", "label": "Company Home",
+            "representations": [{
+              "locale": "de-DE", "route": { "path": "/de-de/unternehmen" },
+              "sourceCandidates": { "markdown": "pages/company-home.de-de.md" }
+            }]
+          }]
+        }]
+      }
+    ]
+  }
+}
+```
+
+This manifest has exactly **one Entity**, two Facets, three Sites and four Pages: Page ID `home` is reused correctly inside three distinct Site scopes, beside the Bali `about` Page. Full-locale keys and route spellings stay distinct from physical places. The Bali `id-ID` Home representation is **unlisted** and exact-case: addressable, excluded from generated discovery and excluded from every missing-translation fallback. The `visitors` Facet extends only its inherited Entity location fact and suppresses and replaces the singular inherited logo without creating a new Entity. The Product must never infer that a visitor on the Jakarta Site is located in Jakarta.
+
+#### 6.2M.3 Advanced JSON body selected by the expanded manifest
+
+For the declared `content/pages/bali-home.en-001.json`, this is a valid first-profile JSON body, assuming its declared Entity assets exist and pass validation:
+
+```json
+{
+  "contentVersion": "1.0.0",
+  "title": "Visit our destinations",
+  "summary": "An accessible layered public Page",
+  "blocks": [
+    {
+      "module": "content.hero", "contractVersion": "1.0.0",
+      "props": { "eyebrow": "Discover", "tagline": "Explore the places we serve" },
+      "presentation": {
+        "foreground": "#FFFFFF",
+        "background": { "kind": "solid", "color": "#123456" },
+        "padding": "xl", "radius": "md"
+      }
+    },
+    {
+      "module": "layout.grid", "contractVersion": "1.0.0",
+      "props": { "columns": { "base": 1, "md": 2, "lg": 2 }, "gap": "lg" },
+      "children": [
+        {
+          "module": "media.image", "contractVersion": "1.0.0",
+          "props": {
+            "asset": { "namespace": "entity", "reference": "images/bali-view.webp" },
+            "alt": "View of the coastline", "fit": "cover"
+          }
+        },
+        {
+          "module": "content.prose", "contractVersion": "1.0.0",
+          "props": { "markdown": "Welcome to our **real authored** content. [About us](../about)." }
+        }
+      ]
+    },
+    {
+      "module": "media.carousel", "contractVersion": "1.0.0",
+      "props": {
+        "slides": [
+          { "asset": { "namespace": "entity", "reference": "images/one.webp" }, "alt": "A garden" },
+          { "asset": { "namespace": "entity", "reference": "images/two.webp" }, "alt": "A trail" }
+        ],
+        "controls": true, "autoplay": false
+      }
+    }
+  ]
+}
+```
+
+The carousel uses direct typed media references rather than a `graphic` property, so its values modify neither public routing nor the representation's property authority. The typed `content.prose` relative link `../about` resolves from `/foundation/en-001/home` to the authored locale-less entry `/foundation/about` inside the configured base; real navigation resolves through the D07 route ledger and never guesses a translated slug. With the prefix `/foundation`, the resolver handles the base-aware `/about` author link consistently, producing neither a wrong host nor a double prefix.
+
+#### 6.2M.4 Required invalid fixtures — deliberate refusals
+
+- **Invalid JSON priority (refused).** If `content/pages/bali-home.en-001.json` exists containing `{ "contentVersion": "1.0.0", "blocks": [{ "module": "unknown.module" }] }` — also missing `title` and `props` — the **entire candidate publication** is rejected and the simultaneously declared valid Markdown file is never used. Diagnostic: `CONTENT_INVALID` and/or `MODULE_UNAVAILABLE`, never `SOURCE_NONE_EFFECTIVE`.
+- **Singular graphic cardinality (refused).** If the Bali Site inherits Facet `graphic.logo` and also declares a local `graphic.logo` with `inheritance: "inherit"` instead of `suppress`, the effective count is 2 and publication refuses with `PROPERTY_CARDINALITY`, even when one value is `internal` or a module would choose a different logo.
+- **Route exposure collision (refused).** If a public insensitive alias claims `/id-id/hidden7a` while the exact-case unlisted Home claims `/id-id/Hidden7A`, publication refuses with `ROUTE_COLLISION` for a public/unlisted caseless collision; an unlisted representation is never exposed through an alias.
+- **Location extension failure (refused).** If the Company Facet attempts to extend a fact originally added inside the Visitors Facet, the cross-branch extension is rejected with `LOCATION_INVALID_EXTEND`; a suppressed ancestral fact is never a valid extension target.
+
+### 6.2N Minimum physical-profile positive and refusal ledger (`P01`–`P14`)
+
+**Documentary, not executed.** Each row is a normative positive and refusal **specification**, not a passing test. §6.3 keeps the `V01`–`V28` conceptual cases unchanged; these `P` cases add the physical-profile obligations that later code-bearing work must implement as real tests, refusal cases included.
+
+| ID | Positive outcome and required refusal |
+| --- | --- |
+| `P01` | An exact `content/publication.json` with `schemaVersion: "1.0.0"` is accepted; an absent, malformed, duplicate-key, unknown-field or otherwise versioned manifest is refused (`MANIFEST_VERSION`, `MANIFEST_UNKNOWN_FIELD`, `MANIFEST_DUPLICATE_KEY`). |
+| `P02` | A valid five-level nested graph with correctly scoped reused IDs is accepted; duplicate IDs, orphans, a second Entity and a bare-language locale are refused (`EFS_DUPLICATE_ID`, `EFS_INVALID`, `LOCALE_INVALID`). |
+| `P03` | JSON absent with valid Markdown selects Markdown; JSON valid with Markdown valid selects JSON; present-but-invalid JSON, a permission-denied read and both candidates missing are refused (`SOURCE_INVALID_PREFERRED_JSON`, `SOURCE_NONE_EFFECTIVE`). |
+| `P04` | Two candidate paths reserved for a future JSON upgrade are accepted; a duplicate candidate claim, including an absent case-folded or hardlink alias, is refused (`SOURCE_COLLISION`). |
+| `P05` | An absent `properties` key inherits, a local `inherit` appends, `suppress` resets then adds local values; a singular collision, a private-value leak and an unknown key are refused (`PROPERTY_CARDINALITY`, `EXPOSURE_LEAK`, `PROPERTY_INVALID`). |
+| `P06` | An identified accessible inherited fact is updated in place by `extend` with field origin preserved; a missing, suppressed, sibling, cyclic or multiply-extended target is refused (`LOCATION_INVALID_EXTEND`). |
+| `P07` | An author-selected platform asset and an Entity asset stay distinct and both publish; a wrong MIME, a missing asset, active SVG, an oversized image and an automatic generic fallback are refused (`ASSET_INVALID`). |
+| `P08` | Recognized CommonMark/GFM constructs and the exact heading and anchor rules are accepted; raw HTML, a second H1, an unsupported directive and an unsafe URL are refused (`CONTENT_INVALID`, `LINK_UNSAFE`). |
+| `P09` | Each of the twenty-one §6.2E.2 modules publishes with minimal valid props and its child policy; an unknown ID, version or prop, incompatible content, arbitrary script and an advanced form builder are refused (`MODULE_UNAVAILABLE`, `MODULE_INVALID_PROPS`). |
+| `P10` | Public insensitive and sensitive claims plus exact-case unlisted claims with independent locale folding are accepted; collisions, encoded slashes, path ambiguity, unsafe bidi and a false canonical redirect are refused (`ROUTE_COLLISION`, `ROUTE_INVALID_ENCODING`). |
+| `P11` | Declared Page links, a safe `mailto:`, an external HTTPS destination and an intentional explicit unlisted link are accepted; a server-side remote fetch, a dangerous scheme and public discovery of unlisted content are refused (`LINK_UNSAFE`, `EXPOSURE_LEAK`). |
+| `P12` | A complete candidate activates atomically; a source modified during validation, a partial candidate, an unknown registry and an incompatible module are rejected without touching the last valid publication (`SNAPSHOT_CHANGED`, `COMPAT_UNSUPPORTED`). |
+| `P13` | The minimal one-Entity starter and the expanded two-Facet multi-Site locale installation are both consistent; an Entity, locale or Page inferred from host, route or source filename is refused. |
+| `P14` | A verified requirement-to-O/D mapping with physical and runtime obligations kept separate is accepted; an undocumented literal, a stale contradictory OPEN gate and a fake executed-test claim are refused. |
 
 ### 6.3 Conceptual contract-case ledger (`V01`–`V28`)
 
-**Documentary, not executed.** Every row below is a normative positive and refusal **specification** with its governing contract named. None of these rows is a passing test, a schema-validator run, a browser result or a runtime publication claim; no such evidence exists in this documentation-only repository. Later code-bearing work must implement them as real tests, including the refusal cases.
+**Documentary, not executed.** Every row below is a normative positive and refusal **specification** with its governing contract named. None of these rows is a passing test, a schema-validator run, a browser result or a runtime publication claim; no such evidence exists in this documentation-only repository. Later code-bearing work must implement them as real tests, including the refusal cases. The physical-profile cases `P01`–`P14` in §6.2N must be read alongside this ledger, and §6.5 maps both sets onto `D01`–`D12` and `O01`–`O12`.
 
 | ID | Required positive and refusal coverage | Governing contract |
 | --- | --- | --- |
@@ -665,16 +1114,47 @@ Each Owner-accepted decision and its canonical home in this Charter. Chief Archi
 | `D11` | Safe locators, links and resource separation. | §3.1C |
 | `D12` | Integrated validation, module compatibility and migration. | §6.1 |
 
+Each decision's physical realization, its governing `O` gate and the cases that verify it are tabulated in §6.5 together with the remaining `R00.E`, `R00.F` and `R00.G` obligations.
+
+### 6.5 Requirement matrix and remaining stage obligations
+
+**`D01`–`D12` realization map.** Accepted behaviour is unchanged; the anchor column names where its exact literals now live, and the case column names the documentary specifications in §6.3 and §6.2N.
+
+| Decision | Physical anchor | Cases |
+| --- | --- | --- |
+| `D01` | §6.2A.1–§6.2A.2, §6.2B (root), §6.2K.1 | `P01`, `P12` |
+| `D02` | §6.2B (nested nodes, identity, qualified targets) | `V01`, `V02`, `V03`, `P02` |
+| `D03` | §1.6, §6.2B (`sourceCandidates`), §6.2C.4 | `V04`, `V05`, `V06`, `P03`, `P04` |
+| `D04` | §1.7, §6.2D, §6.2E.1 | `V07`, `P08` |
+| `D05` | §3.1A, §3.1B, §6.2D, §6.2E.2, §6.2F | `V08`, `V09`, `V27`, `P08`, `P09` |
+| `D06` | §3.2A, §6.2B (`visibilityDefault`/`visibility`), §6.2J.5, §6.2J.10 | `V10`, `P10`, `P11` |
+| `D07` | §3.2C, §6.2J.1–§6.2J.8 | `V11`–`V15`, `P10` |
+| `D08` | §2.3, §6.2G | `V16`, `V17`, `P05` |
+| `D09` | §2.4, §6.2H | `V18`, `V19`, `P06` |
+| `D10` | §3.3B, §6.2I | `V20`, `V21`, `P07` |
+| `D11` | §3.1C, §6.2C, §6.2D.5–§6.2D.7, §6.2J.9 | `V22`, `V23`, `P07`, `P11` |
+| `D12` | §6.1, §6.2K | `V24`, `V25`, `V26`, `P12` |
+
+**`O01`–`O12` coverage.** Each gate's normative home is the §6.2 table; the verifying specifications are `O01`→`P01`; `O02`→`P02`, `P13`; `O03`→`P04`, `P07`; `O04`→`P08`; `O05`→`P09`, `P13`; `O06`→`P09`, `P12`; `O07`→`P05`; `O08`→`P06`; `O09`→`P07`; `O10`→`P10`, `P11`; `O11`→`P12`; `O12`→`P14`.
+
+**Remaining obligations — implementation, not R00.D literals.** None of these may alter the literals above without a new Owner decision:
+
+- **`R00.E` — toolchain and platform.** Programming language, framework, build, test runner and CI; a JSON Schema Draft 2020-12 validator enforcing asserted formats; a Markdown parser pinned to CommonMark 0.31.2 plus GFM 0.29-gfm; the Unicode 18.0.0 data binding; bounded media inspection adapters; the request/matcher and HTTP delivery adapters; persistence and the source/asset adapters; import-boundary enforcement for the Hexagonal layering; the `contracts/**` schema and module-registry artifacts; the Owner-reviewed platform asset delivery package with its version-pinned catalogue, artwork, licensing and provenance; and the migration tooling.
+- **`R00.F` — delivery.** Hosting provider, DNS, TLS, environment configuration, secret storage, backup and operational monitoring, subject to separately approved deployment security.
+- **`R00.G` — quality, lifecycle and release.** Numeric accessibility and performance targets, per-module browser/assistive-technology and layout-shift tests, release/support policy, third-party notices and copyright/attribution.
+
+No implementation-readiness claim may exceed §6.2's disposition rule, and none of the obligations above is evidence that code, schemas, assets or tests exist.
+
 ## 7. Decisions to make before an implementation work order
 
-1. **Authoring and publication contract — decided by `R00.A`, format still open:** accepted and recorded in §1.1, §1.3 and §1.4 are the technical ID grammar and 63-character limit, the parent-scoped uniqueness rules, durable references, the explicitly supplied Entity ID, the seeded `main`/`main`/`home` defaults, drafts outside the published graph, the single versioned manifest as sole publication authority, source integrity and fail-closed refusal. **Still open:** the concrete manifest file and field/locator schema, the editable source layout, JSON/Markdown authoring encoding, draft storage and the encoding of the accepted identity/publication semantics. The accepted physical pattern, its refusals and its source-selection cases are now recorded in §1.5–§1.7; every concrete literal remains an **OPEN** gate listed in §6.2.
-2. **Address, route and locale contract — decided by `R00.B`, encoding still open:** recorded in §3.2, §3.2B and §4.1–§4.4 are one configured canonical HTTP(S) origin with optional prefix and optional authorized aliases, explicit Page and optional localized routes, validated Unicode route text, default-insensitive public matching with author-selected case-sensitive claims, exact-case unlisted matching, independent full-locale normalization, the ten publication collision rules, `308`/`302` redirect semantics, cache safety and locale-less entry/fallback behaviour. **Still technical:** the physical declaration **direction** is now recorded in §3.2C while its literals remain **OPEN** (`R00.D`, §6.2); the pinned Unicode data version and toolchain (`R00.E`); and the implemented matcher, HTTP adapter, redirect/cache behaviour and rendered language selector (later stages).
-3. **Typed property, location and graphic contract — decided by `R00.C`, encoding still open:** accepted and recorded in §2, §2.1 and §3.3A are the governed extensible property registry, the independent `inheritance`/`currentContext` declaration elements with direct-ancestry-only resolution and effective-cardinality validation, per-value provenance and exposure classification with a validated restricted public projection, zero-to-many complete structured location facts with explicit identified-record extension and no geographic inference, registered graphic roles, typed Entity versus generic-platform asset references, default-deny role fallback and fail-closed publication. **Still technical:** the physical declaration direction is now recorded in §2.3, §2.4 and §3.3B while its literals remain **OPEN** (`R00.D`, §6.2); the final property and location field catalogue, the finalized role catalogue with physical names, cardinality, formats and asset processing controls (`R00.D`/`R00.E`), and every implemented resolver, validator, selector and adapter in later stages. No automatic graphic fallback is approved for any role initially.
-4. **Page formats, visibility and presentation:** the advanced modular JSON capability families (§3.1B) and the accepted JSON-first single-effective-source precedence (§1.6), **Owner-approved Page-level `visibilityDefault` with representation-level `visibility` override**, design tokens, shared generic public library, cascading graphic roles and dictionary precedence. Field placement and behavior are decided; schema encoding, valid graphic roles and defaults remain technical choices. Unlisted serving/discovery behavior itself is Owner-accepted.
-5. **Integration scope:** the **included** contact scope is the safe `mailto:` action and the **simple** contact form; **advanced contact forms are excluded** (see §3.4). Remaining technical choices are the field set, delivery adapter/provider, anti-abuse controls, retention, and the booking/map-link and analytics defaults.
-6. **Tooling/lifecycle:** framework, runtime, validation/test gates, release/upgrade strategy, **Apache-2.0 (Owner approved), copyright/attribution, third-party notices, and the release/support policy around the already-enabled GitHub private vulnerability reporting channel** — intake is enabled for the public repository, while triage ownership, response expectations, coordinated disclosure, a supported-version/support policy and any required third-party notice remain open — and independent Solo repo setup (the parent `/00.foundation-solo/` ignore rule is **committed and verified effective** in the enclosing repository at its recorded local revision, which tracks no Solo paths; the parent remains outside the Solo agent's write boundary, and its remote publication is a separate Owner/parent-operator concern, not a Solo bootstrap gate).
+1. **Authoring and publication contract — decided by `R00.A`, physical literals now settled:** accepted and recorded in §1.1, §1.3 and §1.4 are the technical ID grammar and 63-character limit, the parent-scoped uniqueness rules, durable references, the explicitly supplied Entity ID, the seeded `main`/`main`/`home` defaults, drafts outside the published graph, the single versioned manifest as sole publication authority, source integrity and fail-closed refusal. The manifest file and field/locator schema, the editable source layout, the JSON and Markdown authoring encoding, draft isolation and the encoding of the accepted identity semantics are **settled** in §6.2A–§6.2C and the worked examples in §6.2M; only `R00.E` implementation of the stated artifacts remains.
+2. **Address, route and locale contract — decided by `R00.B`, physical literals now settled:** recorded in §3.2, §3.2B and §4.1–§4.4 are one configured canonical HTTP(S) origin with optional prefix and optional authorized aliases, explicit Page and optional localized routes, validated Unicode route text, default-insensitive public matching with author-selected case-sensitive claims, exact-case unlisted matching, independent full-locale normalization, the ten publication collision rules, `308`/`302` redirect semantics, cache safety and locale-less entry/fallback behaviour. The declaration keys, the pinned **Unicode 18.0.0** profile and the collision-ledger rules are settled in §6.2J. **Still technical:** the toolchain that binds that Unicode data (`R00.E`) and the implemented matcher, HTTP adapter, redirect/cache behaviour and rendered language selector (later stages).
+3. **Typed property, location and graphic contract — decided by `R00.C`, physical literals now settled:** accepted and recorded in §2, §2.1 and §3.3A are the governed extensible property registry, the independent `inheritance`/`currentContext` declaration elements with direct-ancestry-only resolution and effective-cardinality validation, per-value provenance and exposure classification with a validated restricted public projection, zero-to-many complete structured location facts with explicit identified-record extension and no geographic inference, registered graphic roles, typed Entity versus generic-platform asset references, default-deny role fallback and fail-closed publication. The nine-key property catalogue, `add`/`extend` envelopes, role cardinalities and media allowlists are settled in §6.2G–§6.2I. **Still technical:** the platform asset library's artwork, licensing and version-pinned catalogue delivery, plus every implemented resolver, validator, selector and adapter in later stages. No automatic graphic fallback is approved for any role initially.
+4. **Page formats, visibility and presentation:** the advanced modular JSON capability families (§3.1B) are instantiated as the twenty-one closed `1.0.0` contracts of §6.2E.2, together with the accepted JSON-first single-effective-source precedence (§1.6), Owner-approved Page-level `visibilityDefault` with representation-level `visibility` override (§6.2B, §6.2J.5), the design tokens of §6.2E.1, the shared read-only generic public library (§6.2I.2) and cascading graphic roles. Field placement, schema encoding and the first module and role catalogues are now decided; only rendering implementation and per-module accessibility/performance testing remain (later stages). Unlisted serving and discovery behaviour is Owner-accepted and restated physically in §6.2J.10.
+5. **Integration scope:** the **included** contact scope is the safe `mailto:` action and the **simple** contact form; **advanced contact forms are excluded** (see §3.4). Remaining technical choices are the field set, delivery adapter/provider, anti-abuse controls, retention, and the booking/map-link and analytics defaults — `R00.E`/`R00.F` decisions that may not alter §6.2's literals.
+6. **Tooling/lifecycle:** framework, runtime, validation/test gates, release/upgrade strategy, **Apache-2.0 (Owner approved), copyright/attribution, third-party notices, and the release/support policy around the already-enabled GitHub private vulnerability reporting channel** — intake is enabled for the public repository, while triage ownership, response expectations, coordinated disclosure, a supported-version/support policy and any required third-party notice remain open — and independent Solo repo setup (the parent `/00.foundation-solo/` ignore rule is **committed and verified effective** in the enclosing repository at its recorded local revision, which tracks no Solo paths; the parent remains outside the Solo agent's write boundary, and its remote publication is a separate Owner/parent-operator concern, not a Solo bootstrap gate). These are `R00.E`–`R00.G` obligations, tabulated in §6.5.
 
-**No undefined implementation mechanism should be treated as approved merely because it appears as an example in this document.**
+**No undefined implementation mechanism should be treated as approved merely because it appears as an example in this document.** The examples in §6.2M are normative at the level of fields and types only, never as evidence that files, schemas or code exist.
 
 ## 8. Governance, repository and evidence boundary
 **New document naming invariant:** the only live WIP files are `plan-roadmap.md`, `plan-next.md`, `workorder-active.md`, and `plan-outlook.md`. Files beginning `plan-` can inform decisions but never authorize source work; `workorder-active.md` only authorizes changes with an exact Owner-issued scope and matching handoff. Do not generate task-specific plan or workorder files to accumulate history.
