@@ -6,171 +6,142 @@
 
 | Field | Value |
 | --- | --- |
-| Work order / edition | `SOLO-WO-014` / `R03` — final O05 module-behavior contract corrections (F04-F07) |
+| Work order / edition | `SOLO-WO-015` / `R01` — R00.D administrative closure and R00.E NEXT selection |
 | Session date | 2026-11-06 |
 | Status | **COMPLETE** |
-| Classification | Stage 00 / `R00.D`, documentation-only. No application, schema artifact, test harness, dependency, asset, release or deployment. |
-| Role | Implementation Agent. No Chief Architect `ACCEPT`, no self-certification, no R00.D closure. |
+| Classification | Stage 00 administrative documentation transition only. No application, schema, dependency, test harness, asset, release or deployment. |
+| Role | Implementation Agent. No Chief Architect `ACCEPT`, no Stage 00 closure, no R00.E acceptance. |
 
-Application code, builds, tests, browsers, HTTP exchanges and deployment are **NOT APPLICABLE** to this documentary order and are not claimed as run or passing.
+Application code, builds, tests, browsers, HTTP behaviour and deployment are **NOT APPLICABLE** to this administrative document transition and are not claimed as run or passing.
 
 ## 1. Preflight (observed)
 
 | Check | Observed |
 | --- | --- |
-| Local root | `C:/Users/Sean/Documents/Provelopment/00.foundation-solo` (`git rev-parse --show-toplevel` agreed) |
+| Local root | `C:/Users/Sean/Documents/Provelopment/00.foundation-solo` (`git rev-parse --show-toplevel`) |
 | Branch / tracking / remote | `main`, upstream `origin/main`, exactly one remote `origin` = `https://github.com/provelopment/provelopment-foundation-solo.git` |
 | Worktrees | 1 |
-| Required starting revision | `586e7bc9e018ae02539c212ad3b31c628b045eaf` |
-| Actual HEAD / `origin/main` / `git ls-remote` | all three `586e7bc9e018ae02539c212ad3b31c628b045eaf` — agreed |
+| Required starting revision | `126d8fa64334d77e039061aa79a182e3ad7173d9` |
+| Actual HEAD / `origin/main` / `git ls-remote` | all three `126d8fa64334d77e039061aa79a182e3ad7173d9` — agreed |
 | WIP inventory | exactly `plan-roadmap.md`, `plan-next.md`, `workorder-active.md`, `plan-outlook.md` |
-| Pre-run dirty state | only `M .documents/WIP/workorder-active.md` — the expected Owner-installed input; no unrelated path modified |
-| Installed ACTIVE | `SOLO-WO-014 R03`, 19,455 bytes, 110 lines, SHA-256 `4C71266653951D6DA72722C4EBDF655B7F0964A3F8D0356B9D49BE23268233DB`, worktree blob `6a4e7646534ef15011ea771036961b80e0f36e30` against committed `4d17f8816720cd333594614a9f3138cb687704e7` |
-| Edition check | title, field table, sections 1-6 and the F04-F07 and G01-G08 literals read in full; edition is R03, and the truncated F07 refusal-case line was read separately to its end |
+| Pre-run dirty state | only `M .documents/WIP/workorder-active.md` — the expected Owner-installed input, not a blocker |
+| Installed ACTIVE | `SOLO-WO-015 R01`, 14,513 bytes, 98 lines, SHA-256 `AA485276F9BF152F3A971A0793EC8855D541253256EAB0FC6ABD5FBA726518C6`, worktree blob `93957814e90b25f9513b4eb2fc4762ab3acd8ea3` against committed `6a4e7646534ef15011ea771036961b80e0f36e30` |
+| Edition verification | title, field table, sections 1-6 and the G01-G08 literals read in full; edition is `SOLO-WO-015` `R01` |
+| Baseline canonical blobs | Architecture Charter `0e82502540383defb9f3a619ef43c46700ca7159` and Product Definition `5e7a9a80f6f477e1e17d06074224a2a27fa2603e`, both matching the order |
+| ROADMAP precondition | 171 lines, exactly one remaining-package bullet beginning `- **R00.D — Content and publication contract:**` at line 9 |
+| NEXT precondition | exactly `# Foundation Solo — plan-next (Next Candidate)` plus one LF (49 bytes) |
+| Stage 00 precondition | heading, outcome, `R00.E`, `R00.F`, `R00.G` and the Stage 00 exit gate all present; 14 stage headings in total |
+| Governing documents read | `README.md`, `AGENTS.md`, `.documents/SOP/sop-architect.md` (including 6A, 6B, 7, 7A, 8), `.documents/SOP/sop-implementation.md`, all four WIP files and the previous canonical report (R03, 176 lines / 20,299 bytes) |
 
-No unexplained dirty path, root/branch/remote divergence or wrong edition was found, so no STOP condition arose.
+No unrelated dirty path, revision divergence, wrong checkout/remote or missing edition was found, so no STOP condition arose.
 
 ## 2. Commits and publication
 
 | Step | Commit | Tree | Published evidence |
 | --- | --- | --- | --- |
-| Baseline | `586e7bc9e018ae02539c212ad3b31c628b045eaf` | — | starting `origin/main` |
-| **A** — preserved R03 ACTIVE | `f71b0581dc87bfb6177d1d1db782b6b9407f6570` | `fac481bb13c802bc45a8def6856c65df9d84e0e6` | [commit](https://github.com/provelopment/provelopment-foundation-solo/commit/f71b0581dc87bfb6177d1d1db782b6b9407f6570) — ACTIVE blob `6a4e7646`, byte-identical to the installed file |
-| **B** — F04-F07 corrections | `132a990967f65f7a26175d0c727dffdf49b5f275` | `43e4af288323ff5f8f2726da5f61d02bc72e4453` | [commit](https://github.com/provelopment/provelopment-foundation-solo/commit/132a990967f65f7a26175d0c727dffdf49b5f275) — exactly one file, +13/-6, Charter blob `cc604af6` |
-| **B2** — disclosed whitespace fix | `5ff498c7a664f3007447fd4daf6bd94acec944d2` | `ac2caabd7b884d07125e7d3e8dcd6075b331675b` | [commit](https://github.com/provelopment/provelopment-foundation-solo/commit/5ff498c7a664f3007447fd4daf6bd94acec944d2) — exactly one file, +1/-2, final Charter blob `0e82502540383defb9f3a619ef43c46700ca7159`, size 213,692 bytes as listed by GitHub |
+| Baseline | `126d8fa64334d77e039061aa79a182e3ad7173d9` | — | starting `origin/main` |
+| **A** — frozen issued order | `67da4e2f27cdd4331d7c4210f937a6bf314116dd` | `e6227e87ff291b9e590efb634c24ce52788de48d` | [commit](https://github.com/provelopment/provelopment-foundation-solo/commit/67da4e2f27cdd4331d7c4210f937a6bf314116dd) — one file, ACTIVE blob `93957814`, byte-identical to the installed file |
+| **B** — WIP closure transition | `e5d9bfe977d6ec852c790d91054f5c81aded6270` | `3ea13928e41ab25a1ea42530e06cf3bb180f83c6` | [commit](https://github.com/provelopment/provelopment-foundation-solo/commit/e5d9bfe977d6ec852c790d91054f5c81aded6270) — exactly three WIP files, `+12/-98` (NEXT `+12`, ROADMAP `-1`, ACTIVE `-97`) |
 | **C** — this report-only commit | supplied in the chat handback, never embedded here | — | — |
 
-- Pushes: `586e7bc..f71b058`, `f71b058..132a990`, `132a990..5ff498c`, all `main -> main`. No force-push, history rewrite, branch, PR, merge, tag, release or deployment.
-- Final published Charter blob `0e82502540383defb9f3a619ef43c46700ca7159` at 213,692 bytes was read back from GitHub at `5ff498c` and matches the local blob exactly, so remote content identity is verified cryptographically rather than by inspection alone.
-- Ending `HEAD` = `origin/main` = `ls-remote` = `5ff498c7a664f3007447fd4daf6bd94acec944d2`; tree clean after every commit.
-
-### 2.1 Disclosed self-correction (B2)
-
-Reviewing the just-published B diff, the new parallax paragraph was found on the line immediately after the observable-motion paragraph, so Markdown would have rendered them as a single block, and three blank lines were left before `6.2E.3`. Rather than report a defective layout as correct, a **whitespace-only** follow-up commit added the missing separator and removed the two surplus blank lines (verified as `+1/-2`, blank lines only). No prose, default, enum, case, reference or identifier changed, and no history was rewritten. The order's permitted structure is respected: A preserves ACTIVE, B carries the contract, B2 is a bounded correction inside the same authorized section, and C is the report. This is the only deviation from a clean A/B/C sequence and is recorded here deliberately.
+- Pushes: `126d8fa..67da4e2` then `67da4e2..e5d9bfe`, both `main -> main`. No force push, rewrite, branch, clone, extra worktree, PR, merge, tag, release or deployment.
+- Remote readback at B: `plan-next.md` `0f667ae8a7de10a34ad87bbd9f0e2de45c3e013a` at 2,872 bytes, `plan-roadmap.md` `ab382665a82ce9a280b47f5561dc1b0c36542667` at 17,205 bytes, `workorder-active.md` `ea5f20b736483c2e102456be1cea9104059fc81a` at 40 bytes, `plan-outlook.md` `cb9c7a610cf3c537557e060ca9656e44a053e69d` at 52 bytes — every local blob confirmed on GitHub, exactly four WIP files, no extra file.
+- The frozen `SOLO-WO-015 R01` remains retrievable from commit A, which is the immediately preceding commit to B.
 
 ## 3. Changed-path ledger
 
 | Path | Operation |
 | --- | --- |
-| `.documents/WIP/workorder-active.md` | preserved unchanged as frozen R03 scope (commit A) |
-| `.documents/Architecture/ARCHITECTURE.md` | 1,173 to **1,179** lines: F04 row and cross-reference, F05 row plus paragraph, F06 paragraph plus pointer, F07 row plus paragraph, `P09` extension; cumulative published diff +14/-8 |
+| `.documents/WIP/workorder-active.md` | preserved byte-for-byte in A (blob `93957814`), then reduced in B to exactly `# Foundation Solo — Active Work Order` plus one LF (blob `ea5f20b7`, 40 bytes) |
+| `.documents/WIP/plan-roadmap.md` | one line removed, 17,479 to 17,205 bytes (blob `ab382665`) |
+| `.documents/WIP/plan-next.md` | neutral header replaced by the single R00.E candidate, 49 to 2,872 bytes (blob `0f667ae8`) |
 | `.documents/Reports/execution-report.md` | this overwrite |
 
-No other path changed. Product Definition, ROADMAP, NEXT, OUTLOOK, README, AGENTS, both SOPs and ACTIVE are blob-identical to the pre-run revision.
-## 4. Correction F04 — deterministic omitted action variant
+No other path changed.
+## 4. ROADMAP closure — exact deletion and preserved remainder
 
-| Field | Evidence |
+| Check | Evidence |
 | --- | --- |
-| Defect | The `content.actions` row registered an optional per-item enum `primary\|secondary\|text` with no documented default, while the optional-value rule permits an enum default only when the row states it, leaving a renderer to choose the visible style. |
-| Corrected anchor | `6.2E.2` row `content.actions` at **line 691**, cross-referenced from the optional-value rule at **line 710** (`variant` = `text` added to the explicit-default list). |
-| Resolution | `variant` keeps exactly `primary\|secondary\|text` and **when omitted is `text`**. `text` is the neutral inline/link-like treatment that stays visibly interactive with a clear accessible name and visible focus and never silently becomes a primary CTA. `primary`/`secondary` are author-selected relative visual-emphasis variants only, never separate link authority, destination or HTTP method, and no variant overrides navigation, exposure, accessibility or routing constraints. No fourth variant and no global styling override was added. |
-| Positive cases | Item without `variant` renders the `text` treatment; explicit `primary` or `secondary` renders the authored emphasis using the same typed-link validation. |
-| Refusal cases | an unknown enum value refuses as `MODULE_INVALID_PROPS`; no variant grants a destination, route, method or fetch authority. |
-| Disposition | **PASS** (documentary) |
+| Removed text | ``- **R00.D — Content and publication contract:** settle versioned JSON/Markdown declarations, `visibilityDefault`/representation `visibility` placement, bounded Page sections, Markdown safety, author link classification, content source precedence and asset path authority.`` — the complete line, 272 characters plus its terminating LF, 274 UTF-8 bytes |
+| Where | former line 9, the only R00.D remaining-package bullet; Git recorded a single hunk `@@ -9 +8,0 @@` with no added line |
+| Size arithmetic | 17,479 minus 274 = 17,205 bytes, which is the resulting file size |
+| Byte-level proof | the frozen ROADMAP blob `70b63ae2` was read as raw bytes, the single target line plus LF removed, and the result compared with the working file: **byte-identical = True** |
+| Stage 00 preserved | heading `## Stage 00 — Architectural contract dossier (decisions only)` present once, its outcome paragraph intact |
+| Preserved packages | `R00.E` 1, `R00.F` 1, `R00.G` 1 remaining-package bullets still present |
+| Stage 00 exit gate | `**Exit gate:** documented, consistent Owner-approved contracts in canonical About/Architecture documents ...` still present, unchanged |
+| Later stages | 14 stage headings retained in order (`Stage 00` through `Stage 13`), 170 lines against 171 before |
+| No history added | the transition inserted no completed-work record, acceptance log or commentary; only a deletion |
+| Remaining R00.D mentions | 0 in the live ROADMAP |
 
-## 5. Correction F05 — layer-height scale and deterministic alignment
+## 5. NEXT — exact candidate comparison
 
-| Field | Evidence |
+The live `plan-next.md` is byte-identical to the 13-line `§4` candidate block inside the frozen issued order (first line `# Foundation Solo — plan-next (Next Candidate)`, sections `## R00.E — Software structure and toolchain`, Objective, Prerequisites and readiness, Proposed scope, Proposed deliverables, Verifiable exit conditions, terminal LF):
+
+| Check | Result |
 | --- | --- |
-| Defect | `layout.layers.props.minHeight` allowed `sm\|md\|lg` with default `md` but never defined the visible minimum-height mapping, and the axis of `align` was undeclared, so an adapter could read the scale as padding tokens or invent different heights and alignment. |
-| Corrected anchors | `6.2E.2` row `layout.layers` at **line 688** and the new paragraph **Layer geometry and painting** at **line 718**. |
-| Resolution | `minHeight` is its **own closed layer-height scale** and not a spacing/padding token: `sm` = **240**, `md` = **400**, `lg` = **640 CSS pixels**, applied as a **minimum** at every breakpoint unless larger natural content expands the region; omitted default `md` therefore means a minimum of 400 CSS pixels; never a maximum, fixed height or padding value, and a breakpoint-dependent token would need a new versioned contract. `align` places each layer's natural-height contents on the **vertical block axis** in the shared relative region — `start` top, `center` middle, `end` bottom — while the horizontal axis fills the available width; no independent cross-axis enum, raw `z-index` or authored CSS field exists. Children keep authored DOM/reading order and paint in authored order, later above earlier, without semantic or keyboard precedence. |
-| Positive cases | absent `minHeight` yields a 400 CSS-pixel minimum; explicit `sm`/`lg` yield 240/640 CSS-pixel minimums; taller content expands the region without clipping; `align:start` top, `center` middle, `end` bottom at every breakpoint. |
-| Refusal cases | unknown `minHeight`/`align` values, or a layer set that would obscure mandatory controls or essential content, clip essential material or leave a hidden focus target, refuse as `MODULE_INVALID_PROPS` or the applicable registered content refusal rather than a renderer-chosen fallback. |
-| Disposition | **PASS** (documentary) |
+| Character-exact comparison against the frozen `§4` block | **True** |
+| Lines / bytes | 13 / 2,872 |
+| Candidate count | exactly one bounded R00.E decision candidate; no second candidate, work order, authority paragraph or decision history |
+| Dependency readiness | R00.E is stated as the earliest unfinished Stage 00 package after the R00.D closure, which matches the ROADMAP that still lists R00.E, `R00.F` and `R00.G` |
+| No preselected toolchain | the candidate explicitly treats language, framework, runtime, dependency selection and toolchain as decisions still to obtain |
+| No code authority | it excludes application code, dependencies, executable schemas, CI workflows and alternate documentation authorities during Stage 00 |
 
-## 6. Correction F06 — parallax progress and smoothing
+## 6. ACTIVE — neutral closure
 
-| Field | Evidence |
+- Final live ACTIVE content is exactly `# Foundation Solo — Active Work Order` followed by one LF: 40 bytes, blob `ea5f20b736483c2e102456be1cea9104059fc81a`, matching an exact string comparison rather than a visual check.
+- No second active order, status line, accepted-work summary or hidden content remains; the issued `SOLO-WO-015 R01` is preserved only in Git history at commit A.
+
+## 7. Canonical preservation
+
+| Path | Blob at B |
 | --- | --- |
-| Defect | R02 bounded parallax to plus/minus 24 CSS pixels on normalized viewport scroll progress without defining the range endpoints, the mapping or the meaning of `durationMs`, leaving the same serialized node open to different adapter interpretations. |
-| Corrected anchors | new paragraph **Parallax progress and smoothing** at **line 714**; the observable-motion paragraph at **line 712** now cites it, and the `design.motion` row at **line 699** keeps `direction` prohibited for parallax. |
-| Resolution | With rendered bounding top `T`, positive height `E` and viewport height `H`: `p = clamp((H - T) / (H + E), 0, 1)`, so `p = 0` when the top reaches the viewport bottom and `p = 1` when the bottom reaches the viewport top. Translation is exactly `y = (2p - 1) x 24` CSS pixels. `durationMs` keeps the **800 ms** default and **100-3000 ms** authored range and now means the time for a **linear interpolation from the currently displayed translation to the latest desired translation**, restarting from the current interpolated position on retargeting, with **no overshoot**. Nonpositive or nonfinite geometry renders statically instead of dividing by zero or emitting an unsafe transform. Under reduced motion, or with no scroll-capable viewport, translation is exactly **0** with all content visible and keyboard-accessible. |
-| Positive cases | `p = 0` gives −24 px; `p = 0.5` gives 0; `p = 1` gives +24 px; reduced motion gives a static 0 translation. |
-| Refusal cases | `direction` authored on parallax refuses (already R02); out-of-range `durationMs` refuses; invalid geometry never produces invalid arithmetic, hidden content or an unsafe transform. |
-| Disposition | **PASS** (documentary) |
+| `.documents/Architecture/ARCHITECTURE.md` | `0e82502540383defb9f3a619ef43c46700ca7159` (unchanged) |
+| `.documents/About/FOUNDATION-SOLO.md` | `5e7a9a80f6f477e1e17d06074224a2a27fa2603e` (unchanged) |
+| `.documents/WIP/plan-outlook.md` | `cb9c7a610cf3c537557e060ca9656e44a053e69d` (unchanged) |
+| `README.md` | `ab8aa7bf5f8e6a9b21d7472d42a9c619f31bbc17` (unchanged) |
+| `AGENTS.md` | `97c372e49b0ea1e279efe35ab8dac8c2ff2a6267` (unchanged) |
+| `.documents/SOP/sop-architect.md` / `sop-implementation.md` | unchanged |
 
-## 7. Correction F07 — carousel initial, manual and autoplay behaviour
-
-| Field | Evidence |
-| --- | --- |
-| Defect | R02 fixed controls, interval and reduced-motion safety but never stated the initial slide, endpoint behaviour or how user navigation interacts with autoplay, so a future adapter would have to invent visible behaviour. |
-| Corrected anchors | `6.2E.2` row `media.carousel` at **line 697** and the new paragraph **Carousel initial, manual and autoplay behaviour** at **line 716**. |
-| Resolution | **Slide index 0** is active on initial render. Previous and Next each move exactly **one** authored slide and **wrap cyclically** (previous from index 0 activates the last; next from the last activates index 0). Inactive slides expose no hidden focusable controls and are never announced as current content, while authored `alt`/`caption` semantics are preserved. Controls stay present and keyboard-operable with accessible names `Previous`, `Next` and a stateful `Start`/`Pause`. With `autoplay` omitted or false nothing advances automatically; Start may begin a visitor-requested slideshow at the **same 10000 ms** default when no `intervalMs` is authored, and no `intervalMs` field is permitted unless effective `autoplay` is `true`. With `autoplay: true`, advancement starts automatically at the R02 validated or derived interval **only when reduced motion is not requested**, resets the complete interval each time, and wraps. Hover/focus temporarily pauses and resumes only if the visitor has not manually paused; Pause or manual Previous/Next stops automatic advancement until the visitor explicitly presses Start again. Under reduced motion the control stays **visible but cannot enable cycling**, while manual navigation remains operable. No undeclared asset is preloaded or fetched and off-screen focus never leaks through inactive slides. |
-| Positive cases | initial first slide; previous from first wraps to last; next from last wraps to first; autoplay omitted/false never autoadvances; autoplay true with absent interval uses 10000 ms; manual navigation pauses autoplay; user Pause persists after hover/focus ends; reduced motion disables autoadvancement and the Start action while manual navigation works. |
-| Refusal cases | `intervalMs` authored with `autoplay` false or absent still refuses; invalid slide count, asset or alt refuses; no passive transition changes EFS publication or discovery. Slide validation, the 2-12 bound and `controls: true` are unchanged. |
-| Disposition | **PASS** (documentary) |
+All `D01`-`D12` and `O01`-`O12` accepted contracts remain canonically recorded in the untouched Charter and Product Definition; this run deleted no decision text, because the closed contract lives there and not in the ROADMAP. No schema artifact, source file, asset, workflow, dependency manifest or other repository was touched.
 
 ## 8. Acceptance gates G01-G08
 
 | Gate | Evidence | Status |
 | --- | --- | --- |
-| G01 — local authority and hygiene | R03 edition, baseline `586e7bc` agreed across HEAD, tracking ref and remote; one worktree; one `origin`; only the expected ACTIVE modification; frozen ACTIVE blob `6a4e7646` committed in A; all pushes verified by `ls-remote`. | **PASS** |
-| G02 — F04 action variants | Row 691 states the omitted default `text` and its accessibility and authority limits; explicit values preserved; unknown enum refuses; typed-link authority unaffected. | **PASS** |
-| G03 — F05 layer layout | Row 688 and paragraph 718 give the 240/400/640 CSS-pixel minimum scale with expansion, vertical block-axis alignment, painting order and the accessibility refusal; padding tokens are explicitly excluded. | **PASS** |
-| G04 — F06 parallax | Paragraph 714 gives the exact formula, endpoints, `(2p - 1) x 24` transform, 800 ms interpolation with no overshoot, reduced-motion zero translation, safe static fallback and the continuing `direction` prohibition. | **PASS** |
-| G05 — F07 carousel | Row 697 and paragraph 716 give index 0 initial state, cyclic single-slide manual controls, autoplay/hover/focus/Pause rules, reduced-motion behaviour and the unchanged R02 interval and refusal rules. | **PASS** |
-| G06 — complete preservation | Counts below: 21 modules, 9 properties, 12 D rows in 6.4 (24 including 6.5), 12 O gates, 28 V cases, 14 P cases, 7 design references; no unrelated edit in the diff. | **PASS** |
-| G07 — examples and contradiction audit | Three JSON examples parse; no example authors a field affected by F04-F07 in a contradictory way; every module row and the optional-value paragraph were re-read for remaining omission ambiguity; no further behavioral default or mapping was found, and the only residual freedom is non-behavioral styling, recorded in section 11. | **PASS** |
-| G08 — exact publication and status | Only the three authorized paths changed; A/B/B2/C commits created locally and pushed; remote readback verified for each; ROADMAP, NEXT and OUTLOOK untouched; ACTIVE not cleared; R00.D not closed; no test or Architect sign-off claimed. | **PASS** |
-## 9. Counts, parsing and contradiction checks
+| G01 — authority/baseline | `SOLO-WO-015 R01` verified, correct root, one worktree, one `origin`, `HEAD = origin/main = ls-remote = 126d8fa`, only the expected ACTIVE modification; ACTIVE 14,513 bytes, SHA-256 `AA485276…18C6`, blob `93957814`. | **PASS** |
+| G02 — frozen scope | Commit A preserves the installed R01 byte-for-byte (blob `93957814`, one file), pushed and confirmed by GitHub commit readback and by the file remaining retrievable in history. | **PASS** |
+| G03 — ROADMAP purity | One bullet removed, single-deletion hunk, byte-identical remainder proved against the frozen blob; Stage 00, `R00.E`/`R00.F`/`R00.G`, the exit gate and all 14 stages retained; no history added. | **PASS** |
+| G04 — NEXT readiness | Character-exact `§4` match, one bounded R00.E decision candidate, dependency-ready earliest package, no toolchain preselection, no code authority. | **PASS** |
+| G05 — ACTIVE closure | Live ACTIVE is exactly the neutral header plus one LF (40 bytes, blob `ea5f20b7`); issued edition preserved in Git history. | **PASS** |
+| G06 — canonical preservation | Charter `0e82502`, Product `5e7a9a80`, OUTLOOK, README, AGENTS and both SOPs unchanged; WIP inventory stays exactly four files. | **PASS** |
+| G07 — Git/report evidence | A/B/C commits local and pushed, changed-path ledger, GitHub readback of every blob, report published separately, truthful worktree/temp inventory in section 10. | **PASS** |
+| G08 — no premature work | Only R00.D consumed; Stage 00 open with `R00.E`/`R00.F`/`R00.G`; no implementation, schema, dependency, test claim, release, deployment or self-awarded acceptance. | **PASS** |
+## 9. Verification method, and a corrected false negative
 
-| Check | Result |
+Reported because the intermediate results were real, even though the published files are correct:
+
+1. A first comparison of the ROADMAP remainder ran `git show` through a PowerShell pipeline into `Set-Content`. It reported a difference at line 1 only, where the em dash had become `ΓÇö`. That was **console decoding of the piped text**, not file content: the working file itself holds the correct character.
+2. A second attempt removed the target line using a **byte** count inside `String.Remove`, which expects a **character** count, produced a two-byte shortfall (17,203 against 17,205) and reported `False`. The mismatch was my arithmetic, not the file.
+3. The definitive check bypassed the console completely: the frozen blob was read as raw bytes with `git cat-file` redirected to a file, the single target line plus LF removed in character units, and the re-encoded bytes compared with the working file by Base64 equality. Result: **byte-identical = True** at 17,205 bytes on both sides, which is also the exact 17,479 - 274 arithmetic.
+
+No file was changed to make a check pass, and no check was reported as passing before it was understood.
+
+## 10. Limits, worktree and temporary cleanup
+
+- **Not applicable and not claimed:** application tests, unit/contract/integration suites, schema validation runs, builds, browser or visual checks, HTTP behaviour, accessibility audits, performance measurements, CI and deployment. This run edited three WIP documents and one report.
+- Working tree clean after commits A and B; one checkout, one worktree, one `origin`, branch `main` tracking `origin/main`.
+- Temporary task files used: a byte-exact copy of the installed order and two read-only ROADMAP extractions in the agent-provided temporary directory. All were task-owned and were deleted before the handback; no Owner or unknown material was removed, and Solo `.temp/` remained empty throughout.
+- `R00.D` is administratively closed **only**: the accepted `D01`-`D12` and `O01`-`O12` contracts remain in the untouched canonical documents, Stage 00 remains open with `R00.E`, `R00.F` and `R00.G`, and no further work order exists or was created.
+- `R00.E` is a candidate awaiting an Owner decision and an Owner-issued order; it is not authority to select a framework or write code. No acceptance of this closure or of R00.E is claimed here.
+
+## 11. Live state after this run
+
+| Slot | Content |
 | --- | --- |
-| Charter lines | 1,173 before, **1,179** published |
-| `6.4` D rows / total D rows | 12 / 24 |
-| O gates | 12 |
-| V cases | 28 |
-| P cases | 14 |
-| Module rows in `6.2E.2` | 21 |
-| Property rows in `6.2G.4` | 9 |
-| Duplicate headings | 0 |
-| Seven design reference URLs | 7 of 7 present |
-| Three JSON examples, local PowerShell parser, no dependency added | 3 of 3 VALID |
-| Structural compatibility of the examples | the affected fields (`variant`, `minHeight`, `align`, `intervalMs`, `durationMs`, `direction`) keep their existing names, enums and bounds; the examples author none of the newly defaulted fields and remain valid |
-| Encoding integrity | UTF-8, LF-only, 0 replacement characters, 0 mojibake lead bytes, no CRLF introduced |
+| ROADMAP | Stage 00 with `R00.E`, `R00.F`, `R00.G` and its exit gate, then Stages 01-13; `R00.D` no longer listed |
+| NEXT | one bounded R00.E software-structure-and-toolchain candidate, decisions only |
+| ACTIVE | neutral header only — `# Foundation Solo — Active Work Order`, 40 bytes |
+| OUTLOOK | unchanged, `cb9c7a61` |
+| Report | this file, the single canonical execution report |
 
-## 10. Required searches (Charter)
-
-| Term | Hits | Inspection outcome |
-| --- | --- | --- |
-| `variant` | 21 | F04 row and cross-reference plus unrelated presentation usage; exactly `primary/secondary/text` with the `text` default |
-| `minHeight` | 4 | F05 row and paragraph plus unrelated minimum-height usage; the 240/400/640 scale is stated once and consistently |
-| `240` | 5 | layer scale, parallax bound references and unrelated numeric text |
-| `400 CSS` | 3 | F05 row, F05 paragraph, P09; consistent 400 CSS-pixel minimum for `md` |
-| `640` | 2 | F05 row and paragraph |
-| `index 0` | 3 | F07 row, F07 paragraph, P09 |
-| `wrap cyclically` | 2 | F07 row and paragraph |
-| `p = clamp` | 2 | F06 paragraph and P09 |
-| `2p - 1` | 2 | F06 paragraph and P09 |
-| `direction` | 17 | motion row, optional-value rule, motion paragraph, F06 prohibition and unrelated prose; parallax still prohibits it |
-
-## 11. Residual freedom and honest limits
-
-- After F04-F07 no row of the twenty-one module contracts retains an unspecified **behavioral** default or mapping: every optional enum, numeric default, interaction step and motion mapping is now written, and prohibited props refuse rather than being ignored.
-- The remaining freedom is deliberately **non-behavioral styling** (palette, typography, exact spacing composition) that `6.2E.1` leaves to the adapter; F04 constrains its action variants only through accessibility, naming and focus requirements, never through a new styling contract. No further Charter amendment is proposed here.
-- No application test, validator run, HTTP exchange or browser behaviour was executed, and none is described as passing. Every disposition in this report is documentary.
-- The two Charter commits touched only the authorized section `6.2E.2` prose and `6.2N` `P09`; no other architectural section was rewritten.
-
-## 12. Unchanged read-only inventory
-
-| Path | Blob, identical before and after |
-| --- | --- |
-| `.documents/About/FOUNDATION-SOLO.md` | `5e7a9a80f6f477e1e17d06074224a2a27fa2603e` |
-| `.documents/WIP/plan-roadmap.md` | `70b63ae220e010ecb3d68833632c26fd1e7778d5` (R00.D still listed) |
-| `.documents/WIP/plan-next.md` | `92fa562b1af0c54391851aa5c79deb1631127069` (neutral heading) |
-| `.documents/WIP/plan-outlook.md` | `cb9c7a610cf3c537557e060ca9656e44a053e69d` |
-| `README.md` | `ab8aa7bf5f8e6a9b21d7472d42a9c619f31bbc17` |
-| `AGENTS.md` | `97c372e49b0ea1e279efe35ab8dac8c2ff2a6267` |
-| `.documents/SOP/sop-architect.md` | `0396251245180b40ee896b50a3456b92835f9cb1` |
-| `.documents/SOP/sop-implementation.md` | `ef616745ee5ad3e01ec8b3b62ac99d3d29b24893` |
-| `.documents/WIP/workorder-active.md` | `6a4e7646534ef15011ea771036961b80e0f36e30` (committed unchanged as step A) |
-
-No schema artifact, contract artifact, module, asset, test harness, dependency, toolchain, provider configuration or other repository was created or modified.
-
-## 13. State, cleanup and resumption
-
-- Working tree clean after every commit; one checkout, one worktree, one `origin`. No task-owned scratch was created in Solo `.temp/`, which is empty at the end, and the agent temporary area holds no remaining task files; no retention is requested and no cleanup failure is known. A clean Git tree is not offered as proof of temporary cleanliness.
-- `R00.D` remains **unclosed**: it stays in ROADMAP, ACTIVE still holds R03, NEXT stays neutral, OUTLOOK is untouched and Stage 00 stays open. This report grants no Architect acceptance and no closure order.
-- `R00.E`, `R00.F` and `R00.G` obligations in `6.5` are unchanged and reserved; the platform asset library still has no authored artwork or filename and no automatic fallback.
-- **Resumption point:** the Chief Architect's GitHub-first review of this report at the published revision, together with commits `f71b0581dc87bfb6177d1d1db782b6b9407f6570`, `132a990967f65f7a26175d0c727dffdf49b5f275` and `5ff498c7a664f3007447fd4daf6bd94acec944d2`, against gates G01-G08 and the F04-F07 positive/refusal cases and the disclosed B2 whitespace correction.
+**Resumption point:** the Chief Architect reads this report and the closure revision on GitHub first, then reviews commits `67da4e2f27cdd4331d7c4210f937a6bf314116dd` and `e5d9bfe977d6ec852c790d91054f5c81aded6270` against gates G01-G08, and independently returns `ACCEPT`, `REVISE` or `STOP`. Only a separate Owner decision can open R00.E.
