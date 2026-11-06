@@ -3,113 +3,114 @@
 | Field | Value |
 | --- | --- |
 | Work order | `SOLO-WO-011` |
-| Edition | `R01` |
-| Handoff | `SOLO-WO-011 R01 — Implementation Agent Handoff` |
-| Classification | Documentation-only architectural codification of `R00.C` |
+| Edition | `R02` |
+| Handoff | `SOLO-WO-011 R02 — Implementation Agent Handoff` |
+| Classification | Corrective documentation-only scope; no application implementation |
+| Independent R01 disposition addressed | Chief Architect **REVISE** — R01 G03 failed whole-document consistency |
 | Repository / branch | `provelopment/provelopment-foundation-solo` / `main` |
-| Run date | 2026-11-05 |
-| Required starting HEAD | `f787203859d419081065cb7cb9175d131a0d6bd0` |
-| Phase A commit (order preserved) | `094f62a931094ac23074688bfbeb1198d1fedb9b` |
-| Phase B commit (two-document codification) | `ccec99462b6a1bf37c30594b51879b4cfe909123` |
-| Phase C report commit | Supplied in the chat handback only; deliberately absent from this file. |
-| Outcome | All ten accepted C01–C10 decisions codified in the Architecture Charter and Product Definition. `R00.C` is **not** administratively closed, Stage 00 remains open, and independent Chief Architect review is outstanding. |
+| Run date | 2026-11-06 |
+| Required starting HEAD | `fb78dc5ccf65580e145f73cd174ba1144a4664d1` |
+| Phase A commit (R02 order preserved) | `bb390d12c7a84f8601164a365b0443297470a74a` |
+| Phase B commit (eight corrections, five documents) | `3a8798bce81355ab838a3a8dd68c9a9cc356dbc3` |
+| Phase C report commit | Reported in the chat handback only; deliberately absent from this file. |
+| Outcome | Eight exact substitutions applied across the five authorized documents. `R00.C` remains administratively open; no `R00.D` selection; independent Chief Architect review outstanding. |
 
 ## 1. Authority, baseline and preflight
 
 | Check | Observed | Result |
 | --- | --- | --- |
-| Installed order | `SOLO-WO-011`, `R01`, `OWNER-ISSUED`, 29,781 bytes, SHA-256 `968a9174…109317`, §§1–9 frozen scope present | matches the delivered handoff |
-| Starting revision | local `HEAD` = `origin/main` = `ls-remote` = `f787203…` | PASS |
-| Repository safety | root equals Git toplevel, branch `main`, one worktree, one `origin` with the expected Solo URL, zero tags | PASS |
-| Initial dirty state | ` M .documents/WIP/workorder-active.md` only (the Owner installation) | PASS |
-| Baseline blobs | Architecture `5ebabc7e…`, Product `95b8fd75…`, ROADMAP `05feb2e3…`, NEXT `7996a1e5…`, OUTLOOK `cb9c7a61…`, prior report `1d587436…`, pre-install ACTIVE `ea5f20b7…` | all exact |
-| Inventory | four WIP files, one canonical report, Solo `.temp/` empty | PASS |
+| Installed order | `SOLO-WO-011`, `R02`, `OWNER-ISSUED`, 21,536 bytes, SHA-256 `05febad5…50674e`, §§1–9 present, eight substitutions in §4 | matches the delivered handoff |
+| Starting revision | local `HEAD` = `origin/main` = `ls-remote` = `fb78dc5…` | PASS |
+| Repository safety | root equals Git toplevel, branch `main`, one worktree, one `origin` (expected Solo URL), zero tags | PASS |
+| Initial dirty state | ` M .documents/WIP/workorder-active.md` only — the Owner's R02 installation | PASS |
+| Baseline blobs | ACTIVE pre-install `006d45ef…`, report `a47b1b73…`, Architecture `ff18a3fc…`, Product `be0ff7fa…`, README `572121c5…`, AGENTS `d4a2a028…`, Implementation SOP `b868facc…`, Architect SOP `03962512…`, ROADMAP `05feb2e3…`, NEXT `7996a1e5…`, OUTLOOK `cb9c7a61…` | all eleven exact |
+| Inventory | four WIP files, one canonical report, Solo `.temp/` present but empty | PASS |
 
-Documents read before editing: `README.md`, `AGENTS.md`, Product Definition, Architecture Charter, both SOPs, all four WIP slots and the current report. Canonical section mapping used for the ledger: Architecture §2 (line 103), §2.1 (123), §2.2 (161), §3.3A (294), §3.4 (307), §6 (405), §7 (428); Product §4 (80), §4A (111), §4B (119), §5 (133), §8 (179).
+Read before editing: `README.md`, `AGENTS.md`, both SOPs, Product Definition, Architecture Charter, all four WIP slots, the current report and ACTIVE §§1–9.
 
-## 2. Phase A — issued order preserved
+## 2. Phase A — R02 order preserved
 
 | Evidence | Value |
 | --- | --- |
-| Commit | `094f62a931094ac23074688bfbeb1198d1fedb9b` |
-| Contents | `.documents/WIP/workorder-active.md` only, `+197 −0` |
-| Order blob / bytes after commit | `006d45ef22dbaa34e0cad9a2ca8eea5d10dd7ea9`; SHA-256 unchanged `968a9174…109317` |
-| Push and readback | `f787203..094f62a`, fast-forward; local `HEAD` = `origin/main` = `ls-remote` = GitHub commit API |
+| Commit | `bb390d12c7a84f8601164a365b0443297470a74a` |
+| Contents | `.documents/WIP/workorder-active.md` only, `+173 −137` |
+| Bytes / SHA-256 after commit | 21,536 bytes; `05febad57d19ebe32779c3354afae660b7081deb3ca2688a8d70b3200250674e` (unchanged from installation) |
+| Blob | `00f5540c560ec119347668065f5f86aec6defa3c` |
+| Push and readback | `fb78dc5..bb390d1` fast-forward; local `HEAD` = `origin/main` = `ls-remote` = GitHub commit API (1 file, +173/−137) |
 
-ACTIVE remains the exact Owner-issued order and was not edited in any later phase.
+ACTIVE remains the exact issued R02 order and was not touched in Phase B or C.
 
-## 3. Phase B — canonical codification
+## 3. Phase B — eight exact substitutions
 
-Commit `ccec99462b6a1bf37c30594b51879b4cfe909123`, exactly two files, `+66 −51`.
+Every old text was confirmed to occur **exactly once** in its target file before editing; no file was altered beyond the specified line.
 
-| Document and section | Operation | Evidence |
-| --- | --- | --- |
-| Architecture §2 | replaced the nearest-declaration paragraph and its six legacy bullets with the C01 registry, C02/C03 two-element declaration model, direct-ancestry, effective-cardinality, C04 provenance, C05 public projection and C10 fail-closed rules; kept the five-level diagram, the property-family paragraph and the `R00.D` boundary | `+42 −30` over hunks 112–124 |
-| Architecture §2.1 | replaced the nearest-value example with the additive two-field example (Facet carries Entity + own fact; suppressing Sites carry only their own), added the C06 structured-fact contract incl. whole-record inheritance and identified-record extension, rewrote the multi-premises sentence; kept every no-inference/no-routing bullet and the request-independence paragraph verbatim | hunks 139–167 |
-| Architecture §3.3A | replaced the four-step nearest-asset algorithm with C07 registered roles (candidates labelled), inheritance/cardinality failure, `suppress` ≠ empty, C08 typed Entity versus generic-platform references, C09 default-deny fallback with zero initial approvals, derived-output and no-leak rules | hunks 306–315 |
-| Architecture §3.4 | inserted one cross-reference paragraph: public `mailto:` necessarily discloses the address; internal recipients must stay server-side via a validated port; delivery, abuse, receipt, privacy and retention deferred to `R00.F`; no form builder/CRM/provider added | insertion after 312 |
-| Architecture §7 item 3 | reclassified the logical `R00.C` contract as decided while keeping physical schema, field catalogue, finalized role catalogue, processing controls and all later-stage implementations expressly open | hunk 432→444 |
-| Product §4 | additive example and rules, C06 structured facts, per-value provenance/exposure, identified-record extension, authored accuracy versus structural validation; all no-inference/no-geo-engine/no-forced-geography bullets retained; logical-versus-physical boundary stated | `+24 −21` over 82–107 |
-| Product §4B | additive `inherit`/`suppress`, registered-role candidates, no silent override, suppression not emptiness, default-deny fallback with zero initial approvals, shared library retained | hunks 127–134 |
-| Product §5 | the `Cascading properties` capability row now states additive inheritance, explicit declaration elements, effective-cardinality validation, provenance and safe projection | hunk 143 |
-| Product §8 | the five-level location direction bullet and the open-items bullet now record additive semantics, structured facts, identified extension and the accepted-logical/open-physical split | hunks 193, 212 |
+| # | File | Section | Line | Old → New (substance) | Occurrences |
+| --- | --- | --- | --- | --- | --- |
+| 4.1 | `.documents/Architecture/ARCHITECTURE.md` | §6 verification table | 426 | “Nearest declaration wins…” → direct-ancestry additive `inheritance`/`currentContext` resolution; absent inherits; `suppress` blocks inherited but keeps valid local values; provenance, effective cardinality and invalid-declaration refusal | 1 |
+| 4.2 | `.documents/Architecture/ARCHITECTURE.md` | §6 verification table | 432 | “…override appropriately; explicit suppression prevents fallback…” → shared generic assets across one Installation; additive direct-ancestry role resolution with effective cardinality; `suppress` retains valid local selections but blocks inherited values and automatic fallback; typed Entity/generic sources distinct | 1 |
+| 4.3 | `.documents/About/FOUNDATION-SOLO.md` | §2 outcome item 4 | 33 | “narrower overrides via a predictable property cascade” → additive direct-ancestry inheritance, explicit suppression of inherited contributions, registered local additions, deliberate identified-record extension | 1 |
+| 4.4 | `README.md` | EFS location paragraph | 34 | “can be overridden by” cascade → additive: Entity `Australia` and Facet `Indonesia` both effective under `inherit`; a Site may `suppress` and contribute `Bali`/`Jakarta` alone; identified-reference extension only, never implicit completion | 1 |
+| 4.5 | `AGENTS.md` | §3 cascading location bullet | 47 | “nearest direct-ancestor declaration taking precedence” → additive values along direct ancestry under `inheritance: inherit | suppress` and `currentContext: none | zero-or-more local facts`; identified-record extension is the only field-level merge | 1 |
+| 4.6 | `AGENTS.md` | §3 graphics bullet | 50 | “explicit suppression prevents inherited and generic fallbacks” → shared library; registered roles with additive direct-ancestry inheritance and validated effective cardinality; `suppress` excludes inherited but permits valid local; never authorizes automatic fallback; all automatic role defaults disabled unless approved | 1 |
+| 4.7 | `.documents/SOP/sop-implementation.md` | §6 item 6 | 115 | “property ancestry only … absent an explicit representation override” → additive `inheritance`/`currentContext` semantics with inherit/add and suppress/contribute examples, validated extension rule, locales never infer or modify location, no location-based routes, accepted projection/suppression | 1 |
+| 4.8 | `.documents/SOP/sop-implementation.md` | §7 property cascade row | 134 | “Nearest explicit value wins…” → additive direct-ancestry inheritance and valid local values; `suppress` excludes inherited but permits local; effective cardinality and duplicate/refusal cases; provenance and restricted projection do not leak internal facts | 1 |
 
-Both replacements were confined to the ledger's named sections: `git diff -U0` hunk headers touch only Architecture 112–124, 139–167, 306–315, 312-insert, 444, and Product 82–107, 127–134, 143, 193, 212. §2.2, §3.2, §3.2B, §1.1/§1.3/§1.4, the Hexagonal section and every `R00.A`/`R00.B` paragraph were left byte-identical; anchors `### 2.2 Location and localization remain independent`, `### 3.2B Owner-accepted public route-case…`, `Authoring and publication contract — decided by R00.A`, `Address, route and locale contract — decided by R00.B`, `B12`, `visibilityDefault` and `` `R00.B` `` all still resolve.
+**Scope proof:** `git diff --numstat` = Architecture `2/2`, Product `1/1`, README `1/1`, AGENTS `2/2`, Implementation SOP `2/2` → exactly eight changed lines; the commit reports `5 files changed, 8 insertions(+), 8 deletions(-)`; all eight `-U0` hunks are single-line replacements at 33, 426, 432, 115, 134, 47, 50 and 34; `git diff --check` clean; no file gained CRLF (all five remain LF-only).
 
-## 4. Documentary positive/refusal matrix (§6 scenarios)
+## 4. Preservation and documentary consistency
 
-These are contract statements verified by reading the amended prose, **not** runtime tests.
-
-| Scenario group | Where the required result is now expressed |
+| Check | Evidence |
 | --- | --- |
-| P01–P04 (absent, `inherit`+local, `suppress`+local, `suppress`+`none`) | Architecture §2 two-element paragraph — additive result, inherited-first order, suppression trace, `none` only in current context |
-| P05 (sibling inheritance) | Architecture §2 direct-ancestry bullet; Product §4 additive bullet |
-| P06–P07 (effective cardinality, duplicate/invalid declaration) | Architecture §2 effective-cardinality and registry bullets: failure, never first/last win or silent dedupe |
-| P08–P09 (internal vs public value; internal in client serialization) | Architecture §2 projection bullet: only the validated public projection is consumable; omitted internal values are neither emitted nor replaced |
-| L01–L02 (Facet two facts; suppressing Site one fact) | Architecture §2.1 example and explanation; Product §4 example and additive bullet |
-| L03–L05 (identified extension; missing/ambiguous/suppressed target; exposing an internal field) | Architecture §2.1 identified-record-extension and whole-record exposure bullets; Product §4 extension bullet |
-| L06–L08 (no inference from locale/URL/Site ID; zero or partial facts valid; no implicit primary) | Architecture §2.1 fact bullets and retained no-inference invariants; Product §4 structured-facts bullet |
-| G01–G03 (inherited logo; inherit+local cardinality failure; suppress+local) | Architecture §3.3A inheritance/cardinality and suppression bullets; Product §4B |
-| G04–G07 (suppress+none; approved role default; no default approved; invalid/unknown/private asset) | Architecture §3.3A C09 default-deny bullet (zero initial approvals; refusal never a fallback trigger) |
-| G08 (shared platform asset used by two Sites) | Architecture §3.3A typed-source bullet: logical namespaces, not ownership nodes |
-| V01–V02 (draft outside authority; invalid draft published or unlisted) | Architecture §2 fail-closed bullet; unlisted remains published and fully validated |
-| C01–C02 (`mailto:` disclosure; internal address as public `mailto:`) | Architecture §3.4 cross-reference paragraph; `R00.F` owns the final delivery contract |
+| ACTIVE after Phase A | blob `00f5540c…`, identical to the published Phase A commit; untouched by Phase B/C |
+| Read-only paths unchanged | Architect SOP `03962512…`, ROADMAP `05feb2e3…`, NEXT `7996a1e5…`, OUTLOOK `cb9c7a61…` remain at baseline blobs |
+| Canonical contracts intact | Architecture §2/§2.1/§3.3A and Product §4/§4B keep the full R00.C text from `ccec994`; only the §6 summary rows and §2 item 4 were corrected |
+| Residual “nearest” search | remaining hits are all negations or unrelated meanings: Architecture 112 and 306 (“**not** a nearest-value-wins rule”), Architecture 137 (“nearest-Site selector … never silently enabled”), Product 97 (“never ‘nearest wins’”), Implementation SOP 111 (“nearest authoritative code”, sequential meaning) |
+| R00.A/R00.B | No ID, publication, route, case, Unicode, locale, unlisted, base-URL, one-Entity or Hexagonal wording changed; no role name, fallback, schema or provider selected |
 
-## 5. Disclosed documentary residual (outside the authorized ledger)
+**Documentary positive/refusal matrix** (assertions in prose — not executed software tests):
 
-A whole-document search for stale nearest-wins wording found two places the ledger does **not** authorize me to edit, so they were left untouched and are reported instead of silently changed:
+| Scenario | Documented result |
+| --- | --- |
+| `inherit` + `none` | Explicit declaration, zero effective values, provenance differs from total absence (Architecture §2) |
+| `inherit` + local fact | Inherited-first collection plus local value; origins preserved (Architecture §2; README; AGENTS) |
+| `suppress` + `none` | Zero values with suppression trace retained (Architecture §2; SOP §7 row) |
+| `suppress` + local value | Ancestor contributions excluded, local value retained (Architecture §2; Product §4; README; AGENTS; SOP §6/§7) |
+| Singular graphic role inherited + local | Effective cardinality failure, never silent replacement (Architecture §3.3A; §6 row 432; AGENTS graphics bullet) |
+| Location extension with existing identified target | Replaced in place with per-field provenance (Architecture §2.1; Product §4; README; AGENTS; SOP §6) |
+| Extension target missing or suppressed | Validation failure; no name/text/coordinate guess (Architecture §2.1; Product §4) |
+| Internal value reaching public output | Refused; only the validated public projection is consumable (Architecture §2; SOP §7 row) |
+| Invalid draft | Allowed only outside the published graph; unlisted remains published and validated (Architecture §2) |
+| Location/route and locale independence | Unchanged in every edited document; locale never infers or modifies location |
 
-1. `.documents/Architecture/ARCHITECTURE.md` §6 row **Property cascade** (line 426) still reads “Nearest declaration wins; absence inherits; explicit suppression works; provenance is correct”, and the §6 row **Graphic cascade and shared library** (line 432) still says inherited graphics “override appropriately”. Both now contradict §2 and §3.3A.
-2. `.documents/About/FOUNDATION-SOLO.md` §2 item 4 (line 33) still speaks of “narrower overrides via a predictable property cascade”.
-
-Architecture §6 (validation approach) and Product §2 (product intent) are outside the ledger's named sections `§2, §2.1, §3.3A, §3.4, §7` and `§4, §4B, §5, §8`. Editing them would exceed the frozen scope, so the Agent has **not** done so. A narrow follow-up authorization is required to make those three phrases consistent; this is the only known documentary inconsistency in the two canonical files after this run.
-
-## 6. Gate disposition
+## 5. Gate disposition
 
 | Gate | Disposition | Evidence |
 | --- | --- | --- |
-| G01 — Authority/baseline | PASS | Issued `SOLO-WO-011 R01` (29,781 B, SHA-256 `968a9174…`) plus matching handoff; `f787203…` baseline; all six baseline blobs exact; one root/worktree/remote, branch `main` |
-| G02 — Phase A | PASS | One order-only commit `094f62a`, bytes unchanged, GitHub readback |
-| G03 — C01/C02/C03 | PASS (codified sections) / **FAIL (whole-document)** | §2 and Product §4 now state governed registration, two independent declaration elements, additive direct-ancestry resolution and effective cardinality; the §6 row and Product §2 item 4 residuals in §5 of this report prevent a whole-document PASS |
-| G04 — C04/C05 | PASS | §2 provenance and projection bullets incl. privacy refusal; Product §4 provenance/exposure bullet |
-| G05 — C06 | PASS | §2.1 and Product §4: zero-to-many typed facts, whole-record inheritance, identified-record extension with field provenance, refusals, no inference; old nearest examples reconciled |
-| G06 — C07/C08/C09 | PASS | §3.3A and Product §4B: registered roles, candidate list labelled, Entity versus generic references, per-role cardinality, suppress+local, default-deny fallback with zero approvals |
-| G07 — C10 | PASS | §2 fail-closed bullet: drafts only outside the published graph, no repair/fallback, unlisted still published |
-| G08 — Contact boundary | PASS | One §3.4 cross-reference paragraph; `R00.F` explicitly owns delivery; no form builder, CRM or provider introduced; advanced forms remain excluded |
-| G09 — Preserved contracts | PASS | Hunk ranges confined to authorized sections; §2.2, §3.2, §3.2B, §1.x, Hexagonal and `R00.A`/`R00.B` anchors verified present and unchanged; two-file commit, no other tracked path |
-| G10 — Scope/publication | PASS | One two-document commit `ccec994` (`+66 −51`) and one report-only commit; no ROADMAP/NEXT/OUTLOOK/ACTIVE change |
-| G11 — Repo hygiene | PASS | Four WIP files, ACTIVE still the exact issued order (blob `006d45ef…`), one worktree, clean tree at run end, temp cleanup reported in §7 |
-| G12 — Honest evidence | PASS | One current report; documentary evidence only; no application, schema, test, build, release or deployment claimed; `R00.C` closure explicitly not claimed |
+| G01 — Authority/baseline | PASS | Issued `SOLO-WO-011 R02` (21,536 B, SHA-256 `05febad5…`) + matching handoff; `fb78dc5…` baseline; eleven baseline blobs exact; single checkout/worktree; only ACTIVE initially modified |
+| G02 — Phase A | PASS | One order-only commit `bb390d1` (`+173 −137`), bytes and SHA-256 unchanged, GitHub readback 1 file |
+| G03 — Canonical correction | PASS | Architecture §6 rows 426/432 and Product §2 item 4 replaced exactly; §2/§2.1/§3.3A and §4/§4B detailed contracts untouched |
+| G04 — Root entry points | PASS | README line 34 and AGENTS lines 47/50 replaced exactly; additive semantics stated consistently with the canonical contract |
+| G05 — Implementation SOP | PASS | Only §6 item 6 (line 115) and §7 row (line 134) changed; Architect SOP blob `03962512…` unchanged |
+| G06 — Owner contract fidelity | PASS | C01–C10 unchanged; additive inheritance, explicit suppression, identified-record extension, privacy and graphics meaning now consistent across all six documents |
+| G07 — R00.A/B preservation | PASS | No identity, publication, routing, locale, unlisted, base-URL, one-Entity or Hexagonal change; no schema/code/provider decision |
+| G08 — Exact Phase B scope | PASS | Five authorized files, eight single-line replacements, one commit `3a8798b` (`5 files changed, 8 insertions(+), 8 deletions(-)`); GitHub readback per-file 1/2/2/2/1 |
+| G09 — Phase C report | PASS | One canonical report, separate report-only commit, remote readback; this file contains no Phase C SHA |
+| G10 — WIP hygiene | PASS | Four WIP files; ACTIVE still the exact R02 order after Phase A; ROADMAP/NEXT/OUTLOOK at baseline blobs; no extra WIP file or report archive |
+| G11 — Worktree and temporary cleanup | PASS | Tree clean at run end, one worktree; both temporary areas inventoried and empty; R02's own capture log removed; R01 historical state reported as unverifiable, not asserted (§6) |
+| G12 — Honest evidence and exclusions | PASS | Direct diff/blob/GitHub evidence; documentary scenarios labelled as assertions; no build, app test, browser, delivery or deployment result claimed; no closure claimed |
 
-Software build, unit, integration, HTTP and browser tests: **NOT APPLICABLE** — this run changed documentation only, and no application, toolchain or test harness exists in Solo.
+Software builds, application tests, HTTP/browser checks, contact delivery and deployment verification: **NOT APPLICABLE** — documentation-only correction in a repository with no application or test harness.
 
-## 7. Publication integrity, limitations and cleanup
+## 6. Temporary cleanup and the R01 gap
 
-1. The first Phase B push was rejected by GitHub with `remote: fatal error in commit_refs_rules` after the local commit had been created. That is a transient server-side failure, not a content rejection. I retried the same ordinary fast-forward push after a short pause and it succeeded (`094f62a..ccec994`). No force-push, rebase, amend or history rewrite was used.
-2. Two command invocations in this run returned without captured shell output (one wrote a bounded capture log). Each result was re-verified directly from the repository through `git status`, `git rev-parse`, blob hashes, `git diff -U0` hunk headers and file byte counts, so no state was inferred from an unread response.
-3. All Git commands used `--no-pager` with `GIT_PAGER=cat`; no pager stall occurred. Solo `.temp/` stayed empty and remains Git-ignored.
-4. No dependency, framework, provider, schema, test tool, branch, PR, merge, tag, release, deployment, DNS/TLS change, secret access or other-repository write occurred, and no destructive Git command was run.
+**R02 preflight observation.** Both permitted temporary areas were inspected directly: the Cline task area `%LOCALAPPDATA%\Temp\cline` existed with **0 items**, and Solo `.temp/` existed with **0 items** (still covered by `.gitignore`). There was therefore no R01-era or other pre-existing task-owned garbage available to delete at R02 preflight, and nothing unknown, Owner-owned or shared was removed.
 
-## 8. Final state
+**R01 historical state — honestly unverifiable.** R01's report mentioned a bounded command-capture log but did not record its deletion. R02 cannot reconstruct that: the area was already empty at preflight, and an empty area proves nothing about an earlier run. This report therefore makes **no** claim that R01's log was deleted — only that no such file existed when R02 started. The gap is closed as a documentation defect (disposition now recorded), not as retroactive proof.
 
-Both canonical documents now carry the accepted `R00.C` logical contract while expressly leave physical schema, field catalogue, finalized role catalogue and every implementation choice open. ACTIVE still holds the exact Owner-issued order; ROADMAP, NEXT and OUTLOOK are untouched; exactly four WIP files and one report exist; the worktree is clean. **`R00.C` is not administratively closed, Stage 00 remains open with R00.C–R00.G pending, and no implementation exists.** No agent self-acceptance is claimed: independent Chief Architect review of the published revision `ccec994` is the next required step, and the §5 residual needs a narrow follow-up authorization.
+**R02 run's own cleanup.** This run produced two command-capture artifacts while the terminal returned late: `proceed-while-running-1793895198177-6uj7w2a.log` was deleted during R01's final step, and `proceed-while-running-1793927895963-6nfpdjs.log` was created while drafting this report and is deleted as this run's last action, after being listed by name and size. No Solo permanent path, `.temp/` content or repo-tracked file is involved.
+
+**Retained items:** none identified. If a future run finds unexpected files in either temporary area, the trigger is: delete only positively identified obsolete task-owned files; otherwise report and retain.
+
+## 7. Final state
+
+Five documents now state additive `inheritance`/`currentContext` semantics consistently, and no stale nearest-value-wins acceptance requirement remains in the canonical authorities or the entry-point/procedural documents. ACTIVE still holds the exact Owner-issued R02 order; ROADMAP, NEXT and OUTLOOK are untouched; exactly four WIP files and one report exist; the worktree is clean at the published `3a8798b` content revision. **`R00.C` remains administratively open, no `R00.D` work is selected, and no implementation exists.** No agent self-acceptance is claimed: independent Chief Architect review of the exact published revision determines `ACCEPT / REVISE / STOP`.
