@@ -30,7 +30,7 @@ Foundation Solo is intended to retain EFS's expressive, reusable content model w
 1. **Simplicity at entry:** create, configure, author, preview and publish a useful website without studying an operator/tenant topology.
 2. **Depth without mandatory complexity:** provide a small default shape that can expand into multiple Facets, Sites, Pages and languages within the single Entity.
 3. **Powerful authorship:** allow validated declarative Page sections and safe Markdown, avoiding the need to edit application code for ordinary content.
-4. **Reuse without duplication:** permit shared Entity-level facts and narrower overrides via a predictable property cascade.
+4. **Reuse without duplication:** permit additive direct-ancestry inheritance of shared Entity-level property values, explicit suppression of inherited contributions, and registered local additions; identified location-record extension is deliberate, not implicit geographic merging.
 5. **Independence and portability:** enable a Solo Installation and its authored content to be operated or moved without a required Provelopment service, account, managed ingress or provider.
 6. **Accessible, secure publication:** deliver reliable navigation, responsive presentation, valid content, standards-aware metadata, controlled public discovery and clear failures.
 7. **Maintainability:** isolate domain concepts from framework, storage, delivery and integrations so the product can evolve without multiplying special cases.

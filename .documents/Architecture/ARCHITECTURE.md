@@ -423,13 +423,13 @@ These are **proposed verification obligations**, not passing tests:
 | Exactly one Entity | A valid one-Entity Installation succeeds; a second Entity is refused |
 | Expandable EFS | Multiple Facets and Sites render correctly; duplicate IDs are refused in the correct scope |
 | Page/locale integrity | One Page has multiple real representations; no cross-Page/Site fallback |
-| Property cascade | Nearest declaration wins; absence inherits; explicit suppression works; provenance is correct |
+| Property cascade | Direct-ancestry additive `inheritance`/`currentContext` resolution; absent declaration inherits; `suppress` blocks inherited contributions but retains valid local values; per-value provenance, effective cardinality and invalid-declaration refusal verified |
 | Location independence | Route results unchanged when place properties change; locale and location never determine each other; Australia → Indonesia → Bali/Jakarta cascade demonstrated |
 | Routing integrity | Host-only and prefixed base URLs configured at creation, later config-only URL change, correct prefix handling/canonicals; unknown/colliding claims fail; an insensitive public claim resolves mixed-case requests to one lowercase canonical Page while a sensitive claim preserves authored capitalization and distinct Pages; sensitive/insensitive overlap, public/unlisted and Unicode-normalization collisions are refused; locale segments normalize independently of Page-route case |
 | Safe authoring | Malformed JSON/Markdown, unsafe URLs and invalid assets are refused or safely rendered |
 | Public projection | Private or suppressed inherited facts never leak into HTML, metadata, scripts or indexes |
 | SEO and discovery | Canonicals, sitemap, unlisted `noindex` and `hreflang` reflect real published representations; no unlisted discovery leakage |
-| Graphic cascade and shared library | One platform public graphic asset is reachable throughout Solo; local/inherited graphic properties override appropriately; explicit suppression prevents fallback; content owner assets remain correctly sourced |
+| Graphic cascade and shared library | Shared generic assets are available throughout one Installation; graphic roles use additive direct-ancestry resolution with effective role cardinality; `suppress` may retain valid local selections but blocks inherited values and automatic fallback; typed Entity/generic sources remain distinct |
 | Visitor quality | Accessible keyboard/mobile behavior and actual served-page smoke evidence |
 | Lifecycle | Independent release vs authored content; deterministic build; deployment/recovery plan |
 | Hexagonal boundary | Dependencies point inward only; the domain core carries no framework, transport, storage or provider imports; use cases run through explicit ports with replaceable adapters wired at a composition root |
