@@ -6,163 +6,148 @@
 
 | Field | Value |
 | --- | --- |
-| Work order / edition | `SOLO-WO-014` / `R01` — Stage 00 / `R00.D` first physical publication profile |
+| Work order / edition | `SOLO-WO-014` / `R02` — R00.D physical publication contract corrections |
 | Session date | 2026-11-06 |
 | Status | **COMPLETE** |
-| Classification | Documentation-only physical specification and canonical contract integration. **No application implementation.** |
-| Role | Implementation Agent. No Chief Architect `ACCEPT`, per-decision sign-off or `R00.D` closure is claimed. |
+| Classification | Stage 00 / R00.D, documentation-only contract correction. No application, schema artifact, test harness, dependency, media asset, release or deployment. |
+| Role | Implementation Agent. No Chief Architect `ACCEPT`, no self-certification, no R00.D administrative closure. |
 
-**Documentation only.** No executable schema, application code, dependency, test suite, media asset, provider operation, PR, merge, release or deployment was created. Tests, builds, HTTP and browser proof are `NOT APPLICABLE` to a documentation-only repository and are recorded below as not run, never as passing.
+Tests, builds, HTTP exchanges and browser behaviour are **NOT APPLICABLE** to this documentation-only correction and are not claimed as PASS.
 
 ## 1. Preflight (observed)
 
 | Check | Observed |
 | --- | --- |
-| Local root | `C:/Users/Sean/Documents/Provelopment/00.foundation-solo` (`git rev-parse --show-toplevel`) |
-| Branch / tracking | `main`, upstream `origin/main` |
+| Local root | `C:/Users/Sean/Documents/Provelopment/00.foundation-solo` |
+| Branch / remote | `main`; exactly one remote, `origin` = `https://github.com/provelopment/provelopment-foundation-solo.git` |
 | Worktrees | 1 |
-| Remotes | exactly 1: `origin` = `https://github.com/provelopment/provelopment-foundation-solo.git` |
-| Expected starting `HEAD` | `2f83738e9bac0ac6c7caba67932cdc66198a09e5` |
-| Actual starting `HEAD` / `origin/main` / `ls-remote` | all three `2f83738e9bac0ac6c7caba67932cdc66198a09e5` — agreed |
+| Required starting HEAD | `2d3e81011ba717722e681c15f21a9c8caa6a9d4f` |
+| Actual HEAD / origin-main / ls-remote | all three `2d3e81011ba717722e681c15f21a9c8caa6a9d4f` — agreed |
 | WIP inventory | exactly `plan-roadmap.md`, `plan-next.md`, `workorder-active.md`, `plan-outlook.md` |
 | Pre-run dirty state | only `M .documents/WIP/workorder-active.md` — the expected Owner-installed input |
-| Installed ACTIVE | `SOLO-WO-014 R01`, 98,547 bytes, 576 lines, SHA-256 `86C86EC26E5858C24AD0C8CEDE4BE9349154A26B4A9ECAF26FBDB25A153224C3`, worktree blob `849ca2609f7128a16dd1e84819680ee9f3e1a73b` against committed `0dda756cd771c681c884a4d37c89e070299cce41` |
-| Installed edition | header, objective, edit ledger and Appendix A `A01`–`A14` all read in full; edition is `R01` as expected |
-| NEXT | one line, the neutral heading — not modified, no candidate selected |
+| Installed ACTIVE | `SOLO-WO-014 R02`, 19,330 bytes, 124 lines, SHA-256 `66EDE61CB763F059B01EA9C4B74C14C49DBDE7C91CF01CB2E565218A34936245`, worktree blob `4d17f8816720cd333594614a9f3138cb687704e7` against committed `849ca2609f7128a16dd1e84819680ee9f3e1a73b` |
+| Edition check | header, sections 1-7 and the F01/F02/F03 literals read in full; edition is R02, not R01 |
 
-The R01 edition was verified before any write; no wrong-edition, divergent-remote or unexpected-dirty-path condition occurred.
+No unexplained modification, divergence or wrong edition was found, so no STOP condition arose.
 
 ## 2. Commits and publication
 
 | Step | Commit | Tree | Remote readback |
 | --- | --- | --- | --- |
-| Baseline | `2f83738e9bac0ac6c7caba67932cdc66198a09e5` | — | starting `origin/main` |
-| **A** — preserved R01 ACTIVE | `3e0df4dd29ec23a6b260515ac6749b0bb264aaa4` | `c5ec0dc5d1b1201b87c269b6e02d4157ffbb9d01` | [commit](https://github.com/provelopment/provelopment-foundation-solo/commit/3e0df4dd29ec23a6b260515ac6749b0bb264aaa4) |
-| **B** — integrated `O01`–`O12` profile | `04d9f7ba88cf3ea99ebb36acecc71e0f21986ed3` | `3df688cc83a7ef1eab987b259e976baee99d3894` | [commit](https://github.com/provelopment/provelopment-foundation-solo/commit/04d9f7ba88cf3ea99ebb36acecc71e0f21986ed3) |
-| **C** — this report-only commit | supplied in the chat handback, never self-referenced here | — | — |
+| Baseline | `2d3e81011ba717722e681c15f21a9c8caa6a9d4f` | — | starting origin-main |
+| **A** — preserved R02 ACTIVE | `9d1633240ccc3653f5d70234d3280d647ccbf2cc` | `e1106cf089cbb5f0741c527639134715392a6c43` | [commit](https://github.com/provelopment/provelopment-foundation-solo/commit/9d1633240ccc3653f5d70234d3280d647ccbf2cc) |
+| **B** — F01-F03 corrections | `6609217c39cdd8d4070e956ae51194f98cad3cfa` | `a8b1b35fc700f505b210c4026ce73daf756874a4` | [commit](https://github.com/provelopment/provelopment-foundation-solo/commit/6609217c39cdd8d4070e956ae51194f98cad3cfa) |
+| **C** — this report-only commit | supplied in the chat handback, never embedded here | — | — |
 
-- Pushes: `2f83738..3e0df4d  main -> main`, then `3e0df4d..04d9f7b  main -> main`. No force-push, rewrite, branch, PR, merge, tag, release or deployment.
-- Step A committed blob `849ca260`, byte-identical to the installed work-order file; ACTIVE was never edited, annotated, cleared or self-accepted. ROADMAP, NEXT and OUTLOOK were untouched.
-- Step B GitHub readback reports **exactly two files**, +529/−49: `ARCHITECTURE.md` +522/−42 and `FOUNDATION-SOLO.md` +7/−7. Remote blobs equal local committed blobs (`ARCHITECTURE.md` `31e0d4e5b994abff4a240b26ffdb103aae7e32da`, `FOUNDATION-SOLO.md` `5e7a9a80f6f477e1e17d06074224a2a27fa2603e`).
-- Ending `HEAD` after B: `04d9f7ba88cf3ea99ebb36acecc71e0f21986ed3`, equal to `origin/main` and `git ls-remote`. Working tree clean after each commit.
+- Pushes: `2d3e810..9d16332 main -> main`, then `9d16332..6609217 main -> main`. No force-push, rewrite, branch, PR, merge, tag, release or deployment.
+- Step A committed ACTIVE blob `4d17f881` — byte-identical to the installed file, unedited, uncertified and uncleared.
+- Step B GitHub readback reports **exactly one file**: `.documents/Architecture/ARCHITECTURE.md`, +13/-9, total 22. Committed blob `2a8f2cc226e61c71ffa432aaf2ce374beeb2ce76`.
+- Ending HEAD after B = origin-main = ls-remote = `6609217c39cdd8d4070e956ae51194f98cad3cfa`; the tree was clean after each commit.
 
-## 3. Changed-path ledger (whole run)
+## 3. Changed-path ledger
 
 | Path | Operation |
 | --- | --- |
-| `.documents/WIP/workorder-active.md` | preserved unchanged as the frozen R01 scope |
-| `.documents/Architecture/ARCHITECTURE.md` | 689 → **1,169** lines: new §6.2A–§6.2N, converted §6.2 register, reconciled §1.3/§1.5/§1.6/§1.7/§2.3/§2.4/§3.1A–§3.1C/§3.2A–§3.2C/§3.3B/§6.1/§6.3/§6.4/§7, new §6.5, header revision 7 |
-| `.documents/About/FOUNDATION-SOLO.md` | 220 lines: header revision 6, §4.1 close-out sentence, §8 heading and two list items reclassified from open to specified |
+| `.documents/WIP/workorder-active.md` | preserved unchanged as frozen R02 scope |
+| `.documents/Architecture/ARCHITECTURE.md` | 1,169 to **1,173** lines: F01 in section 6.2B base paragraph; F02 in 6.2H.6; F03 in six 6.2E.2 rows plus two new normative paragraphs and the 6.2N P09 wording |
 | `.documents/Reports/execution-report.md` | this overwrite |
 
-No other path changed.
+No other path changed. Product Definition, ROADMAP, NEXT, OUTLOOK, README, AGENTS, both SOPs and ACTIVE are byte-identical to the pre-run revision.
+## 4. Correction F01 — HTTP(S) base grammar
 
-## 4. Completion gates `G01`–`G10`
-
-| Gate | Result | Evidence |
-| --- | --- | --- |
-| `G01` | PASS | §1 preflight; ACTIVE committed byte-exactly as step A; four WIP slots intact |
-| `G02` | PASS | §5 below: twelve `D` rows and their anchors; §1.6 and §3.2A bodies untouched |
-| `G03` | PASS | §6.2 accepted register replaces the OPEN register; twelve normative subsections; no residual OPEN gate for a settled literal |
-| `G04` | PASS | §6.2B key grammar; §6.2E.2 twenty-one module contracts; §6.2G catalogue; §6.2H fields; §6.2I formats; §6.2J routes/links; §6.2K codes |
-| `G05` | PASS | three JSON blocks parse with the local PowerShell parser; refusals in §6.2M.4; no file claimed installed |
-| `G06` | PASS | §6.3 source/metadata checks, §6.2J.1 base-prefix-once, §6.2J.2–.7 locale/case/collision, §6.2I.5 exposure, §6.2H.5–.6 inheritance/suppression |
-| `G07` | PASS | `V01`–`V28` all retained (28 rows), seven design URLs present once each, `P01`–`P14` added, no form builder/code execution/untrusted HTML/remote fetch |
-| `G08` | PASS | only §2 paths; GitHub publication verified; tests `NOT APPLICABLE`; cleanup in §9 |
-| `G09` | PASS | `R00.D` not closed: ROADMAP unchanged and still lists it; NEXT neutral; ACTIVE frozen; Stage 00 open; `R00.E`/`F`/`G` obligations listed in §6.5 |
-| `G10` | PASS | exact revision, `D`/`O` matrices in §5–§6, contradiction sweep in §7, no implementation-readiness or test claim |
-## 5. D01-D12 regression rechecks
-
-All twelve accepted decisions are preserved; Appendix A supplied physical literals only. Anchors are final line spans in step B.
-
-| Decision | Anchor | Recheck | Status |
-| --- | --- | --- | --- |
-| D01 | 1.5 L104-L114; 6.2A L614-L623 | one strict JSON manifest remains sole authority; schemaVersion mandatory; unknown field, duplicate key and other version refuse | PASS |
-| D02 | 6.2B L625-L643 | nested five-level grammar, scoped IDs, containment-as-parentage, structured qualified targets; parentId refused | PASS |
-| D03 | 1.6 L116-L139 unchanged; 6.2B L637; 6.2C L645-L651 | at least one of two candidates, JSON-first by existence, invalid present JSON refuses, duplicate claims refuse, no merge | PASS |
-| D04 | 1.7 L141-L147; 6.2D; 6.2E.1 | bodies yield one validated model and cannot override manifest identity, locale, visibility, route or properties | PASS |
-| D05 | 3.1A L251, 3.1B L263 logic unchanged; 6.2D L653-L663; 6.2E L665-L712; 6.2F | CommonMark/GFM with raw HTML refused; twenty-one named versioned modules; no Solo syntax, MDX, code execution or form builder | PASS |
-| D06 | 3.2A L346-L361; 6.2B L631; 6.2J.5 L777; 6.2J.10 L783 | direct Page visibilityDefault and representation visibility; unlisted exact-case, noindex nofollow, no auto-discovery, not private | PASS |
-| D07 | 3.2C L407-L419; 6.2J L770-L783 | base and alias, Site locale, Page entries and fallback, route and case claims, derived collision ledger; no locale, location, host or filename guessing | PASS |
-| D08 | 2.3 L219-L229 semantics unchanged; 6.2G L723-L747 | inline properties, governed registry, additive inherited-first order, suppress with optional local values, provenance and public projection | PASS |
-| D09 | 2.4 L231-L243; 6.2H L749-L758 | identified facts, add and extend, in-place update, no location tier, no routing, locale or location inference | PASS |
-| D10 | 3.3B L440-L452; 6.2I L760-L768 | typed entity and platform namespaces, role cascade under D08, zero automatic generic fallback, generated variants not authoritative | PASS |
-| D11 | 3.1C L278-L291; 6.2C; 6.2D.5-.7; 6.2J.9 L782 | locators, asset references and public links separated and namespaced; no traversal, symlink escape, discovery, remote fetch or double prefix | PASS |
-| D12 | 6.1 L577-L591; 6.2K L785-L793 | explicit version tuple, ordered fail-closed stages, closed diagnostics, atomic snapshot activation, breaking change requires migration | PASS |
-
-## 6. O01-O12 physical-gate evidence
-
-| Gate | Canonical anchor | Positive contract and required refusal |
-| --- | --- | --- |
-| O01 | 6.2A L614-L623 | Accepts exactly content/publication.json, UTF-8 without BOM, schemaVersion 1.0.0, 2 MiB maximum, Draft 2020-12 closed shape. Refuses duplicate keys, NaN, unknown fields, YAML, parser recovery and any second manifest. |
-| O02 | 6.2B L625-L643 | Accepts the closed five-key root and closed nested Entity-Facet-Site-Page-representation grammar with object qualified targets. Refuses a sixth root key, parentId, bare Page IDs, unscoped duplicate IDs and a bare-language locale. |
-| O03 | 6.2C L645-L651 | Accepts portable lowercase-ASCII locators of at most 240 bytes and 8 segments under proven containment. Refuses traversal, symlinks and junctions, reserved names, case-folded or hardlink aliases and unverified ownership. |
-| O04 | 6.2D L653-L663 | Accepts CommonMark 0.31.2 plus GFM 0.29-gfm with one H1, deterministic anchors and content/assets images. Refuses raw HTML, a second H1, heading jumps, unsafe schemes and any remote image fetch. |
-| O05 | 6.2E L665-L712 | Accepts the closed body grammar and the twenty-one 1.0.0 modules with closed props. Refuses unknown module, version or prop, forbidden children, depth above 12, more than 250 nodes and any script or form-builder input. |
-| O06 | 6.2F L714-L721 | Accepts only product-distributed registered modules at exact installed versions. Refuses remote, eval, custom or unpinned modules, semver ranges and latest; a removed contract refuses rather than substitutes. |
-| O07 | 6.2G L723-L747 | Accepts properties on all five levels with inherit or suppress plus currentContext, public or internal exposure and the nine-key catalogue. Refuses unknown keys, singular collisions, elevation to public and cardinality masked by projection. |
-| O08 | 6.2H L749-L758 | Accepts add and extend with factId, the closed LocationFields catalogue and WGS84 coordinates via a contiguous QualifiedOwner. Refuses cross-branch, suppressed, circular, self-added or doubly-extended targets and any exposure change. |
-| O09 | 6.2I L760-L768 | Accepts typed namespace and reference assets, PNG, JPEG, WebP and AVIF images, MP4 and WebM video with WebVTT captions inside stated bounds. Refuses SVG, GIF, remote fetch, wrong MIME, oversized media and automatic generic fallback. |
-| O10 | 6.2J L770-L783 | Accepts the closed base, defaultLocale, languagePreferences, entryPaths and route contract with Unicode 18.0.0, insensitive default, opt-in sensitive claims and exact-case unlisted. Refuses collisions, encoded delimiters, bidi ambiguity and false canonical redirects. |
-| O11 | 6.2K L785-L793 | Accepts the exact version tuple, ordered fail-closed stages, enumerated diagnostic codes and one atomic activation. Refuses unsupported versions, partial publication, stale snapshots and implicit upgrades. |
-| O12 | 6.2L L795-L801; 6.2M L803-L1040; 6.2N L1042-L1065; 6.5 L1119-L1146 | Accepts one-to-one D, O, V and P traceability with physical and runtime obligations separated. Refuses an undocumented literal, a stale OPEN gate and any fake executed-test claim. |
-## 7. Worked examples and local checks actually performed
-
-| Check | Method | Result |
-| --- | --- | --- |
-| JSON syntax of all three examples | local PowerShell ConvertFrom-Json over each fenced json block in 6.2M | 3 of 3 parsed as VALID; no dependency added |
-| Minimal example conformance | manual trace against 6.2B: five root keys, one Entity, one Facet, one Site, one Page, one representation, en-001 locale, route beginning with the lowercased locale segment, both candidates under pages/ with correct extensions, landing fully qualified | consistent |
-| Expanded example conformance | manual trace: one Entity, two Facets, three Sites, four Pages, Page ID home reused in three Site scopes; entity location fact indonesia with public exposure; Facet extend targets entity owner only; logo suppressed then locally replaced; id-ID Home unlisted with no caseMatching and no aliases; about Page entryPaths plus missingTranslation default; sensitive id-ID route; de-DE Site default | consistent |
-| JSON body conformance | manual trace: contentVersion, title, summary, three blocks; hero first so the root H1 sits in it; grid children with a media image and prose; carousel with two slides, controls true, autoplay false; every asset typed with namespace and extension | consistent |
-| Refusal fixtures | 6.2M.4 states invalid-present-JSON refusal, singular graphic collision, public and unlisted caseless route collision and cross-branch location extension | present and classified |
-| Base prefix applied once | 6.2J.1 and the 6.2M.3 note with prefix foundation | consistent |
-| Locale, case and visibility interaction | 6.2J.3 and 6.2J.5 cross-checked against the expanded example | consistent |
-| Module and property counts | 21 module rows in 6.2E.2; 9 property rows in 6.2G.4 | verified by row count |
-
-## 8. Contradiction sweep over both documents
-
-| Search | Hits after integration | Inspection outcome |
-| --- | --- | --- |
-| Remaining physical literals | 0 | the eleven former OPEN paragraphs were all replaced with settled-literal statements |
-| format TBD, to decide | 0 | no stale deferral language survives |
-| OPEN | Architecture 19, Product 12 | every hit is Open Graph, open-source, opening-hours, the phrase recording that the former OPEN register is superseded, or an explicitly R00.E-deferred item; no gate that Appendix A settles is still described as open |
-| proposed | Architecture 10, Product 3 | remaining uses are the request-pipeline sketch, the verification-obligation framing and ordinary prose; none asserts that an R00.D literal is undecided |
-| schemaVersion | Architecture 4 | 1.5, 6.2A, 6.2B, 6.2K only |
-| visibilityDefault / visibility | 3.2A, 6.2B, 6.2J.5, 6.2J.10, 6.2M.2, Product 4B | consistently manifest-authoritative, never a body setting |
-| properties | 2.3, 2.4, 6.2B, 6.2C, 6.2G, 6.2H, 6.2M.2 | the inline object and its envelope are consistent throughout |
-
-Structural counts after integration: Architecture 1,169 lines; D index 12 rows; V ledger 28 rows; P ledger 14 rows; O register 12 rows; module catalogue 21 rows; seven design reference URLs present exactly once; duplicate headings 0. Product Definition 220 lines.
-
-## 9. Preservation and cleanup
-
-| Read-only path | Preserved blob (identical before and after) |
+| Field | Evidence |
 | --- | --- |
-| .documents/WIP/plan-roadmap.md | 70b63ae220e010ecb3d68833632c26fd1e7778d5 (R00.D still listed) |
-| .documents/WIP/plan-next.md | 92fa562b1af0c54391851aa5c79deb1631127069 (neutral heading only) |
-| .documents/WIP/plan-outlook.md | cb9c7a610cf3c537557e060ca9656e44a053e69d |
-| README.md | ab8aa7bf5f8e6a9b21d7472d42a9c619f31bbc17 |
-| AGENTS.md | 97c372e49b0ea1e279efe35ab8dac8c2ff2a6267 |
-| .documents/SOP/sop-architect.md | 0396251245180b40ee896b50a3456b92835f9cb1 |
-| .documents/SOP/sop-implementation.md | ef616745ee5ad3e01ec8b3b62ac99d3d29b24893 |
-| .documents/WIP/workorder-active.md | 849ca2609f7128a16dd1e84819680ee9f3e1a73b, committed unchanged as step A |
+| Original contradiction | Section 6.2B admitted HTTPS plus HTTP loopback only for local development, while 6.2J.1 accepts an authored http: or https: URL with a DNS hostname or IP — the latter implementing the Owner-accepted R00.B HTTP(S) origin. |
+| Corrected anchor | 6.2B `base` paragraph, final line 629, replaced in place as a single paragraph. 6.2J.1 deliberately unchanged. |
+| Resolution | `base.canonical` and every `aliases` element are a **validated absolute HTTP or HTTPS base URL** with a DNS hostname or IP plus the 6.2J.1 authority and prefix restrictions: no credentials, query, fragment, control character or encoded separator, IDNA-conformant lowercase canonical host with default ports normalized, and a 0-5 segment ASCII-safe prefix. HTTP is schema-valid authored data and is not loopback-limited or development-only; HTTPS stays strongly recommended; a deployment security policy may disallow non-HTTPS deployment without redefining this schema; authority is never derived from `Host` or forwarding headers; the prefix is applied exactly once; the alias count stays 0-8. |
+| Positive cases | `https://example.org/site` accepted; `http://example.org/site` accepted as schema-valid; a valid HTTP loopback base accepted with no separate publication schema. |
+| Refusal cases | malformed HTTP URI, credentials in the authority, unsafe prefix, encoded separators, unknown host authority, a ninth alias, an alias equal to canonical after normalization. |
+| Disposition | **PASS** (documentary) |
 
-Committed content blobs after step B: ARCHITECTURE.md 31e0d4e5b994abff4a240b26ffdb103aae7e32da, FOUNDATION-SOLO.md 5e7a9a80f6f477e1e17d06074224a2a27fa2603e.
+## 5. Correction F02 — one location field-provenance shape
 
-**Temporary workspace.** No task-owned scratch was created in Solo .temp/, which is empty at the end. Long-command output capture produced Cline task logs outside the repository; they are task-owned, contain no repository content and are removed before this run closes. No justified retention is requested and no cleanup failure is known. A clean Git tree is not offered as proof of temporary cleanliness.
+| Field | Evidence |
+| --- | --- |
+| Original contradiction | 6.2G.6 defined a closed `fieldOrigins` map of owner plus localIndex, while 6.2H.6 described field provenance as a qualified owner with an operation — two possible per-field shapes. |
+| Corrected anchor | 6.2H.6, final line 761; the abbreviated pair was replaced by an explicit deferral. 6.2G.6 remains the sole serialized shape. |
+| Resolution | Each currently set location field maps to the closed shape `{ "owner": <QualifiedOwner>, "localIndex": non-negative integer }`, naming the node and the precise local add or extend array position that last explicitly authored that field. An add stamps every populated field with its owner and index; an extend stamps only the fields present in `set`, and untouched fields keep their prior origin; the operation kind is recorded only in the 6.2G.6 `resolutionEvents`; a field origin has no operation member and no second serialized shape exists; `originOwner` and `originLocalIndex`, fact identity, order and whole-record `exposure` are unchanged and the record is never publicly projected. |
+| Positive case | Entity `location.add` at index 0 sets `countryCode` and Facet `location.extend` at index 1 sets `namedPlace`: `fieldOrigins.countryCode` points to Entity/index 0, `fieldOrigins.namedPlace` to Facet/index 1, and `resolutionEvents` records the add and the extend separately. |
+| Refusal cases | an extend supplying a new `exposure`; a target that is self, a sibling, suppressed or cross-branch; two conflicting same-node extensions of one target; any field origin carrying an operation member. |
+| Disposition | **PASS** (documentary) |
 
-## 10. Remaining obligations and honest limits
+## 6. Correction F03 — closed optional behaviour in the module contracts
 
-- `R00.D` is **not** closed: ROADMAP still lists it, ACTIVE still holds this order, NEXT stays neutral, and Stage 00 stays open. Closure needs the Chief Architect independent ACCEPT of this revision plus a separately Owner-issued administrative order.
-- **R00.E** (toolchain and platform): language, framework, build, test and CI; the Draft 2020-12 validator with format assertion; the pinned Markdown parser; the Unicode 18.0.0 data binding; media inspection adapters; request, matcher and HTTP adapters; persistence and source/asset adapters; import-boundary enforcement; the contracts schema and module-registry artifacts; the Owner-reviewed platform asset delivery package with artwork, licensing and version-pinned catalogue; migration tooling.
-- **R00.F** (delivery): hosting provider, DNS, TLS, environment configuration, secret storage, backup and monitoring under separately approved deployment security.
-- **R00.G** (quality, lifecycle, release): numeric accessibility and performance targets, per-module browser and assistive-technology tests, release and support policy, third-party notices and copyright attribution.
-- No schema file, validator, module, asset, media pipeline, framework, provider account, test suite, release or deployment exists, and none is claimed. Documentation-only evidence cannot prove runtime behaviour.
-- The platform generic library has **no** mandated artwork or filename: its delivery is a later Owner-reviewed asset package, and no fallback exists in the first profile.
+| Field | Evidence |
+| --- | --- |
+| Original gap | 6.2E.2 allowed optional presentation, motion and interaction parameters without defining behaviour when omitted; `media.carousel` allowed autoplay true with no interval and `design.motion` allowed an authored effect with omitted duration and direction, leaving an adapter to choose meaning. |
+| Corrected anchors | 6.2E.2 rows `layout.stack` (685), `layout.layers` (688), `media.carousel` (697), `design.watermark` (698), `design.motion` (699), `interaction.accordion` (701); two new normative paragraphs at 710 and 712; 6.2N P09 wording at 1060. |
+| Exact defaults | stack `align` omitted resolves `stretch`; layers `align` omitted resolves `center`; watermark `position` omitted resolves `center`; `autoplay` omitted is `false` with controls always present; `intervalMs` valid only when effective autoplay is true, authored integer 6000-20000, and omitted under autoplay true resolves **10000 ms**; `durationMs` omitted resolves **800 ms** for fade, slide, reveal and parallax and **3000 ms** for marquee, with the authored range still 100-3000; `direction` omitted resolves `up` for slide and `left` for marquee; omitted accordion `initialOpen` leaves all panels collapsed while `singleOpen` stays `true`. |
+| Refusals | a declared `intervalMs` with autoplay false or absent; `direction` on fade, reveal or parallax; `span` outside grid or bento; any unrecognized or incompatible prop — each refuses publication and is never silently ignored. |
+| Motion semantics | fade reveals opacity 0 to 1 on first entry; slide enters from a 16 CSS-pixel offset opposite its direction and settles in flow; reveal uncovers top to bottom on first entry; those three run once and keep content accessible before entry; marquee is static until an always-visible Start/Pause control starts it, then scrolls `durationMs` per 24 CSS pixels and pauses on hover, focus or Pause; parallax follows normalized scroll progress with a bounded minus-24 to plus-24 CSS-pixel translation using the smoothing duration. All five render statically under reduced motion, no essential content depends on movement, focus is never hidden or trapped, and no authored JS/CSS is accepted. |
+| Required cases | autoplay true without interval yields 10000 ms; autoplay false with any interval refuses; omitted motion direction and duration yield the effect-specific values; `direction` on fade refuses; omitted watermark position resolves center; omitted accordion initial-open yields all collapsed; reduced motion yields static accessible content. |
+| Registry unchanged | still exactly twenty-one `1.0.0` module IDs with all field names and value enums retained; no module added, renamed or removed. |
+| Disposition | **PASS** (documentary) |
+## 7. Regression status — decisions and gates
 
-## 11. Permission boundaries observed
+**D01-D12**: all twelve preserved with their D03 dual-candidate and D05 Markdown/module amendments. F01 touches only the 6.2B base admission rule, which strengthens D07 addressing consistency without changing base, alias, prefix or authority semantics. F02 clarifies the internal derived provenance shape of D09 without changing fact identity, exposure, extension targets or ordering. F03 closes omission behaviour inside the D05 module contracts without adding a module or changing an enum. Each has a direct normative anchor: D01 6.2A/6.2B, D02 6.2B, D03 1.6/6.2B/6.2C, D04 1.7/6.2D/6.2E.1, D05 3.1A/3.1B/6.2D/6.2E.2/6.2F, D06 3.2A/6.2B/6.2J.5/6.2J.10, D07 3.2C/6.2J.1-6.2J.8, D08 2.3/6.2G, D09 2.4/6.2H, D10 3.3B/6.2I, D11 3.1C/6.2C/6.2D.5-6.2D.7/6.2J.9, D12 6.1/6.2K.
 
-Permanent edits were confined to the four paths in section 2 of the order. No branch, second checkout, worktree, clone, PR, merge, force-push, history rewrite, tag, release, deployment, dependency install, application code, schema artifact, media asset or other-repository write occurred. ROADMAP, NEXT, OUTLOOK, README, AGENTS and both SOPs were untouched; ACTIVE was neither edited nor cleared and no candidate was selected.
+**O01-O12**: all twelve remain settled and unchanged. O10 is the gate whose accepted policy F01 aligns to, and no other gate text moved. O07 and O08 keep one provenance contract after F02. O05 keeps exactly twenty-one contracts with now-complete omission behaviour after F03.
 
-## 12. State and resumption point
+**V01-V28** and **P01-P14**: preserved verbatim except the in-place P09 wording extension, which adds the default and prohibited-prop obligations without adding a case or a parallel ledger. Counts below are the mechanical evidence.
 
-Ending HEAD after step B is 04d9f7ba88cf3ea99ebb36acecc71e0f21986ed3; step C adds only this report. Disposition: **COMPLETE** for the documentary scope with `R00.D` unresolved and unclosed. The resumption point is the Chief Architect GitHub-first review of this report and commits 3e0df4d and 04d9f7b against gates G01-G10 and the O and D matrices above.
+## 8. Counts and example checks
+
+| Check | Result |
+| --- | --- |
+| Architecture lines | 1,169 to 1,173 |
+| Section 6.4 D rows / total D rows across 6.4 and 6.5 | 12 / 24 |
+| O gate rows | 12 |
+| V case rows | 28 |
+| P case rows | 14 |
+| Module rows in 6.2E.2 | 21 |
+| Property rows in 6.2G.4 | 9 |
+| Duplicate headings | 0 |
+| Seven design reference URLs | 7 of 7 present |
+| JSON example blocks parsed with the local PowerShell parser, no dependency added | 3 of 3 VALID (946, 4002 and 1461 characters) |
+| Minimal/expanded graph and JSON body coherence | unchanged; the examples use only fields whose meanings are unchanged, and none of them authors an omitted-default or a prohibited prop |
+| Encoding integrity | 300 section signs, 96 en dashes, 1 U+2212, 0 replacement characters, 0 mojibake lead bytes, UTF-8 round-trip stable |
+
+## 9. Required searches (Architecture)
+
+| Term | Hits | Inspection outcome |
+| --- | --- | --- |
+| `HTTP` | 38 | includes the reconciled 6.2B base rule, 6.2J.1, the 6.2D link allowlist and ordinary prose; no remaining loopback-only or development-only admission |
+| `loopback` | 1 | only the F01 sentence stating HTTP is **not** restricted to loopback |
+| `fieldOrigins` | 2 | 6.2G.6 definition and the 6.2H.6 deferral; one serialized shape only |
+| `fieldOrigin` | 2 | same two paragraphs, plural and singular references |
+| `operation` | 23 | add/extend envelopes, resolutionEvents operations and the F02 sentence forbidding an operation member inside a field origin |
+| `durationMs` | 4 | motion row, optional-value rule, motion-semantics paragraph, P09 |
+| `intervalMs` | 3 | carousel row, optional-value rule, P09 |
+| `initialOpen` | 3 | accordion row, optional-value rule, P09 |
+| `align` | 6 | stack, layers, layers layout effects and presentation text; each default now written |
+| `position` | 18 | watermark default plus watermark/parallax presentation prose and unrelated normal usage |
+| `OPEN` | 20 | all benign: Open Graph, open-source, the sentence recording that the former OPEN register is settled, and R00.E-deferred items; no settled literal is described as open |
+
+## 10. Unchanged read-only inventory
+
+| Path | Blob identical before and after |
+| --- | --- |
+| `.documents/About/FOUNDATION-SOLO.md` | `5e7a9a80f6f477e1e17d06074224a2a27fa2603e` |
+| `.documents/WIP/plan-roadmap.md` | `70b63ae220e010ecb3d68833632c26fd1e7778d5` (R00.D still listed) |
+| `.documents/WIP/plan-next.md` | `92fa562b1af0c54391851aa5c79deb1631127069` (neutral heading only) |
+| `.documents/WIP/plan-outlook.md` | `cb9c7a610cf3c537557e060ca9656e44a053e69d` |
+| `README.md` | `ab8aa7bf5f8e6a9b21d7472d42a9c619f31bbc17` |
+| `AGENTS.md` | `97c372e49b0ea1e279efe35ab8dac8c2ff2a6267` |
+| `.documents/SOP/sop-architect.md` | `0396251245180b40ee896b50a3456b92835f9cb1` |
+| `.documents/SOP/sop-implementation.md` | `ef616745ee5ad3e01ec8b3b62ac99d3d29b24893` |
+| `.documents/WIP/workorder-active.md` | `4d17f8816720cd333594614a9f3138cb687704e7` (committed unchanged as step A) |
+
+No schema file, contract artifact, module, asset, test harness, dependency, toolchain, provider configuration or other repository was created or modified.
+
+## 11. State, cleanup and honest limits
+
+- Working tree clean after each commit; one checkout and one worktree; one remote. No task-owned scratch was created in Solo `.temp/`, which is empty at the end. Cline task output capture outside the repository was removed; no retention is requested and no cleanup failure is known. A clean Git tree is not offered as proof of temporary cleanliness.
+- `R00.D` remains **unclosed**: it stays in ROADMAP, ACTIVE still holds R02, NEXT stays neutral and Stage 00 stays open. Neither the Implementation Agent nor this report grants Architect acceptance or a closure order.
+- The `R00.E`, `R00.F` and `R00.G` obligations in 6.5 are unchanged and remain reserved for their stages; the platform asset library still has no authored artwork or filename and no automatic fallback.
+- No application test, validator run, HTTP exchange or browser behaviour was executed, and none is described as passing. Every disposition above is documentary.
+- Resumption point: the Chief Architect review of this report and commits `9d1633240ccc3653f5d70234d3280d647ccbf2cc` and `6609217c39cdd8d4070e956ae51194f98cad3cfa` against gates G01-G08 and the F01-F03 cases.
