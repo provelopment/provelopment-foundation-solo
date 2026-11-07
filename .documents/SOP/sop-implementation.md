@@ -149,14 +149,14 @@ Apply the permanent A1 evidence standard in [`sop-architect.md`](sop-architect.m
 
 ## 7A. Security obligations
 
-These are the implementation-side duties for the security lifecycle owned by [Architect SOP](sop-architect.md) §7C and [Architecture](../Architecture/ARCHITECTURE.md) §5A. They bind only where the authorised scope touches security-relevant behaviour; the Architect owns policy and acceptance, and §6B/§5B remains the sole version-control procedure.
+Security evidence is required by **A1**, the permanent acceptance standard in [`sop-architect.md`](sop-architect.md) §7B, applied against the architectural boundaries in [Architecture](../Architecture/ARCHITECTURE.md) §5A. There is no separate security procedure to administer and no register to maintain. These duties bind only where the authorised scope touches security-relevant behaviour; the Architect owns policy and acceptance.
 
-- **Before implementing**, check the [security register](../Security/security-issues.md) and the relevant public advisories for the exact stack being introduced or changed, and record the applicability conclusion for the revision actually present. Never claim an audit, scan or dependency review that was not executed.
-- **During implementation**, apply the secure-by-default constraints of Architecture §5A: validate at the boundary and fail closed, refuse rather than coerce malformed or ambiguous input, keep secrets and server-only configuration out of authored content, public output, logs and diagnostics, apply least privilege to adapters and providers, and keep security policy in the domain core rather than in an adapter.
-- **Evidence, not assertion.** Map each applicable security condition to the command or inspection that demonstrates it at the exact revision, and include the negative and refusal cases the task actually touches. An unavailable, skipped or inapplicable check is reported `NOT RUN` or `NOT APPLICABLE` with its reason — never `PASS`.
-- **Sensitive findings stay private.** A suspected vulnerability in Solo is reported through GitHub private vulnerability reporting per [`.github/SECURITY.md`](../../.github/SECURITY.md), not in a pull request, issue, commit message, chat log or the public register. Do not publish exploit recipes, working payloads or confidential detail in any artefact.
-- **The register is evidence, not a queue.** Update an entry only within an authorised order, keep its identifier stable, state only what was actually verified, and never mark a finding `Resolved` without tested evidence. It never authorises remediation and never becomes a fifth WIP file.
-- **Report honestly.** Where this repository has no code, manifest, CI or deployment, the applicable security checks are `NOT APPLICABLE` with that reason: a documentation-only result is not a security certification.
+- **Evidence to A1, not assertion.** For the exact revision under review, establish applicability and produce the negative, refusal, secret-isolation and abuse evidence A1 requires. Never claim an audit, scan or dependency review that was not executed.
+- **Apply the §5A boundaries.** Validate at the boundary and fail closed, refuse rather than coerce malformed or ambiguous input, keep secrets and server-only configuration out of authored content, public output, logs and diagnostics, apply least privilege to adapters and providers, and keep security policy in the domain core rather than in an adapter.
+- **Report honestly.** An unavailable, skipped or inapplicable check is `NOT RUN` or `NOT APPLICABLE` with its reason — never `PASS`. Where this repository has no code, manifest, CI or deployment, the applicable checks are `NOT APPLICABLE`: a documentation-only result is not a security certification.
+- **Sensitive findings stay private.** A suspected vulnerability in Solo is reported through GitHub private vulnerability reporting per [`.github/SECURITY.md`](../../.github/SECURITY.md), never in a pull request, issue, commit message, chat log or any public file, and no exploit recipe or confidential detail is published in any artefact.
+
+§6B/§5B remains the sole version-control procedure.
 
 ## 8. Reporting — no report-file proliferation
 
