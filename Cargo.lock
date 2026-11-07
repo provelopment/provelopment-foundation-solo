@@ -96,6 +96,7 @@ dependencies = [
  "serde_json",
  "solo-adapters",
  "solo-application",
+ "syn",
 ]
 
 [[package]]

@@ -1,11 +1,1 @@
 # Foundation Solo — plan-next (Next Candidate)
-
-## Stage 01 — R01.B: Hexagonal Source-Boundary Enforcement
-
-**Objective:** Complete strict, fail-closed Rust source-level import and module-boundary enforcement for the existing four-crate workspace and its real CLI-to-application use case; prove illegal references cannot pass by aliasing, re-exporting, indirection or bypassing the guard.
-
-**Prerequisites and readiness:** Stage 00 architecture/toolchain choices are accepted; `R01.A` was independently accepted at source revision `ff55dc702587cc8bfef98c8c8a3d0665ccfc162b`. The Rust 2024 workspace (`solo-domain`, `solo-application`, `solo-adapters`, `solo-cli`), `rustc 1.99.1`, shared `Cargo.lock`, Cargo-metadata dependency graph guard, versioned inbound `BootstrapPreflightV1`, real CLI adapter and single composition root already exist. Architecture §6A.2 selects `syn =3.0.9` for source-level checking. The pending work is the missing AST/source-boundary proof, not recreation of the existing workspace.
-
-**Candidate scope and deliverables:** Implement the Architecture §6A.3 `check-architecture` source checker alongside the real Cargo graph check. Enforce inward-only references, private adapter internals, `use`, `pub use`, renamed aliases, qualified paths, `extern`, `#[path]`, `include!`, module expansion and source-loading/dynamic-loading refusal. Handle inspectable supported generated/macro forms, fail closed on unresolvable forms, and add direct, alias, re-export, macro, qualified-path and dynamic negative fixtures, plus a guard-bypass/disabled negative. Preserve the existing real application port, test fakes where needed and the sole CLI composition root; do not introduce ornamental ports or later-stage product functionality.
-
-**Verifiable exit conditions:** Legal existing source and graph return exit `0`; each forbidden fixture returns nonzero; bypassing/disabling the checker fails the suite. The check is invoked on the real source tree, not a grep-only approximation. Locked Rust format, Clippy, unit/integration/architecture and release-build checks pass with exact dependency and warning evidence, including negative tests and source/ref hashes. No implementation of R01.C CI, HTTP/browser, production publication, new provider, or unrelated stages.
