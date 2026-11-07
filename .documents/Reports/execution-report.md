@@ -1,182 +1,139 @@
 # Foundation Solo — Execution Report
 
-> **One canonical report.** Overwritten in place on every run; Git history retains earlier revisions. It is not a WIP file and grants no authority. Its own commit SHA is given in the chat handback only.
+> **One canonical report.** Overwritten in place every run; Git history retains earlier revisions. Not a WIP file, grants no authority, and its own commit SHA appears only in the chat handback.
 
 ## Run identity
 
 | Field | Value |
 | --- | --- |
 | Session date | 2026-11-07 |
-| Run type | Owner handoff received — `SOLO-WO-021 R02`; **STOPPED at preflight** |
-| Work order claimed | `SOLO-WO-021`, edition **`R02`** — R00.F contact and integrations |
-| Owner handoff | **Received** — Owner message `Foundation Solo — Implementation Agent Instruction / SOLO-WO-021 R02` |
-| Order actually installed in ACTIVE | **NOT the R02 Approved Scope** — see below |
-| **Status** | **STOPPED — installed-order identity fails and the frozen scope is absent; no substantive change** |
-| Starting revision | `79b8f305d07a28aae295cea39db51d82afcc1e99` (tree `9d8d7d4a46cbfa5b6fedd746ea7cf19de799092f`) |
-| Ending revision | No order, contract or WIP change; this report is the run's only published commit |
-| Changes made | This report only |
+| Work order | `SOLO-WO-021`, edition **`R03`** — `R00.F` contact and integrations |
+| Owner handoff | **Received** — Owner-delivered `SOLO-WO-021 R03` execution instruction, matching the installed edition |
+| Installed order identity | **25,451 bytes**, SHA-256 **`E02AEF86F828B11155363EFC34218C7307540853530A44EBFCA28FD62D113A15`**, marker `OWNER-ISSUED` |
+| Verified root | `C:/Users/Sean/Documents/Provelopment/00.foundation-solo` — equals `git rev-parse --show-toplevel`; real checkout, not the parent workspace, no symlink or junction |
+| Branch / remote | `main`; exactly one worktree; sole `origin` = `https://github.com/provelopment/provelopment-foundation-solo.git` |
+| Initial revision | `9d5372fc8bb2af08af7942e337c127c2ee238499` |
+| Issuance-freeze commit | `cd01b15d5beeece342fe38d512626489395950c8` |
+| Codification commit | `3728d4784fc940095aaad70bd0444c2c901147c6` |
+| Status | **COMPLETE for the documentary scope** — all applicable R03 gates pass; `OD-1`–`OD-7` recorded as open Owner decisions with their code-bearing cases blocked |
 
-The matching Owner handoff required by `SOLO-WO-021 R02` has now arrived. The frozen order was therefore re-preflighted in full, as the instruction's §1–§2 direct. Two independent, explicit stop conditions were found. **Steps A–E were not executed.** Nothing was committed to ACTIVE, PR #1 was not archived, no branch was deleted, no canonical document was edited and NEXT was not touched.
-
-## Decisive finding 1 — the ACTIVE slot no longer holds the issued order
-
-`.documents/WIP/workorder-active.md` no longer contains the `SOLO-WO-021 R02` Approved Scope. It now contains a **4,283-byte handoff summary** titled `# Foundation Solo — Owner issuance handoff for existing SOLO-WO-021 R02`.
-
-| Check | Required by the handoff and the order | Actually installed |
-| --- | --- | --- |
-| Edition | `SOLO-WO-021 R02` Approved Scope | A handoff *describing* R02 |
-| Size | **68,131 bytes** | **4,283 bytes** |
-| SHA-256 | **`B88673C79D36A0090472306428BCAC776C0237D3065594A3F1F337E856A547A0`** | **`9D1916F3B7394B2801C5BE3DA897AD440DC245C441F4DAC10D7BFEC44F5B8B6F`** |
-| First line | `# Foundation Solo — Active Work Order` + Approved Scope | `# Foundation Solo — Owner issuance handoff…` |
-| Diff versus `HEAD` | — | +37 / −1 (38-line insertion replacing the neutral heading) |
-
-The installed document states of itself: *"This is **not** a replacement for `.documents/WIP/workorder-active.md`, not a second work order, and must **not** be committed as a separate WIP or policy document."* The handoff text has been pasted **into** the ACTIVE slot, displacing the order it describes. Its own guard reads: *"If it does not, do **not** issue this handoff; reconcile the mismatch under Owner/Architect control."*
-
-Consequences that forced the STOP:
-
-- **Step A (freeze issuance) cannot be performed.** Committing the current working-tree file would freeze a handoff summary as the standing work order and permanently overwrite the neutral committed ACTIVE (`ea5f20b7`). That is the opposite of freezing an Approved Scope.
-- **Step C (codification) cannot be performed.** The instruction §2 requires me to *"read the entire installed R02 Approved Scope and its G01–G16 gates before touching any file."* That scope is not present, so its permitted paths, permission ledger, `F01`–`F04` / `M01`–`M05` contract literals and gate definitions are unavailable. The instruction §1 and the handoff both forbid substituting a reconstructed copy or recalculating a digest.
-- **Steps B and D inherit the same blocker**, because each is authorized only *"as R02 specifies"* and R02's own specification is no longer readable from the installed slot.
-
-## Decisive finding 2 — pinned HEAD drift
-
-| Item | Value |
-| --- | --- |
-| Pinned R02 starting `main` SHA | `7a7f69a8a94615a01459877b9d32719d39daf5f7` |
-| Local `HEAD` | `79b8f305d07a28aae295cea39db51d82afcc1e99` |
-| Tracking ref / live `origin/main` | `79b8f305d07a28aae295cea39db51d82afcc1e99` |
-| Divergence | **advanced by one report-only commit** |
-
-The advancing commit is the previous run's mandatory report-only commit. The frozen order nonetheless states unconditionally that the pinned SHA *"MUST match local HEAD, tracking ref and live `origin/main` before any non-report write. Any further drift ⇒ STOP for fresh review/reissue, never silent rebase."* Your instruction §2 independently repeats: *"Do not silently relax a frozen HEAD condition to absorb this advancement: use the original order's exact preflight rules and STOP if compatibility is not established."* Compatibility is not established, so it was not assumed.
-
-## The frozen order is recoverable — and intact
-
-The genuine R02 Approved Scope survives in the local Git object database and was verified byte-identical to the issued edition. Nothing was written to the repository to establish this; a temporary copy was extracted to Solo `.temp/`, hashed, and deleted.
-
-| Item | Value |
-| --- | --- |
-| Recoverable Git blob | `feb20a92b227f30d5c74fecf43a5694006f6e98a` |
-| Extracted size | `68,131` bytes — matches the expected size exactly |
-| Extracted SHA-256 | `B88673C79D36A0090472306428BCAC776C0237D3065594A3F1F337E856A547A0` — matches the expected digest exactly |
-
-The agent must **not** restore it into ACTIVE: the order states the agent *"may not self-install or self-authorize it."* Owner-side restoration of that blob is the remedy, and it is the Owner's action to take, not this run's.
-
-## Preflight results
+## Preflight — every prerequisite verified before any non-report write
 
 | Check | Result |
 | --- | --- |
-| Physical root | `C:/Users/Sean/Documents/Provelopment/00.foundation-solo`; `git rev-parse --show-toplevel` identical — a real checkout, not the parent workspace, no symlink or junction |
-| Branch | `main` |
-| `HEAD` / tracking / live remote | `79b8f305…` = tracking ref = `git ls-remote origin refs/heads/main`; ahead/behind `0 / 0` |
-| Worktrees | **Exactly one** — this path at `79b8f30`; no second checkout, clone, shadow or nested repository |
-| Remotes | **Exactly one** `origin` = `https://github.com/provelopment/provelopment-foundation-solo.git` |
-| `git status --porcelain=v1 -uall` | Exactly ` M .documents/WIP/workorder-active.md`; no untracked or unknown path |
-| Stashes | `git stash list` empty |
+| `git status --porcelain=v1 -uall` at start | Exactly ` M .documents/WIP/workorder-active.md` — the permitted order installation, no other changed or untracked path |
+| Worktrees / remotes / stashes | One worktree, one correct `origin`, no stashes |
 | WIP inventory | Exactly `plan-roadmap.md`, `plan-next.md`, `workorder-active.md`, `plan-outlook.md` |
-| **Installed order identity** | **FAIL** — 4,283 B / `9D1916F3…`; the R02 Approved Scope (68,131 B / `B88673C7…`) is not in the slot |
-| **Pinned starting SHA** | **FAIL** — pinned `7a7f69a8…`, actual `79b8f305…` |
-| Owner handoff present | **PASS** — Owner-delivered `SOLO-WO-021 R02` Implementation Agent Instruction, naming the order, edition and expected identity |
-| Git identity | `Sean Moore <development@provelopment.com>` |
+| Immutable content anchors (7/7) | Architecture `0f26366e`, Product `51d96258`, NEXT `e483a281`, ROADMAP `50ff6d30`, OUTLOOK `cb9c7a61`, ACTIVE-as-committed `ea5f20b7`, security `5b50e1f0` — **all matched** |
+| HEAD movement from the R03 reference baseline `79b8f305…` | Exactly **one** commit (`9d5372f`) touching **only** `.documents/Reports/execution-report.md`. R03 §2 expressly permits this: a published HEAD advanced *only* by an independently verified canonical execution-report commit, with all listed anchors unchanged, is not a reason to reset or alter scope. Recorded, not waived — and no reset was performed. |
+| Separate matching Owner handoff | Present and naming `SOLO-WO-021 R03` |
 
-## Baseline source blobs pinned by R02 — all still match `HEAD`
+The R03 baseline is a *reference point*, not reset authority, so the prior run's report-only commit did **not** create a stop condition here. This is the defect escalated in the previous report and corrected by R03.
 
-The canonical documents were not disturbed; the failure is confined to the ACTIVE slot.
+## Step 2 — issuance freeze
 
-| Document | Ordered by R02 | Actual at `HEAD` `79b8f305` |
-| --- | --- | --- |
-| Architecture Charter | `0f26366e542545201d40cb03d8be1d6e2ed8ff62` | `0f26366e542545201d40cb03d8be1d6e2ed8ff62` |
-| Product Definition | `51d9625826956bcd45b5977dee7e48c2323ac1d8` | `51d9625826956bcd45b5977dee7e48c2323ac1d8` |
-| ACTIVE (committed) | `ea5f20b736483c2e102456be1cea9104059fc81a` | `ea5f20b736483c2e102456be1cea9104059fc81a` |
-| NEXT | `e483a281718fc9b74a815212bffe35c395a1dbd2` | `e483a281718fc9b74a815212bffe35c395a1dbd2` |
-| ROADMAP | `50ff6d3037f16576b9b455f17169408acd4fda38` | `50ff6d3037f16576b9b455f17169408acd4fda38` |
+The unmodified installed edition was committed alone as `cd01b15d5beeece342fe38d512626489395950c8`. The frozen blob `e8a1f73201ac329599d9286db9f5f3c184367cef` was extracted and re-hashed: **25,451 bytes, SHA-256 `E02AEF86…D113A15`** — byte-identical to the installed edition. The Approved Scope was not mutated to make the check pass, and no evidence area was appended.
 
-The committed ACTIVE remains the neutral heading, so no order has ever been frozen into Git history — consistent with the R01 STOP report.
+## Steps 3–5 — architecture comparison and codification
 
-## Ordered activities A–E
+Existing literals were located before writing anything: the governed **`contact.email`** property (§6.2G.4), the `mailto:` grammar (§6.2D.7) and typed `email` link (§6.2J.9), exposure classification (§6.2G.3), resource limits (§6.2A.7), the reserved `SubmitSimpleContact` inbound port and `ContactDelivery` outbound port (§6A.4), and the §5A constraints.
 
-| Step | Result | Basis |
-| --- | --- | --- |
-| A — freeze issuance | **NOT EXECUTED** | Would commit a handoff summary as the standing order and overwrite neutral ACTIVE; installed file is not the R02 Approved Scope |
-| B — archive PR #1, delete obsolete branch | **NOT EXECUTED** | Authorized only *inside* a satisfied R02 preflight; PR #1 and the branch were left untouched |
-| C — architectural codification (§6B `interaction.contact`, Product repairs, cross-references) | **NOT EXECUTED** | The R02 literals (`F01`–`F04`, `M01`–`M05`), permitted paths and exact decisions are unreadable from the installed slot, and reconstruction is forbidden |
-| D — authorized NEXT transition | **NOT EXECUTED** | Permitted only *as R02 specifies*; that specification is unavailable. NEXT, ROADMAP and OUTLOOK untouched |
-| E — verification and reporting | **PARTIAL — report only** | This canonical report is published. The documentation gates that depend on executed steps A–D are not runnable, so they are recorded as `NOT EXECUTED`, never PASS |
+**New bounded section: `§6B` — twelve subsections**, inserted between `§6A` and `§7`:
 
-No canonical document, WIP slot, PR or branch was altered. No code, schema, dependency, provider, CI, test, release or deployment was created or claimed.
-
-## Gates `G01`–`G16`
-
-| Gate | Result | Basis |
-| --- | --- | --- |
-| G01 — authority | **FAIL** | The matching Owner handoff is now present, but the installed ACTIVE is not the `SOLO-WO-021 R02` Approved Scope (size and digest mismatch) and the pinned starting SHA has drifted |
-| G02 — frozen issuance | **NOT EXECUTED** | No valid order to freeze; committing the installed file would freeze a handoff summary |
-| G03 — module governance | **NOT EXECUTED** | Charter unchanged |
-| G04 — closed module | **NOT EXECUTED** | §6B not written |
-| G05 — privacy configuration | **NOT EXECUTED** | No documentary change |
-| G06 — request contract | **NOT EXECUTED** | No documentary change |
-| G07 — abuse and privacy | **NOT EXECUTED** | No documentary change |
-| G08 — outcomes | **NOT EXECUTED** | No documentary change |
-| G09 — small integrations | **NOT EXECUTED** | No documentary change |
-| G10 — future tests | **NOT EXECUTED** | No documentary change |
-| G11 — preservation | **PASS (observed)** | Nothing was edited; the mis-installed ACTIVE file, the canonical documents, ROADMAP, OUTLOOK and the security register were all left exactly as found |
-| G12 — canonical edits | **NOT EXECUTED** | No Charter or Product edit |
-| G13 — WIP and path purity | **PASS (observed)** | Four WIP files only; no fifth file, no archive, no dated report; ROADMAP, NEXT and OUTLOOK unmodified |
-| G14 — Git publication | **PASS, report only** | The single report commit was published to `origin/main` and read back; no issuance or codification commit was fabricated |
-| G15 — honest report | **PASS** | This record; no runtime claim, no self-acceptance, no invented evidence, no reconstruction of the missing scope |
-| G16 — PR #1 housekeeping | **NOT EXECUTED** | Blocked on G01; PR #1 unarchived and `docs/solo-wo-018-security-register` intact both locally and on `origin` |
-
-A check that was not run is never reported as PASS, and an applicable unproven gate is `UNVERIFIED`, not PASS.
-
-## PR #1, branches and preservation
-
-| Item | State at handback |
+| Subsection | Content |
 | --- | --- |
-| PR #1 | Untouched this run. Last verified state: `closed`, `merged: false`, head `docs/solo-wo-018-security-register` @ `b62d856`, base `main` @ `0a948be0` |
-| `refs/heads/docs/solo-wo-018-security-register` | Present at `b62d856` — **retained**, no authority exercised to delete |
-| `refs/remotes/origin/docs/solo-wo-018-security-register` | Present at `b62d856` — **retained** |
-| `refs/heads/main` / `refs/remotes/origin/main` | `79b8f30`, plus this report commit |
-| ROADMAP | Unchanged — still lists both `R00.F` and `R00.G`; no obligation consumed |
-| NEXT | Unchanged — still the single `R00.F` candidate |
-| OUTLOOK | Unchanged |
-| Security register | Unchanged; `SOLO-SEC-2026-001` still `Not applicable` to the code-free assessed revision |
-| Architecture §5A, SOP §7A/§7C, `C1`–`C4`, 21 original module contracts | Untouched |
+| 6B.1 | Preserved literals — reasserted, not amended |
+| 6B.2 | Two contact actions never conflated; configuration absence as a first-class state |
+| 6B.3 | The single simple form — closed three-field envelope, normalization, provisional bounds |
+| 6B.4 | `SubmitSimpleContact` use case, `ContactDelivery` port, inward-only dependencies, no address inference |
+| 6B.5 | Seven truthful outcomes, closed set, accessible states, safe retry |
+| 6B.6 | Privacy, log restraint, no default core retention |
+| 6B.7 | Fail-closed boundary, proportionate first-party abuse control, explicit refusal criteria |
+| 6B.8 | Presentation and the module-registry boundary, both placements, adopted recommendation |
+| 6B.9 | Safe links, bounded static booking/directions links, no-analytics default |
+| 6B.10 | Future proof matrix `F01`–`F10` — every case unrun |
+| 6B.11 | Open Owner decisions `OD-1`–`OD-7` |
+| 6B.12 | Preservation, exclusions, reservations |
+
+**Cross-reference repairs (authorised):** §6.5's `R00.F` obligation now points at §6B; §7.5 "Integration scope" now records the settled contract and the `OD` register. **Two deletions total**, both exactly these replaced lines.
+
+**Placement decision.** R03 §3.H required both credible placements be presented with the simplest recommended, and a STOP only if the chosen placement needs a registry change. The adopted placement is the **system-owned use case surfaced through an expressly configured Page/action boundary**, which adds **no** module and leaves the exactly-twenty-one `1.0.0` catalogue intact — so the §3.H stop condition is not triggered. The alternative (`interaction.contact` 22nd module, or an `O05` revision) is recorded as `OD-6`. No 22nd module is claimed, created or concealed.
+
+**Product alignment (narrow, consistency-only):** two edits — the accepted contact bullet now points at §6B and the `OD` register; "integration" was removed from the deferred-contracts list and replaced by a bullet recording the contract as specified. Advanced-form exclusion, one Entity, `mailto:` inclusion and the simple form are all unchanged.
+
+## Gate-by-gate disposition
+
+R03 numbers its requirements as §5 steps rather than `G` identifiers, so each required step and each named verification check is reported individually here.
+
+| R03 requirement | Result | Evidence |
+| --- | --- | --- |
+| §5.1 Authority and integrity | **PASS** | Installed edition, owner handoff, single checkout, sole remote, seven anchors, clean/known tree and four WIP files all verified; actual bytes and SHA-256 recorded |
+| §5.2 Freeze the issued order | **PASS** | `cd01b15`; frozen blob re-hashed byte-identical to the installed edition; pushed and read back |
+| §5.3 Compare existing architecture | **PASS** | `contact.email`, `mailto:` grammar, typed `email` link, exposure rules, limits, reserved ports and §5A located before writing |
+| §5.4 Codify settled rules | **PASS for settled scope** | §6B.1–§6B.12 added; `OD-1`–`OD-7` recorded rather than fabricated (see the judgement note below) |
+| §5.5 Align Product minimally | **PASS** | Two narrow consistency edits only; every accepted Product guarantee preserved |
+| §5.6 Issue-transition cleanup | **PASS** | NEXT cleared to the neutral heading **after** the freeze succeeded; ROADMAP and OUTLOOK untouched; nothing marked accepted or closed |
+| §5.7 Verification | **PASS** | Seven named checks below |
+| §5.8 Report and publish | **PASS** | This report; only permitted paths committed; cleanup complete |
+
+**Named verification checks (§5.7).**
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Structural | **PASS** | `## 6A.` (1176) → `## 6B.` (1580) → `## 7.` (1723) → `## 8.` (1734); 11 top-level headings, no duplicate; §6B.1–§6B.12 all present and correctly nested as `###` |
+| Reference integrity | **PASS** | All 25 in-Charter `§6B` references resolve to an existing subsection; the Product pointer `../Architecture/ARCHITECTURE.md` §6B resolves; every cited §1.3, §2.1, §2.2, §3.1C, §4.1, §5, §5A, §6.2A.7, §6.2D.5–8, §6.2E.2, §6.2G.3–4, §6.2J.9 target exists |
+| Encoding | **PASS** | Architecture 321,997 B and Product 38,548 B are UTF-8 **without BOM**, LF-only (0 CRLF); NEXT normalised to LF, 49 B |
+| Contradiction | **PASS** | `contact.email` (§6.2G.4) still states it implies no submission endpoint; `mailto:` still permits one addr-spec and no send claim; registry still exactly **21** modules; `interaction.contact` appears only as a deferred option and in `OD-6`, never as an accepted module |
+| Permission | **PASS** | Only ARCHITECTURE, Product, NEXT and this report written; PR #1 and the obsolete branch untouched; no code, schema, dependency, CI, provider, secret or deployment |
+| Git integrity | **PASS** | Frozen order commit and codification commit distinct; only named paths staged; no force, rewrite, reset or clean; remote verified by `ls-remote` and read-back |
+| Security lifecycle | **PASS** | §5A untouched; fail-closed boundary, secret isolation, log restraint and inward-only dependency rules codified; `C1`–`C4` remain **UNVERIFIED**; `SOLO-SEC-2026-001` still an external advisory, never labelled patched |
+
+**Interpretive judgement, disclosed for review.** R03 §5.4 directs a STOP where material Owner choices remain undetermined "rather than claiming complete codification", while §3.B and §3.E direct the agent to *identify* such items as decisions requiring approval and keep the code-bearing gate blocked. These were reconciled by codifying every rule R03 fixed, recording `OD-1`–`OD-7` explicitly, and marking the dependent `F02`/`F06`/`F08` cases `BLOCKED` — no numeric value, retention period, acknowledgement or analytics decision was invented. If the Chief Architect reads §5.4 as requiring a full stop, that is the single point to `REVISE`; the substantive codification would not change.
+
+## Open Owner decisions — carried, not resolved
+
+| ID | Decision | Blocks |
+| --- | --- | --- |
+| `OD-1` | exact field bounds and whole-payload ceiling | `F02`, all code-bearing work |
+| `OD-2` | rate/abuse thresholds and window lengths | `F06` |
+| `OD-3` | retention period and data-subject notices at the provider boundary | provider adoption, retention proof |
+| `OD-4` | whether a privacy acknowledgement exists, and its defined legal basis | the final field set |
+| `OD-5` | idempotency/replay policy and correlation-handle lifetime | `F08` |
+| `OD-6` | whether a 22nd `interaction.contact` module replaces the adopted placement | registry amendment only |
+| `OD-7` | whether any analytics is approved, and which | analytics adoption only |
 
 ## Application, tests and runtime
 
-No application code, manifest, dependency, JSON Schema, `config/contact.json`, endpoint, CI workflow, provider account or deployment exists or was created. Compilation, unit, integration, browser, accessibility, provider and quota tests are **NOT APPLICABLE** — there is nothing to run. `R00.E` hold points `C1`–`C4` remain **UNVERIFIED**; `E01`–`E10` remain documented but unproven. No merge, release or deployment is claimed and no test command was invented.
+No application code, manifest, dependency, JSON Schema, endpoint, CI workflow, provider account or deployment exists or was created. `F01`–`F10` are **all unrun** — `NOT RUN` or `BLOCKED` by the `OD` items above, never `PASS`. `R00.E` hold points `C1`–`C4` remain **UNVERIFIED**. No test command, build, scanner result, merge, release or deployment is claimed or invented.
 
-## Repository refs observed — disclosure
+## Historical PR #1 and the obsolete branch — deliberately untouched
 
-`git for-each-ref` additionally shows `refs/cline/checkpoints/…` (Cline IDE checkpoint refs from earlier sessions, including the one preceding this run). These are **IDE tool state, not Solo governance**: they are not branches on `main`, not worktrees, not WIP files and not published to `origin`. They were neither created nor altered by this run and were not deleted, since they are tool-owned rather than task-owned material. They are also why the displaced order remains reachable as blob `feb20a92`.
+R03 §4 supersedes the earlier R02 authority for this housekeeping: PR housekeeping is **read-only evidence only**, and no merge, reopen, archive, or local/remote branch deletion occurs in this edition, because those operations are unnecessary to `R00.F` codification. Accordingly PR #1 was left as previously recorded (`closed`, `merged: false`, head `docs/solo-wo-018-security-register` at `b62d856`), and both the local and remote `docs/solo-wo-018-security-register` refs remain present at `b62d856`. Nothing was merged, reopened, altered or deleted, and no API call was made this run.
 
-## Temporary workspace and cleanup
+## Preservation and cleanup
 
-One temporary artefact was created to prove the order is recoverable: `.temp/wo021-r02-recover-check.md`, extracted from blob `feb20a92` with `git cat-file`, measured at 68,131 bytes and SHA-256 `B88673C7…A547A0`, and then **deleted**. `.temp/` is verified empty (0 items) and Git-ignored via `.gitignore:20`. Nothing was staged from either `.temp/` or the Cline task temp area, and no task-owned material remains anywhere. There are no retained items and no cleanup failure.
+| Item | State |
+| --- | --- |
+| ROADMAP | Unchanged — `R00.F` and `R00.G` both still listed; no obligation consumed or pruned |
+| OUTLOOK | Unchanged |
+| Security register | Unchanged at `5b50e1f0`; `SOLO-SEC-2026-001` still `Not applicable` to the code-free assessed revision |
+| WIP inventory | Still exactly four files; NEXT is the neutral heading; no archive, dated report or fifth file |
+| Architecture §5A, SOPs §7A/§7C, `C1`–`C4`, 21 module contracts, `contact.email`, `mailto:` grammar | Untouched |
+| Temporary workspace | One temporary artefact (`.temp/frozen-check.md`, used to re-hash the frozen order blob) was created and **deleted**; `.temp/` verified **0 items** and Git-ignored via `.gitignore:20`. No task-owned material remains; no retained items and no cleanup failure |
+| Working tree at handback | Clean (`git status --porcelain` empty) after the report commit |
 
-## Changed-path and commit ledger
+## Changed-path ledger
 
-| Path | Change | Note |
+| Path | Change | Commit |
 | --- | --- | --- |
-| `.documents/Reports/execution-report.md` | Overwritten | The run's only committed and pushed change |
-
-`.documents/WIP/workorder-active.md` remains modified and **uncommitted**, exactly as it was found. It was deliberately **not** committed, reverted, replaced or deleted: it is Owner-controlled material, restoring the real order is an Owner action, and the file itself states it must not be committed as a WIP document.
-
-## State at handback
-
-`main` is one worktree on one remote at `79b8f305…` locally and on `origin`, plus this single report commit. One uncommitted path remains: `.documents/WIP/workorder-active.md` at 4,283 bytes, holding the handoff summary rather than the `SOLO-WO-021 R02` Approved Scope. Committed ACTIVE is still the neutral heading `ea5f20b7`. The genuine order is intact in the object database as blob `feb20a92b227f30d5c74fecf43a5694006f6e98a` (68,131 B, `B88673C7…A547A0`, verified). PR #1 and the obsolete branch are untouched; ROADMAP still lists `R00.F` and `R00.G`; NEXT still holds the `R00.F` candidate; OUTLOOK and the security register are unchanged.
-
-## Required Owner decisions
-
-Two blockers, either sufficient to sustain this STOP. The smallest resolution is both together:
-
-1. **Restore the issued order into ACTIVE.** The Owner should re-install the exact 68,131-byte edition into `.documents/WIP/workorder-active.md` — the verified bytes are recoverable locally from blob `feb20a92`. The agent must not do this, because installing or authorising an order is expressly the Owner's act. The handoff summary currently occupying the slot should be removed from that path (it was never meant to live there), preferably before reinstallation so the slot holds only the order.
-2. **Disposition the pinned-HEAD drift.** Pinned `7a7f69a8…` no longer equals `HEAD`/`origin/main` `79b8f305…`, and the advancing commit is the mandated report-only commit from the prior run. That needs either a fresh R02 review/reissue pinned to the current `main`, or an explicit Owner/Architect statement of how report-only commits are to interact with the pinned-SHA precondition. A silent rebase, recalculation or waiver by an agent is forbidden.
-
-Once a valid order occupies ACTIVE with an unambiguous starting-revision rule, the same handoff already delivered re-enables steps A–E without any further product decision.
+| `.documents/WIP/workorder-active.md` | Unmodified R03 edition committed verbatim as the issuance freeze (+135) | `cd01b15` |
+| `.documents/Architecture/ARCHITECTURE.md` | `§6B` added (+145/−2) — the two deletions being the §6.5 `R00.F` obligation and the §7.5 integration-scope line replaced with §6B-aware text | `3728d47` |
+| `.documents/About/FOUNDATION-SOLO.md` | Narrow consistency repair (+3/−2) | `3728d47` |
+| `.documents/WIP/plan-next.md` | R00.F candidate cleared to the neutral heading (−12) | `3728d47` |
+| `.documents/Reports/execution-report.md` | This report, overwritten in place | report commit |
 
 ## Handback note
 
-No acceptance is claimed. This run executed nothing beyond the canonical report and stops on the actual blockers above. Independent Chief Architect disposition (`ACCEPT / REVISE / STOP`) is required against the published report at its exact revision; ROADMAP closure, ACTIVE clearing and any `R00.G` order remain separate Owner decisions.
-
+`COMPLETE` is reported only for the documentary scope R03 defines. **No acceptance is claimed.** Independent Chief Architect disposition (`ACCEPT / REVISE / STOP`) is required against this published report at its exact revision. Administrative closure of `R00.F`, ROADMAP pruning and any `R00.G` order remain separate Owner decisions, and `R00.G` was not started.
 
 
