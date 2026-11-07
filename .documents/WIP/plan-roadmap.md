@@ -6,7 +6,6 @@
 
 **Remaining packages**
 
-- **R00.F — Contact and integrations:** specify safe `mailto:`; simple form field set, validation, consent/privacy, rate/abuse policy, delivery-failure behavior, storage/retention and port responsibilities. Explicitly exclude advanced contact forms. Define whether and how static booking/directions links and privacy-respecting analytics meet the first release. The contract is now codified in [Architecture](../Architecture/ARCHITECTURE.md) §6B, with the simple form as the registered `interaction.contact` module; this obligation stays pending until independent acceptance and separate Owner closure.
 - **R00.G — Lifecycle and nonfunctional standards:** settle initial setup/preview/content-update/upgrade/recovery responsibilities, immutable release identity, deployment portability, supported versions and security response — including triage ownership, coordinated-disclosure handling and response expectations, judged by the **A1** acceptance standard in [Architect SOP](../SOP/sop-architect.md) §7B rather than a separate register-closure process — accessibility/performance targets and precise acceptance matrix.
 
 **Exit gate:** documented, consistent Owner-approved contracts in canonical About/Architecture documents; a decision matrix showing accepted versus open non-blocking matters; a minimal first code-bearing complete work order prepared for Owner review. No important design decision is delegated silently to an implementation agent. **No code exists solely because this stage is accepted.**
