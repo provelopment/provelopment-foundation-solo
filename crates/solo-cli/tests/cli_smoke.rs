@@ -1,10 +1,19 @@
 //! End-to-end tests through the **actual compiled process**, capturing real exit
 //! statuses and streams rather than simulating them.
+//!
+//! Scratch material is created only inside this checkout's own `.temp/` root, with
+//! exclusive creation, symlink/reparse-point validation and non-recursive cleanup
+//! that can only ever remove a child this test positively created.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 const BIN: &str = env!("CARGO_BIN_EXE_solo-cli");
+
+/// The Solo checkout root, resolved from the compile-time manifest path.
+const SOLO_ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");
 
 fn run(args: &[&str]) -> Output {
     Command::new(BIN)
@@ -51,10 +60,10 @@ fn required_refusal_case_reports_an_identity_code() {
 
     assert_eq!(output.status.code(), Some(2));
     assert_eq!(stdout_of(&output), "", "a refusal must not write stdout");
-    let stderr = stderr_of(&output);
     assert!(
-        stderr.contains("PREFLIGHT_ENTITY_ID_INVALID"),
-        "unexpected diagnostic: {stderr:?}"
+        stderr_of(&output).contains("PREFLIGHT_ENTITY_ID_INVALID"),
+        "unexpected diagnostic: {:?}",
+        stderr_of(&output)
     );
 }
 
@@ -194,11 +203,122 @@ fn refuses_unusable_argument_sets() {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Scratch confinement: authorized root, exclusive creation, safe cleanup.
+// ---------------------------------------------------------------------------
+
+/// Resolves the one authorized scratch root for this checkout.
+///
+/// The root is this Solo checkout's own `.temp/`, derived from the compile-time
+/// manifest path. It must stay inside the canonical checkout and must not be
+/// redirected by a symlink or reparse point; there is deliberately no fallback to a
+/// general OS temporary directory.
+fn scratch_root() -> PathBuf {
+    let checkout = std::fs::canonicalize(SOLO_ROOT).expect("the Solo checkout root must resolve");
+    let root = checkout.join(".temp");
+    std::fs::create_dir_all(&root).expect("the authorized task scratch root must be creatable");
+    let resolved = std::fs::canonicalize(&root).expect("the scratch root must resolve");
+
+    assert!(
+        resolved.starts_with(&checkout),
+        "scratch root {resolved:?} escaped the Solo checkout {checkout:?}"
+    );
+    assert!(
+        !is_redirected(&resolved),
+        "scratch root {resolved:?} is a symlink or reparse point"
+    );
+
+    resolved
+}
+
+#[cfg(windows)]
+fn is_redirected(path: &Path) -> bool {
+    use std::os::windows::fs::MetadataExt;
+    /// `FILE_ATTRIBUTE_REPARSE_POINT`
+    const REPARSE: u32 = 0x0400;
+    std::fs::symlink_metadata(path)
+        .map_or(true, |metadata| metadata.file_attributes() & REPARSE != 0)
+}
+
+#[cfg(not(windows))]
+fn is_redirected(path: &Path) -> bool {
+    std::fs::symlink_metadata(path).map_or(true, |metadata| metadata.file_type().is_symlink())
+}
+
+/// A uniquely named scratch child that this test positively created.
+struct ScratchChild {
+    path: PathBuf,
+}
+
+impl ScratchChild {
+    /// Creates a fresh, never-reused child under the authorized scratch root.
+    fn create() -> Self {
+        let root = scratch_root();
+        let path = root.join(unique_child_name());
+        Self::create_at(&path).expect("exclusive scratch child")
+    }
+
+    /// Creates exactly `path`, refusing anything that already exists.
+    ///
+    /// `create_dir` is used rather than `create_dir_all` precisely because it fails
+    /// when the target exists, which is what makes creation exclusive.
+    fn create_at(path: &Path) -> std::io::Result<Self> {
+        std::fs::create_dir(path)?;
+        Ok(Self {
+            path: path.to_path_buf(),
+        })
+    }
+
+    fn path(&self) -> &Path {
+        &self.path
+    }
+}
+
+impl Drop for ScratchChild {
+    fn drop(&mut self) {
+        // Non-recursive by design: only an empty child created by this test can be
+        // removed, so foreign or pre-existing material can never be deleted here.
+        let _ = std::fs::remove_dir(&self.path);
+    }
+}
+
+fn unique_child_name() -> String {
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+    let sequence = COUNTER.fetch_add(1, Ordering::Relaxed);
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |elapsed| elapsed.as_nanos());
+    format!(
+        "solo-cli-smoke-{}-{}-{}",
+        std::process::id(),
+        nanos,
+        sequence
+    )
+}
+
+fn entry_count(path: &Path) -> usize {
+    std::fs::read_dir(path).expect("readable directory").count()
+}
+
 #[test]
-fn a_successful_run_creates_no_files_in_the_working_directory() {
-    let scratch = std::env::temp_dir().join(format!("solo-cli-probe-{}", std::process::id()));
-    std::fs::create_dir_all(&scratch).expect("scratch directory");
-    let before = directory_len(&scratch);
+fn scratch_root_is_inside_the_checkout_and_not_redirected() {
+    let root = scratch_root();
+    let checkout = std::fs::canonicalize(SOLO_ROOT).expect("checkout root resolves");
+
+    assert!(root.starts_with(&checkout));
+    assert!(!is_redirected(&root));
+    assert_eq!(
+        root.file_name().and_then(|name| name.to_str()),
+        Some(".temp"),
+        "scratch must use this checkout's own .temp root, with no OS-temp fallback"
+    );
+}
+
+#[test]
+fn a_successful_run_creates_no_files_in_its_working_directory() {
+    let child = ScratchChild::create();
+    let directory = child.path().to_path_buf();
+    assert_eq!(entry_count(&directory), 0, "the child starts empty");
 
     let output = Command::new(BIN)
         .args([
@@ -208,20 +328,75 @@ fn a_successful_run_creates_no_files_in_the_working_directory() {
             "--base-url",
             "https://example.com",
         ])
-        .current_dir(&scratch)
+        .current_dir(&directory)
         .output()
         .expect("binary must run");
 
     assert_eq!(output.status.code(), Some(0));
     assert_eq!(
-        directory_len(&scratch),
-        before,
+        entry_count(&directory),
+        0,
         "the preflight must not write any file"
     );
 
-    std::fs::remove_dir_all(&scratch).expect("scratch cleanup");
+    drop(child);
+    assert!(
+        !directory.exists(),
+        "the test must leave no task-owned residue behind"
+    );
 }
 
-fn directory_len(path: &Path) -> usize {
-    std::fs::read_dir(path).expect("readable directory").count()
+#[test]
+fn an_existing_scratch_child_is_refused_and_preserved() {
+    let root = scratch_root();
+    let existing = root.join(unique_child_name());
+    std::fs::create_dir(&existing).expect("pre-existing material");
+    let sentinel = existing.join("preexisting-material.txt");
+    std::fs::write(&sentinel, b"keep me").expect("sentinel");
+
+    match ScratchChild::create_at(&existing) {
+        Ok(_) => panic!("an existing scratch child must be refused, never reused"),
+        Err(error) => assert_eq!(error.kind(), std::io::ErrorKind::AlreadyExists),
+    }
+
+    assert!(
+        existing.is_dir(),
+        "pre-existing directory must be preserved"
+    );
+    assert_eq!(
+        entry_count(&existing),
+        1,
+        "pre-existing material must never be removed"
+    );
+    assert_eq!(
+        std::fs::read(&sentinel).expect("sentinel must still be readable"),
+        b"keep me"
+    );
+
+    std::fs::remove_file(&sentinel).expect("scoped sentinel cleanup");
+    std::fs::remove_dir(&existing).expect("scoped child cleanup");
+    assert!(!existing.exists());
+}
+
+#[test]
+fn cleanup_never_removes_foreign_material_recursively() {
+    let child = ScratchChild::create();
+    let directory = child.path().to_path_buf();
+    let foreign = directory.join("foreign-material.txt");
+    std::fs::write(&foreign, b"not mine to delete").expect("foreign material");
+
+    drop(child);
+
+    assert!(
+        directory.exists(),
+        "cleanup must not remove a non-empty directory"
+    );
+    assert!(
+        foreign.exists(),
+        "cleanup must never delete material it did not create"
+    );
+
+    std::fs::remove_file(&foreign).expect("scoped foreign cleanup");
+    std::fs::remove_dir(&directory).expect("scoped child cleanup");
+    assert!(!directory.exists());
 }

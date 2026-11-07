@@ -1,0 +1,7 @@
+# Deterministic Windows GNU executables for the pinned 1.99.1 GNU host variant.
+# Without this, the GNU linker stamps a wall-clock PE TimeDateStamp (and the
+# derived CheckSum that covers it) into every executable, so two clean builds of
+# identical source differ. Suppressing the timestamp makes repeated builds
+# byte-identical without touching dependency, toolchain or other-target behavior.
+[target.x86_64-pc-windows-gnu]
+rustflags = ["-C", "link-arg=-Wl,--no-insert-timestamp"]
