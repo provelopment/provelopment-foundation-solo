@@ -1,0 +1,28 @@
+# Foundation Solo — R01.A minimal reproducible engineering foundation.
+# Four real crates in a strict inward-only Hexagonal (Ports and Adapters) shape:
+#   solo-domain       pure validated domain types (std only)
+#   solo-application  inbound use-case contract and service (solo-domain only)
+#   solo-adapters     external CLI input/output translation (inward only)
+#   solo-cli          single binary and the one composition root
+# See .documents/Architecture/ARCHITECTURE.md §5A for the binding boundaries.
+
+[workspace]
+members = [
+    "crates/solo-domain",
+    "crates/solo-application",
+    "crates/solo-adapters",
+    "crates/solo-cli",
+]
+resolver = "3"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.99"
+license = "Apache-2.0"
+publish = false
+
+[workspace.dependencies]
+solo-domain = { path = "crates/solo-domain" }
+solo-application = { path = "crates/solo-application" }
+solo-adapters = { path = "crates/solo-adapters" }

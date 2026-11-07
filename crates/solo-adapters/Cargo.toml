@@ -1,0 +1,12 @@
+[package]
+name = "solo-adapters"
+description = "Foundation Solo driving adapter: CLI argument translation and safe result rendering."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+solo-application = { workspace = true }
+solo-domain = { workspace = true }

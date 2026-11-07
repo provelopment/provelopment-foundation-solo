@@ -1,0 +1,10 @@
+[package]
+name = "solo-domain"
+description = "Pure Foundation Solo domain types: validated entity identity and authored base candidate."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
