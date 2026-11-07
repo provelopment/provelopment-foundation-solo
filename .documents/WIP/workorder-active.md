@@ -1,110 +1,84 @@
 # Foundation Solo — Active Work Order
 
-## Approved Scope — `SOLO-WO-018` / `R01`
+## Approved Scope — `SOLO-WO-019` / `R02`
 
-| Field | Owner-approved value on issuance |
+| Field | Owner-issued instruction |
 | --- | --- |
-| Work order | `SOLO-WO-018`, edition `R01` |
-| Marker | `OWNER-ISSUED` — effective **only** after the Owner installs this exact document in the single ACTIVE slot and sends the matching explicit handoff |
-| Date | 2026-11-07 |
-| Repository | `provelopment/provelopment-foundation-solo` (public); verified Owner-local root: `C:\Users\Sean\Documents\Provelopment\00.foundation-solo` |
-| Base ref | `main`; GitHub baseline observed during preparation: `6e98b93513dab0b511e9bd4f4df4bbd64063b576` — verify live local/remote revision before edits, do not assume it is unchanged |
-| Classification | Bounded security-documentation and register-governance transition; **no software remediation, executable implementation, release or deployment** |
-| Owner handoff | Separate Owner-sent message explicitly naming `SOLO-WO-018 R01` and confirming that this exact edition was installed in `.documents/WIP/workorder-active.md` |
-| Independence | The Implementation Agent executes; the Chief Architect independently reviews. Neither agent self-issues, self-accepts, merges or deploys. |
+| Marker | **`OWNER-ISSUED`**, effective only when the Owner installs this exact document in `.documents/WIP/workorder-active.md` **and** sends the matching `SOLO-WO-019 R02` handoff |
+| Objective | Codify **proactive security by design** as a permanent, cross-cutting Foundation Solo requirement while Solo has **no application code** |
+| Classification | One bounded documentation/architecture-governance implementation; no application code, deployment, release, or security remediation |
+| Repository | `provelopment/provelopment-foundation-solo`; expected local root `C:\Users\Sean\Documents\Provelopment\00.foundation-solo` (verify actual root) |
+| Reference baseline | `main` was `4082ab7be2ae4648f360548926a7e25672fa0d03` when prepared; verify actual local and remote HEAD before edits |
+| Existing review artifact | PR #1: `https://github.com/provelopment/provelopment-foundation-solo/pull/1`, branch `docs/solo-wo-018-security-register`, known head `daa2cb98625c67fc33f29eb0cdc78e6026f336d9` |
+| Previous order | This R02 **replaces** the Owner-installed `SOLO-WO-019 R01` in ACTIVE. It **removes the prerequisite** that `SOLO-WO-018` be closed or PR #1 merged before security-by-design codification. Existing `REVISE`/`STOP` reports remain truthful history, not execution blockers under R02. |
 
-### 1. Owner decision embodied by issuance
+### 1. Explicit Owner decision and simplified execution
 
-By **installing this exact approved scope and sending its matching handoff**, the Owner expressly decides and authorizes all of the following **for this task only**:
+By installing this order and sending its matching handoff, the Owner:
 
-1. Introduce the dedicated canonical security-findings concern at **`.documents/Security/security-issues.md`**, outside WIP. It is a durable, evidence-linked **security issue and remediation register**; it is **not** a work-order queue, an alternative ROADMAP/NEXT/ACTIVE/OUTLOOK or an execution-report archive. The new concern is identified with narrow document-map pointers in `README.md` and `AGENTS.md`. The public register contains no confidential vulnerability details.
-2. Prioritize this one bounded documentation task ahead of the currently selected `R00.F` NEXT candidate. This **does not complete, alter, accept, remove or work on** `R00.F`, `R00.G`, `R11.A`, or any ROADMAP obligation. On issuance, mechanically neutralize the pending `R00.F` entry in NEXT while preserving that obligation in ROADMAP. NEXT selection after this task is a **separate Owner-authorized closure/reconciliation action**.
-3. Authorize one short-lived documentation branch and a pull request **without merge**; authorize the specific `main` commits and pushes below for frozen issuance/NEXT transition and the one canonical execution report. No other WIP workflow changes are permitted.
+1. Adopts **security by design, from planning through maintenance**, as a core Solo product principle. An external vulnerability is a source of preventive requirements, **not automatically an identified vulnerability in Solo**.
+2. Authorizes using the **existing PR #1 and its security-register branch** as the starting review artifact, extending that branch with the documentation below. **Do not require PR #1 to be merged first; do not create a second PR merely to continue this task.** Update PR #1's title/description to reflect the consolidated scope. The combined PR awaits one independent Architect review.
+3. Expressly prioritizes this documentation work ahead of the existing NEXT candidate. Preserve all remaining ROADMAP work including `R00.F`, `R00.G`, and `R11.A`. NEXT is already neutral and **must remain untouched**. No stage or package is deemed complete or accepted by this task.
+4. Authorizes the implementation agent's routine Git operations for the explicitly named paths and branches under Architect SOP §6B. This approval is **not** permission to merge PR #1, release, deploy, self-accept, or clear ACTIVE.
 
-This Owner decision is **not effective merely because this text appears in a chat, downloadable draft or GitHub issue**. The Owner alone installs it in ACTIVE and sends the matching handoff. The agent must verify both before any non-report write.
+**Do not STOP solely because WO018 has an unresolved `REVISE`, PR #1 remains unmerged, or the security register is absent on `main`: those are precisely the prior dependency errors resolved by this Owner-issued replacement.** The register is present on the approved PR #1 branch. Do STOP if actual repository/authorization/safety evidence contradicts this order.
 
-### 2. Objective and completed deliverables
+### 2. Deliverable — one lasting, enforceable security protocol
 
-Establish a **single authoritative, reusable security-findings register** with a bounded, evidence-based assessment of the **repository as it actually exists now**. Seed it with the previously raised WordPress core update-window advisory, **CVE-2026-119977** (source facts to be independently checked by the agent), including its applicability, potential future relevance, defensive requirements and reassessment trigger.
+Codify this concise lifecycle in the appropriate **existing** canonical documents, with links rather than competing copies:
 
-Deliver exactly:
+**Identify → Verify → Assess → Prevent/Respond → Validate → Reassess.**
 
-- `.documents/Security/security-issues.md` — a complete Markdown register with a defined upkeep convention, explicit evidence limits, finding index, detailed record for `SOLO-SEC-2026-001`, remediation/verification requirements, outstanding issues and change-history fields. It may contain additional findings only when grounded in concrete inspected evidence.
-- Minimal, coherent pointers in `README.md` (project document map) and `AGENTS.md` (one authority per concern) identifying the register's limited purpose. Do not rewrite product governance or expand the four WIP files.
-- An Owner-issued order frozen in Git history, an authorized neutral NEXT transition, a pushed documentation branch with an **open, unmerged PR**, and the single factual execution report at `.documents/Reports/execution-report.md` published to `origin/main`.
+- **Identify:** security advisories, dependency/technology changes, design threats, code findings, vulnerability reports, incidents, and release/update risks; protect confidential disclosure through existing `.github/SECURITY.md`.
+- **Verify:** record authoritative sources, dates, affected versions/components and evidence, not headlines or unproven claims.
+- **Assess:** classify applicability to Solo's exact current revision, trust boundaries, exposure, consequences, confidence, severity, owner and unknown/out-of-scope assets. Distinguish vendor risk from Solo-specific risk.
+- **Prevent/Respond:** consider secure-by-default designs *before* implementation; specify threat/abuse and refusal cases; propose controls or remediation with an Owner-approved bounded work order when changes are required. Do not turn the security register into a parallel task queue.
+- **Validate:** make security acceptance conditions explicit in relevant future work orders. Require proportionate source/configuration/dependency review, negative and abuse tests, least privilege, secret isolation, safe public projection, and secure release/update/rollback evidence **when those capabilities exist**. Never mark tests not run as PASS; never mark a finding `Resolved` without evidence.
+- **Reassess:** revisit the register when dependencies, frameworks, adapters/providers, deployments, release/update designs or vulnerabilities change, and before release. Leave exact cadence, response SLA, supported-version and provider decisions for Owner approval in the proper existing roadmap packages.
 
-**Not a deliverable:** a production security certification or a code-level application penetration test. The published Solo repository currently contains governance/architecture documentation and no implemented application, dependency manifest, CI tests or deployment. The agent must reconfirm this at the reviewed revision, report limitations, and avoid marking untested product behaviour `PASS`.
+**Worked example:** Existing `SOLO-SEC-2026-001`, WordPress Core update-window CVE-2026-119977, stays an independently sourced **external advisory not applicable to the assessed code-free Solo repository**. Demonstrate the pipeline from source verification to applicability assessment, proposed future safeguards (e.g. verified release artifacts, staging isolation, atomic activation, least privilege and rollback), objective future tests, and a trigger for reassessment if Solo ever adds relevant technology. **No WordPress patch, code, CMS adoption, scan, or deployment is required or claimed.**
 
-### 3. Exact permanent-file write ledger
+### 3. Exact permitted permanent-file changes
 
-| Path | Authorized operation |
+| Path | Change permitted |
 | --- | --- |
-| `.documents/WIP/workorder-active.md` | Owner installs the exact frozen order. Agent may **stage, commit and publish those Owner-installed bytes only** as its separate issuance commit. Agent must not rewrite Approved Scope, overwrite it with a template, self-apply the `OWNER-ISSUED` marker or clear ACTIVE. |
-| `.documents/WIP/plan-next.md` | **Only** after the above Owner issuance checks: replace the currently observed `R00.F — Contact and integrations` candidate with the existing one-line neutral NEXT title, `# Foundation Solo — plan-next (Next Candidate)` followed by exactly one LF. Preserve ROADMAP's `R00.F` obligation. If the observed candidate differs or the neutralization is not exact, STOP. |
-| `.documents/Security/security-issues.md` | Create the one canonical register outside WIP; do not create per-finding report files, backup copies or parallel trackers. |
-| `README.md` | Add only the minimum project-document-map entry/pointer for the canonical register and its purpose. Preserve existing statements on project maturity and authority. |
-| `AGENTS.md` | Add only a compatible, narrowly worded reference within the existing *one authority per concern* map (Security owns public-safe security findings, not SOP/work authorization). Preserve all existing Owner, WIP and handoff rules byte-for-byte otherwise. |
-| `.documents/Reports/execution-report.md` | Overwrite the **one** canonical report with this run's factual evidence and publish it to `origin/main`; do not create another report. |
+| `.documents/WIP/workorder-active.md` | **Owner replaces** R01 with this exact R02. Agent may only commit/push the Owner-installed bytes unchanged as a frozen-issuance commit on `main`. Do not self-edit, clear, or add agent acceptance. |
+| `.documents/About/FOUNDATION-SOLO.md` | One compact product-level requirement: security is proactive and continuous, planned before code. |
+| `.documents/Architecture/ARCHITECTURE.md` | One integrated cross-cutting security subsection: risk/trust-boundary assessment, safe defaults, validated supply chain, release/update integrity, defensive tests and reassessment points; preserve all accepted EFS, routing, D/O/E, C1–C4 contracts and statuses. |
+| `.documents/SOP/sop-architect.md` | Minimal Architect procedure for the six-step security lifecycle, threat/risk evaluation and independently verifiable gates; **do not replace or duplicate §6B Git procedure** or weaken A1. |
+| `.documents/SOP/sop-implementation.md` | Minimal implementation-agent obligations for security evidence, negative/refusal checks, truthful `NOT RUN` / `NOT APPLICABLE` statuses and private disclosure handling; refer to Architect SOP rather than restating it. |
+| `.documents/Security/security-issues.md` | Preserve the PR #1 register, its stable issue ID and narrow WordPress applicability; add only concise process links/trace to the new protocol, if missing. |
+| `.documents/WIP/plan-roadmap.md` | Strengthen **only** the pending `R00.G` security-response/lifecycle contract and `R11.A` security review expectations, and `R10` update/recovery acceptance if genuinely necessary. Preserve all pending work, stage identities and unrelated text. |
+| `README.md` and `AGENTS.md` | Minimal coherent document-map and security-by-design references; **preserve** all existing authorization, WIP and product rules. Preserve the PR #1 register links. |
+| `.documents/Reports/execution-report.md` | Overwrite **the one** existing canonical report with actual run evidence; push a report-only commit on `main`. |
 
-**Read-only:** `.documents/About/FOUNDATION-SOLO.md`, `.documents/Architecture/ARCHITECTURE.md`, both SOPs, `.documents/WIP/plan-roadmap.md`, `.documents/WIP/plan-outlook.md`, `.github/SECURITY.md`, `.github/**`, repository hygiene files and all other project paths. If authoritative contract changes beyond the narrow, expressly approved Security mapping are needed, STOP for a new Owner decision. Do not alter other repositories or the parent workspace.
+**Do not modify** `plan-next.md`, `plan-outlook.md`, `.github/SECURITY.md`, application/dependency files, other repositories or any other permanent path. Do not create another WIP file, SOP, register, report archive or status tracker. There are exactly four WIP files.
 
-### 4. Register content specification
+### 4. Execution and publication
 
-The security register must have clear sections for:
+1. Read `README.md`, `AGENTS.md`, Product Definition, Architecture Charter, both SOPs, the four WIP files and current execution report **in the required order**. Confirm correct actual Solo checkout, `main`, one worktree, exactly one `origin` with the correct URL, base revision/remote agreement and Git status. The sole permitted existing dirty file is the **Owner-replaced R02 ACTIVE**, unless another known and separately authorised change is verified. Verify the full order ID, edition and `OWNER-ISSUED` marker plus a separate matching Owner handoff. STOP on unexplained dirty or Owner-owned data; no reset/clean/stash/force push.
+2. Verify PR #1 still corresponds to the Solo repository and contains the existing canonical register on its known branch/head. Confirm NEXT is already the neutral one-line title and ROADMAP still contains the pending `R00.F`, `R00.G` and `R11.A` obligations. **No prerequisite merge or former-order closure check applies to this R02.** If PR #1 has changed since preparation, inspect the change and use it only if the provenance/scope remains clear; otherwise STOP with the concrete discrepancy.
+3. Commit/push the **exact Owner-installed R02 ACTIVE bytes only** to `origin/main` as a frozen issuance. From the **same checkout**, work on the existing PR #1 branch, without rebasing or rewriting its published commit. Incorporate `main` by a non-destructive branch-side merge only if required, then update only the authorized documentation files. Commit and push to that same branch, update PR #1 description/title, **leave it open and unmerged**, and verify remote branch commit/tree and changed paths.
+4. Return safely to `main`, overwrite and publish **only** the current `.documents/Reports/execution-report.md` on `origin/main`, and verify GitHub readback. Report the report-commit SHA in chat, not inside the report. **After publication**, record actual `git status --porcelain`, local `HEAD`, upstream and remote SHA in the chat handoff; document both Solo `.temp/` and Cline-provided temporary workspace cleanup or limitations. Retain ACTIVE and neutral NEXT until a later Owner-authorized reconciliation.
+5. Apply Architect SOP §6B as **the sole Git/GitHub procedure**. Ordinary commit, push, branch, PR-edit and remote-verification mechanics are delegated; no separate approvals for individual commands. No PR merge, release, deployment, provider/DNS/TLS/account action, dependency installation, secret access, live exploitation, destructive action, new worktree/clone or other-repository write.
 
-1. Purpose and boundaries; assessed repository, commit, date, assessor; distinction between **current findings**, **external advisories/watch items**, and **future hardening requirements**. A security issue is not an implementation authorization.
-2. Public-reporting safety and reference to the existing GitHub private vulnerability reporting channel in `.github/SECURITY.md`; no sensitive proofs, exploit recipes, exposed tokens, PII, internal addresses or confidential attack paths in this public repository.
-3. Finding index with stable issue ID, short title, source/reference, source severity versus Solo-specific risk, affected component/scope, impact, status, owner/TBD, priority, evidence date and revisit trigger.
-4. Detailed finding records: technical summary, affected versions/configuration where source-supported, applicability to the **actually assessed Solo revision**, evidence and gaps, threat/impact, concrete remediation or preventive safeguards, objective validation/closure criteria, and links to authorized implementation work when it later exists. Never report a vulnerability as remediated without tested evidence.
-5. Assessment methodology, **checks actually run**, precise scope exclusions, unknowns and limitations; a concise future-review checklist as code and deployment capabilities arrive, without inventing a current vulnerability backlog.
-6. Register maintenance rule and change history. Future discoveries are incorporated into **this** file with stable IDs and appropriate independent review and Owner-authorized edits; do not make this file a replacement for the four WIP slots.
+### 5. Acceptance criteria (independent Chief Architect review)
 
-#### Required initial record: `SOLO-SEC-2026-001`
+Mark each **PASS / FAIL / UNVERIFIED**, or reasoned **NOT APPLICABLE**:
 
-- Title: **WordPress core full-update window — potential unauthenticated remote code execution**.
-- CVE: **CVE-2026-119977**. Verify the official CVE/WordPress/CISA record and quote exact affected/fixed versions, severity, conditions and dates only where supported; link the primary sources and retrieval date. Do **not** copy the previous agent's claims as proof without source checking.
-- Investigate repository contents, manifests and deployment evidence *actually present*, including WordPress-specific files, dependencies or integration declarations. The prior read-only report observed no WordPress and no implemented application; the agent must verify again at exact HEAD. If still absent, classify **`Not applicable — assessed Solo repository at <SHA>`**, **not** `Fixed`, `Mitigated` or "Solo cannot ever be affected." An external installation/service cannot be cleared without separate evidence.
-- Record the vendor-level risk separately from **Solo's observed applicability**. Include a reassessment trigger if Solo adopts WordPress, integrates a WordPress-managed service, or acquires an update mechanism with comparable time-of-check/time-of-use exposure.
-- Record implementation-agnostic future safety requirements (e.g. signed/integrity-checked artifacts, immutable or atomic publication, least-privilege permissions, controlled update staging, monitoring and rollback) as **proposed preventive controls to assess during later authorized lifecycle/security work**, not as implemented protections or defects in nonexistent code.
+- **G01 — Authority/provenance:** matching installed R02 and Owner handoff, correct root/remote, safe starting state, prior PR #1 branch verified, unchanged frozen scope published.
+- **G02 — Core requirement:** Product Definition and Architecture explicitly make security-by-design a requirement from planning to maintenance, with no code-existence or security-certification fiction.
+- **G03 — Process:** the six steps have clear inputs, role ownership, confidentiality, response decision, evidence, objective closure and reassessment triggers; no second governance authority is created.
+- **G04 — Future lifecycle gates:** SOPs and ROADMAP require proportional security proof in relevant future implementation, release and update work; A1, existing contracts and no-early-release boundaries preserved.
+- **G05 — WordPress exemplar:** the original ID and source/applicability remain intact; controls are proposed, not implemented; this case visibly exercises the security process.
+- **G06 — Repository purity:** exactly four WIP files, no new parallel trackers/SOPs, authorized files only, private intake kept private, no sensitive public disclosure.
+- **G07 — Git/report:** frozen issuance on `main`, updated existing PR #1 open/unmerged, remote verified, canonical execution report published on `main`; actual final Git status/remote equality evidenced.
+- **G08 — Cleanup/truthfulness:** actual checks and limitations reported, Solo and Cline temp disposition specified, `NOT RUN` and `NOT APPLICABLE` used honestly; no self-approval, merge or deployment claim.
 
-If no other repository-backed finding exists, explicitly say so within the bounded assessment; do not manufacture vulnerabilities or pretend that a static documentation-only review assures future software security. Preserve existing `.github/SECURITY.md` private reporting policy.
+There is **no application code, CI, dependency or deployment to test**. Such checks are `NOT APPLICABLE` for this documentation-only order, not PASS. The Architect will review the **exact published report and PR** and return `ACCEPT / REVISE / STOP`; acceptance alone never authorizes merge or WIP closure.
 
-### 5. Preflight, execution and version-control procedure
+### 6. STOP and handback
 
-Follow `AGENTS.md`, Architect SOP §6A–§6B/§7A–§8 and Implementation SOP §4–§5C/§9. This order grants these **outcomes and file boundaries**, not competing Git rules or a command-by-command replacement for §6B.
+STOP only for **real** authorization, repository, confidentiality or scope conflicts: mismatch between installed R02 and handoff, unexpected changed PR provenance, unknown local edits, inability to preserve the four-file WIP rule, secret leakage, or an unapproved contract change. Preserve existing work and publish a factual STOPPED report when safe. **Do not resurrect the removed WO018-merge prerequisite.**
 
-**Preflight:** Re-read governing documents in their mandatory order. Confirm the physical Solo root, `main`, current HEAD, `origin/main`, remote URL, one worktree, Git status, existing WIP file inventory, installed ACTIVE exact bytes and separate matching Owner handoff. The previously reported local dirty `workorder-active.md` represented an invalid order; the Owner must have **explicitly replaced** that material with this edition. Treat any unexplained differences/dirty state as STOP; do not reset, clean, stash, overwrite or discard Owner-owned material.
-
-**Authorized Git flow:**
-
-1. From the single verified checkout, publish a **separate frozen-issuance/NEXT-transition commit to `origin/main`**, consisting only of the exact Owner-installed `.documents/WIP/workorder-active.md` and the mechanically neutralized `.documents/WIP/plan-next.md`. Verify remote readback and preserve the earlier NEXT candidate in Git history. No amendment or force-push.
-2. From that verified `main` revision, create **one short-lived branch** (suggested `docs/solo-wo-018-security-register`) in the same checkout. Create/update only the register, `README.md` and `AGENTS.md`. Validate the content and stage only those paths; commit, push and verify the exact remote commit/tree/blobs. Open one PR to `main` with scope and evidence; **leave it unmerged**.
-3. Return safely to the existing checkout's `main` without discarding work. Overwrite **only** `.documents/Reports/execution-report.md` with the factual run report; commit and push that report to `origin/main`, then read back the remote report and commit. Keep ACTIVE installed and NEXT neutral until separate Owner-authorized reconciliation following independent review.
-4. Report branch, PR URL, commit SHAs, base/head, tree IDs, exact changed-path lists, actual Git commands/outcomes, remote URL and clean final worktree. If a safe clean state is impossible, STOP and disclose the preserved state without deleting anything.
-
-**Permissions:** commit/push on `main` **only** for the frozen order + NEXT transition and the canonical report; create/push one documentation branch and PR for the three documentation deliverables. No PR merge, auto-merge, release/tag/deploy, provider/account/DNS/TLS operations, dependency installs, security scanning against external networks, credential access or disclosure, destructive operations, force-push, history rewrite, secondary checkout, or other-repository write. No WIP evidence edits beyond the two named transition paths. The Owner retains all separate merger/release decisions.
-
-**Temporary files:** Normal scratch may use only Solo's ignored `.temp/` and the agent's actually supplied Cline temporary workspace, never an extra checkout. Verify scratch is not tracked/staged; clean identifiable obsolete task-owned files/logs. Disclose justified retention with trigger and unresolved cleanup failures; never delete unknown/Owner-owned material.
-
-### 6. Required report and acceptance gates
-
-Overwrite and push `.documents/Reports/execution-report.md` on **every** run, including STOP/FAIL, when safe. It must state session date, `SOLO-WO-018 R01`, real starting and final revisions, exact paths and changes, Owner-issuance match, detailed actions, evidence links, test/check outcomes, PR state, privacy review, cleanup/retention, limitations, and stop/resume point. Do not embed the report's own eventual commit SHA inside the report; include it in the agent's chat handback after publication. The report is on `main` even while the review branch PR remains unmerged.
-
-Independent Architect acceptance will use the following gates, marked **PASS / FAIL / UNVERIFIED** (or **NOT APPLICABLE** with reason when genuinely inapplicable):
-
-- **G01 — Authorization and baseline:** exact Owner-installed ACTIVE ID/edition/marker and matching handoff; verified Solo root, one checkout, single correct remote, current refs, known status.
-- **G02 — WIP purity:** exactly four WIP files; ACTIVE frozen in a published commit; NEXT neutralized exactly; ROADMAP including `R00.F` and `R11.A` and OUTLOOK untouched; no additional WIP/report file.
-- **G03 — Register and document mapping:** canonical `.documents/Security/security-issues.md` created; stable schema; minimal matching README/AGENTS pointers; no competing authorities.
-- **G04 — Source accuracy:** WordPress advisory facts supported by independently checked primary sources; vendor severity distinguished from Solo applicability; exact assessment SHA and limitations recorded.
-- **G05 — Actionability and truthfulness:** remediation, future preventive controls, verification/reassessment criteria and finding status are specific; no invented code/hosting/test capability or unjustified finding closure.
-- **G06 — Public repository safety:** no sensitive exploit/credential/private data; confidential reports routed to existing GitHub private channel; no unsupported public-security guarantees.
-- **G07 — Git provenance:** scoped frozen order/main transition and report commits, scoped branch commit, pushed PR unmerged, remote readback of exact trees/blobs, no force-push or unauthorized writes, clean tree or fully reported blocker.
-- **G08 — Cleanup and reporting:** one current report on main, truthful checks and `NOT RUN`/`NOT APPLICABLE` explanations, no task-owned scratch residue or unreported retention, no claim of self-acceptance.
-
-For this **documentation-only** scope, build, runtime, application security testing, CI and browser gates are **NOT APPLICABLE or NOT RUN with the reason recorded**, never `PASS`. No stage or work package is accepted, consumed or removed by this run; no merge is implicit. The Architect independently verifies the exact GitHub report and PR content and issues `ACCEPT / REVISE / STOP` to the Owner. Closure/reconciliation of ACTIVE and NEXT requires a **separate** Owner-approved order.
-
-### 7. STOP / escalation
-
-STOP without further implementation changes if: issuance ID/edition/marker or matching handoff is missing; unexpected local dirty/Owner-owned material or revision divergence exists; the required path is disputed; WIP would contain a fifth file; actual facts contradict source assertions; the branch/remote or authorization is unsafe; confidential evidence would be exposed; a new architecture/provider/security-response decision is needed; or the bounded path ledger cannot be honored. Preserve state, do not silently substitute a different path or task, and publish the STOPPED canonical report when safe.
-
-**This Approved Scope remains frozen after Owner issuance. The agent never marks it accepted or clears ACTIVE.**
+Hand back: PR #1 link, frozen-order commit, updated PR head/tree, report commit, path ledger, validation results, remaining limitations, final local Git status and temporary-workspace disposition. Neither agent may self-accept or merge this work.
