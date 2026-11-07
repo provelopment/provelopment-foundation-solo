@@ -553,6 +553,22 @@ This contract does **not** by itself select a framework, language, directory tre
 
 Solo must have no runtime dependency on the existing Foundation, its demonstration installation, Spokes, Provelopment root governance files or an external managed tenant router. Reference code may be evaluated and deliberately reused only after checking compatibility, provenance, licensing and fit for Solo's clean architecture.
 
+## 5A. Security by design — cross-cutting risk, integrity and verification
+
+**Security is a design obligation, not a hardening stage.** It applies from architectural planning through implementation, release and maintenance of every Solo capability, and it belongs to the same authorities as everything else here: this section fixes the architectural constraints, [Architect SOP](../SOP/sop-architect.md) §7C fixes the review protocol, [Implementation SOP](../SOP/sop-implementation.md) §7A fixes agent obligations, and the [security issues register](../Security/security-issues.md) records findings. **No control described in this section is implemented**, and nothing here certifies security: this repository still contains no application code, dependency manifest, CI configuration or deployment.
+
+**Risk lifecycle.** Every security question — an advisory, a dependency or provider change, a design threat, a code finding, a report or an incident — follows one sequence: **identify → verify → assess → prevent/respond → validate → reassess.** Verification establishes authoritative sources, dates, affected versions and the exact Solo revision rather than trusting a headline or a request; assessment classifies applicability against Solo's real trust boundaries and separates vendor-wide risk from Solo-specific risk; a control or fix becomes implementation work only through a separate Owner-issued order.
+
+**Trust boundaries and attack surface to analyse.** The public request and routing boundary; authored content including Markdown and JSON bodies; configuration and server-only secrets; adapters and outbound integrations such as storage, email transport, providers and analytics; the published release artefact and its update path; and any persisted data. Location, locale and route facts are never security inputs, and unlisted visibility is never access control.
+
+**Preventive constraints.** Validate at the boundary and fail closed: malformed, ambiguous or unauthorized input is refused rather than coerced into a plausible result. Keep secrets and server-only configuration out of authored content, public projections, diagnostics and source control. Apply least privilege to every adapter, provider and operator action, and treat provider responses as untrusted input. Preserve the Ports-and-Adapters boundary above so that security policy stays in the domain core instead of leaking into — or being assumed from — an adapter. Authorized content never overwrites generated output, and no authored filename publishes itself.
+
+**Supply chain and update integrity.** Adopt a dependency or provider only after checking its provenance, licence, maintenance status and security posture; pin what is adopted and record the decision. A release must remain an immutable, verifiable artefact distinct from an Installation and from a deployment. Update design must verify artefact integrity before activation, apply change atomically through staging with recoverable rollback, and never silently discard authored content or a last known good state.
+
+**Verification expectations.** Security acceptance requires objective evidence at the exact reviewed revision: the applicable negative and refusal cases, import/boundary checks, secret-isolation and public-projection checks, and release/update integrity checks **once those capabilities exist**. An unrun check is reported `NOT RUN` or `NOT APPLICABLE` with its reason, never `PASS`, and a finding is never `Resolved` without tested evidence.
+
+**Reassessment points.** Revisit whenever a relevant advisory changes, a dependency, framework, adapter or provider appears or changes, a deployment or release/update mechanism is introduced, a trust boundary moves, or a release candidate is reviewed. Response cadence, triage ownership, supported versions and provider choices remain Owner decisions in the packages that already own them ([`plan-roadmap.md`](../WIP/plan-roadmap.md) `R00.G`, `R10`, `R11.A`); this section invents no such commitment.
+
 ## 6. Validation and acceptance approach
 
 These are **proposed verification obligations**, not passing tests:

@@ -30,6 +30,8 @@ This register exists so that a security finding raised against Solo has one dura
 
 A finding's presence here never authorises remediation work. Remediation requires its own separately issued order.
 
+**Protocol.** This register is the recording surface of the six-step security lifecycle — **identify → verify → assess → prevent/respond → validate → reassess** — whose architecture constraints are in [Architecture](../Architecture/ARCHITECTURE.md) §5A, whose review procedure is [Architect SOP](../SOP/sop-architect.md) §7C, and whose agent duties are [Implementation SOP](../SOP/sop-implementation.md) §7A. Entries record the evidence that pipeline produced; they never substitute for it, and no entry becomes work outside an Owner-issued order.
+
 ## 2. Public-repository safety and reporting channel
 
 This repository is public, so this register is public. It therefore carries **no** live secrets or tokens, no personal data, no internal hostnames or addresses, no confidential attack paths, and no exploit recipes or reproduction payloads. Findings are described at the level already published by vendors and national advisories.
@@ -145,6 +147,21 @@ Implementation-agnostic properties worth designing for when Solo's release and u
 - monitoring and alerting on update activity, with a tested rollback path.
 
 They are recorded here so later lifecycle and security work has a starting checklist; accepting or rejecting any of them is a separate Owner decision.
+
+#### 4.10 Worked trace through that lifecycle
+
+This case is the register's first complete pass through the pipeline, at the planning stage where Solo has no code to test:
+
+| Step | What this case actually did | Evidence |
+| --- | --- | --- |
+| Identify | An external WordPress advisory was raised against a Solo repository that does not use WordPress | §4.1 |
+| Verify | Source facts re-derived from the CVE record, a national advisory and the vendor release archive; the NVD page was unreadable and that limitation is disclosed | §4.1–§4.2 |
+| Assess | Applicability tested against the exact revision `0a948be0`: no WordPress, no dependency manifest, no CI, no deployment | §4.3–§4.4 |
+| Prevent/Respond | No remediation justified; preventive requirements proposed for any future update mechanism with comparable exposure | §4.6, §4.9 |
+| Validate | Vendor-level impact separated from Solo risk; closure criteria stated as conditional evidence tests, not as a claim that tests passed | §4.5, §4.7 |
+| Reassess | Explicit trigger recorded: WordPress adoption, a comparable update mechanism, or any unexamined external system | §4.8 |
+
+The point of the example is procedural, not sensational: a genuinely severe vendor vulnerability correctly produced **no Solo defect**, because the assessment stayed evidence-bound. Every entry in this register must be able to show the same trace, or state honestly which step could not be completed.
 
 ## 5. Methodology, checks actually run, exclusions and limitations
 

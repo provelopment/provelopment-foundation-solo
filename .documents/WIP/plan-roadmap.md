@@ -7,7 +7,7 @@
 **Remaining packages**
 
 - **R00.F — Contact and integrations:** specify safe `mailto:`; simple form field set, validation, consent/privacy, rate/abuse policy, delivery-failure behavior, storage/retention and port responsibilities. Explicitly exclude advanced contact forms. Define whether and how static booking/directions links and privacy-respecting analytics meet the first release.
-- **R00.G — Lifecycle and nonfunctional standards:** settle initial setup/preview/content-update/upgrade/recovery responsibilities, immutable release identity, deployment portability, supported versions and security response, accessibility/performance targets and precise acceptance matrix.
+- **R00.G — Lifecycle and nonfunctional standards:** settle initial setup/preview/content-update/upgrade/recovery responsibilities, immutable release identity, deployment portability, supported versions and security response — including triage ownership, coordinated-disclosure handling, response expectations and the evidence that closes a security action, consistent with the lifecycle in [Architecture](../Architecture/ARCHITECTURE.md) §5A — accessibility/performance targets and precise acceptance matrix.
 
 **Exit gate:** documented, consistent Owner-approved contracts in canonical About/Architecture documents; a decision matrix showing accepted versus open non-blocking matters; a minimal first code-bearing complete work order prepared for Owner review. No important design decision is delegated silently to an implementation agent. **No code exists solely because this stage is accepted.**
 
@@ -128,7 +128,7 @@
 
 - **R10.A:** one-Entity standalone establishment with chosen base origin/prefix, default Facet/Site, usable starter Pages, and validated authoring assets/configuration without normal user edits to core application code.
 - **R10.B:** distinguish product source, immutable release, independent Installation, authored content updates, upgrades, deployment and rollback; define version/compatibility rules and safe migrations only where needed.
-- **R10.C:** implement reproducible release-payload construction/verification and clean-room establishment/update/upgrade/recovery tests; avoid Foundation's Spoke-centric lifecycle and unknown provider assumptions.
+- **R10.C:** implement reproducible release-payload construction/verification and clean-room establishment/update/upgrade/recovery tests, including artefact-integrity verification before activation, atomic staged activation with recoverable rollback and preservation of authored content and the last known good state; avoid Foundation's Spoke-centric lifecycle and unknown provider assumptions.
 
 **Exit gate:** establish a new Installation from an exact product artifact, change content/branding and configured public base without changing core or Entity ID, rebuild deterministically, perform supported upgrade/rollback or recovery, and refuse invalid/mismatched payloads. No real provider deployment or release publication without separate Owner approval.
 
@@ -138,7 +138,7 @@
 
 **Remaining packages**
 
-- **R11.A:** security review of manifest, routes, content parser, HTML/Markdown, URL handling, contact, property privacy, assets, dependencies, secrets and error disclosure; address material findings with bounded work orders.
+- **R11.A:** security review of manifest, routes, content parser, HTML/Markdown, URL handling, contact, property privacy, assets, dependencies, secrets and error disclosure, applying the lifecycle in [Architecture](../Architecture/ARCHITECTURE.md) §5A at the exact candidate revision; resolve every open register entry with tested evidence or an explicitly Owner-accepted risk, treat an unrun or unverifiable check as unverified rather than passing, and address material findings with bounded work orders.
 - **R11.B:** accessibility and performance review against Owner-approved thresholds; cross-browser/responsive checks, meaningful user flows and truthful fallback/error UX.
 - **R11.C:** resilience, diagnostics, deterministic CI, representative multi-Site/full-locale stress matrices and documentation coherence; remove dead code, needless abstractions and unjustified compatibility machinery rather than carrying defects forward.
 
