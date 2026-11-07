@@ -1,85 +1,130 @@
 # Foundation Solo — Execution Report
 
-> **One canonical report.** Overwritten in place on every run; Git history retains earlier revisions. It is not a WIP file and grants no authority.
+> **One canonical report.** Overwritten in place on every run; Git history retains earlier revisions. It is not a WIP file and grants no authority. Its own commit SHA is given in the chat handoff only, never below.
 
 ## Run identity
 
 | Field | Value |
 | --- | --- |
 | Session date | 2026-11-07 |
-| Work order ID as installed | `SOLO-SEC-WO-001` — no edition suffix, no `OWNER-ISSUED` marker |
-| Matching handoff | received in chat, summarising the same order |
-| Status | **STOPPED** — before any implementation write |
-| Classification | Security-assessment / documentation order; not executable in its present form |
-| Starting revision | `52cf68e89b9d0466a41de7b3dae34423be4f7bb4` on `main` = `origin/main` = `git ls-remote` |
+| Work order | `SOLO-WO-018`, edition `R01` |
+| Marker | `OWNER-ISSUED` present in ACTIVE (§G01 evidence below) |
+| Owner handoff | Received, explicitly naming `SOLO-WO-018 R01` and confirming installation of that exact edition |
+| Status | **COMPLETE** — deliverables produced; nothing merged, accepted or closed |
+| Starting revision | `6e98b93513dab0b511e9bd4f4df4bbd64063b576` on `main` = `origin/main` = `git ls-remote` |
+| Frozen-issuance revision | `0a948be028dffbbe2e737900d1df185e8ccfea17` on `main` (also the branch base and the assessed revision) |
+| Report publication | Committed on `main` directly above `0a948be`, pushed to `origin/main`, read back |
 
-## Stop decision
+## Owner-issuance match (G01 evidence)
 
-Execution stopped for two independent reasons. Neither involves a factual dispute about the threat, the repository or the remote; both are authorization-form defects that only the Owner can resolve.
-
-**B1 — the required path violates the permanent WIP file-purity rule.** The order mandates `.documents/WIP/security-issues.md`. Four binding statements forbid it:
-
-- `AGENTS.md` §5: “`.documents/WIP/` contains **only**” the four named files, and “Never create `WIP/Reports`, `WIP/Work-Orders`, `WIP/Archive`, per-task or dated reports, or any duplicate status folder elsewhere.”
-- Architect SOP §8: “`.documents/WIP/` contains exactly four retained files and no others … **Neither a subdirectory nor any additional plan, work-order, log, archive, tracker or report file is permitted.**” A vulnerability register is exactly such a tracker, and “Only a separately Owner-authorized documentation transition may change this lifecycle.”
-- Architect SOP §6B(g): “No report archive or additional WIP file is created.”
-- Implementation SOP §9: “No other WIP file, archive or parallel report may be created.”
-
-`AGENTS.md` §3 requires a stop rather than a silent weakening when an instruction conflicts with an accepted requirement. The order itself asks for the existing workflow to be respected, so this looks like an unintended path choice rather than an intended governance change — but only the Owner may decide that.
-
-**B2 — the installed order lacks the two execution preconditions.** Implementation SOP §9 requires “the exact `OWNER-ISSUED` `SOLO-WO-*` approved scope in ACTIVE plus its matching Owner handoff,” and §4 requires checking “`OWNER-ISSUED`, the frozen exact scope, the unique `SOLO-WO-*` ID.” In the installed file, `OWNER-ISSUED` occurs **0 times** and the only identifier token is `SOLO-SEC-WO-001`, which does not match `SOLO-WO-*`. Implementation SOP §4.1 is explicit: “If a claimed approval is unverifiable, STOP before edits.”
-
-Stopping preserves real intent rather than inventing authority: nothing was created, amended, renamed, reset, cleaned or deleted, and the installed order is left untouched for the Owner to correct or re-issue.
-
-## What this run did and did not do
-
-Read-only work only, plus this report.
-
-| Action | Result |
+| Check | Observed |
 | --- | --- |
-| Repository preflight (`rev-parse --show-toplevel`, branch, `status --porcelain`, `remote -v`, `ls-remote`, worktree count) | root `C:/Users/Sean/Documents/Provelopment/00.foundation-solo`; branch `main`; one worktree; one `origin` = `https://github.com/provelopment/provelopment-foundation-solo.git`; local = remote = `52cf68e` |
-| Read `AGENTS.md`, `README.md`, both SOPs, Charter, Product Definition, all four WIP files, current report, `.github/SECURITY.md` | complete |
-| Inspect the actual code, dependency, CI and deployment surface | **none exists** — see below |
-| Verify the cited advisories against primary sources | **all three confirmed genuine** — see below |
-| Create `.documents/WIP/security-issues.md` | **not created** — forbidden path (B1) |
-| Create a branch, commit the register, push, open a pull request | **not performed** — no valid authorization (B2); no branch, PR or register commit exists |
-| Modify application code, configuration, deployment, `.gitignore` or branch protection | **not performed** |
-| Commit or discard the installed order | **not performed** — committing it would be an unauthorized WIP write and discarding it would destroy Owner material |
+| Physical Solo root | `C:/Users/Sean/Documents/Provelopment/00.foundation-solo` — verified via `git rev-parse --show-toplevel` |
+| Branch / worktrees / remotes | `main`; exactly one worktree; exactly one remote, `origin` = `https://github.com/provelopment/provelopment-foundation-solo.git` |
+| `OWNER-ISSUED` occurrences in ACTIVE | **2** |
+| Work-order identifier tokens | `SOLO-WO-018` only — matches the handoff |
+| Edition | `R01` — matches the handoff |
+| Installed ACTIVE bytes | 17,156 B / 110 lines / SHA-256 `B94832174EA9D5438B40E4DEA2064452932DEF8878AC2ADC6EE95C7C474CDAA7` / blob `f9961e3570b06838cdfd9debe04f075483845d7f` |
+| Target path in order | `.documents/Security/security-issues.md` — outside WIP, 4 mentions; zero mentions of a WIP register path |
+| Pre-existing dirty state | Only the Owner-installed ACTIVE; the earlier invalid `SOLO-SEC-WO-001` material had been **explicitly replaced** by the Owner, as the order anticipated |
 
-## Read-only observations relevant to the requested assessment
+The order and handoff matched; no STOP condition applied at preflight.
 
-Recorded as preflight observations, **not** as a completed assessment. No register entry exists, so nothing here is a closed finding and none of it may be cited as an authorised output of the requested order.
+## Authorized changes
 
-- **No application surface.** The repository tracks **19 files / 506,866 bytes**: nine `.documents/` files, `AGENTS.md`, `README.md`, `LICENSE`, `.editorconfig`, `.gitattributes`, `.gitignore`, and four `.github/` files. The only non-Markdown tracked files are `LICENSE` and the three dotfiles `.editorconfig`, `.gitattributes` and `.gitignore` — no source code, package manifest, lockfile, container definition, CI workflow, database, authentication layer, secret store or deployment configuration exists, consistent with `AGENTS.md` §7.
-- **WordPress is absent from the assessed scope.** `git grep -i -E 'wordpress|wp-config|wp-content'` over all tracked files matches nothing except the incoming order itself, which merely quotes the advisory. There is no CMS, no web root and no published application version, so the CVE below has **no reachable affected component inside Solo**.
-- **An existing security policy is already in the repository** at `.github/SECURITY.md`: GitHub private vulnerability reporting is enabled and independently verified, and the file deliberately states no supported version, response time or release commitment. Any register must be reconciled with it rather than duplicating or contradicting it.
-- **The cited advisory is real and its facts are accurate.** Verified independently against primary sources this run:
-  - **CVE-2026-119977** — state `PUBLISHED`, assigner Wordfence, published 2026-10-31, updated 2026-11-04; **CVSS 3.1 base 8.1 HIGH** (`AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:H`); **CWE-367** time-of-check/time-of-use race condition; affected WordPress 4.7.0 through the 7.1 branch prior to **7.1.4**; CISA ADP records the KEV entry on **2026-11-03** with SSVC *Exploitation: active*, *Automatable: no*, *Technical Impact: total*; references point at the 7.1.4 fixed sources and the 7.1.4 release note.
-  - **Canadian Centre for Cyber Security advisory AV26-1117**, dated 2026-11-03 — confirmed: “WordPress Core Prior to 7.1.4”, recording the CISA KEV addition of the same CVE on the same date.
-  - **WordPress release archive** — confirms **7.1.4 released 2026-10-28**, matching the order's stated date.
-  - Limitation: the NVD detail page returned only a JavaScript shell with no record content, so **NVD was not independently confirmed** from here; the MITRE/CVE Program record above is the stronger primary source and is unambiguous.
-
-## Smallest decision required to unblock
-
-One Owner decision fixes both blockers at once. Recommended: **Option A**, issued as a corrected order with the marker, ID and non-WIP path.
-
-| Option | What the Owner authorizes | Consequence |
+| Commit | Branch | Content |
 | --- | --- | --- |
-| **A — recommended** | Re-issue as `SOLO-WO-018 R01`, marked `OWNER-ISSUED`, with the register at **`.documents/Security/security-issues.md`** (new folder, outside WIP), plus the one-line document-map/authority update that makes Security a named concern | Keeps the four-file WIP invariant and the current authority map intact; the register becomes a first-class durable document |
-| **B** | Keep the register inside `.documents/` but attach it to an existing concern — extend `.github/SECURITY.md` (repository-standard, already permitted as a narrow exception) instead of a new file | No new authority slot, no new folder; smallest possible change, but the register and the reporting policy share one file |
-| **C** | Explicitly amend the WIP lifecycle to permit a fifth retained file | Requires an Owner-authorized lifecycle transition; it would also contradict the “exactly four files” statements in `AGENTS.md` §5, both SOPs and the previous closure order, so at minimum those would need amending in the same authorized scope |
+| `0a948be028dffbbe2e737900d1df185e8ccfea17` | `main` | Frozen issuance: exact Owner-installed ACTIVE (blob `f9961e35` — byte-identical to the installed file) plus mechanically neutralized NEXT. Tree `b3f00832eff9c4deec4e4fedb15e27e12a52eb0e` |
+| `daa2cb98625c67fc33f29eb0cdc78e6026f336d9` | `docs/solo-wo-018-security-register` | Register plus the two minimal document-map pointers. Tree `45688e5628a92d31764ed6c334737322560f8869` |
+| *report commit* | `main` | This report only (SHA in chat handoff) |
 
-Whichever option is chosen, the re-issued order should also state: the exact permitted write paths; whether a short-lived branch and pull request are authorized (Architect SOP §6B(c) permits them **only** when an order says so explicitly — the current text does authorize them, so that part is fine); that the report remains the only WIP-adjacent publication and is pushed from `main`; and that merge, release and deployment stay separately unauthorized.
+**Path ledger and line counts**
 
-Nothing in the assessment scope itself needs to change: the WordPress conclusion will be *Not applicable to assessed scope* with the evidence above, and the remaining register content will necessarily be short because Solo has no code, dependencies or deployment to assess. The order's warning against inflating generic checklist items is therefore easy to honour.
+| Path | Operation | Numstat |
+| --- | --- | --- |
+| `.documents/WIP/workorder-active.md` | publish Owner-installed bytes only | `109 0` (creation of the frozen order in the committed file) |
+| `.documents/WIP/plan-next.md` | neutralize candidate | `0 12` |
+| `.documents/Security/security-issues.md` | create register (blob `503339a27caadd41397a81b7242cc8fb419d5ed1`, 19,761 B / 182 lines) | new file |
+| `README.md` | one document-map entry (item 7) | `1 0` |
+| `AGENTS.md` | one clause in the existing *one authority per concern* sentence | `1 1` |
+| `.documents/Reports/execution-report.md` | overwrite this report | replaced |
 
-## Repository state after this run
+No other path was written. `.documents/About/`, `.documents/Architecture/`, both SOPs, `.documents/WIP/plan-roadmap.md`, `.documents/WIP/plan-outlook.md`, `.github/**` and all other files were read-only.
 
-- Published: this report only, as a separate report-only commit on `main`, pushed to the existing `origin`.
-- Branch, pull request and register commit: **none created** — the handoff cannot supply a PR URL, branch name or register commit SHA, because none exist and inventing them would be a false claim.
-- `git status --porcelain` is **not empty**: the single entry is the Owner-installed `M .documents/WIP/workorder-active.md`. This is a justified retention — committing it would be an unauthorized WIP write and discarding it would destroy Owner-owned issuance evidence. The file is preserved byte-for-byte at 11,129 bytes / 69 lines / SHA-256 `DAD338D65F144F11010D2D0B503FBC7FCE944545CF63ABC609B672E08B132372` / blob `e3ff4df8b905727cf156840369e9f6f32c2cf3f8` as installed.
-- One worktree, one remote, no branch other than `main`, no stray scratch: Solo `.temp/` holds only this report's draft parts during the run and is emptied before handoff.
-- No secrets, tokens, personal data, internal hostnames or exploit instructions were written anywhere. The advisory facts above are public, vendor-published and contain no reproduction steps.
+## Actions and outcomes
 
-## Next action
+1. Re-read governing documents in mandatory order: `README.md`, `AGENTS.md`, Product Definition, Architecture Charter, Architect SOP, Implementation SOP, all four WIP files, the current report, `.github/SECURITY.md`.
+2. Preflight verified root, branch, HEAD, `origin/main`, remote URL, one worktree, status and the four-file WIP inventory.
+3. Verified the observed NEXT candidate before touching it: 3,184 B, SHA-256 `B4F3F0D5…`, no CR, exactly one `## R00.F — Contact and integrations` heading, and the expected title-prefixed structure. Neutralization then wrote exactly `# Foundation Solo — plan-next (Next Candidate)` + one LF → **49 bytes, 1 LF, 0 CR**, asserted against the expected text rather than guessed. ROADMAP retained `R00.F` and `R11.A` (untouched, SHA-256 `4BCB1D2B…` before and after); OUTLOOK untouched (`E871222B…`).
+4. Committed and pushed the frozen issuance + NEXT transition to `origin/main`, then verified `git ls-remote` agreed with local `HEAD`.
+5. Created branch `docs/solo-wo-018-security-register` from that verified revision and re-ran the assessment at exactly that commit before writing the register.
+6. Created the register, added the two pointers, validated, committed, pushed the branch, opened **PR #1** unmerged.
+7. Returned to `main` without discarding work (branch preserved remotely), then overwrote this report and pushed it.
 
-**Owner decision required (Option A, B or C).** On receipt of a corrected, properly marked `SOLO-WO-*` order I can execute the whole register in one run: assessment, register content, secret hygiene check, `git diff --check`, dedicated branch, push, pull request left unmerged, and this report overwritten. Until then no register entry exists, the WordPress applicability question is answered only as a read-only observation, and the CVE must not be described anywhere as fixed, mitigated or accepted for Solo.
+## Checks actually run
+
+| Check | Outcome | Status |
+| --- | --- | --- |
+| Repository/working-tree preflight | Root, `main`, one worktree, one correct remote, `HEAD` = `origin/main` | **PASS** |
+| WIP purity | Exactly four WIP files before and after; no fifth file, no subdirectory, no report archive | **PASS** |
+| NEXT neutralization exactness | Asserted pre-state, then 49 B / 1 LF / 0 CR | **PASS** |
+| ACTIVE byte fidelity | Committed blob `f9961e35` = installed blob; `OWNER-ISSUED` ×2; ID and edition match the handoff | **PASS** |
+| ROADMAP / OUTLOOK immutability | Identical SHA-256 before and after; `R00.F`, `R11.A` present | **PASS** |
+| Register structure | 6 required H2 sections, 9 subsections, 9 tables, stable-ID index, change-history row, trailing LF, no CR | **PASS** |
+| `git diff --check` (branch scope) | Clean | **PASS** |
+| Scope containment | Staged paths limited to the three authorized files; no `.temp/` content tracked | **PASS** |
+| Link targets | `../WIP/workorder-active.md`, `../../.github/SECURITY.md`, register path all exist | **PASS** |
+| Public-safety review of the register | No credential patterns; the only 40-hex token is the public assessed commit SHA; no exploit steps, PII or internal hosts | **PASS** |
+| External source verification | CVE Program record, Cyber Centre AV26-1117, WordPress release archive re-checked 2026-11-07; affected range, fixed 7.1.4 (2026-10-28), CVSS 3.1 8.1 HIGH, CWE-367 and KEV 2026-11-03 all confirmed | **PASS** |
+| NVD record confirmation | Page returned a JavaScript shell only | **NOT RUN** — limitation recorded in the register |
+| Dependency audit / static analysis / unit, integration and CI tests / browser or Lighthouse gates | No application code, manifest, test suite, CI configuration or deployment exists | **NOT APPLICABLE** with reason |
+| Application security testing or live exploitation | Prohibited by scope and never attempted | **NOT RUN** by design |
+
+**Nothing untested was reported as `PASS`.** Every `NOT APPLICABLE` reflects a verified absence of the capability in this documentation-only repository, not a skipped check on existing software.
+
+## Register content delivered
+
+- **§1** purpose and boundaries, the three separate categories (current findings / external advisories / future hardening), and the assessed snapshot identifying revision `0a948be0`, date, assessor and explicit in/out-of-scope environments.
+- **§2** public-repository safety and the existing GitHub private vulnerability reporting channel, plus the severity and status vocabulary — with `Mitigated` explicitly not equal to `Resolved`.
+- **§3** finding index with stable ID, source references, vendor severity versus Solo-specific risk, owner, priority, evidence date and revisit trigger.
+- **§4** detailed record `SOLO-SEC-2026-001`: verified source facts, sources and retrieval date with the NVD limitation, applicability verdict **`Not applicable — assessed Solo repository at 0a948be0`**, evidence table, what remains uncleared, vendor-level threat and impact (no attack steps), conditional remediation if applicability ever changes, validation and closure criteria, reassessment trigger, and proposed preventive controls marked as unimplemented.
+- **§5** methodology, the checks table, exclusions, unknowns, an honest limitation statement, and a future-review checklist for when code and deployment arrive.
+- **§6** maintenance rule, stable-ID convention, review requirement, and the change-history table with this run's revision 1.
+
+Applicability evidence at `0a948be0`: 19 tracked files / 503,920 bytes; **0** executable, script or config files; **0** dependency manifests or lockfiles; **0** CI workflows; **0** deployment, environment or IaC artifacts; no WordPress path or integration; the only textual WordPress matches are the order and report prose that document the advisory; no released or deployed version.
+
+## Pull request (open, unmerged)
+
+| Field | Value |
+| --- | --- |
+| PR | **#1** — <https://github.com/provelopment/provelopment-foundation-solo/pull/1> |
+| Title | docs(security): establish Solo security issues register (SOLO-WO-018 R01) |
+| State | `OPEN`, not a draft — **not merged, no auto-merge, no merge queue** |
+| Base | `main` at `0a948be028dffbbe2e737900d1df185e8ccfea17` |
+| Head | `docs/solo-wo-018-security-register` at `daa2cb98625c67fc33f29eb0cdc78e6026f336d9` (remote-verified) |
+| Changed files | 3 — register, `README.md`, `AGENTS.md` |
+
+Merge remains an entirely separate Owner decision, as does any later closure or reconciliation of ACTIVE and NEXT.
+
+## Privacy and public-safety review
+
+The register and this report are public. Reviewed for: credential or token material (none — the only 40-hex string is the public commit SHA), personal data (none), internal hostnames or private addresses (none), exploit recipes, payloads or reproduction steps (none — the advisory is described only at vendor/advisory publication level), and unsupported security guarantees (explicitly avoided; the register states that a clean documentation-only result says nothing about future software security). Confidential material would be handled only through GitHub private vulnerability reporting.
+
+## Cleanup and retention
+
+- Solo `.temp/` held only this run's scratch drafts; all task-owned scratch was deleted before handoff, so `.temp/` is empty and untracked.
+- **Justified retention:** `.documents/WIP/workorder-active.md` remains installed as `SOLO-WO-018 R01`, and `.documents/WIP/plan-next.md` remains neutral, until a separate Owner-authorized reconciliation follows independent review. `docs/solo-wo-018-security-register` and PR #1 are retained deliberately as the review artifact; cleanup trigger is the Owner's merge or close decision.
+- Nothing unknown or Owner-owned was deleted, reset, cleaned or stashed. One worktree, one remote, no second checkout, no force-push, no history rewrite.
+
+## Limitations
+
+1. This is a documentation-only assessment of a repository with no application, dependency manifest, CI or deployment. It is **not** a penetration test, a certification, or any evidence about software that does not yet exist.
+2. NVD could not be read for `CVE-2026-119977`; the CVE Program record and national advisory are cited instead, and the limitation is published in the register.
+3. The CISA KEV catalogue page was not separately retrieved; the KEV entry date comes from CISA's ADP enrichment in the CVE record and is corroborated by AV26-1117.
+4. Anything outside this repository — hosting, DNS/TLS, providers, external WordPress installations — is out of scope and neither cleared nor implicated.
+
+## Acceptance status and resume point
+
+No self-acceptance is claimed. No stage, work package or candidate was accepted, completed, consumed or removed; `R00.F`, `R00.G`, `R11.A`, Stage 00 and the ROADMAP obligations are untouched. The Chief Architect should independently inspect this report at its exact GitHub revision, the frozen order commit, and PR #1's content, then return `ACCEPT / REVISE / STOP`.
+
+**Resume point:** an Owner-authorized order, after independent review, for (a) merging or closing PR #1 and (b) whatever separate reconciliation of ACTIVE and NEXT the Owner decides. Nothing further is authorized by this run.
