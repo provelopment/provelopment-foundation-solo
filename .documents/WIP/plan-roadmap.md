@@ -4,10 +4,6 @@
 
 **Outcome:** every technical choice blocking the first coherent Solo implementation is recorded as an explicit Owner decision; no executable application code, dependency install, release or deployment.
 
-**Remaining packages**
-
-- **R00.G — Lifecycle and nonfunctional standards:** settle initial setup/preview/content-update/upgrade/recovery responsibilities, immutable release identity, deployment portability, supported versions and security response — including triage ownership, coordinated-disclosure handling and response expectations, judged by the **A1** acceptance standard in [Architect SOP](../SOP/sop-architect.md) §7B rather than a separate register-closure process — accessibility/performance targets and precise acceptance matrix.
-
 **Exit gate:** documented, consistent Owner-approved contracts in canonical About/Architecture documents; a decision matrix showing accepted versus open non-blocking matters; a minimal first code-bearing complete work order prepared for Owner review. No important design decision is delegated silently to an implementation agent. **No code exists solely because this stage is accepted.**
 
 ## Stage 01 — Reproducible engineering and hexagonal skeleton

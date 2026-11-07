@@ -1,21 +1,20 @@
 # Foundation Solo — plan-next (Next Candidate)
 
-## `R00.G` — Lifecycle and nonfunctional standards
+## `R01.A` — Reproducible minimal source layout, typed configuration and deterministic local build
 
-**Candidate only.** This single bounded candidate is derived from the unchanged `R00.G` bullet in [ROADMAP](plan-roadmap.md) and the reservations recorded in [Architecture](../Architecture/ARCHITECTURE.md) §6.5 and §6A. Selecting it here is **not** a work order, grants no execution authority, and decides nothing.
+**Candidate only.** This single bounded candidate is derived from the unchanged `R01.A` bullet in [ROADMAP](plan-roadmap.md) Stage 01 and the conditionally selected stack recorded in [Architecture](../Architecture/ARCHITECTURE.md) §6A (`E01`–`E10`). Selecting it here is **not** a work order, grants no execution authority, authorizes no Stage 01 work, and decides nothing.
 
-**Objective.** Settle the remaining first-release lifecycle, release and nonfunctional standards as **documentary Owner decisions only** — no application code, dependency install, provider activation, release or deployment.
+**Objective.** When — and only when — an Owner-issued code-bearing work order exists, establish the minimal reproducible engineering foundation: the selected source layout, strictly typed configuration, pinned tooling and a deterministic local build, without borrowing another repository's runtime.
 
-**Prerequisite and readiness.** `R00.F` is administratively closed, leaving `R00.G` as the last open Stage 00 package. Readiness is **partial and stated honestly**: the contact contract's Stage 08/09/10/11 allocations are already decided, but every `R00.G` subject below still awaits an explicit Owner decision, and no agent may invent, default or infer those values. `F01`–`F17` remain `NOT RUN` and `C1`–`C4` remain `UNVERIFIED`; nothing here supplies missing evidence or substitutes for a test.
+**Prerequisite and readiness.** `R00.G` is administratively closed as a documentary package, so `R01.A` is now the single NEXT candidate. Readiness is **not yet satisfied** and is stated honestly: Stage 00's exit gate still requires **a minimal first code-bearing complete work order prepared by the Chief Architect for Owner review**, and no such order has been presented, issued or executed. No application code, installed dependency, toolchain pin file, lockfile, generated artefact or executable proof exists; `C1`–`C4` remain `UNVERIFIED` and `F01`–`F17` remain `NOT RUN`. Nothing in this candidate is currently met.
 
-**Proposed decisions-only scope.**
-- First-release operational responsibilities for initial setup, preview, content update, upgrade and recovery.
-- Immutable release identity, and portability of an Installation and its deployment between hosts without re-identifying content or changing its public addresses beyond authorised configuration.
-- Supported versions, support window and security-response responsibilities — triage ownership, coordinated-disclosure handling and response expectations — judged by the **A1** standard in [Architect SOP](../SOP/sop-architect.md) §7B rather than a separate register-closure process.
-- Accessibility and performance targets, to be **set numerically by the Owner** rather than guessed in a plan document.
-- A precise acceptance matrix tying each decided item to its verification obligation.
+**Proposed bounded scope (future work order only).**
+- The selected **conditional** stack exactly as pinned by reference in §6A.2 — Rust 2024 edition with `rustc 1.99.1` and a tracked `rust-toolchain.toml`; the four-package workspace `solo-domain`, `solo-application`, `solo-adapters`, `solo-cli` with one tracked shared `Cargo.lock` — and no alternative, substituted or invented toolchain, package manager or framework.
+- A minimal deterministic clean-room installation and `cargo build --release --locked` build from a verified compatible revision.
+- Strictly typed configuration for the authored base URL of §4.1 and the Entity identifier, validated and refused on contradiction, with no implicit defaults.
+- No historical Foundation compatibility runtime, no shared ingress, and no speculative feature shell for unimplemented Stage 02+ behaviour.
+- No provider or hosting coupling of any kind: the core stays delivery-neutral and Vercel-independent, and no Vercel API, project, DNS, TLS or secret action is included.
 
-**Documentary exit conditions (verifiable).** Every subject above is recorded as an explicit Owner decision in the appropriate canonical authority; nothing is left provisional, silently delegated or deferred without an Owner decision; the acceptance matrix names each decided item together with its future evidence source; and no implementation, test outcome, release or deployment is claimed. Provider selection or operation, hosting, DNS, TLS, secret storage, monitoring and backup remain separately authorised later matters and are not settled by this candidate.
+**Verifiable exit conditions (future).** A clean-room install and build reproduce deterministically from the pinned inputs; configuration validation accepts valid authored values and refuses invalid ones; the dependency graph contains no core-to-adapter direction and no forbidden historical runtime; and the resulting change contains only the authorized skeleton with static checks green. Each of these is a **future gate**: none may be reported as passing before it is actually executed, and none has been executed now.
 
-**Not authorized by this candidate:** any Stage 01 or later work, any `R00.G` implementation work order or agent prompt, any provider or deployment action, and any reinterpretation of the accepted `R00.F` contact contract.
-
+**Not authorized by this candidate:** any Stage 01 or later implementation, any code, test, CI, dependency installation or schema generation, any `R01.A` work order or agent prompt, `R01.B`/`R01.C` — which remain in ROADMAP with their separate scopes undecided here — any provider or deployment action, any release, and any claim that Stage 00 has exited. Stage 00 remains **open** until its own distinct exit gate is satisfied.
