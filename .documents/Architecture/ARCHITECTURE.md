@@ -1168,7 +1168,7 @@ Each decision's physical realization, its governing `O` gate and the cases that 
 **Remaining obligations — implementation, not R00.D literals.** None of these may alter the literals above without a new Owner decision:
 
 - **`R00.E` — toolchain and platform (selection recorded in §6A; implementation and executable proof outstanding).** The implementation language, framework, package layout, build, test and CI toolchain, the JSON Schema Draft 2020-12 validator enforcing asserted formats, the Markdown parser pinned to CommonMark 0.31.2 plus GFM 0.29-gfm, the Unicode 18.0.0 data binding and the import-boundary enforcement technique are **selected** in §6A (`E01`–`E10`) and still owe their unexecuted `C1`–`C4` proof. Outstanding implementation remains: bounded media inspection adapters; the request/matcher and HTTP delivery adapters; persistence and the source/asset adapters; the `contracts/**` schema and module-registry artifacts; the Owner-reviewed platform asset delivery package with its version-pinned catalogue, artwork, licensing and provenance; and the migration tooling.
-- **`R00.F` — delivery.** Hosting provider, DNS, TLS, environment configuration, secret storage, backup and operational monitoring, subject to separately approved deployment security.
+- **`R00.F` — delivery and contact implementation.** The contact and integrations **decisions** are settled in §6B; what remains is implementation — the configured delivery adapter and provider, plus the hosting provider, DNS, TLS, environment configuration, secret storage, backup and operational monitoring, subject to separately approved deployment security, together with the open Owner decisions `OD-1`–`OD-7` of §6B.11.
 - **`R00.G` — quality, lifecycle and release.** Numeric accessibility and performance targets, per-module browser/assistive-technology and layout-shift tests, release/support policy, third-party notices and copyright/attribution.
 
 No implementation-readiness claim may exceed §6.2's disposition rule, and none of the obligations above is evidence that code, schemas, assets or tests exist.
@@ -1577,13 +1577,156 @@ Every `D` and `O` entry below remains previously accepted and unchanged; this ta
 
 **Future executable proof summary.** Nothing in §6A is a completed conformance claim. The gate that must be satisfied before any conformity statement is: C1-a/b/c parser, schema and semantic validation on official and Solo corpora; C1-d/e Unicode 18 and full route-oracle proof including UTS #39 data; the Markdown corpus proof; C3 `check-architecture` with its injected negative fixtures and the generated Rust→TypeScript wire parity and runtime guards; C2 sealed-artefact, compare-and-swap and real delivery proof per supported mode; and C4 the complete `D`/`O`/`P`/`V` and twenty-one-module refusal ledger. Each is `UNVERIFIED` now, and each must fail when its protection is removed.
 
+## 6B. `R00.F` — Owner-issued contact and integrations contract (documentary only)
+
+**Status and authority.** This section records the **Owner-issued** first-release contact-and-integrations contract (`SOLO-WO-021 R03`). It settles **documentary decisions only**. It is **not** an implemented capability: no form code, provider account, credential, schema artefact, endpoint, test suite or deployment exists, and nothing here is evidence that any was created. Executable proof of the rules below is a **non-waivable future gate** (§6B.10), not a completed one. Where a rule depends on a numeric, commercial or legal policy value the Owner has not fixed, §6B.11 names it as an **open Owner decision** and the corresponding code-bearing gate stays blocked; no universal value is fabricated here.
+
+### 6B.1 Preserved literals — nothing in this section supersedes them
+
+These accepted contracts are reasserted, not amended:
+
+- the governed **`contact.email`** property — `{ "address": <valid mailbox>, "exposure": "public"|"internal" }`, effective cardinality 0–1, permitted at all five EFS levels, registry maximum exposure `public` (§6.2G.4) — which remains a displayable public address fact and **still implies no contact submission endpoint**;
+- the `mailto:` action grammar — one validated addr-spec recipient plus an optional governed `subject` of ≤160 plain-text scalars, no CR/LF injection, no secrets, **no auto-send and no claimed send result** (§6.2D.7) — and the classified `{ "kind": "email", … }` typed link (§6.2J.9);
+- the exactly **twenty-one** `1.0.0` module IDs of §6.2E.2 — this section adds **no** module and revises **no** module contract;
+- exposure classification and validated public projection (§6.2G.3), the §5A security constraints and review protocol, and every `D01`–`D12`, `O01`–`O12` and `E01`–`E10` requirement with the `C1`–`C4` **UNVERIFIED** status.
+
+### 6B.2 Two contact actions that are never conflated
+
+**A public `mailto:` action and a contact-form submission are different use cases.** The `mailto:` destination is authored public content rendered in public markup: it must be intentionally public and author-approved, it opens the visitor's own mail client, and it **must not** be described as server delivery, as a secret, as a tracked submission or as a guaranteed receipt. A form submission is a **server-side** use case: it must never serialize an internal recipient address, provider identity, credential, endpoint or delivery configuration into public HTML, JS, JSON, public URL parameters, client-side error text or ordinary diagnostics.
+
+**Configuration absence is a first-class state, not an error to hide.** Where an installation has no configured delivery adapter, or no resolvable recipient, the form is presented as clearly **disabled or unavailable** and is never presented as operational; it must not accept a message and silently discard it. The public `mailto:` action remains independently usable whenever `contact.email` is authored with `public` exposure, because it requires no server-side delivery at all.
+
+### 6B.3 The single simple form — closed request contract
+
+**Exactly one bounded form exists.** It collects exactly three fields — `name`, `email`, `message` — and no other personally identifying field is collected by default. A privacy-notice acknowledgement is **not** part of this settled contract: it may be added only if the Owner defines its legal and operational basis and effect, and consent is never a preselected or pre-ticked checkbox and never a blanket legal-compliance claim (§6B.11 `OD-4`).
+
+All three values are **inert untrusted data**. `name` and `message` are never interpreted as markup, never interpolated into a template, never evaluated and never used to construct a header; they are escaped on every output path.
+
+| Key | Type | Required | Normalization and validation |
+| --- | --- | --- | --- |
+| `name` | plain string | yes | NFC normalize; trim leading and trailing whitespace; 1–100 Unicode scalar values; no control characters; markup characters stay literal data |
+| `email` | plain string | yes | trim; exactly one addr-spec under the §6.2J.9 mailbox grammar; ≤254 octets; no display name, comment form, comma list or header injection |
+| `message` | plain string | yes | NFC normalize; 1–4,000 Unicode scalar values; control characters other than ordinary whitespace refuse; opaque text, never markup |
+
+**Bounds are provisional and not Owner-ratified (`OD-1`).** The three numbers above are deliberate analogues of accepted §6.2A.7 and §6.2D bounds, **not** accepted facts; they must not be implemented as settled limits before `OD-1` is decided. The whole decoded request payload carries a provisional ceiling of 16 KiB, which is also an `OD-1` item.
+
+**The envelope is closed.** A non-object root, unknown or additional key, repeated key, non-UTF-8 or malformed encoding, wrong type, empty required value, over-limit value, oversized body or unparsable payload refuses the **whole** request. There is no partial acceptance, silent coercion, lossy truncation, field dropping or guess at intent (§1.3, §5A). Server-side validation is mandatory and independent of every client hint: `required`, `maxlength`, `type` and pattern attributes are presentation conveniences only and never authority.
+
+### 6B.4 Application use case and outbound delivery port
+
+**Typed inbound boundary.** The request reaches the application as an already-decoded typed value — never a framework request object, a raw byte stream, a form map or an OS type. The accepted inbound port name is `SubmitSimpleContact(ValidatedInquiry, AbuseContext) -> truthful delivery outcome`, reserved in §6A.4. This edition permits an equivalent name, but the accepted §6A.4 names are **retained** so that §6A.4 and §6A.12 remain coherent.
+
+`ValidatedInquiry` carries exactly the normalized `name`, `email` and `message`, the resolved non-public `recipientId`, and a safe correlation handle. It never carries a credential, a provider payload, a client-supplied origin claim or the raw request body. `AbuseContext` carries only the minimum signals the §6B.7 controls require and is never persisted as a visitor profile.
+
+**Outbound delivery port.** The reserved `ContactDelivery` port (§6A.4) accepts a validated message plus a `recipientId` **resolved from private installation configuration**, and returns an outcome from §6B.5 only. The port exposes no provider SDK type, transport handle, credential or vendor error string to the application, and adapter failures are translated into the fixed enumeration.
+
+**Everything external stays in adapters and the composition root.** Provider SDKs, SMTP or API transport, outbound HTTP, credential and secret access, framework objects, persistence and environment access live only in adapters wired at the single `solo-cli` composition root (§6A.4). The domain core and application use cases import none of them and dependencies point inward only (§5, §5A). A `ContactDelivery` adapter holds least privilege for outbound sending and nothing more.
+
+**No location or address inference.** No path, hostname, forwarded header, IP geolocation, locale, route, EFS node, Page identity or authored `location` fact may select, derive or grant authority over a recipient, provider, rate policy or outcome. The recipient comes only from validated private configuration, and any Site/Page context is passed as an approved typed reference, never re-inferred from the request (§2.1, §2.2).
+
+**Request-boundary policy.** Origin and CSRF handling must be defined against an explicit trusted-proxy boundary; client-supplied `Origin`, `Referer`, `X-Forwarded-*` or host values are untrusted unless a configured proxy boundary establishes otherwise (§5A). Response shapes are enumerated from §6B.5 only, uniform in timing and wording where a difference would help an attacker, and never echo provider diagnostics. Replay handling is required wherever a retry could duplicate a message (§6B.5, `OD-5`).
+
+### 6B.5 Truthful outcomes — the fixed enumeration
+
+Exactly seven application outcomes exist. They are a **closed** set: no eighth outcome, no provider-specific code and no free-text provider reason reaches a visitor.
+
+| Outcome | Meaning | Visitor-facing state |
+| --- | --- | --- |
+| `invalid_request` | the envelope failed §6B.3 validation | field-level accessible errors naming the offending field, never echoing the submitted value |
+| `not_configured` | no delivery adapter, or no resolvable recipient (§6B.2) | form presented unavailable or disabled; not a fault of the visitor |
+| `rate_limited` | a §6B.7 abuse control refused the request | bounded accessible refusal with safe retry guidance |
+| `accepted_for_delivery` | a configured adapter accepted the message for onward delivery | acknowledgement meaning **accepted for delivery only** |
+| `rejected_downstream` | the provider or downstream transport refused it | accessible failure with no provider detail |
+| `temporarily_unavailable` | adapter or dependency outage where retry may succeed | accessible retry state |
+| `indeterminate` | the result cannot be established | accessible "not confirmed" state that never claims delivery |
+
+An acknowledgement **may only** mean accepted for delivery: it never asserts that a mailbox received, opened or read the message. `accepted_for_delivery` must not be produced by a fake, log-only or no-provider adapter — a demonstration adapter reports `not_configured` or `indeterminate`, never live delivery. `rejected_downstream` and `temporarily_unavailable` must remain distinguishable to the application even where the visitor-facing wording is deliberately uniform.
+
+**Accessible states and safe retry.** Every outcome has a programmatically determinable state, a visible message and an assistive-technology announcement that does not depend on colour alone or on focus theft; error association follows normal form-error conventions, and submitted values are preserved only where preserving them is safe. Retry is offered only where it cannot duplicate a message: after `indeterminate` or `rejected_downstream` the client must not blindly resubmit, and any retry carries an idempotency handle so a repeated attempt is deduplicated rather than becoming a second inquiry (`OD-5`).
+
+### 6B.6 Privacy, logging and retention decisions
+
+**Secrets and recipient mapping are never authored content.** Delivery credentials, the internal recipient mapping, provider configuration and endpoint detail stay outside authored and public content, outside the public projection and outside source control (§5A).
+
+**Minimum transient processing — no default retention in core.** A submission is processed to validate it and hand it to the delivery port. Solo's core **does not persist contact messages by default**. A chosen downstream provider may apply its own retention policy, which must be documented when a provider is actually adopted; no provider is selected here (§6B.12). No analytics or form telemetry may silently capture the submitted message, the visitor address or the message body.
+
+**Log restraint.** Ordinary logs and diagnostics must not contain the raw message body, the visitor's email address or any credential; where correlation is needed a generated handle is logged instead. Diagnostics name the failing stage and the safe field or outcome, never a provider response body, a secret, a server-private root or untrusted submitted content (§6.2D.8, §5A).
+
+**Failure handling and data-subject obligations.** A delivery failure must not leave a partial or orphaned record. Data-subject notices, deletion commitments and any retention period are **Owner-approved policy choices at the provider boundary** (§6B.11 `OD-3`). This section asserts no jurisdiction's legal compliance and claims none.
+
+### 6B.7 Fail-closed boundary and proportionate abuse control
+
+**Fail closed at the request boundary.** Malformed, ambiguous, unauthorized or oversized input is refused rather than coerced into a plausible result (§1.3, §5A). Server-side validation is authoritative regardless of client hints; the body is size-constrained before parsing; and no submitted content is ever executed, interpreted as markup, used to construct a header or written to a filesystem path.
+
+**Proportionate, first-party controls.** Rate and abuse controls are bounded, first-party and proportionate. This contract does **not** mandate a third-party CAPTCHA, visitor tracking, a visitor account or a persistent global identity system, and must not introduce one by default. Automated and repeated submissions are handled by a defined refusal path, never by silent acceptance.
+
+**Explicit refusal criteria.** A request refuses when the envelope fails §6B.3; when the decoded body exceeds the payload ceiling; when a required field is absent or over-limit; when submissions for the applicable bounded key exceed the configured rate; when the delivery adapter is unavailable and the request cannot be safely queued; or when origin/CSRF validation fails under the defined trusted-proxy boundary. Each criterion becomes a code-bearing verification case in §6B.10.
+
+**Owner policy still required.** Exact rate thresholds, window lengths, retention periods and any security response service level are **Owner decisions** (§6B.11 `OD-2`, `OD-3`). Until they are fixed the corresponding §6B.10 cases stay blocked, and no universal numeric value is asserted here.
+
+### 6B.8 Public presentation and the module-registry boundary
+
+**Entrypoint.** The simple form is one public contact entrypoint, presented as an ordinary form region on a Page that expressly enables it. Its presentation uses only accepted primitives — the Page's authored content, accepted accessible form conventions and the §6B.5 outcome states. It introduces no new presentation token, no new module ID and no concealed field.
+
+**Two credible placements, with a recommendation.**
+
+1. **A distinct system-owned contact use case surfaced through an expressly configured Page/action boundary.** The form is an application-level use case that a Page explicitly opts into, following the same pattern as accepted safe-link action handling. This adds **no** module, changes **no** registry entry, and preserves the exactly twenty-one `1.0.0` catalogue of §6.2E.2. **This is the recommended and adopted placement for this edition.**
+2. **A versioned `interaction.contact` authored module with an explicit subsequent registry amendment.** A closed JSON module node authors could place in a Page body. It would require a **new 22nd module** or a revision of `O05`, and therefore a separate registry amendment and an Owner decision.
+
+**The registry boundary is unchanged.** §6.2E.2 still contains exactly the twenty-one accepted IDs, and no `interaction.contact` module exists or is hereby accepted. Earlier R02 drafting that mentioned such a module was never installed and is **not** independent evidence: no 22nd module has been accepted, created or concealed. Adopting placement 2 is a material Owner decision (§6B.11 `OD-6`) and must not be inferred from this section. Under either placement there is no general form builder, no conditional or multistep workflow and no form administration surface (§3.4).
+
+### 6B.9 Public links, bounded integrations and analytics
+
+**Safe links preserved.** Authored `mailto:`, internal Page and fragment links, and external `http://`/`https://` links remain governed by §3.1C, §6.2D.5–§6.2D.7 and §6.2J.9. The typed `email` variant keeps its single addr-spec plus optional ≤160-scalar `subject`, and no typed link gains a new field here.
+
+**Bounded external actions.** The first release supports **static external booking links and maps/directions links** to author-approved destinations. It supports **no** booking engine, availability or inventory feed, reservation transaction, visitor account, live geolocation service, or server-side fetch of a third-party destination (§3.1C, §6.2J.9). A map or directions link is an ordinary classified external link: it conveys no location authority and never infers a recipient, route or canonical.
+
+**Analytics default: none.** No analytics is required or enabled in the first release. Any later privacy-respecting analytics adapter must be separately Owner-approved, independently disable-able, never required for public publication, and must never collect the contact submission. Absent evidenced Owner approval the **no-analytics default** stands and provider adoption remains outside this edition (`OD-7`).
+
+### 6B.10 Future executable proof matrix — `F01`–`F10` (all unrun)
+
+Every case below is a **non-waivable future gate**. None has been executed: this repository contains no application code, schema artefact, test suite, provider or deployment, so no row is `PASS`.
+
+| Case | Required proof | Status |
+| --- | --- | --- |
+| `F01` | the closed three-field envelope accepts a valid inquiry and refuses unknown keys, repeated keys, wrong types, empty required values, non-UTF-8 and oversized bodies with no partial acceptance | `NOT RUN` |
+| `F02` | `name`/`email`/`message` normalization, NFC handling, control-character refusal and provisional bound enforcement behave exactly as §6B.3 states | `BLOCKED — OD-1` |
+| `F03` | `SubmitSimpleContact` reaches `ContactDelivery` with a resolved non-public `recipientId`, and no recipient address appears in any public output, client error or ordinary log | `NOT RUN` |
+| `F04` | all seven §6B.5 outcomes are reachable and distinct, and `accepted_for_delivery` is never produced by a fake, log-only or no-provider adapter | `NOT RUN` |
+| `F05` | `not_configured` presents the form as unavailable and never accepts-and-discards a message, while the public `mailto:` action stays usable | `NOT RUN` |
+| `F06` | rate and repeated-submission refusal trigger at the configured policy and remain bounded and accessible | `BLOCKED — OD-2` |
+| `F07` | origin/CSRF and trusted-proxy handling reject forged `Origin`, `Referer` and `X-Forwarded-*` claims | `NOT RUN` |
+| `F08` | retry after `indeterminate` or `rejected_downstream` deduplicates rather than creating a second inquiry | `BLOCKED — OD-5` |
+| `F09` | accessible success and error states, field association and assistive-technology announcements for every outcome | `NOT RUN` |
+| `F10` | inward-only dependency proof: no provider SDK, transport, framework, storage or environment import in the domain core or application use cases | `NOT RUN` |
+
+### 6B.11 Open Owner decisions — explicitly blocked, never assumed
+
+| ID | Decision required | Blocks |
+| --- | --- | --- |
+| `OD-1` | ratify the exact field bounds and whole-payload ceiling (§6B.3) | `F02` and any code-bearing work |
+| `OD-2` | rate/abuse thresholds and window lengths (§6B.7) | `F06` |
+| `OD-3` | retention period, data-subject notices and deletion commitments at the provider boundary (§6B.6) | provider adoption and the `F03` retention proof |
+| `OD-4` | whether a privacy-notice acknowledgement exists, and its defined legal and operational basis and effect (§6B.3) | the form's final field set |
+| `OD-5` | idempotency/replay policy and correlation-handle lifetime (§6B.4, §6B.5) | `F08` |
+| `OD-6` | whether to adopt the `interaction.contact` 22nd module or an `O05` revision instead of the adopted placement (§6B.8) | registry amendment only |
+| `OD-7` | whether any analytics is approved at all, and which (§6B.9) | analytics adoption only |
+
+### 6B.12 Preservation, exclusions and what remains reserved
+
+**Preserved exactly.** One Entity per Installation; the Entity → Facet → Site → Page → localized-representation hierarchy; stable Page identity independent of locale, route and location; full region-qualified locale tags; the §3.2B route-case, Unicode and collision contract; unlisted visibility that is never access control; authored location independent of routing; exposure-classified public projection; and the §5A integrity, secrecy and refusal constraints. `D01`–`D12`, `O01`–`O12`, `E01`–`E10` and `C1`–`C4` retain their status unchanged.
+
+**Excluded.** Advanced contact forms, form builders, conditional or multistep workflows, form administration, file attachments, CRM and ticketing pipelines, visitor accounts, a persistent global identity system, booking engines, live inventory, transactions, geolocation services, server-side third-party fetching, mandatory CAPTCHA and default analytics (§3.4, Product §6).
+
+**Reserved to later packages.** Provider, transport, hosting, DNS, TLS, secret storage, operational monitoring and backup (remaining `R00.F` implementation and deployment scope); numeric accessibility and performance targets, release and support policy, and third-party notices (`R00.G`); and every schema artefact, adapter, endpoint, test and CI job (`R00.E` and later code-bearing stages). `SOLO-SEC-2026-001` remains a documented **external advisory** assessed as not applicable to the code-free examined revision — Solo is **not** labelled patched or immune.
+
 ## 7. Decisions to make before an implementation work order
 
 1. **Authoring and publication contract — decided by `R00.A`, physical literals now settled:** accepted and recorded in §1.1, §1.3 and §1.4 are the technical ID grammar and 63-character limit, the parent-scoped uniqueness rules, durable references, the explicitly supplied Entity ID, the seeded `main`/`main`/`home` defaults, drafts outside the published graph, the single versioned manifest as sole publication authority, source integrity and fail-closed refusal. The manifest file and field/locator schema, the editable source layout, the JSON and Markdown authoring encoding, draft isolation and the encoding of the accepted identity semantics are **settled** in §6.2A–§6.2C and the worked examples in §6.2M; only `R00.E` implementation of the stated artifacts remains.
 2. **Address, route and locale contract — decided by `R00.B`, physical literals now settled:** recorded in §3.2, §3.2B and §4.1–§4.4 are one configured canonical HTTP(S) origin with optional prefix and optional authorized aliases, explicit Page and optional localized routes, validated Unicode route text, default-insensitive public matching with author-selected case-sensitive claims, exact-case unlisted matching, independent full-locale normalization, the ten publication collision rules, `308`/`302` redirect semantics, cache safety and locale-less entry/fallback behaviour. The declaration keys, the pinned **Unicode 18.0.0** profile and the collision-ledger rules are settled in §6.2J. **Still technical:** the toolchain that binds that Unicode data (`R00.E`) and the implemented matcher, HTTP adapter, redirect/cache behaviour and rendered language selector (later stages).
 3. **Typed property, location and graphic contract — decided by `R00.C`, physical literals now settled:** accepted and recorded in §2, §2.1 and §3.3A are the governed extensible property registry, the independent `inheritance`/`currentContext` declaration elements with direct-ancestry-only resolution and effective-cardinality validation, per-value provenance and exposure classification with a validated restricted public projection, zero-to-many complete structured location facts with explicit identified-record extension and no geographic inference, registered graphic roles, typed Entity versus generic-platform asset references, default-deny role fallback and fail-closed publication. The nine-key property catalogue, `add`/`extend` envelopes, role cardinalities and media allowlists are settled in §6.2G–§6.2I. **Still technical:** the platform asset library's artwork, licensing and version-pinned catalogue delivery, plus every implemented resolver, validator, selector and adapter in later stages. No automatic graphic fallback is approved for any role initially.
 4. **Page formats, visibility and presentation:** the advanced modular JSON capability families (§3.1B) are instantiated as the twenty-one closed `1.0.0` contracts of §6.2E.2, together with the accepted JSON-first single-effective-source precedence (§1.6), Owner-approved Page-level `visibilityDefault` with representation-level `visibility` override (§6.2B, §6.2J.5), the design tokens of §6.2E.1, the shared read-only generic public library (§6.2I.2) and cascading graphic roles. Field placement, schema encoding and the first module and role catalogues are now decided; only rendering implementation and per-module accessibility/performance testing remain (later stages). Unlisted serving and discovery behaviour is Owner-accepted and restated physically in §6.2J.10.
-5. **Integration scope:** the **included** contact scope is the safe `mailto:` action and the **simple** contact form; **advanced contact forms are excluded** (see §3.4). Remaining technical choices are the field set, delivery adapter/provider, anti-abuse controls, retention, and the booking/map-link and analytics defaults — `R00.E`/`R00.F` decisions that may not alter §6.2's literals.
+5. **Integration scope — decided by `R00.F`, documentary contract settled:** the **included** contact scope is the safe `mailto:` action and the **simple** contact form; **advanced contact forms are excluded** (see §3.4). The bounded contact and integration contract is now settled in §6B: two distinct contact actions that are never conflated, the closed three-field form envelope, the `SubmitSimpleContact` use case over the reserved `ContactDelivery` port with a privately resolved recipient, the seven truthful outcomes, fail-closed proportionate abuse limits, log restraint with no default core retention, the adopted system-owned placement that leaves the twenty-one-module registry unchanged, static external booking and directions links, and the no-analytics default. **Still open by explicit Owner decision** (`OD-1`–`OD-7`, §6B.11): the exact field bounds and payload ceiling, rate and abuse thresholds, retention and data-subject policy, whether a privacy acknowledgement exists at all, idempotency policy, whether a 22nd `interaction.contact` module replaces the adopted placement, and whether any analytics is approved. Delivery provider, hosting, DNS, TLS and secret storage remain implementation and deployment work. None of these may alter §6.2's literals.
 6. **Tooling/lifecycle:** release/upgrade strategy — the framework, runtime, package layout, validation/test gates and CI platform are **selected conditionally in §6A and still owe unexecuted conformance proof**, so no build or test claim may be inferred from their selection — plus **Apache-2.0 (Owner approved), copyright/attribution, third-party notices, and the release/support policy around the already-enabled GitHub private vulnerability reporting channel** — intake is enabled for the public repository, while triage ownership, response expectations, coordinated disclosure, a supported-version/support policy and any required third-party notice remain open — and independent Solo repo setup (the parent `/00.foundation-solo/` ignore rule is **committed and verified effective** in the enclosing repository at its recorded local revision, which tracks no Solo paths; the parent remains outside the Solo agent's write boundary, and its remote publication is a separate Owner/parent-operator concern, not a Solo bootstrap gate). These are `R00.E`–`R00.G` obligations, tabulated in §6.5.
 
 **No undefined implementation mechanism should be treated as approved merely because it appears as an example in this document.** The examples in §6.2M are normative at the level of fields and types only, never as evidence that files, schemas or code exist.
