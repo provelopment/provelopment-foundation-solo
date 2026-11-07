@@ -7,117 +7,104 @@
 | Field | Value |
 | --- | --- |
 | Date | 2026-11-07 |
-| Work order | `SOLO-WO-021` edition **`R05`** — bounded correction following R04 `REVISE` |
-| Owner handoff | **Received** — separate Owner message naming `SOLO-WO-021 R05` and instructing the agent to read and run `.documents/WIP/workorder-active.md` |
-| Installed order | **21,375 bytes**, SHA-256 **`4D602F6BF13F13A4CA408DE36481A2E2BF5A15118C98769EBB878918591C3CF8`**, 133 lines, LF-only, `OWNER-ISSUED` |
-| Starting revision | `21e439053016a26f09459a53a94819a1195cc0ff` |
-| Issuance-freeze commit | **`0dda0b0cf1eeb5a925489d9e5c6ec987c3a2663a`** (ACTIVE only) |
-| Correction commit | **`24e534df24f9bb7bce2fb96a0ee0884d8e60cf4e`** |
-| Source tree at correction commit `24e534d` | `3674dc382348ebf4914e3fac4c4adb18b43c0e41` (the report commit's own tree necessarily differs, because it contains this file; that SHA and tree are given only in the chat handback) |
-| Status | **`COMPLETE`** — G01–G11 all PASS |
+| Work order | `SOLO-WO-021` edition **`R06`** — final contact-contract disambiguation, documentation only |
+| Owner activation | **Received** — separate Owner message: *"Execute `SOLO-WO-021 R06`: read and run `.documents/WIP/workorder-active.md`."* |
+| Installed order | **18,053 bytes**, SHA-256 **`7B6CF80EC9A1956BD582D8A596822467A35E5C39FCCDF03BCBEE0A1835E17190`**, 102 lines, strict UTF-8, no BOM, LF-only, `OWNER-ISSUED` |
+| Reviewed starting `main` | `358592862666ee42770a9c0e476fd227dd203393` |
+| Issuance-freeze commit | **`a18e4248d653b4da2970bade7c61032689090509`** (ACTIVE only) |
+| Correction commit | **`90ca85f339b0a1691e877a4de4f06e29aab82a18`**, tree `eea28147e457c45ed75b1366ba1cd4edc1b4b363` |
+| Status | **`COMPLETE`** — G01–G10 all PASS |
 
-## G01 — Authority and preflight
+## G01 — Owner authority and preflight
 
-Root `C:/Users/Sean/Documents/Provelopment/00.foundation-solo` equals `git rev-parse --show-toplevel`; branch `main`; one worktree; sole `origin` = `provelopment/provelopment-foundation-solo`; no stashes. The worktree carried exactly ` M .documents/WIP/workorder-active.md` — the permitted Owner installation — and nothing else.
+Root `C:/Users/Sean/Documents/Provelopment/00.foundation-solo` equals `git rev-parse --show-toplevel`; branch `main` tracking `origin/main`; exactly one worktree; sole `origin` = `provelopment/provelopment-foundation-solo`; no stashes. The worktree carried exactly ` M .documents/WIP/workorder-active.md` — the permitted Owner installation — and nothing else.
 
-All ten pinned blobs matched at `21e4390` before any write: pre-install `workorder-active.md` `c69ec236`, `ARCHITECTURE.md` `120b8703`, `sop-architect.md` `30bf8add`, `FOUNDATION-SOLO.md` `50a58123`, `sop-implementation.md` `a5771160`, `plan-roadmap.md` `613d3fcb`, `plan-next.md` `92fa562b`, `execution-report.md` `2bca0075`, `AGENTS.md` `32562b67`, `README.md` `ed492cb6`. All ✅.
+All eleven pinned anchors matched at `3585928` before any write: pre-install ACTIVE `1e0ce769`, `ARCHITECTURE.md` `aa3bdb5f`, `execution-report.md` `e6fac4f4`, `FOUNDATION-SOLO.md` `50a58123`, `sop-architect.md` `03962512`, `sop-implementation.md` `a5771160`, `plan-roadmap.md` `613d3fcb`, `plan-next.md` `92fa562b`, `plan-outlook.md` `cb9c7a61`, `README.md` `ed492cb6`, `AGENTS.md` `32562b67` — all ✅. `.documents/Security/` remains absent from HEAD and was not recreated. Exactly four WIP files.
 
-`.documents/Security/security-issues.md` is absent from HEAD and was **not** restored. Four WIP files present.
+## G02 — Issuance freeze before any source edit
 
-## G02 — Freeze sequence, executed first (the R04 deviation is not repeated)
+The unaltered Owner-installed R06 was committed **first and alone**: `git add` scoped to `workorder-active.md`, producing `a18e424` containing exactly that one file. It was pushed, remote head confirmed at `a18e424`, and frozen blob `99ded895` extracted and re-hashed to **18,053 bytes / `7B6CF80EC9A1956BD582D8A596822467A35E5C39FCCDF03BCBEE0A1835E17190`** — byte-identical. The extraction artifact was deleted immediately (`.temp/` back to 0). Architecture editing began only afterwards.
 
-The unaltered Owner-installed R05 was committed **before any other file was touched**: `git add` was scoped to `workorder-active.md` alone, and `0dda0b0` contains exactly that one file. It was pushed and the remote head confirmed at `0dda0b0`. The frozen blob `1e0ce769` was then extracted and re-hashed to **21,375 bytes / `4D602F6BF13F13A4CA408DE36481A2E2BF5A15118C98769EBB878918591C3CF8`** — byte-identical to the installed file. The temporary extraction artifact was deleted immediately (`.temp/` back to 0). Only then did Architecture/SOP editing begin.
+## FINDING A — browser-enhancement contradiction resolved
 
-## C01 — Public form endpoint versus private delivery detail
+The conflict was real and located at exactly one operative sentence: §6A.12's **"Each interactive module must supply (a) server golden DOM with a valid `data-solo-envelope` …"**, which sat beside the same section's express no-`BrowserEnhancementV1` rule for `interaction.contact`.
 
-- **§6B.2:** the form's HTML `action` is now stated to be a **server-owned, publicly routable submission URL** — necessarily visible in public markup, never a secret, never an author-supplied custom action URL — carrying only non-secret CSRF and attempt control tokens. The private set is named explicitly: internal recipient address, provider identity and configuration, credentials, provider API/SMTP destination, transport diagnostics.
-- **§6A.12 `interaction.contact` row:** the absolute claim "no recipient, address, provider, credential or endpoint appears in output" was replaced with the precise split — the **public form action and safe control tokens may appear**; internal recipient/address, provider configuration, credentials, internal provider endpoint and transport diagnostics may not. All refusal, no-JS and port requirements were preserved verbatim.
-- **§6B.6:** "endpoint detail" is now qualified as **internal provider or delivery endpoint detail**, with an explicit note that the browser-visible server-owned action URL is neither that detail nor a secret.
+- **§6A.12 "Boundary assertions per module":** now reads **"Each of those five — `tabs`, `accordion`, `modal`, `carousel` and `motion` — and only those five"**, and adds an explicit clause that `interaction.contact` **is not** a browser-enhancement module: it is a server-rendered, standards-based HTML form that must carry no `data-solo-envelope`, export no `BrowserEnhancementV1` payload, and require no DTO parity fixture or client-runtime decoder, with generic closed-module validation, safe rendering and real keyboard/no-JS/refusal tests applying instead. Its `interaction.` prefix confers no browser-enhancement status, and no sixth `kind`, no special browser controller, no arbitrary authored script, no extra JSON node property and no alternative Page-enablement mechanism may be added.
+- **§6A.5 "Nothing else crosses":** one added sentence records that the only payload-carrying modules are the five enumerated kinds, and that a server-rendered form such as `interaction.contact` is among the non-enhanced modules.
 
-No runtime URL, path, authoring key or provider was invented.
+The five-kind enumeration at §6A.5 was **not** altered and remains exactly `tabs`, `accordion`, `modal`, `carousel`, `motion`.
 
-## C02 — R00.F versus later-stage ownership
+## FINDING B — mandatory native transport and closed five-key envelope
 
-- **§6.5** `R00.F` bullet replaced: it is now **"contact and integrations decisions"** — documentary decisions only, settled in §6B, retaining **no** hidden implementation, deployment or DNS/TLS obligation, and explicitly **not yet closed**. Implementation is attributed: contact form / `mailto:` / delivery adapter → **Stage 08 (`R08.A`–`R08.C`)**; static booking and directions links with analytics-off → **Stage 09 (`R09.A`–`R09.C`)**; establishment and deployment/update/recovery → `R00.G`'s lifecycle decision contract with **Stage 10** implementation and **Stage 11** security/nonfunctional evidence.
-- **§6B.12:** the "remaining `R00.F` implementation and deployment scope" wording was replaced with the same attribution, with schema/runtime artifacts kept with `R00.E` and later code-bearing stages.
-- **§6A.16 item 3** ("Package-label split") is now recorded as **resolved** under this order rather than as a live contradiction, and the list introduction no longer claims three open inconsistencies.
-- **§7** was reviewed: item 5 already framed `R00.F` as a settled documentary contract and did not restore the mislabeling, so it was left unedited.
+§6B.3's conditional *"Where the entrypoint accepts JSON or `application/x-www-form-urlencoded`"* paragraph was replaced by two precise paragraphs:
 
-Stage names were cross-checked against `plan-roadmap.md`, which reads exactly *"Stage 08 — Safe contact actions and simple inquiry form"*, *"Stage 09 — Approved small integrations and user actions"*, *"Stage 10 — Installation, content updates, release and recovery lifecycle"* and *"Stage 11 — Cross-system hardening and nonfunctional assurance"*.
+- **Mandatory first-release transport.** A standard HTML `method="post"` `application/x-www-form-urlencoded` **UTF-8** submission, fully operable with JavaScript disabled; accepted with an **absent charset parameter or `charset=UTF-8`** matched case-insensitively. `multipart/form-data`, `application/json`, every other encoding, unsupported charsets and an unbounded parser are **refused in the first release**. The earlier conditional JSON reference is recorded as decoding guidance only — never a second endpoint, general JSON inquiry API or fallback — and later JSON support needs explicit separate Owner authority.
+- **One closed five-key transport envelope.** Exactly three visitor keys (`name`, `email`, `message`) plus exactly two server-owned non-personal controls (`csrfToken`, `attemptToken`); decoding **separates the two controls out before** constructing the closed three-value `ValidatedInquiry`; controls are never authored props, visitor fields, visitor data or personal data. Unknown, duplicate and repeated keys, missing or malformed control values, ambiguous percent escapes, invalid UTF-8 and both **16 KiB** ceilings refuse the complete wire submission **including the control keys**. No honeypot, tracker, JSON fallback, attachment, custom action or new API.
 
-## C03 — Historical reservation now points to decided outcomes
+§6B.8 gained one clarifying sentence: the two control keys are wire transport controls, never props, so their presence in a native POST neither extends the closed prop set nor counts as an authored field — resolving the misreading that the closed three-field payload rejects the CSRF/attempt controls.
 
-§6A.16's "Explicitly reserved, not decided here" became **"Explicitly reserved at the time, now decided"**: **at the earlier `R00.E` edition** the contact field set and bounds, simple-form placement, abuse and rate policy, consent and privacy-notice policy, delivery outcomes, retry and deduplication, and analytics scope were reserved **for `R00.F`** and **are now decided in §6B**. Provider adoption and provider-specific privacy/retention terms remain later-scoped, as do `R00.G`'s nonfunctional and lifecycle decisions and the applicable implementation stages. It states plainly that `R00.E` selected only the unprivileged `ContactDelivery` port boundary and **resolved no contact design**. The R00.E toolchain assumptions, sealed-artifact interface, `C1`–`C4` `UNVERIFIED` status and all accepted publication literals were preserved.
+## FINDING C — token expiry versus the permanent single-dispatch rule
 
-## C04 — A1-only security cleanup finished
+§6B.4's "Attempt token and deduplication" paragraph was replaced by **"Attempt token, expiry and deduplication"**: the token expires **no later than 24 hours after issue** and can never become valid again; a missing, expired, invalid or unverifiable token is refused **without any outbound dispatch**; the non-content deduplication record is effective for the token's full validity and expires at that same defined boundary; after expiry or loss of deduplication state the same token creates **no fresh dispatch authority**; that refusal maps to the existing generic form-level `invalid_request` with no new outcome and no provider detail; a genuinely fresh attempt needs a deliberate new visitor action and a newly issued token under the existing duplicate-warning policy. At-most-once dispatch is retained and downstream exactly-once inbox delivery is still explicitly never promised.
 
-The obsolete final sentence recording `SOLO-SEC-2026-001` as a WordPress-derived external advisory was **deleted** from §6B.12; the removed register remains historical Git evidence only. No CVE, advisory watchlist, register or substitute workflow was added. Architecture now contains **zero** occurrences of `SOLO-SEC`, `WordPress` or `CVE-`. §5A's substantive boundaries — fail-closed validation, secret isolation, public projection, least-privilege adapters, immutable publication integrity and rollback, and the truthful `NOT RUN`/`NOT APPLICABLE` rule — are unchanged.
+§6B.11's policy table gained a **Wire transport** row, and its **Deduplication** row now records that the token expires within 24 h and never regains dispatch authority.
 
-## C05 — Outcome and retry consistency
+## Proof cases updated (all still `NOT RUN`)
 
-- **§6B.5 visitor-state table:** `invalid_request` now also covers a CSRF or origin refusal, and requires field-specific accessible errors naming the offending field **where it is safe to do so**, while a CSRF/origin refusal shows the **generic form-level** security refusal and reveals no sensitive detail. Validation was not weakened.
-- **§6B.5 retry wording** was aligned to §6B.4: no automated resend is ever performed; a repeated attempt with the **same** token returns its last safely known result **without dispatching again**; only a fresh, deliberate visitor action with a newly issued token begins a new attempt, with a duplicate warning. It explicitly forbids promising downstream exactly-once inbox delivery.
+| Case | Change |
+| --- | --- |
+| `F01` | now requires the closed **five-key** wire envelope and refusal of unknown, additional, duplicate and repeated keys — including a repeated or unknown **control** key — plus missing/malformed controls, wrong types, invalid UTF-8, ambiguous percent escapes and oversize bodies |
+| `F03` | now requires the one obligatory media type (urlencoded, absent charset or case-insensitive `charset=UTF-8`) with `multipart/form-data`, `application/json`, other encodings, unsupported charsets and unbounded parsers refused; both 16 KiB ceilings applied to the complete wire submission including control keys |
+| `F13` | now covers **expiry**: missing/expired/invalid/unverifiable tokens refused without dispatch and mapped to generic `invalid_request`; ≤24 h expiry, never revalidating, no fresh authority after expiry or state loss, alongside the existing multi-instance at-most-once and no-blind-resend requirements |
+| `F16` | now requires a **real native POST with JavaScript disabled** that reaches the server and renders each truthful outcome, alongside the existing accessibility semantics |
 
-No contradiction requiring a new architectural choice was found, so no widening of the order occurred.
-
-## Architect SOP §7C removed
-
-The entire standalone `## 7C. Security decision and review protocol` section — heading plus all three substantive paragraphs — was deleted (8 lines). The heading sequence is now `§7A` → `§7B` → `§8`, with no renumbering needed and no gap introduced. **A1 §7B, role separation, §6B Git procedure, §7/§7A review and report duties, the WIP lifecycle and the private-disclosure safeguard are all preserved** — private reporting remains binding through Architecture §5A and `.github/SECURITY.md`, both unmodified. No independent checklist, advisory register, triage programme or shadow standard remains, and no live `§7C` reference exists anywhere outside the frozen historical ACTIVE order.
+`F02`, `F04`–`F12`, `F14`, `F15` and `F17` are unchanged. All **17** cases remain `NOT RUN`.
 
 ## Acceptance gates
 
 | Gate | Result | Direct evidence |
 | --- | --- | --- |
-| G01 Owner authority | **PASS** | Exact installed R05 (`21,375 B` / `4D602F6B…`), separate matching handoff, verified one Solo root, `main`/`origin`, four WIP files, known worktree (only the ACTIVE installation) |
-| G02 Freeze sequence | **PASS** | `0dda0b0` contains ACTIVE alone; pushed and remote head read back **before** any Architecture/SOP edit; frozen blob `1e0ce769` re-hashed byte-identically; R04 sequencing deviation **not** repeated |
-| G03 Correct public endpoint | **PASS** | §6A.12, §6B.2 and §6B.6 distinguish the public form action plus non-secret tokens from internal recipient/provider/credentials/endpoint/diagnostics; no authoring field or provider invented |
-| G04 Stage allocation | **PASS** | §6.5, §6A.16 and §6B.12 consistently assign `R00.F` to documentary decisions, implementation to `R08`/`R09`, lifecycle policy to `R00.G` with Stage 10 implementation and Stage 11 evidence; stale package-label split removed and recorded resolved |
-| G05 Historical reservation | **PASS** | §6A.16 now states the earlier `R00.E` reservation explicitly and points to the ratified §6B decisions; provider and lifecycle matters remain correctly deferred |
-| G06 A1 only | **PASS** | Architect SOP §7C removed entirely; `§7A`→`§7B`→`§8` intact; A1 §7B, §5A and private reporting preserved; zero live `§7C` references outside frozen ACTIVE |
-| G07 Advisory clutter eliminated | **PASS** | Zero `SOLO-SEC`, `WordPress` or `CVE-` occurrences in Architecture; no register presented as authority; Git history untouched |
-| G08 Contract preservation | **PASS** | Registry still **exactly 22** `1.0.0` IDs; the original 21 rows and the `interaction.contact` row content unchanged apart from the C01 endpoint wording; EFS, routing, location, publication, numeric/privacy/abuse/replay semantics and A1 thresholds untouched |
-| G09 Form semantics consistency | **PASS** | §6B.5 invalid-state and retry wording now consistent with §6B.4; `F01`–`F17` all still `NOT RUN`; `C1`–`C4` `UNVERIFIED` |
-| G10 Allowed-path Git purity | **PASS** | Only `workorder-active.md` (freeze), `ARCHITECTURE.md`, `sop-architect.md` and this report changed; no extra WIP file, no security register, no PR/branch mutation, no deployment |
-| G11 Report and checkout | **PASS** | Single overwritten report with gate evidence and real revisions; one worktree; clean tree; remote read-back; task temp cleaned |
+| G01 Owner authority | **PASS** | Exact R06 installed (18,053 B / `7B6CF80E…`), distinct matching activation, verified root, `main`, sole `origin`, one worktree, known initial state (ACTIVE only) |
+| G02 Freeze | **PASS** | `a18e424` contains ACTIVE alone; pushed and remote-read-back **before** any Architecture edit; frozen blob `99ded895` re-hashed byte-identically |
+| G03 Browser contract | **PASS** | Kinds still exactly five (`tabs`, `accordion`, `modal`, `carousel`, `motion`); §6A.12 now binds `data-solo-envelope`, DTO parity and decoder fixtures to **only those five** and states `interaction.contact` carries none while still requiring server-rendered, keyboard and no-JS form behaviour; §6A.5 clarifies payload ownership; no sixth `kind` |
+| G04 Transport contract | **PASS** | One obligatory `application/x-www-form-urlencoded` UTF-8 native POST (absent charset or case-insensitive `charset=UTF-8`); five closed keys with exactly three visitor fields and two server-owned controls; duplicate/unknown/malformed/ambiguous-escape/invalid-UTF-8/oversize refusal; multipart and JSON refused; no form builder or default JSON |
+| G05 Replay expiry | **PASS** | §6B.4 sets ≤24 h expiry, never revalidating, refusal without dispatch when missing/expired/invalid/unverifiable, no fresh authority after expiry or state loss, generic `invalid_request` mapping; §6B.11 dedup row and `F13` make the boundary verifiable |
+| G06 Preservation | **PASS** | Registry still **exactly 22** IDs; lowest changed line is **1300** in a 3,000+ line file, so the §6.2E.2 registry at line 725 and all 21 preceding module rows are untouched; the `interaction.contact` registry row is unchanged; **seven** outcomes intact; field, rate, retention, analytics, port and site decisions intact; §5A at line 556 untouched |
+| G07 Future proof cases | **PASS** | `F01`/`F03`/`F13`/`F16` updated for five-key decoding, no-JS POST, token expiry and multi-instance replay; **17 of 17** cases still `NOT RUN`; `C1`–`C4` remain `UNVERIFIED` |
+| G08 No unrelated changes | **PASS** | `git diff --name-only` reports only `.documents/Architecture/ARCHITECTURE.md`; no security work, no PR/branch mutation, no provider, no `R00.G`, no `.github/**` change, no security register recreated |
+| G09 WIP governance | **PASS** | Exactly four WIP files retained; ROADMAP still lists `R00.F`/`R00.G` (blob `613d3fcb` unchanged); NEXT neutral (`92fa562b` unchanged); ACTIVE still R06 (`99ded895`); no archive or extra document created |
+| G10 Git/report hygiene | **PASS** | Exact commits recorded, diff **13 insertions / 10 deletions in 1 file**, single overwritten report, remote read-back performed, one worktree, clean tree, task temp cleaned to 0 |
 
-**Overall: `COMPLETE`.** No gate is self-accepted; disposition belongs to the independent Chief Architect.
+**Overall: `COMPLETE`.** No gate is self-accepted; independent disposition belongs to the Chief Architect.
 
 ## No false runtime success
 
-This repository still has no implemented application, schema artifact, test suite, CI job, mail provider, contact endpoint or deployment. **`F01`–`F17` are all `NOT RUN`; `C1`–`C4` remain `UNVERIFIED`.** A documentary check may PASS; no security, browser or delivery test may be claimed.
+This repository still contains no application, schema artefact, test suite, CI job, contact endpoint, mail provider or deployment. **`F01`–`F17` are all `NOT RUN`; `C1`–`C4` remain `UNVERIFIED`.** No contact service, browser behaviour, security certification, delivery or deployment is claimed.
 
 ## Changed paths
 
 | Path | Change | Commit |
 | --- | --- | --- |
-| `.documents/WIP/workorder-active.md` | Owner-installed R05 frozen verbatim | `0dda0b0` |
-| `.documents/Architecture/ARCHITECTURE.md` | C01–C05 corrections (20 lines) | `24e534d` |
-| `.documents/SOP/sop-architect.md` | §7C section removed (−8 lines) | `24e534d` |
+| `.documents/WIP/workorder-active.md` | Owner-installed R06 frozen verbatim | `a18e424` |
+| `.documents/Architecture/ARCHITECTURE.md` | FINDING A/B/C resolutions and four proof-case updates | `90ca85f` |
 | `.documents/Reports/execution-report.md` | This report | report commit |
-| `FOUNDATION-SOLO.md`, `sop-implementation.md`, `plan-roadmap.md`, `plan-next.md`, `plan-outlook.md`, `README.md`, `AGENTS.md`, `.github/**` | **Read-only — unchanged** | — |
-| `.documents/Security/security-issues.md` | **Remains absent** | — |
+| Product, both SOPs, ROADMAP, NEXT, OUTLOOK, `README.md`, `AGENTS.md`, `.github/**` | **Read-only — unchanged** (all anchor blobs identical) | — |
+| `.documents/Security/security-issues.md` | **Remains absent**; not recreated | — |
 
-Diff: **10 insertions, 18 deletions across 2 files.** No other tracked file altered.
+## Consistency checks run
 
-## Documentary checks run
-
-- All ten pinned blobs verified equal at the starting revision; `.documents/Security/` absent from HEAD.
-- `§6B` structure intact — **12 subsections** (`6B.1`–`6B.12`), correct order.
-- Registry row count **22**; `interaction.contact` present exactly once in each of §6.2E.2 and the §6A.12 matrix.
-- `§6.5`, `§6A.16`, §7 and §6B.12 present and mutually consistent after edit.
-- Both edited files are **strict valid UTF-8, no BOM, LF-only (0 CRLF), 0 mojibake**; `§` ×438 and `—` ×239 in Architecture, `§` ×10 and `—` ×27 in the Architect SOP. (A `ΓÇö`/`┬º` appearance in one `git diff` pager capture was console decoding only, disproved by strict byte-level validation.)
-- Zero live `§7C` references remain outside the frozen ACTIVE order.
-
-## PR #1 — Owner-completed, not an R05 task
-
-Recorded for completeness only: the Owner confirms **PR #1 is archived on GitHub**, and the obsolete `docs/solo-wo-018-security-register` branch was already deleted remotely and locally, with GitHub showing only `main`. No PR or branch mutation was performed or required in this run, and no archive API capability was needed. This is **not** a live blocker and is **not** reopened as an R00.F obligation.
+- Diff hunks confined to lines **1300, 1437, 1617–1619, 1635, 1683, 1703, 1705, 1715, 1718, 1731–1732** — every one inside the authorized §6A.5, §6A.12, §6B.3, §6B.4, §6B.8, §6B.10 and §6B.11 regions. Nothing outside them.
+- Registry **22** rows; `interaction.contact` present exactly once in §6.2E.2 (line 725) and once in the §6A.12 matrix (line 1435); seven outcome rows; **17** proof cases all `NOT RUN`; §6B still **12** subsections.
+- Stale wording eliminated: zero occurrences of *"Where the entrypoint accepts JSON"*, *"separate closed transport envelope"* or the ambiguous *"Each interactive module"*.
+- Zero occurrences of `SOLO-SEC`, `WordPress` or `CVE-`; §5A and `.github/SECURITY.md` untouched — R06's security exclusion honoured.
+- File is **strict valid UTF-8, no BOM, LF-only (0 CRLF), 0 mojibake**.
 
 ## Cleanup and remote read-back
 
-Clean working tree; one worktree on `main`; `.documents/WIP/` exactly four files; `.temp/` verified **0 items** (the single frozen-blob re-hash artifact was created and deleted); no task-owned material retained and no cleanup failure. `origin/main` read back at the correction commit `24e534d`, and again after the report commit — verified below in the chat handback.
+Clean working tree; one worktree on `main`; `.documents/WIP/` exactly four files; Solo `.temp/` verified **0 items** (the single frozen-blob re-hash artifact was created and deleted); no task-owned material retained and no cleanup failure. `origin/main` verified at the correction commit and again at the report commit — see the chat handback for the exact SHA and tree.
 
 ## Handback
 
-R00.F is **ready for independent Chief Architect acceptance review**, with all eleven gates supported by source or Git evidence above. It is **not** self-accepted or administratively closed: `R00.F` remains in ROADMAP, NEXT is untouched and neutral, ACTIVE still holds the frozen R05 order, and no stage was pruned, promoted, started, merged, released or deployed. Independent `ACCEPT / REVISE / STOP` is required against this report and the exact diff; only after `ACCEPT` **and** separate express Owner-authorised closure may the WIP slots transition.
+R00.F is **ready for independent closure review**, with all ten gates supported by source or Git evidence above. It is **not** closed: `R00.F` remains in ROADMAP, NEXT is untouched and neutral, ACTIVE still holds the frozen R06 order, and no stage was pruned, promoted, reassigned, started, merged, released or deployed. Independent `ACCEPT / REVISE / STOP` is required against this report and the exact diff. Only after that `ACCEPT` may the Owner separately authorize **one administrative closure** — removing `R00.F` from ROADMAP, clearing ACTIVE to its neutral title, and selecting `R00.G` in NEXT after a readiness assessment — which is a distinct order and **not** authorized by R06.
 
 
