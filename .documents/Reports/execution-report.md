@@ -13,7 +13,7 @@
 | Starting revision | `21e439053016a26f09459a53a94819a1195cc0ff` |
 | Issuance-freeze commit | **`0dda0b0cf1eeb5a925489d9e5c6ec987c3a2663a`** (ACTIVE only) |
 | Correction commit | **`24e534df24f9bb7bce2fb96a0ee0884d8e60cf4e`** |
-| Final tree | `3674dc382348ebf4914e3fac4c4adb18b43c0e41` |
+| Source tree at correction commit `24e534d` | `3674dc382348ebf4914e3fac4c4adb18b43c0e41` (the report commit's own tree necessarily differs, because it contains this file; that SHA and tree are given only in the chat handback) |
 | Status | **`COMPLETE`** — G01–G11 all PASS |
 
 ## G01 — Authority and preflight
