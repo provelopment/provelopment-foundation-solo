@@ -6,7 +6,6 @@
 
 **Remaining packages**
 
-- **R01.A:** establish the selected minimal source layout, strictly typed configuration, pinned tooling/dependencies and deterministic local build, without borrowing another repository's runtime.
 - **R01.B:** introduce domain/application/port/adapter boundaries and one composition root, with explicit import-boundary enforcement including aliases and re-exports; ports must serve actual use cases rather than decorative abstractions.
 - **R01.C:** establish unit, integration, architecture and production-mode/browser smoke infrastructure plus CI; ensure tests report failures, no hidden compatibility runtime, and reproducible workspace-cleanup behavior.
 
