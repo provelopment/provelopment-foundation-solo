@@ -1,11 +1,5 @@
 # Foundation Solo — Implementation Roadmap
 
-## Stage 00 — Architectural contract dossier (decisions only)
-
-**Outcome:** every technical choice blocking the first coherent Solo implementation is recorded as an explicit Owner decision; no executable application code, dependency install, release or deployment.
-
-**Exit gate:** documented, consistent Owner-approved contracts in canonical About/Architecture documents; a decision matrix showing accepted versus open non-blocking matters; a minimal first code-bearing complete work order prepared for Owner review. No important design decision is delegated silently to an implementation agent. **No code exists solely because this stage is accepted.**
-
 ## Stage 01 — Reproducible engineering and hexagonal skeleton
 
 **Prerequisite:** Stage 00 architecture/toolchain choices needed for the skeleton accepted.
