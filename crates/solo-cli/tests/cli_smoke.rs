@@ -206,43 +206,122 @@ fn refuses_unusable_argument_sets() {
 // ---------------------------------------------------------------------------
 // Scratch confinement: authorized root, exclusive creation, safe cleanup.
 // ---------------------------------------------------------------------------
+//
+// The validator inspects the **unresolved** `.temp` entry before anything resolves
+// or uses it. Inspecting only the resolved target cannot prove the original entry
+// was not redirected: a junction or symlink pointing at another `.temp` directory
+// would present a plain directory after resolution. Resolution therefore happens
+// strictly after the raw-entry check has passed, and the resolved path must still be
+// this checkout's own direct `.temp` root.
 
-/// Resolves the one authorized scratch root for this checkout.
-///
-/// The root is this Solo checkout's own `.temp/`, derived from the compile-time
-/// manifest path. It must stay inside the canonical checkout and must not be
-/// redirected by a symlink or reparse point; there is deliberately no fallback to a
-/// general OS temporary directory.
-fn scratch_root() -> PathBuf {
-    let checkout = std::fs::canonicalize(SOLO_ROOT).expect("the Solo checkout root must resolve");
-    let root = checkout.join(".temp");
-    std::fs::create_dir_all(&root).expect("the authorized task scratch root must be creatable");
-    let resolved = std::fs::canonicalize(&root).expect("the scratch root must resolve");
-
-    assert!(
-        resolved.starts_with(&checkout),
-        "scratch root {resolved:?} escaped the Solo checkout {checkout:?}"
-    );
-    assert!(
-        !is_redirected(&resolved),
-        "scratch root {resolved:?} is a symlink or reparse point"
-    );
-
-    resolved
+/// Why a candidate scratch root was refused.
+#[derive(Debug, PartialEq, Eq)]
+enum ScratchRootError {
+    /// The entry could not be inspected; metadata and permission errors fail closed.
+    Unreadable,
+    /// The entry is a Windows reparse point or a Unix symbolic link.
+    Redirected,
+    /// The entry exists but is not a directory.
+    NotADirectory,
+    /// The resolved path is not this checkout's direct `.temp` root.
+    NotTheCheckoutTemp,
 }
 
+/// Detects a redirected directory entry from its **unresolved** metadata.
 #[cfg(windows)]
-fn is_redirected(path: &Path) -> bool {
+fn is_redirected_entry(metadata: &std::fs::Metadata) -> bool {
     use std::os::windows::fs::MetadataExt;
-    /// `FILE_ATTRIBUTE_REPARSE_POINT`
-    const REPARSE: u32 = 0x0400;
-    std::fs::symlink_metadata(path)
-        .map_or(true, |metadata| metadata.file_attributes() & REPARSE != 0)
+    /// `FILE_ATTRIBUTE_REPARSE_POINT`, independent of the directory bit.
+    const REPARSE_POINT: u32 = 0x0400;
+    metadata.file_attributes() & REPARSE_POINT != 0
 }
 
 #[cfg(not(windows))]
-fn is_redirected(path: &Path) -> bool {
-    std::fs::symlink_metadata(path).map_or(true, |metadata| metadata.file_type().is_symlink())
+fn is_redirected_entry(metadata: &std::fs::Metadata) -> bool {
+    metadata.file_type().is_symlink()
+}
+
+fn inspect_unresolved(metadata: &std::fs::Metadata) -> Result<(), ScratchRootError> {
+    if is_redirected_entry(metadata) {
+        return Err(ScratchRootError::Redirected);
+    }
+    if !metadata.is_dir() {
+        return Err(ScratchRootError::NotADirectory);
+    }
+    Ok(())
+}
+
+/// Ensures `checkout_root`'s direct `.temp` child is a genuine, unredirected
+/// directory and returns its resolved path.
+///
+/// The direct child path is constructed without resolving that entry. It is
+/// inspected with `symlink_metadata` first; only a passing entry is resolved, and the
+/// resolved path must still be exactly `<checkout>/.temp`. A missing child is created
+/// with `create_dir`, which never follows an existing entry and never replaces one.
+fn ensure_scratch_root(checkout_root: &Path) -> Result<PathBuf, ScratchRootError> {
+    let checkout =
+        std::fs::canonicalize(checkout_root).map_err(|_| ScratchRootError::Unreadable)?;
+    let candidate = checkout.join(".temp");
+
+    match std::fs::symlink_metadata(&candidate) {
+        Ok(metadata) => inspect_unresolved(&metadata)?,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            std::fs::create_dir(&candidate).map_err(|_| ScratchRootError::Unreadable)?;
+            let created =
+                std::fs::symlink_metadata(&candidate).map_err(|_| ScratchRootError::Unreadable)?;
+            inspect_unresolved(&created)?;
+        }
+        Err(_) => return Err(ScratchRootError::Unreadable),
+    }
+
+    let resolved = std::fs::canonicalize(&candidate).map_err(|_| ScratchRootError::Unreadable)?;
+    if resolved != candidate {
+        return Err(ScratchRootError::NotTheCheckoutTemp);
+    }
+    Ok(resolved)
+}
+
+/// Creates a genuine directory redirect: a junction on Windows, a symlink elsewhere.
+#[cfg(windows)]
+fn create_directory_link(target: &Path, link: &Path) {
+    // `mklink /J` creates a real directory junction, a reparse point that needs no
+    // elevation and no policy change.
+    let output = std::process::Command::new("cmd")
+        .args(["/C", "mklink", "/J"])
+        .arg(link)
+        .arg(target)
+        .output()
+        .expect("cmd must be available to create a junction");
+    assert!(
+        output.status.success(),
+        "junction creation failed: {}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+}
+
+#[cfg(not(windows))]
+fn create_directory_link(target: &Path, link: &Path) {
+    std::os::unix::fs::symlink(target, link).expect("directory symlink creation");
+}
+
+/// Removes the redirect itself, never the directory it points at.
+#[cfg(windows)]
+fn remove_directory_link(link: &Path) {
+    std::fs::remove_dir(link).expect("removing a junction removes only the link");
+}
+
+#[cfg(not(windows))]
+fn remove_directory_link(link: &Path) {
+    std::fs::remove_file(link).expect("removing a symlink removes only the link");
+}
+
+/// Resolves the one authorized scratch root for this checkout.
+///
+/// Derived from the compile-time manifest path, validated by [`ensure_scratch_root`],
+/// with no fallback to a general OS temporary directory.
+fn scratch_root() -> PathBuf {
+    ensure_scratch_root(Path::new(SOLO_ROOT))
+        .expect("this checkout's own .temp root must be a genuine unredirected directory")
 }
 
 /// A uniquely named scratch child that this test positively created.
@@ -305,13 +384,125 @@ fn scratch_root_is_inside_the_checkout_and_not_redirected() {
     let root = scratch_root();
     let checkout = std::fs::canonicalize(SOLO_ROOT).expect("checkout root resolves");
 
-    assert!(root.starts_with(&checkout));
-    assert!(!is_redirected(&root));
     assert_eq!(
-        root.file_name().and_then(|name| name.to_str()),
-        Some(".temp"),
-        "scratch must use this checkout's own .temp root, with no OS-temp fallback"
+        root,
+        checkout.join(".temp"),
+        "the scratch root must be exactly this checkout's direct .temp"
     );
+
+    let entry = std::fs::symlink_metadata(&root).expect("entry metadata");
+    assert!(
+        !is_redirected_entry(&entry),
+        "the unresolved .temp entry must not be a reparse point or symlink"
+    );
+    assert!(entry.is_dir());
+}
+
+#[test]
+fn a_missing_temp_child_is_created_and_then_inspected() {
+    let fixture = ScratchChild::create();
+    let fixture_root = fixture.path().to_path_buf();
+
+    let resolved = ensure_scratch_root(&fixture_root).expect("missing .temp is created");
+    assert_eq!(
+        resolved.file_name().and_then(|name| name.to_str()),
+        Some(".temp")
+    );
+    assert!(resolved.is_dir());
+    assert_eq!(entry_count(&resolved), 0);
+
+    let entry = std::fs::symlink_metadata(&resolved).expect("entry metadata");
+    assert!(!is_redirected_entry(&entry));
+
+    std::fs::remove_dir(&resolved).expect("scoped fixture cleanup");
+    assert!(!resolved.exists());
+}
+
+#[test]
+fn a_non_directory_temp_child_is_refused() {
+    let fixture = ScratchChild::create();
+    let fixture_root = fixture.path().to_path_buf();
+    let not_a_directory = fixture_root.join(".temp");
+    std::fs::write(&not_a_directory, b"not a directory").expect("fixture file");
+
+    assert_eq!(
+        ensure_scratch_root(&fixture_root),
+        Err(ScratchRootError::NotADirectory)
+    );
+
+    assert!(
+        not_a_directory.is_file(),
+        "the refused entry must be left intact"
+    );
+    std::fs::remove_file(&not_a_directory).expect("scoped fixture cleanup");
+}
+
+#[test]
+fn a_redirected_temp_resolving_inside_the_checkout_is_refused() {
+    // Everything below is positively owned fixture space inside this checkout's real
+    // `.temp`; the real `.temp` entry itself is never touched.
+    let fixture = ScratchChild::create();
+    let container = fixture.path().to_path_buf();
+
+    let target = container.join("target");
+    std::fs::create_dir(&target).expect("fixture target");
+    let real_temp = target.join(".temp");
+    std::fs::create_dir(&real_temp).expect("fixture target .temp");
+    let material = real_temp.join("existing-material.txt");
+    std::fs::write(&material, b"must survive validation").expect("fixture material");
+
+    let candidate_root = container.join("candidate");
+    std::fs::create_dir(&candidate_root).expect("fixture candidate root");
+    let redirected = candidate_root.join(".temp");
+    create_directory_link(&real_temp, &redirected);
+
+    // The arrangement the previous post-resolution-only check would have accepted:
+    // the resolved destination is a directory, is not itself redirected, and lies
+    // inside this permitted checkout.
+    let checkout = std::fs::canonicalize(SOLO_ROOT).expect("checkout root resolves");
+    let resolved_view = std::fs::canonicalize(&redirected).expect("the link resolves");
+    assert!(resolved_view.is_dir());
+    assert!(resolved_view.starts_with(&checkout));
+    assert_eq!(
+        resolved_view.file_name().and_then(|name| name.to_str()),
+        Some(".temp")
+    );
+    let resolved_entry = std::fs::symlink_metadata(&resolved_view).expect("resolved metadata");
+    assert!(
+        !is_redirected_entry(&resolved_entry),
+        "the destination looks like an ordinary directory, which is why resolution-only checks fail"
+    );
+
+    // The revised validator refuses the original unresolved entry, before using it.
+    assert_eq!(
+        ensure_scratch_root(&candidate_root),
+        Err(ScratchRootError::Redirected)
+    );
+
+    // Refusal must not have modified or deleted the link, its target or contents.
+    let link_entry = std::fs::symlink_metadata(&redirected).expect("link must survive");
+    assert!(
+        is_redirected_entry(&link_entry),
+        "the redirect itself must still be in place"
+    );
+    assert!(real_temp.is_dir(), "the target directory must survive");
+    assert_eq!(
+        std::fs::read(&material).expect("material must survive"),
+        b"must survive validation"
+    );
+
+    // Scoped cleanup of only this test's own fixture: link first, then its target.
+    remove_directory_link(&redirected);
+    assert!(!redirected.exists(), "the fixture link is gone");
+    assert!(
+        real_temp.is_dir(),
+        "removing the link must not remove its target"
+    );
+    std::fs::remove_file(&material).expect("scoped material cleanup");
+    std::fs::remove_dir(&real_temp).expect("scoped target .temp cleanup");
+    std::fs::remove_dir(&target).expect("scoped target cleanup");
+    std::fs::remove_dir(&candidate_root).expect("scoped candidate cleanup");
+    assert_eq!(entry_count(&container), 0, "no fixture residue remains");
 }
 
 #[test]
