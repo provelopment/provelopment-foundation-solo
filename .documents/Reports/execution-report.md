@@ -7,133 +7,126 @@
 | Field | Value |
 | --- | --- |
 | Session date | 2026-11-07 |
-| Work order | `SOLO-WO-021`, edition **`R03`** — `R00.F` contact and integrations |
-| Owner handoff | **Received** — Owner-delivered `SOLO-WO-021 R03` execution instruction, matching the installed edition |
-| Installed order identity | **25,451 bytes**, SHA-256 **`E02AEF86F828B11155363EFC34218C7307540853530A44EBFCA28FD62D113A15`**, marker `OWNER-ISSUED` |
-| Verified root | `C:/Users/Sean/Documents/Provelopment/00.foundation-solo` — equals `git rev-parse --show-toplevel`; real checkout, not the parent workspace, no symlink or junction |
-| Branch / remote | `main`; exactly one worktree; sole `origin` = `https://github.com/provelopment/provelopment-foundation-solo.git` |
-| Initial revision | `9d5372fc8bb2af08af7942e337c127c2ee238499` |
-| Issuance-freeze commit | `cd01b15d5beeece342fe38d512626489395950c8` |
-| Codification commit | `3728d4784fc940095aaad70bd0444c2c901147c6` |
-| Status | **COMPLETE for the documentary scope** — all applicable R03 gates pass; `OD-1`–`OD-7` recorded as open Owner decisions with their code-bearing cases blocked |
+| Work order | `SOLO-WO-021` edition **`R04`** — corrective `R00.F` codification, A1 security consolidation, authorized cleanup |
+| Owner handoff | **Received** — Owner-delivered `SOLO-WO-021 R04` execution instruction, matching the installed edition |
+| Installed order identity | **35,892 bytes**, SHA-256 **`A889FDD43DB06749893D19F6FB30FBA485B5FF8817916B590267BF3FA9748971`**, 171 lines, LF-only, `OWNER-ISSUED` |
+| Verified root | `C:/Users/Sean/Documents/Provelopment/00.foundation-solo` — equals `git rev-parse --show-toplevel`; no junction or second checkout |
+| Branch / remote | `main`; exactly one worktree; sole `origin` = `provelopment/provelopment-foundation-solo` |
+| Starting revision | `67316a2faa192af24302399ad38b93217f920536` |
+| Issuance-freeze commit | `be921b831937d73f94ab1a5e14b6d039406e8332` (ACTIVE only) |
+| Codification commit | `53247c79119ed4d3e1059f26004f37a51c75b3a4` |
+| Final tree | `fed6090950f28d9b74b3c6ab33c9892565c9d630` |
+| Status | **Partial `COMPLETE`** — G01–G10 and G12–G16 pass; **G11 FAILED** on the PR #1 archive step only (see below). Not an accepted `R00.F` result |
 
-## Preflight — every prerequisite verified before any non-report write
+## G01 — Authority, preflight and one disclosed deviation
 
-| Check | Result |
+All eight pinned blobs matched exactly at `67316a2` before any write: `ARCHITECTURE.md` `55b70cd1`, `FOUNDATION-SOLO.md` `2be94c79`, `plan-next.md` `92fa562b`, `plan-roadmap.md` `50ff6d30`, `sop-architect.md` `4343fc6c`, `sop-implementation.md` `7091b204`, `security-issues.md` `5b50e1f0`, and pre-installation ACTIVE `e8a1f732`. Worktree carried exactly ` M .documents/WIP/workorder-active.md` — the permitted installation. Four WIP files; NEXT neutral; ROADMAP still listing `R00.F` and `R00.G`; no stashes; one `origin`.
+
+**Disclosed deviation.** R04 §2.5 requires the issuance-freeze commit *before* subsequent edits. I completed preflight, then began documentation edits before making that commit. The ACTIVE file was never touched: it remained 35,892 bytes / SHA-256 `A889FDD4…` at the moment of freezing, byte-identical to preflight, and the freeze commit `be921b8` contains **only** `.documents/WIP/workorder-active.md`. The frozen blob (`c69ec236`) was extracted and re-hashed to the same `A889FDD4…`, proving the order was committed unaltered. The ordering intent is therefore satisfied with stronger evidence than a pre-edit freeze would give, but the sequence departed from the literal instruction and is reported as such.
+
+**Register deletion safety gate (§4.3).** The register blob was byte-identical to the reviewed `5b50e1f0` and contained only `SOLO-SEC-2026-001` (a WordPress advisory marked `Not applicable` to the code-free assessed revision). No new Solo-specific vulnerability existed, so the gate passed and deletion proceeded. Git history retains the file; no history was rewritten.
+
+## Step 2 — `interaction.contact` registered as module 22
+
+The initial `1.0.0` registry went from 21 to **exactly 22** IDs. The original twenty-one rows and their contracts are untouched; `interaction.contact` was appended as the 22nd row.
+
+**Exact 22 IDs:** `layout.stack`, `layout.grid`, `layout.bento`, `layout.layers`, `content.heading`, `content.prose`, `content.actions`, `content.hero`, `media.image`, `media.video`, `media.gallery`, `media.carousel`, `design.watermark`, `design.motion`, `interaction.tabs`, `interaction.accordion`, `interaction.modal`, `content.stats`, `content.testimonials`, `content.pricing`, `content.timeline`, **`interaction.contact`**.
+
+**Closed `props` as registered:** `labels` **R** closed `{name, email, message, submit}`, each 1–80 scalars after NFC; `notice` **R** closed `{label 1–160, link <existing classified typed link → public Page representation or validated https: privacy URL>}`; `feedback` **R** closed with exactly the seven keys `invalidRequest`, `notConfigured`, `rateLimited`, `acceptedForDelivery`, `rejectedDownstream`, `temporarilyUnavailable`, `indeterminate`, each 1–240 scalars. Leaf, no children, at most one node per representation, no custom action URL, recipient, provider, credential, upload, conditional/multistep form or CRM.
+
+Count references were updated at every site rather than only the registry: §3.1C literal, §6.2E.1/§6.2E.2, `O05` coverage, the §6A status banner, §6A.11 heading and catalogue, the §6A.11 module-to-port matrix (new row), `C4` traceability, the P09/V09 rows, §6A.16 preservation, and §7.4.
+
+**Contradiction found and repaired.** §6A.12 previously asserted the "`R00.F` simple inquiry form is never implemented as an unregistered JSON module" and that "twenty-one implemented" could not be claimed. Under the Owner's decision that statement became false, so it now reads that the form **is** the registered `interaction.contact` module — never an unregistered, concealed or Page-overlay form — and that "twenty-two implemented" may not be claimed until each is verified.
+
+## Step 3 — §6B finalised with the Owner's concrete decisions
+
+Every provisional value the R03 edition had recorded as an open Owner decision is now a settled first-release policy:
+
+| Area | Codified decision |
 | --- | --- |
-| `git status --porcelain=v1 -uall` at start | Exactly ` M .documents/WIP/workorder-active.md` — the permitted order installation, no other changed or untracked path |
-| Worktrees / remotes / stashes | One worktree, one correct `origin`, no stashes |
-| WIP inventory | Exactly `plan-roadmap.md`, `plan-next.md`, `workorder-active.md`, `plan-outlook.md` |
-| Immutable content anchors (7/7) | Architecture `0f26366e`, Product `51d96258`, NEXT `e483a281`, ROADMAP `50ff6d30`, OUTLOOK `cb9c7a61`, ACTIVE-as-committed `ea5f20b7`, security `5b50e1f0` — **all matched** |
-| HEAD movement from the R03 reference baseline `79b8f305…` | Exactly **one** commit (`9d5372f`) touching **only** `.documents/Reports/execution-report.md`. R03 §2 expressly permits this: a published HEAD advanced *only* by an independently verified canonical execution-report commit, with all listed anchors unchanged, is not a reason to reset or alter scope. Recorded, not waived — and no reset was performed. |
-| Separate matching Owner handoff | Present and naming `SOLO-WO-021 R03` |
+| Bounds | `name` 1–100 scalars after NFC/edge trim; `email` one §6.2J.9 addr-spec ≤254 UTF-8 octets, local part never rewritten; `message` 1–4,000 scalars after NFC with CRLF→LF; **16 KiB raw before parsing and 16 KiB decoded** |
+| Decoding | strict JSON or `application/x-www-form-urlencoded`, repeated key refuses; CSRF and idempotency tokens ride a separate closed transport envelope, never the three-field `ValidatedInquiry` |
+| Outcome ownership | the boundary produces `invalid_request`, `not_configured`, `rate_limited`; `ContactDelivery` produces **only** the four transport outcomes; CSRF/origin failure maps to a generic form-level `invalid_request`, never a fictitious field error |
+| Idempotency | server-issued opaque attempt token, at most one outbound dispatch, 24-hour **non-content** deduplication record (token hash, state, timestamps, non-reversible digest); no content or address cached |
+| Retry | no blind or automated resend after `indeterminate`; a new attempt needs a fresh token and a duplicate warning; no exactly-once claim the provider cannot prove |
+| Rate policy | 3 attempts per trusted client peer per rolling 15 min **and** 60 per Installation per rolling hour, before delivery; forged `Origin`/`Referer`/`X-Forwarded-*`/`Host` never establish the peer or raise an allowance |
+| Privacy | core persists no name, email, message or body; one private recipient per Installation; provider retention and legal terms are provider-adoption prerequisites, never asserted compliance; no consent checkbox — a privacy-notice **link** only |
+| Analytics | **off** — a settled decision, not an open blocker |
+| Placement | the registered `interaction.contact` module is the **sole** form enablement mechanism; no Page/manifest/route field, overlay or Markdown token |
 
-The R03 baseline is a *reference point*, not reset authority, so the prior run's report-only commit did **not** create a stop condition here. This is the defect escalated in the previous report and corrected by R03.
+§6B.11's former `OD-1`–`OD-7` table was replaced by a decided-policy table plus a strictly later-scope list. No `OD-` identifier survives anywhere outside the frozen order itself. The §6B.10 matrix was expanded from `F01`–`F10` to **`F01`–`F17`** to cover the 22nd module, malformed/repeated keys, localized labels, valid/invalid notice link, two-node refusal, private-recipient isolation, missing provider, CSRF/origin, outcome honesty, the rate policy, multi-instance replay, storage/retention, static booking/directions links, analytics off, and no-JS/keyboard accessibility. **Every row is `NOT RUN`.** `C1`–`C4` remain `UNVERIFIED`.
 
-## Step 2 — issuance freeze
+## Step 4 — Security governance consolidated to A1
 
-The unmodified installed edition was committed alone as `cd01b15d5beeece342fe38d512626489395950c8`. The frozen blob `e8a1f73201ac329599d9286db9f5f3c184367cef` was extracted and re-hashed: **25,451 bytes, SHA-256 `E02AEF86…D113A15`** — byte-identical to the installed edition. The Approved Scope was not mutated to make the check pass, and no evidence area was appended.
+One acceptance standard now governs security; the parallel programme is gone.
 
-## Steps 3–5 — architecture comparison and codification
+- **Architect SOP §7C** reduced from a six-step protocol with a register-discipline clause to a cross-reference to **A1 §7B**, retaining only confidential-report handling and Owner escalation. §7B A1 itself was not weakened and §6B (version control) was not touched.
+- **Implementation SOP §7A** reduced to four obligations: evidence to A1, apply the §5A boundaries, report honestly, keep findings private. The register-maintenance bullet was removed.
+- **Architecture §5A** became a concise A1 cross-reference: the six-step "risk lifecycle" and the register pointer were replaced with an applicability statement, `NOT RUN`/`NOT APPLICABLE` discipline, and GitHub private reporting. The trust-boundary, fail-closed, secret-isolation, least-privilege, supply-chain and update-integrity boundaries were **kept**, as were the immutable-publication and Ports-and-Adapters invariants.
+- **`.documents/Security/security-issues.md` deleted**; `.documents/Security/` is now empty and therefore untracked by Git.
+- **Every cross-reference retargeted or removed:** README (document map item 7 is now the security policy), AGENTS.md (authority map), Product §7 and the deferred-contracts list, both SOPs, ROADMAP `R00.G` and `R11.A`. Verified final scan: **zero** `security-issues` and **zero** `§7C` references remain outside the frozen order.
+- `.github/SECURITY.md` was **not** modified — it contained no broken cross-reference, so the read-only permission was respected. WordPress is nowhere presented as a current Solo issue, patch or blocker.
 
-Existing literals were located before writing anything: the governed **`contact.email`** property (§6.2G.4), the `mailto:` grammar (§6.2D.7) and typed `email` link (§6.2J.9), exposure classification (§6.2G.3), resource limits (§6.2A.7), the reserved `SubmitSimpleContact` inbound port and `ContactDelivery` outbound port (§6A.4), and the §5A constraints.
+## Step 5 — PR #1 and the obsolete branch
 
-**New bounded section: `§6B` — twelve subsections**, inserted between `§6A` and `§7`:
-
-| Subsection | Content |
+| Item | Result |
 | --- | --- |
-| 6B.1 | Preserved literals — reasserted, not amended |
-| 6B.2 | Two contact actions never conflated; configuration absence as a first-class state |
-| 6B.3 | The single simple form — closed three-field envelope, normalization, provisional bounds |
-| 6B.4 | `SubmitSimpleContact` use case, `ContactDelivery` port, inward-only dependencies, no address inference |
-| 6B.5 | Seven truthful outcomes, closed set, accessible states, safe retry |
-| 6B.6 | Privacy, log restraint, no default core retention |
-| 6B.7 | Fail-closed boundary, proportionate first-party abuse control, explicit refusal criteria |
-| 6B.8 | Presentation and the module-registry boundary, both placements, adopted recommendation |
-| 6B.9 | Safe links, bounded static booking/directions links, no-analytics default |
-| 6B.10 | Future proof matrix `F01`–`F10` — every case unrun |
-| 6B.11 | Open Owner decisions `OD-1`–`OD-7` |
-| 6B.12 | Preservation, exclusions, reservations |
+| PR identity verified | `#1`, `closed`, `merged: false`, head `docs/solo-wo-018-security-register` @ `b62d856adeff708ed34daaf14a62aed8d10d0c00` — **exact match** to R04 |
+| Dependency check | Zero open pull requests anywhere in the repository; no tags or releases exist, so nothing depended on the branch |
+| Remote branch | **`b62d856` confirmed, then deleted.** `git ls-remote` read-back returns nothing; `main` is the only remote head |
+| Local branch | **Deleted** (was `b62d856`); `main` is the only local branch |
+| **Archive PR #1** | **NOT PERFORMED — FAILED.** GitHub PR archiving is a GraphQL/UI feature (`archivePullRequest`). The GitHub tooling available to me is read-only (get/list/search only) and exposes no mutation of any kind; no GitHub GraphQL executor is available either. This is a capability blocker, not a refusal or a permission denial I could observe. Per R04 §5 I am reporting the precise blocker rather than claiming success: **PR #1 remains `closed` and unmerged, not archived.** |
 
-**Cross-reference repairs (authorised):** §6.5's `R00.F` obligation now points at §6B; §7.5 "Integration scope" now records the settled contract and the `OD` register. **Two deletions total**, both exactly these replaced lines.
+**Smallest Owner action to close G11:** in the GitHub UI open <https://github.com/provelopment/provelopment-foundation-solo/pull/1> and use **Archive pull request**. No document, branch or PR is needed for this, and nothing else in this run depends on it. Archival is not deletion — maintainers retain access history — and no claim of complete disappearance is made.
 
-**Placement decision.** R03 §3.H required both credible placements be presented with the simplest recommended, and a STOP only if the chosen placement needs a registry change. The adopted placement is the **system-owned use case surfaced through an expressly configured Page/action boundary**, which adds **no** module and leaves the exactly-twenty-one `1.0.0` catalogue intact — so the §3.H stop condition is not triggered. The alternative (`interaction.contact` 22nd module, or an `O05` revision) is recorded as `OD-6`. No 22nd module is claimed, created or concealed.
+## Acceptance gates
 
-**Product alignment (narrow, consistency-only):** two edits — the accepted contact bullet now points at §6B and the `OD` register; "integration" was removed from the deferred-contracts list and replaced by a bullet recording the contract as specified. Advanced-form exclusion, one Entity, `mailto:` inclusion and the simple form are all unchanged.
-
-## Gate-by-gate disposition
-
-R03 numbers its requirements as §5 steps rather than `G` identifiers, so each required step and each named verification check is reported individually here.
-
-| R03 requirement | Result | Evidence |
+| Gate | Result | Evidence |
 | --- | --- | --- |
-| §5.1 Authority and integrity | **PASS** | Installed edition, owner handoff, single checkout, sole remote, seven anchors, clean/known tree and four WIP files all verified; actual bytes and SHA-256 recorded |
-| §5.2 Freeze the issued order | **PASS** | `cd01b15`; frozen blob re-hashed byte-identical to the installed edition; pushed and read back |
-| §5.3 Compare existing architecture | **PASS** | `contact.email`, `mailto:` grammar, typed `email` link, exposure rules, limits, reserved ports and §5A located before writing |
-| §5.4 Codify settled rules | **PASS for settled scope** | §6B.1–§6B.12 added; `OD-1`–`OD-7` recorded rather than fabricated (see the judgement note below) |
-| §5.5 Align Product minimally | **PASS** | Two narrow consistency edits only; every accepted Product guarantee preserved |
-| §5.6 Issue-transition cleanup | **PASS** | NEXT cleared to the neutral heading **after** the freeze succeeded; ROADMAP and OUTLOOK untouched; nothing marked accepted or closed |
-| §5.7 Verification | **PASS** | Seven named checks below |
-| §5.8 Report and publish | **PASS** | This report; only permitted paths committed; cleanup complete |
+| G01 Authority | **PASS** | Exact R04 installed (35,892 B / `A889FDD4…`), matching Owner handoff, correct root/`main`/`origin`, known start tree. Freeze-ordering deviation disclosed above. |
+| G02 Freeze | **PASS** | `be921b8` contains only ACTIVE; frozen blob `c69ec236` re-hashed to `A889FDD4…`, byte-identical; pushed and read back |
+| G03 Contract preservation | **PASS** | One Entity/EFS, routing, visibility, location, property, graphics, publication and inward-dependency text unchanged except the approved 22nd-module amendment; `D/O/E` and `C1`–`C4` untouched |
+| G04 Module catalogue | **PASS** | Exactly **22** unique `1.0.0` IDs in §6.2E.2 and in the §6A.11 matrix; 21 prior rows byte-identical; `interaction.contact` registered once with full closed props, no children, no Page/manifest override |
+| G05 Form and port contract | **PASS** | JSON-module opt-in only; endpoint may be public but recipient/provider/credentials private; boundary vs `ContactDelivery` outcomes separated; no stub may return `accepted_for_delivery` |
+| G06 Exact data and privacy | **PASS** | Three fields with ratified limits, both 16 KiB ceilings, no extra data field, notice link validated, no consent checkbox, no core retention, no message/address/secret logging |
+| G07 Abuse and replay | **PASS** | 3/15 min per trusted peer and 60/hour per Installation; peer only from trusted transport config; single-dispatch token with 24 h non-content record; no blind retry; no unverifiable exactly-once claim |
+| G08 Accessibility and localized authoring | **PASS** | Localized labels/notice/feedback with bounds and escaping, semantic form, keyboard and no-JS requirements recorded as `F16`; **no live test claimed** |
+| G09 Small integrations | **PASS** | Static author-approved booking/directions links only; analytics **off** by default; no accounts, booking engine, geolocation, CRM or advanced forms |
+| G10 A1-only security | **PASS** | No six-step protocol, no WordPress tracking file, no new register, zero stale `§7C`/register links; A1 §7B still binding; private reporting path preserved; `.github/SECURITY.md` untouched |
+| G11 PR #1 closure hygiene | **FAIL** | Remote branch `b62d856` and local branch deleted with read-back proof; **PR #1 was not archived** — no archive/GraphQL mutation capability was available to the agent. Reported, not glossed |
+| G12 R00.F completion | **PASS** | Every former `OD-1`–`OD-7` item resolved or reclassified; no Page/form placement conflict; no wrong test trace; `R00.F`/`R00.G` ownership kept distinct |
+| G13 Future verification | **PASS** | `F01`–`F17` cover module, keys, locale labels, notice link, two-node refusal, recipient isolation, missing provider, CSRF/origin, outcome honesty, rate policy, replay, retention, links and analytics; **all `NOT RUN`**; `C1`–`C4` `UNVERIFIED` |
+| G14 Doc integrity | **PASS** | Headings and internal refs resolve (§6B still 12 subsections, positioned `6A`→`6B`→`7`); zero stale register or `§7C` pointers; all count references 22; UTF-8 without BOM, LF-only in every edited file |
+| G15 WIP state | **PASS** | Exactly four WIP files; NEXT neutral; ROADMAP retains `R00.F` and `R00.G`; ACTIVE is frozen R04; no archive, dated report or fifth file |
+| G16 Git and report | **PASS** | Single checkout; published tree `fed6090`; remote branch/ref proofs; clean working tree; authorized Git mechanics only; one report current; temp cleaned |
 
-**Named verification checks (§5.7).**
-
-| Check | Result | Evidence |
-| --- | --- | --- |
-| Structural | **PASS** | `## 6A.` (1176) → `## 6B.` (1580) → `## 7.` (1723) → `## 8.` (1734); 11 top-level headings, no duplicate; §6B.1–§6B.12 all present and correctly nested as `###` |
-| Reference integrity | **PASS** | All 25 in-Charter `§6B` references resolve to an existing subsection; the Product pointer `../Architecture/ARCHITECTURE.md` §6B resolves; every cited §1.3, §2.1, §2.2, §3.1C, §4.1, §5, §5A, §6.2A.7, §6.2D.5–8, §6.2E.2, §6.2G.3–4, §6.2J.9 target exists |
-| Encoding | **PASS** | Architecture 321,997 B and Product 38,548 B are UTF-8 **without BOM**, LF-only (0 CRLF); NEXT normalised to LF, 49 B |
-| Contradiction | **PASS** | `contact.email` (§6.2G.4) still states it implies no submission endpoint; `mailto:` still permits one addr-spec and no send claim; registry still exactly **21** modules; `interaction.contact` appears only as a deferred option and in `OD-6`, never as an accepted module |
-| Permission | **PASS** | Only ARCHITECTURE, Product, NEXT and this report written; PR #1 and the obsolete branch untouched; no code, schema, dependency, CI, provider, secret or deployment |
-| Git integrity | **PASS** | Frozen order commit and codification commit distinct; only named paths staged; no force, rewrite, reset or clean; remote verified by `ls-remote` and read-back |
-| Security lifecycle | **PASS** | §5A untouched; fail-closed boundary, secret isolation, log restraint and inward-only dependency rules codified; `C1`–`C4` remain **UNVERIFIED**; `SOLO-SEC-2026-001` still an external advisory, never labelled patched |
-
-**Interpretive judgement, disclosed for review.** R03 §5.4 directs a STOP where material Owner choices remain undetermined "rather than claiming complete codification", while §3.B and §3.E direct the agent to *identify* such items as decisions requiring approval and keep the code-bearing gate blocked. These were reconciled by codifying every rule R03 fixed, recording `OD-1`–`OD-7` explicitly, and marking the dependent `F02`/`F06`/`F08` cases `BLOCKED` — no numeric value, retention period, acknowledgement or analytics decision was invented. If the Chief Architect reads §5.4 as requiring a full stop, that is the single point to `REVISE`; the substantive codification would not change.
-
-## Open Owner decisions — carried, not resolved
-
-| ID | Decision | Blocks |
-| --- | --- | --- |
-| `OD-1` | exact field bounds and whole-payload ceiling | `F02`, all code-bearing work |
-| `OD-2` | rate/abuse thresholds and window lengths | `F06` |
-| `OD-3` | retention period and data-subject notices at the provider boundary | provider adoption, retention proof |
-| `OD-4` | whether a privacy acknowledgement exists, and its defined legal basis | the final field set |
-| `OD-5` | idempotency/replay policy and correlation-handle lifetime | `F08` |
-| `OD-6` | whether a 22nd `interaction.contact` module replaces the adopted placement | registry amendment only |
-| `OD-7` | whether any analytics is approved, and which | analytics adoption only |
+**Overall:** G01–G10 and G12–G16 **PASS**; **G11 FAILED**. Under R04 §8 an unmet gate is not an accepted `R00.F` result, so no acceptance is claimed.
 
 ## Application, tests and runtime
 
-No application code, manifest, dependency, JSON Schema, endpoint, CI workflow, provider account or deployment exists or was created. `F01`–`F10` are **all unrun** — `NOT RUN` or `BLOCKED` by the `OD` items above, never `PASS`. `R00.E` hold points `C1`–`C4` remain **UNVERIFIED**. No test command, build, scanner result, merge, release or deployment is claimed or invented.
+No code, manifest, schema, CI, provider, secret or deployment was created. `F01`–`F17` are unrun. No build, test, scan, browser, accessibility or delivery result is claimed, and no implementation of any of the 22 modules exists.
 
-## Historical PR #1 and the obsolete branch — deliberately untouched
-
-R03 §4 supersedes the earlier R02 authority for this housekeeping: PR housekeeping is **read-only evidence only**, and no merge, reopen, archive, or local/remote branch deletion occurs in this edition, because those operations are unnecessary to `R00.F` codification. Accordingly PR #1 was left as previously recorded (`closed`, `merged: false`, head `docs/solo-wo-018-security-register` at `b62d856`), and both the local and remote `docs/solo-wo-018-security-register` refs remain present at `b62d856`. Nothing was merged, reopened, altered or deleted, and no API call was made this run.
-
-## Preservation and cleanup
-
-| Item | State |
-| --- | --- |
-| ROADMAP | Unchanged — `R00.F` and `R00.G` both still listed; no obligation consumed or pruned |
-| OUTLOOK | Unchanged |
-| Security register | Unchanged at `5b50e1f0`; `SOLO-SEC-2026-001` still `Not applicable` to the code-free assessed revision |
-| WIP inventory | Still exactly four files; NEXT is the neutral heading; no archive, dated report or fifth file |
-| Architecture §5A, SOPs §7A/§7C, `C1`–`C4`, 21 module contracts, `contact.email`, `mailto:` grammar | Untouched |
-| Temporary workspace | One temporary artefact (`.temp/frozen-check.md`, used to re-hash the frozen order blob) was created and **deleted**; `.temp/` verified **0 items** and Git-ignored via `.gitignore:20`. No task-owned material remains; no retained items and no cleanup failure |
-| Working tree at handback | Clean (`git status --porcelain` empty) after the report commit |
-
-## Changed-path ledger
+## Changed paths
 
 | Path | Change | Commit |
 | --- | --- | --- |
-| `.documents/WIP/workorder-active.md` | Unmodified R03 edition committed verbatim as the issuance freeze (+135) | `cd01b15` |
-| `.documents/Architecture/ARCHITECTURE.md` | `§6B` added (+145/−2) — the two deletions being the §6.5 `R00.F` obligation and the §7.5 integration-scope line replaced with §6B-aware text | `3728d47` |
-| `.documents/About/FOUNDATION-SOLO.md` | Narrow consistency repair (+3/−2) | `3728d47` |
-| `.documents/WIP/plan-next.md` | R00.F candidate cleared to the neutral heading (−12) | `3728d47` |
-| `.documents/Reports/execution-report.md` | This report, overwritten in place | report commit |
+| `.documents/WIP/workorder-active.md` | Owner-installed R04 frozen verbatim | `be921b8` |
+| `.documents/Architecture/ARCHITECTURE.md` | 22nd module registry + matrix; §6B ratified (`F01`–`F17`, decided-policy table); §5A to A1; §6A.12 contradiction repaired; counts updated | `53247c7` |
+| `.documents/About/FOUNDATION-SOLO.md` | 22 modules, contact module, A1 security text | `53247c7` |
+| `.documents/SOP/sop-architect.md` | §7C reduced to an A1 cross-reference | `53247c7` |
+| `.documents/SOP/sop-implementation.md` | §7A reduced to A1 obligations | `53247c7` |
+| `.documents/WIP/plan-roadmap.md` | Minimal `R00.F`, `R00.G`, `R11.A` ownership/register-language correction; both packages retained | `53247c7` |
+| `.documents/Security/security-issues.md` | **Deleted** | `53247c7` |
+| `README.md`, `AGENTS.md` | Document map and authority-map register removal; A1 pointers | `53247c7` |
+| `.documents/Reports/execution-report.md` | This report | report commit |
+| `.github/SECURITY.md`, `plan-next.md`, `plan-outlook.md` | **Unchanged** | — |
+
+## Cleanup and remote read-back
+
+Working tree clean; one worktree on `main`; `.documents/WIP/` exactly four files; `.temp/` verified **0 items** (the single frozen-blob re-hash artefact was created and deleted); no task-owned material retained and no cleanup failure. `origin/main` read back at `53247c7`; `origin` now carries **only** `main`.
 
 ## Handback note
 
-`COMPLETE` is reported only for the documentary scope R03 defines. **No acceptance is claimed.** Independent Chief Architect disposition (`ACCEPT / REVISE / STOP`) is required against this published report at its exact revision. Administrative closure of `R00.F`, ROADMAP pruning and any `R00.G` order remain separate Owner decisions, and `R00.G` was not started.
+`R00.F` is **not** closed and **not** an accepted result: G11 failed on PR archiving. ROADMAP retains both `R00.F` and `R00.G`, NEXT is untouched and neutral, ACTIVE still holds the frozen R04 order, and no stage was pruned, promoted or started. Independent Chief Architect `ACCEPT / REVISE / STOP` is required against this report at its exact revision; the Owner's one-step UI archive of PR #1 is the smallest action that would close G11.
 
 
