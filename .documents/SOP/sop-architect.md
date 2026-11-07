@@ -193,14 +193,6 @@ Do not launch another work order until the prior work has a reviewed disposition
 
 **Disposition test.** Mark each required order acceptance condition `PASS`, `FAIL` or `UNVERIFIED` against direct evidence, and mark a genuinely inapplicable general standard explicitly **`NOT APPLICABLE`** with its reason. Silence is `UNVERIFIED`, never a pass, and inapplicability is never counted as a pass. A stage cannot be consumed by an accepted claim alone.
 
-## 7C. Security decision and review protocol
-
-Security is reviewed as part of **A1**, the permanent engineering acceptance standard in §7B. A1 is the single mandatory security acceptance gate: it requires applicability to be established for the exact reviewed revision, applicable negative, secret, abuse and refusal evidence, and a block on critical or high security or correctness defects, with unrun evidence recorded as `NOT RUN`, `UNVERIFIED` or `NOT APPLICABLE`. There is no separate six-step security procedure, no advisory watchlist and no independent register to administer. §6B remains the **sole** version-control procedure, and §7 and §7A continue to apply unchanged.
-
-**Confidential reports.** A report that may be a real vulnerability in Solo goes to GitHub **private vulnerability reporting** under [`.github/SECURITY.md`](../../.github/SECURITY.md), never a public issue, pull request, commit message, chat log or any public file. The Architect triages inside that private channel and publishes only a sanitised, non-operational summary after coordinated disclosure.
-
-**Owner escalation.** Response SLAs, triage ownership, supported-version policy, provider or service selection, coordinated-disclosure timing and any explicit risk acceptance remain Owner decisions in the packages that already own them (`R00.G`, `R10`, `R11.A`). The Architect proposes; it never installs a substitute policy, and nothing in this section grants remediation or release authority.
-
 ## 8. WIP lifecycle — stage, candidate, issued order and ideas
 
 **Inventory and file purity.** `.documents/WIP/` contains exactly four retained files and no others: `plan-roadmap.md`, `plan-next.md`, `workorder-active.md` and `plan-outlook.md`. Neither a subdirectory nor any additional plan, work-order, log, archive, tracker or report file is permitted. The single canonical execution report remains at `.documents/Reports/execution-report.md`, outside WIP, overwritten on every run when safe. Git history is the record of completed work.
