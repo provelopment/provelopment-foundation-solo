@@ -1,102 +1,100 @@
 # Foundation Solo — Active Work Order
 
-## Approved Scope — SOLO-WO-021 / R06
+## Approved Scope — SOLO-WO-022 / R01
 
-**Issuance rule.** This is the Chief Architect's **one proposed corrective work order**, following independent `ACCEPT` of `SOLO-WO-021 R05` and the Owner's request for a further final R00.F intent audit before closure. It is **not OWNER-ISSUED** until the Owner deliberately replaces the entire `.documents/WIP/workorder-active.md` in the **existing single Solo checkout** with this exact file **and** sends a separate matching Owner activation naming `SOLO-WO-021 R06`. The Implementation Agent must not install, amend, self-issue, or execute an order without both conditions. There is never a parallel R05/R06 order.
+**Issuance:** This is the Chief Architect's **single proposed administrative closure order** following independent `ACCEPT` of `SOLO-WO-021 R06` at published `main` revision `7863342d6b60b5af1b28bd8b41e29fe9efbe6765`. It becomes **`OWNER-ISSUED` only when the Owner deliberately installs this entire exact file as `.documents/WIP/workorder-active.md` in the one existing Foundation Solo checkout and separately directs the Implementation Agent to execute `SOLO-WO-022 R01` by reading and running that path**. Mere download or drafting is not issuance. No parallel orders are authorized.
 
-| Key | Frozen value |
+| Item | Frozen authority |
 | --- | --- |
-| Order | `SOLO-WO-021 R06` |
-| Package | `R00.F` — **final contact-contract disambiguation**, documentation only |
+| Work order | `SOLO-WO-022 R01` |
+| Package | **Administrative closure of accepted `R00.F` and selection of `R00.G` as NEXT candidate only** |
 | Repository | `https://github.com/provelopment/provelopment-foundation-solo` |
-| Sole working location | Owner's existing verified Foundation Solo checkout, branch `main`, sole `origin` above |
-| Independently reviewed starting `main` | `358592862666ee42770a9c0e476fd227dd203393` (2026-11-07) |
-| Matching Owner activation | “Execute `SOLO-WO-021 R06`: read and run `.documents/WIP/workorder-active.md`.” |
-| Target outcome | R00.F **ready for independent closure review**; **no closure performed** |
+| Target | The Owner's one existing verified Solo checkout, `main`, sole `origin` above |
+| Reviewed `main` | `7863342d6b60b5af1b28bd8b41e29fe9efbe6765` — R06 canonical report commit |
+| Accepted evidence | `SOLO-WO-021 R06` correction commit `90ca85f339b0a1691e877a4de4f06e29aab82a18`; canonical R06 report; independent Chief Architect `ACCEPT` of R06 and its three contact-contract corrections in this conversation |
+| Required separate Owner handoff | Owner explicitly installs this R01 and instructs agent to **read and run `.documents/WIP/workorder-active.md`** for `SOLO-WO-022 R01` |
+| Intended end state | `R00.F` removed from ROADMAP; `R00.G` remains pending and is the **only** NEXT candidate; ACTIVE contains **only its neutral title**; accepted R00.F contract remains durable in Architecture/Product; one GitHub-published report |
 
-**Previous authority and scope.** R05's corrections are independently accepted; they are **not reopened**. This R06 order responds solely to three additional implementation-facing ambiguities found by comparing this conversation's full R00.F decisions with the canonical published contract. The first-release catalogue is **exactly 22** `1.0.0` modules, including the registered `interaction.contact` leaf. Its three visitor data fields, localized labels, privacy notice and seven feedback texts, one private recipient per Installation, truthful seven application/four transport outcomes, field limits, dual 16-KiB ceilings, 3-per-15-minute and 60-per-hour rate limits, 24-hour attempt record, no core message persistence, static booking/directions links, analytics off, and advanced-form exclusions are all settled and remain binding. `mailto:` is a separate intentionally public client-mail action. No new module or additional product capability is authorized.
+### 1. Exact objective and hard boundary
 
-### 1. Findings and precise authorized decisions
+Close **only** the already independently accepted `R00.F` decisions-only package, under Architect SOP §8. This is **WIP reconciliation and narrow acceptance-status parity**, **not** another R00.F contract revision, not `R00.G` implementation, and not a Stage 00 completion claim. The Owner's issuance and matching handoff provide the *separate express closure authorization* required by the SOP.
 
-**FINDING A — browser-enhancement contradiction.** Architecture §6A.5 defines exactly five browser enhancement kinds (`tabs`, `accordion`, `modal`, `carousel`, `motion`), while §6A.12's general sentence demands a `BrowserEnhancementV1` envelope for *every interactive module*, which could be read to include `interaction.contact`, notwithstanding its own row's express **no browser enhancement payload** rule. **Binding resolution:** `interaction.contact` is a **server-rendered, standards-based HTML form**, not a `BrowserEnhancementV1` client-controller module. The existing five browser-enhanced modules remain the only ones requiring `data-solo-envelope`, DTO parity and client-runtime decoder fixtures. Contact uses server-rendered semantic markup, an approved public POST action and progressively enhanced/no-JavaScript submission. It **must not** grow a sixth DTO `kind`, a special browser controller, arbitrary authored script, a new JSON node property, or an alternative Page-enablement mechanism. Apply generic closed-module validation, safe rendering and realistic form/keyboard/no-JS tests to contact. Its `interaction.` prefix does not confer browser-enhancement status.
+The binding first-release contract remains as published: exactly **22** registered `1.0.0` JSON modules, including `interaction.contact`; a separate safe public `mailto:` action; exactly three contact data fields; the native five-key UTF-8 URL-encoded POST with server-owned controls and no-JavaScript functionality; seven truthful outcomes; private recipient and replaceable `ContactDelivery` port; fixed bounds, rate controls, token expiry and single-dispatch policy; privacy notice and no default core message retention; static booking/directions links; analytics **off**; advanced forms excluded. `F01`–`F17` remain `NOT RUN` and `C1`–`C4` `UNVERIFIED`. **No implementation, test, delivery, release or deployment acceptance is inferred.**
 
-**FINDING B — no-JavaScript submission framing left conditional.** Architecture §6B.3 says "where" JSON or `application/x-www-form-urlencoded` is accepted but does not declare a mandatory first-release wire format, and its three-field closed payload can be misread as rejecting the already required server-issued CSRF/attempt controls on a native form POST. **Binding minimal first-release resolution:** The required browser-facing contact submission is a standard HTML `method="post"` form using **`application/x-www-form-urlencoded` UTF-8** so it works with JavaScript disabled. Accept that media type with an absent charset parameter or `charset=UTF-8` (case-insensitive charset label); reject unsupported encodings, `multipart/form-data`, `application/json`, and other media types **in the first release**. The earlier conditional JSON reference was decoding guidance, **not** approval of a second endpoint or a general JSON inquiry API; any later JSON support requires explicit separate Owner authority. A request has exactly **three visitor data keys** (`name`, `email`, `message`) and exactly **two server-owned, non-personal form-control keys** (`csrfToken`, `attemptToken`). These five wire keys comprise one **closed transport envelope** even though native form encoding puts them in the same POST body; decoding separates the two controls before constructing the closed three-value `ValidatedInquiry`. The control names and values are never authored module props or additional visitor fields. Reject unknown/duplicate keys, missing/malformed control values, ambiguous percent escapes, invalid UTF-8 and any body over the ratified **16 KiB raw and 16 KiB decoded** limits; the bounds apply to the complete wire submission including control keys. Preserve server-authoritative validation, origin/CSRF verification, and the existing outcome enumeration. No honeypot field, tracker, JSON fallback, attachment, alternative custom action or new API is silently introduced.
+**Out of scope:** All security procedure/remediation/advisory work, historic PR #1 and its branch, provider selection or operation, secret/configuration changes, application code, schemas, tests, CI, module changes, other Stage 00 packages, Stage 01–13 execution, architectural redesign, additional documents, extra WIP files, PR creation/merge, release, deployment and all other repositories. Do not alter A1, its references or the established private reporting channel. No decision from the accepted R00.F contact contract may be reinterpreted, weakened or silently reopened.
 
-**FINDING C — expiry versus permanent single-dispatch rule.** Architecture §6B.4 requires a given server-issued attempt token to authorize **at most one outbound dispatch** but allows its non-content deduplication record to expire after 24 hours without explicitly governing an old token presented after that expiry. **Binding resolution:** An attempt token expires **no later than 24 hours after issue** and can **never** become valid again; server-side state/verification must reject a missing, expired, invalid or unverifiable token without outbound dispatch. The atomic non-content deduplication record remains effective for the token's full validity and may expire at the defined 24-hour boundary. After expiry or lost deduplication state the same token must **not** create fresh dispatch authority. Such refusal maps to the existing generic `invalid_request` form-level outcome (no new visitor outcome or provider detail). A *fresh* attempt requires a deliberate new visitor action, a newly issued token, and the existing duplicate-warning policy where appropriate. Same-token concurrent/multi-instance claims still dispatch at most once; an `indeterminate` result never triggers blind or automatic retry. This codifies the previously ratified policy, not downstream exactly-once inbox delivery.
+### 2. Preflight and first commit — freeze Owner-installed closure authority
 
-**No additional Owner decisions are opened.** These precise narrow resolutions are presented for Owner approval **through installation of this R06 edition**; they are not instructions for the agent to choose among alternatives. If any resolution conflicts with another accepted contract beyond the named wording, the agent must STOP and report the exact conflict, not invent a fourth design change.
+1. Read in the repo-mandated order: `README.md`, `AGENTS.md`, Product, Architecture, Architect and Implementation SOPs, all four WIP files and the current canonical report. Inspect the real Git checkout and status; do not assume a path or permission based on this text.
+2. Verify exactly one Solo root/worktree, real Git root, branch `main`, sole expected `origin`, tracking ref, `HEAD`, clean or explained working tree, no unknown modifications, no stashes or second checkout. The **sole expected initial local modification** is the Owner's installation of this R01 in `WIP/workorder-active.md`. Check the R01 edition and the separate matching Owner activation; neither the previous R06 order nor this draft alone authorizes execution. STOP on any unexpected dirty file, authority mismatch, or substantive upstream drift.
+3. Independently match these pinned source blobs from reviewed `main` and the actual pre-installation checkout. A later **report-only** commit may be tolerated after verified ancestry and unchanged source anchors; any substantive change requires STOP, not an assumption:
 
-### 2. Required canonical documentation changes
-
-Modify **only** `.documents/Architecture/ARCHITECTURE.md` within the following tightly bounded locations:
-
-1. **§6A.5 / §6A.12 browser boundary**: disambiguate the general `Each interactive module` statement so its enhanced-DOM/DTO requirements apply to **only the five enumerated browser-enhancement modules**, not `interaction.contact`. Retain the contact row's no-`BrowserEnhancementV1` rule and the existing five kinds, browser safety/parity requirements, 22-ID catalogue, and unchanged contract rows. If a nearby generic assertion would otherwise require a false `data-solo-envelope` on contact, correct only that assertion. No schema or runtime files.
-2. **§6B.3, §6B.8 and applicable form matrix evidence**: fix the first-release POST media type, exact separation of three visitor keys from two server-owned control keys, and the closed native form transport, without changing the visitor field types, limits, normalization, public endpoint/secret boundary, module `props`, or user-visible outcomes. Add or refine only the **appropriate `F01`/`F03`/`F16` future tests** to require exact media-type/charset, hidden control handling, no-JS real POST, and unknown/repeated key refusal. All remain `NOT RUN`.
-3. **§6B.4–§6B.5, §6B.11 and `F13`**: make token expiry and loss-of-state refusal explicit, and reflect its safe `invalid_request` mapping and 24-hour expiry edge in the future test. Do **not** introduce a new storage provider, token system, visitor data field, eighth outcome, longer retention, automatic resend or a weaker at-most-once guarantee.
-4. **Cross-consistency only**: make the smallest direct references needed inside the same Architecture file; do not reword accepted decisions for style. Recheck §6.2E.2, §6A.5, §6A.12, §6B and §7 for contradictory statements and preservation of the 22-module first profile. If another file genuinely needs substantive change, STOP and request separate Owner scope rather than extending this order.
-
-The Architecture Charter remains the **single permanent normative home** for these contacts. Do not create a contact supplement, decision log, issue register, archive or fifth WIP file. No live permanent document should describe this documentary correction as executable feature delivery.
-
-### 3. Security-work exclusion and other immutable boundaries
-
-**Security remediation, the earlier security-governance cleanup, PR #1 and its archive, and the deleted historical advisory register are explicitly OUT OF SCOPE.** No work in Architecture §5A, either SOP's security clauses, `.github/SECURITY.md`, GitHub PR/branch history or any security register is authorized. This order does not ask for a security audit, vulnerability search, security fix or new security procedure. Merely preserve the existing accepted publication, private-data and safe-contact invariants where they are directly relevant to the three contact decisions above.
-
-**No code, schemas, registry executables, dependencies, tests run, provider activation, mail accounts, analytics, CI, deployment, DNS/TLS, release, R00.G changes, stage reassignment, or roadmap pruning.** Preserve the single-Entity EFS hierarchy, source authority, exact routing/locale/visibility, location independence, properties/graphics, inward-only Ports and Adapters, 21 preceding module rows, and published `interaction.contact` module props verbatim. No additional form fields, advanced form builder, CMS/CRM, booking engine, account identity system, mandatory analytics, or new browser DTO kind.
-
-### 4. Preflight, frozen order and Git safety
-
-1. Read root `README.md`, `AGENTS.md`, Product Definition, Architecture, both SOPs, all four WIP files, current canonical execution report, and applicable root-mandated materials in their prescribed order. Verify the real Solo root, `main` and tracking upstream, correct sole `origin`, **one** worktree/checkout, no stashes or unknown user-owned changes, HEAD, exact WIP inventory, and the Owner's **separate matching R06 activation**. Expected initial modification is **only** the Owner-installed replacement `.documents/WIP/workorder-active.md`; never discard unknown content.
-2. Verify the published baseline `main` is `358592862666ee42770a9c0e476fd227dd203393` or has advanced **only** by independently verified report-only commits leaving all following anchors unchanged. The previous frozen ACTIVE and canonical source blob IDs at that reference are:
-
-| Exact path | Expected blob SHA-1 |
+| File | Expected Git blob at reviewed R06 `main` |
 | --- | --- |
-| `.documents/WIP/workorder-active.md` **before Owner installs R06** | `1e0ce769b900458a2833eff273f20253101ed7c4` |
-| `.documents/Architecture/ARCHITECTURE.md` | `aa3bdb5fe6121e66a3268fb3c9425a8f37a54b02` |
-| `.documents/Reports/execution-report.md` | `e6fac4f47470f9e17801a1d083a997603d181206` |
+| `.documents/WIP/workorder-active.md` **before Owner installation** | `99ded895032e4a79331db65a52aa3dcf0e2ca97c` |
+| `.documents/Architecture/ARCHITECTURE.md` | `f702617e274dd9ffe22b963e679ca935cd3a30eb` |
 | `.documents/About/FOUNDATION-SOLO.md` | `50a58123b2ec5797635eec87cdd788ee28e2abf7` |
-| `.documents/SOP/sop-architect.md` | `0396251245180b40ee896b50a3456b92835f9cb1` |
-| `.documents/SOP/sop-implementation.md` | `a577116082bf8133a6056667aa52fe4ffc2ae94d` |
 | `.documents/WIP/plan-roadmap.md` | `613d3fcb979c4e3687438136f9c286a54fd6a07c` |
 | `.documents/WIP/plan-next.md` | `92fa562b1af0c54391851aa5c79deb1631127069` |
 | `.documents/WIP/plan-outlook.md` | `cb9c7a610cf3c537557e060ca9656e44a053e69d` |
+| `.documents/SOP/sop-architect.md` | `0396251245180b40ee896b50a3456b92835f9cb1` |
+| `.documents/SOP/sop-implementation.md` | `a577116082bf8133a6056667aa52fe4ffc2ae94d` |
+| `.documents/Reports/execution-report.md` | `c640d2730074b875af3ca666f7ed0da805001b01` |
 | `README.md` | `ed492cb689276a2a8b2112438a7f7cae941af233` |
 | `AGENTS.md` | `32562b6730e26a37b9febae63efd7d5c6a5866ac` |
 
-3. STOP if there is substantive drift, a missing matching handoff, an unexpected dirty file, multiple checkout/worktrees, conflicting authority, or any unsupported write. No history rewrite, reset, clean, force push, new branch, new clone or PR.
-4. **Before editing any other file**, hash the exact Owner-installed R06 (bytes, LF/UTF-8 and SHA-256), then make the **first commit and push exclusively `.documents/WIP/workorder-active.md`**, unchanged. Verify the frozen blob and remote read-back. Only then may the agent edit Architecture. Follow the sole Git version-control procedure in Architect SOP §6B.
+4. Confirm the **four and only four** WIP files exist; ROADMAP still has both `R00.F` and `R00.G`, NEXT is neutral with no candidate, and ACTIVE still contains the frozen R06 **before installation**. Confirm the current published report documents R06 and the owner's R01 installation is the only uncommitted change.
+5. **Before editing any other file**, calculate the installed R01 byte length and SHA-256; commit/push **only the exact Owner-installed `workorder-active.md`** as the issuance-freeze commit; read back the blob and remote HEAD and verify its bytes/checksum. No source/ROADMAP/NEXT edits may precede this first remote-verified freeze. Follow Architect SOP §6B, without extra PR, force push, reset, destructive clean or additional worktree.
 
-### 5. Exact path-and-operation ledger
+### 3. Administrative reconciliation — perform in this order
+
+**A. ROADMAP — remove only accepted R00.F.** In `.documents/WIP/plan-roadmap.md`, delete **exactly** the one current bullet beginning `- **R00.F — Contact and integrations:**` under Stage 00's `**Remaining packages**`. Preserve `R00.G` word-for-word, the Stage 00 heading/outcome/exit gate, all later stage obligations and their order. Stage 00 remains **open** while R00.G is pending. Add no completion history, acceptance matrix, archive note or policy to ROADMAP.
+
+**B. NEXT — select R00.G as the one candidate, do not issue.** Populate `.documents/WIP/plan-next.md` beneath its existing title with a **single bounded** `R00.G — Lifecycle and nonfunctional standards` candidate, derived from the unchanged ROADMAP R00.G bullet and Architecture §6.5/§6A reservations. It should contain only: identifier/objective, prerequisite/readiness, proposed decisions-only scope/deliverables, and verifiable documentary exit conditions. Include first-release setup/preview/content-update/upgrade/recovery responsibilities; immutable release identity and independent Installation/deployment portability; supported versions and response responsibilities; accessibility/performance targets; precise acceptance matrix. Mark dependency/readiness honestly, without inventing Owner-approved numerical values, service/provider choices or evidence that tests passed. The candidate **does not** authorize execution. Do not populate a second candidate, work order, or Stage 01 action.
+
+**C. Durable Architecture status parity — minimal, no contract edits.** In `.documents/Architecture/ARCHITECTURE.md`:
+- At §6.5's `R00.F` bullet, replace **only** the outdated ending that says R00.F is “not yet closed” and pending review with a brief truthful statement that the documentary `R00.F` contract is **independently accepted and administratively closed by this Owner-issued reconciliation**. Keep its full decided-scope and Stage 08/09/10/11 allocations unchanged.
+- At §6B's **opening status paragraph only**, update the historical `SOLO-WO-021 R04` edition-specific status to state that the accepted first-release documentary contract incorporates the later R05/R06 clarifications, and that closure is administrative, **not** implemented contact functionality. Do **not** restate, modify, add or remove any module, field, limit, method, output, port, provider, privacy, abuse or token rule.
+- If another direct **administrative status** sentence in the same file affirmatively claims R00.F is still unaccepted/open despite the above, repair that sentence alone with a cited exact line in the report. Do not edit historical R00.E-at-the-time reservations, substantive §6B.1–§6B.12 rules, or unrelated accepted contracts. If a meaningful design contradiction would require more, STOP and report; do not expand scope under “parity.”
+
+**D. ACTIVE — clear only after A–C have been safely staged/committed according to §6B.** Replace the frozen installed `workorder-active.md` with exactly its neutral identifying heading and final newline:
+
+`# Foundation Solo — Active Work Order`
+
+No Approved Scope, `NONE` essay, historical work order, policy, execution evidence or preauthorization remains. The **Owner's R01 authorization** allowed this final clearing; it does **not** authorize running R00.G. Do not clear ACTIVE prematurely if prior steps cannot complete. Git history preserves the R01 issuance-freeze and earlier orders.
+
+**E. Canonical report.** Overwrite **only** `.documents/Reports/execution-report.md` with the factual administrative closure evidence, publish it as required by the SOP and read it back from GitHub. Preserve the report as the one current report, not a history/archive. Report exact starting/freeze/reconciliation/final commit and tree identities and the path diff. Do not prewrite the report's own commit SHA inside its content. Report any incomplete step honestly rather than claiming closure.
+
+### 4. Allowed paths and operations — exact ledger
 
 | Path | Authority |
 | --- | --- |
-| `.documents/WIP/workorder-active.md` | Owner installs exact R06; agent may only **freeze/commit/push it verbatim first**, never edit scope or clear ACTIVE |
-| `.documents/Architecture/ARCHITECTURE.md` | **Edit** the three enumerated contact ambiguities and necessary immediate references only |
-| `.documents/Reports/execution-report.md` | **Overwrite, commit/push, read back** the one canonical factual report for this run |
-| All other files including Product, both SOPs, ROADMAP, NEXT, OUTLOOK, root docs, `.github/**` and removed security register | **Read-only / no recreation** |
-| PRs, branches, releases, providers, deployments and other repositories | **No mutations** |
-| Solo `.temp/` and the active task's Cline-provided temporary workspace | Disposable scratch only, with careful cleanup of task-owned material |
+| `.documents/WIP/workorder-active.md` | Owner installs R01; agent freezes **unaltered** R01 first and finally clears ACTIVE to its sole neutral heading after successful reconciliation |
+| `.documents/WIP/plan-roadmap.md` | **Delete only** the existing R00.F bullet; preserve all other ROADMAP content and pending Stage 00 |
+| `.documents/WIP/plan-next.md` | **Insert one** bounded R00.G candidate derived from ROADMAP; never an issued work order |
+| `.documents/Architecture/ARCHITECTURE.md` | **Narrow R00.F administrative-status parity only** in §6.5 and §6B opening status, plus strictly necessary identical-status correction if discovered |
+| `.documents/Reports/execution-report.md` | Overwrite/publish the **one** canonical evidence report |
+| Product, SOPs, `plan-outlook.md`, `README.md`, `AGENTS.md`, `.github/**`, all other files | **Read only; no edits**. If a necessary change lies here, STOP rather than widen the order |
+| Git | Ordinary §6B staging/commits/push/read-back confined to authorized paths on verified `main`; no branch creation, PR, merge, reset, clean, history rewrite or deployment |
+| Temporary material | Only Solo `.temp/` or active Cline-supplied temp area; clean task-owned disposable artifacts; never remove unknown items |
 
-### 6. Execution and independent acceptance gates
+### 5. Acceptance gates — independently verifiable
 
-**Sequence:** verify authority and anchors → freeze and remotely read back exact R06 **before any other source edit** → edit Architecture only → check every cross-contract consistency and final diff → publish corrected documentation and overwrite the single report → read back `origin/main` and verify final status/cleanup → hand off to independent Architect review. Never create a PR.
-
-| Gate | Evidence required for PASS |
+| Gate | Evidence needed for PASS |
 | --- | --- |
-| G01 — Owner authority | Exact R06 installed, distinct matching Owner handoff, verified root/`main`/sole `origin`, one worktree and known initial state |
-| G02 — Freeze | Byte-identical R06 alone committed and pushed **before** editing Architecture, independently read back |
-| G03 — Browser contract | Exactly five `BrowserEnhancementV1` kinds remain; `interaction.contact` has **no** DTO/envelope, but does have server-rendered, keyboard and no-JS form requirements; all other existing enhanced-module obligations retained |
-| G04 — Transport contract | One obligatory UTF-8 URL-encoded native POST media type, five **closed** transport keys with exactly three visitor data fields + two server-owned controls, strict duplicate/unknown/malformed/oversize refusal; no JSON/multipart default or added form builder |
-| G05 — Replay expiry | Token expires no later than 24h; expired/missing state fails without dispatch; no same-token resend even after record expiry; `F13` and relevant documentation make the boundary verifiable |
-| G06 — Preservation | The original 21 module rows and the `interaction.contact` registry row unchanged, 22 IDs and seven outcomes remain, all prior field/rate/retention/analytics/port/site decisions intact |
-| G07 — Future proof cases | Relevant `F01`/`F03`/`F13`/`F16` updated for decoding, no-JS POST, token expiry and multi-instance replay; all `F01`–`F17` still `NOT RUN`; `C1`–`C4` remain `UNVERIFIED` |
-| G08 — No unrelated changes | Only frozen ACTIVE, Architecture, and canonical report changed; security work, PR #1, provider and R00.G untouched |
-| G09 — WIP governance | Exactly four retained WIP files; ROADMAP still lists `R00.F` and `R00.G`; NEXT neutral; ACTIVE remains R06; no unapproved archive or extra document |
-| G10 — Git/report hygiene | Exact commits, changed-path diff, current report and remote read-back, one worktree and clean checkout, owned temporary files cleaned or an explicit failure |
+| G01 Authority | Correct Owner-installed R01 and distinct Owner activation; pinned source anchors, checkout, branch, remote and WIP baseline independently checked |
+| G02 Freeze | R01 exact byte identity frozen, pushed and read back as **ACTIVE-only first commit before any other edits** |
+| G03 ROADMAP | Precisely the R00.F bullet removed; Stage 00 and R00.G retained, no other backlog history/pruning |
+| G04 NEXT | Exactly one R00.G documentary candidate with readiness, scope and exit conditions; no numerical/provider approvals invented; no execution authority |
+| G05 ACTIVE | Exactly one identifying heading and final LF after reconciliation; no live order remains |
+| G06 Durable parity | Architecture says R00.F documentation accepted and administratively closed; full §6B contract preserved verbatim apart from opening status; no implemented capability claimed |
+| G07 Contract preservation | All 22 module IDs/contracts, five enhancement kinds, five-key native form transport, field bounds, outcomes, token expiry, rate limits, privacy/no-retention, analytics-off and future proof cases unchanged |
+| G08 Scope purity | No security-related edits, code, provider, release, deployment, PR or branch mutations; only five authorized source/report paths changed |
+| G09 Honesty | `F01`–`F17` still `NOT RUN`; `C1`–`C4` still `UNVERIFIED`; no R00.G decision or test presented as approved/executed |
+| G10 Git/report | Correct published commit/tree and remote correspondence, clean working tree, one worktree, exactly four WIP files, single overwritten report and task-temp cleanup evidence |
 
-**Every gate applies to the documentary scope only.** No implemented contact service, schema, browser behavior, test result, security certification, delivery or deployment may be claimed. A reported `COMPLETE` is not independent `ACCEPT`. If a material inconsistency survives or any gate fails, publish a truthful partial or STOP report when safe; do not claim R00.F closure.
+**STOP / partial execution:** If any gate fails, source drift or unapproved work exists, or an authorized edit cannot be safely completed, preserve the evidence and Owner data, do not claim R00.F closed, and publish a factual `STOPPED`/`FAILED` report when safe. No new work-order file, backlog, PR, provider action or alternative branch. All future work remains behind its own separate Owner-issued order.
 
-### 7. Handoff and next transition
+### 6. Final handback
 
-In `.documents/Reports/execution-report.md`, report exact installed R06 identity and checksum, preflight and issuance-freeze evidence, source commits/tree, exact Architecture paragraphs amended, full G01–G10 results, preservation and contradictory-text checks, any skipped/unverifiable proof, working-tree/temp cleanup and remote read-back. Do not embed the report commit's own SHA in its content; include the real URL/SHA in the agent's separate handback.
-
-The agent **must not** declare independent `ACCEPT`, close `R00.F`, remove it from ROADMAP, clear ACTIVE, populate NEXT, issue `R00.G`, or begin later implementation. After independent Architect `ACCEPT` of R06, the Owner may separately authorize **one administrative R00.F closure/reconciliation**: remove exactly R00.F from ROADMAP, clear ACTIVE to the neutral title, and select `R00.G` in NEXT only after readiness assessment. That is a distinct order and is **not** authorized by R06.
+The agent reports the exact remote commit/tree, changed paths, all ten gates and their evidence, and returns for independent Chief Architect `ACCEPT / REVISE / STOP`. This closure order **must not** itself issue an R00.G implementation order or prompt, run any R00.G task, claim Stage 00 closed, alter security governance, or make product release/deployment claims. The Owner controls any subsequent distinct issuance.
