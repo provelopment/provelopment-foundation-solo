@@ -7,80 +7,64 @@
 | Field | Value |
 | --- | --- |
 | Date | 2026-11-07 |
-| Work order | **`SOLO-WO-028 R01`** — Stage 01 `R01.A` scratch-root safety correction |
-| Owner handoff | Received — instruction to align with `README.md`/`AGENTS.md` and execute the installed `SOLO-WO-028 R01` |
-| Local root | `C:\Users\Sean\Documents\Provelopment\00.foundation-solo` (verified, single checkout, sole `origin`) |
-| Starting HEAD / tree | `49955538c6b32a9d81e7464fba28a72d2cd04927` / `b5311d10251e974d1d26b65a7eec5b507e2dd56a` |
-| Corrected source commit | **`5ae69bb9f396bb8bd33a62501e620f062d78a79c`** / tree **`0535cda375d95d0f7aafb7e8f6fa7ee45ecda1a5`** |
-| Compiler / target | `rustc 1.99.1 (58cf8f9c3 2026-10-13)`, `cargo 1.99.1 (5f94df478 2026-08-27)`, host **`x86_64-pc-windows-gnu`** |
-| **Status** | **`COMPLETE`** — all six `S-01`–`S-06` gates pass on the committed identity. Factual run status only, never Architect `ACCEPT`. |
+| Work order | **`SOLO-WO-029 R01`** — `R01.A` accepted closure and `R01.B` NEXT selection |
+| Owner handoff | Received — instruction to align with `README.md`/`AGENTS.md` and execute the installed `SOLO-WO-029 R01` |
+| Verified local root | `C:\Users\Sean\Documents\Provelopment\00.foundation-solo` (actual `git rev-parse --show-toplevel`), branch `main`, one worktree, sole `origin` = `provelopment/provelopment-foundation-solo` |
+| Starting HEAD / tree | `ff55dc702587cc8bfef98c8c8a3d0665ccfc162b` / `1e090cdc2d5fb07474af2bdbd4d37e03dd9e7194` |
+| Accepted `R01.A` basis | Chief Architect `ACCEPT` for `SOLO-WO-028 R01` at `ff55dc702587cc8bfef98c8c8a3d0665ccfc162b`; accepted implementation source commit `5ae69bb9f396bb8bd33a62501e620f062d78a79c` |
+| Installed-order history commit (local) | **`d68b09a4729211260992f0ec2fe249fb6f9df6a0`** / tree `4d6fd64939f2b30a27750559f6009193cb35ace8` |
+| Reconciliation commit (final source state) | **`98264ae70b4a4cb567659443dcca6be5f1e02856`** / tree **`a8b6f379bb5e727dce9a67ba9e93acc9154889d0`** |
+| **Status** | **`COMPLETE`** — administrative WIP reconciliation only. Factual run status; the agent does not award `ACCEPT` and does not close Stage 01. |
 
-## The defect and the correction
+## Preflight verification
 
-The previous validator resolved the candidate root **first** and inspected the **resolved** entry. That cannot prove the original `.temp` entry was not redirected: a junction or symlink whose destination is itself a plausible `.temp` directory inside the checkout presents, after resolution, an ordinary directory with no reparse attribute. Resolution-only inspection therefore accepts it.
+All fourteen reviewed blob identities matched the starting commit with **zero drift**: `README.md` `3f3005d6…`, `AGENTS.md` `32562b67…`, `About/FOUNDATION-SOLO.md` `1d80f627…`, `Architecture/ARCHITECTURE.md` `03e8923f…`, `sop-architect.md` `8760be32…`, `sop-implementation.md` `a5771160…`, `plan-roadmap.md` `4f46dfcc…`, `plan-next.md` `92fa562b…`, `plan-outlook.md` `cb9c7a61…`, `execution-report.md` `693bdca7…`, `Cargo.toml` `14505be4…`, `Cargo.lock` `d64704da…`, `rust-toolchain.toml` `9ec55b3b…`, `.cargo/config.toml` `74a4fb6c…`; committed `workorder-active.md` was `dd9e9985…` (`SOLO-WO-028 R01`). The only permitted pre-existing tracked change was the Owner's complete installation of `SOLO-WO-029 R01` (worktree blob `5cbcd88e…`, 16,009 B, 133 lines, LF, no BOM) — confirmed to identify exactly this order. WIP held exactly four files with no subdirectories; NEXT and OUTLOOK were heading-only; ROADMAP carried `R01.A`, `R01.B`, `R01.C` under Stage 01. The accepted disposition was re-read at the fixed starting revision and is not contradicted: the canonical report at that revision records `SOLO-WO-028 R01` `COMPLETE` with the `S-01`–`S-06` gate evidence for source commit `5ae69bb`, and `R01.B` remains a pending ROADMAP package.
 
-`crates/solo-cli/tests/cli_smoke.rs` now does the opposite order:
+## Local Git sequence and results
 
-1. From the canonical checkout root it builds the direct child `checkout.join(".temp")` **without resolving that entry**.
-2. It inspects that original path with `symlink_metadata` before any `canonicalize`, traversal or use: on Windows it rejects `FILE_ATTRIBUTE_REPARSE_POINT` (`0x0400`) regardless of the directory bit; elsewhere it rejects symbolic links. Non-directories and metadata/permission errors are refused (`NotADirectory`, `Unreadable`) rather than treated as an empty or safe root.
-3. A missing `.temp` is created with `create_dir` — the non-following, non-recursive call that fails when the name already exists — and the **newly created unresolved** entry is inspected before use. No `create_dir_all`, no following of an existing junction, no deletion or replacement of any existing entry.
-4. Only after the raw-entry check passes is the path resolved, and the result must equal `checkout/.temp` **exactly** (`NotTheCheckoutTemp` otherwise). Accepting any directory that merely lives inside the checkout or merely ends in `.temp` is refused.
-5. Exclusive unique children, non-recursive removal of positively owned empty children, no deletion of the shared root or foreign content, and no OS-temp fallback are all preserved. The real CLI still writes no file into its working directory.
+1. `git add -- .documents/WIP/workorder-active.md` then commit → **`d68b09a`** (tree `4d6fd649`), 1 file changed, 97 insertions / 65 deletions. The installed order bytes are preserved unchanged (`git rev-parse :<path>` = `5cbcd88e…` before commit, `git hash-object` = `5cbcd88e…` after). Local only; not published as an intermediate push and not treated as a second work order.
+2. Reconciliation edits applied, then `git add` on the three WIP files and commit → **`98264ae`** (tree `a8b6f379`), 3 files changed, 10 insertions / 132 deletions.
+3. `git diff --name-status ff55dc7..HEAD` → exactly `M .documents/WIP/plan-next.md`, `M .documents/WIP/plan-roadmap.md`, `M .documents/WIP/workorder-active.md`.
+4. Unchanged-path audit against `ff55dc7` for README, AGENTS, About, Architecture, both SOPs, OUTLOOK, `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml`, `.cargo/config.toml`, `crates/solo-cli/src/main.rs`, `crates/solo-cli/tests/cli_smoke.rs` → `drift_count = 0`.
 
-The validation lives in one small helper, `ensure_scratch_root(checkout_root)`, so exactly the production test-path logic can be exercised against a controlled fixture root. No dependency, production option or unrelated behaviour was added.
+## ROADMAP reconciliation (Stage 01, before → after)
 
-## Raw-versus-resolved proof (independent probe, disposable scratch)
+Removed exactly one bullet; `git diff --numstat` reports `0` insertions / `1` deletion for `plan-roadmap.md`. Byte-level check: the baseline blob contains the bullet exactly once, and `baseline.Replace(bullet + LF, "")` is byte-identical to the new file — 16,055 B → 15,859 B, a 196-byte reduction equal to the 195-character bullet plus its LF. No other byte changed; line-ending policy (LF) preserved.
 
-A real Windows directory junction was made in Solo `.temp/` fixture space, pointing at another `.temp` directory inside the same checkout. On that same fixture the two inspection strategies diverge exactly as the Architect described:
+```text
+- - **R01.A:** establish the selected minimal source layout, strictly typed configuration, pinned tooling/dependencies and deterministic local build, without borrowing another repository's runtime.
+```
 
-| Observation | Value |
-| --- | --- |
-| Unresolved entry attributes | `raw_entry_reparse = True` |
-| Resolved destination | `<checkout>\.temp\probe-028\target\.temp` |
-| Resolved is a directory | `True` |
-| Resolved is itself a reparse point | `False` |
-| Resolved inside the checkout | `True` |
-| Resolved basename | `.temp` |
-| **Previous post-resolution-only checks** | **`accept = True`** |
-| **Revised unresolved-entry check** | **`reject = True`** |
-| Material inside the target after the probe | intact (`keep`) |
-| Removing the link leaves the target | `target_survived = True` |
+Retained unchanged: the Stage 01 heading and prerequisite, the `**Remaining packages**` label, `R01.B`, `R01.C`, the Stage 01 exit gate, and all twelve later stages (13 `## Stage` headings before and after). No completed-work note, history or commentary was inserted into ROADMAP.
 
-This is the direct demonstration that the old arrangement would have been accepted and that only the pre-resolution check refuses it.
+## NEXT selection
 
-## Adversarial regression in the committed suite
+`.documents/WIP/plan-next.md` now contains exactly one bounded candidate: **`Stage 01 — R01.B: Hexagonal Source-Boundary Enforcement`**. Its content was compared character-for-character against the prescribed block extracted from the installed order and matches exactly (`next_exact_match = True`, 2,289 B, UTF-8, no BOM, LF only, single terminal LF). Readiness basis as recorded in the candidate: Stage 00 choices accepted; `R01.A` accepted at `ff55dc70…`; the four-crate Rust 2024 workspace, `rustc 1.99.1`, shared `Cargo.lock`, Cargo-metadata graph guard, versioned inbound `BootstrapPreflightV1`, real CLI adapter and single composition root already exist; Architecture §6A.2 selects `syn =3.0.9`; the missing piece is the AST/source-boundary proof. This remains a **candidate** only — no part of `R01.B` was implemented, no dependency was chosen or installed, and no implementation path ledger was created.
 
-`a_redirected_temp_resolving_inside_the_checkout_is_refused` builds, inside positively owned Solo `.temp/` fixture space, a container holding `target/.temp` (real directory with an existing material file) and `candidate/.temp` — a genuine directory junction to `target/.temp`. Both ends are inside the checkout. The test asserts, on the same fixture, that the resolved destination looks entirely acceptable (directory, not a reparse point, inside the checkout, basename `.temp`) — precisely why resolution-only logic fails — then asserts `ensure_scratch_root(&candidate) == Err(Redirected)`; then asserts the refusal changed nothing: the link is still a reparse point, the target directory still exists, and the material file still reads `must survive validation`. Cleanup removes only the fixture link first (asserting the target survives its removal), then its own material, `target/.temp`, `target` and `candidate`, finishing with the container's own `Drop`; the test proves no fixture residue remains and never touches the real checkout `.temp` entry.
+## ACTIVE closure
 
-The junction is created with `mklink /J` through `cmd` — a genuine directory reparse point needing no elevation, no policy change and no global configuration. On non-Windows hosts the same test uses a real directory symlink via `std::os::unix::fs::symlink`. No synthetic boolean substitutes for the end-to-end refusal.
+`.documents/WIP/workorder-active.md` is now exactly the neutral slot: 40 bytes, UTF-8, no BOM, single terminal LF, one line `# Foundation Solo — Active Work Order` and nothing else (`active_exact_match = True`; `last_byte = 10`; no `SOLO-WO-029` text survives in the slot). The complete installed order is retained in published Git history at commit `d68b09a`.
 
-Retained and strengthened positive coverage: genuine non-redirected `.temp` resolves to exactly `checkout/.temp`; a missing `.temp` is created and then inspected; a non-directory `.temp` is refused and left intact; exclusive child creation still refuses a colliding child and preserves its contents; cleanup still cannot remove a non-empty directory or foreign file; a successful CLI run still writes no file into its working directory.
+## WIP inventory and parity check
 
-## Gate evidence (all on committed `5ae69bb`)
+`.documents/WIP/` contains exactly four files — `plan-roadmap.md`, `plan-next.md`, `workorder-active.md`, `plan-outlook.md` — and zero subdirectories. `plan-outlook.md` is unchanged (`cb9c7a61…`). **Parity check:** the `R01.A` engineering work introduced no new durable product decision; the accepted Rust/workspace/hexagonal rules already live in Architecture §6A.2–§6A.4, so About, Architecture and both SOPs were intentionally left untouched and no accepted contract was duplicated into WIP.
 
-| Gate | Evidence | Result |
+## Gate evidence
+
+| Gate | Direct evidence | Result |
 | --- | --- | --- |
-| **S-01 Checkout/scope** | Starting HEAD/tree, canonical report (`9fd446c9`), committed ACTIVE (`d5ad2a26`), NEXT (`92fa562b`), `cli_smoke.rs` (`b9d3b80b`), `main.rs` (`6faa9fae`), `.cargo/config.toml` (`74a4fb6c`) and `Cargo.lock` (`d64704da`) all matched; one worktree, sole `origin`, no stash, no branch; only the three permitted paths changed (ACTIVE, `cli_smoke.rs`, report) | **PASS** |
-| **S-02 Raw entry check** | `symlink_metadata` inspects the unresolved `checkout/.temp` before any resolution; reparse/symlink, non-directory and metadata-error cases refused; resolution strictly afterwards and must equal `checkout/.temp` | **PASS** |
-| **S-03 Adversarial refusal** | Real junction whose destination is inside the checkout refused (`Redirected`); old post-resolution checks demonstrably accept the same fixture; link, target and material preserved; target survives link removal | **PASS** |
-| **S-04 Scratch ownership** | Genuine root, exclusive children, collision refusal and preservation, non-recursive cleanup, zero residue (`solo-cli-smoke-*` count `0` after the whole suite), no OS-temp fallback | **PASS** |
-| **S-05 No regressions** | `fmt` `0`, `clippy -D warnings` `0`, `test` `0` — **80 tests** (15 CLI process, 13 graph, 13 base, 11 identity, 11 adapter, 9 application, 8 CLI unit); release build `0`; real CLI `0`/`2`; two independent clean builds byte-identical | **PASS** |
-| **S-06 Reporting/publication** | One overwritten report, authorized paths only, clean tree, one final push, remote identity verified | **PASS** |
+| **L-01 Acceptance and source** | `R01.A` independently `ACCEPT` at `ff55dc70…` for source `5ae69bb`; one checkout on `main`, sole `origin`; the only pre-existing tracked change was the Owner-installed order | **PASS** |
+| **L-02 ROADMAP** | Exactly one `R01.A` bullet removed (`0` insertions / `1` deletion, byte-exact recomposition); `R01.B`, `R01.C`, Stage 01 exit gate and all other stages identical | **PASS** |
+| **L-03 NEXT** | Exactly one dependency-ready `R01.B` candidate matching the prescribed text character-for-character; no implementation performed | **PASS** |
+| **L-04 ACTIVE/WIP** | Neutral single-heading ACTIVE, 40 B, LF, no BOM; four WIP files, no subdirectories; OUTLOOK unchanged; issued-order bytes preserved at `d68b09a` | **PASS** |
+| **L-05 No unintended change** | 13 audited paths at `drift_count = 0`; changed paths across the whole run are the four authorized documentation paths only; Rust checks marked NOT RUN with scope reason | **PASS** |
+| **L-06 Evidence and publication** | Single factual report, clean tree, task-owned scratch removed, one final push, remote identity confirmed | **PASS** |
 
-## Commands executed (exit codes as observed locally)
+## Verification limits
 
-`rustc --version` → `0` (`1.99.1`); `cargo --version` → `0` (`1.99.1`); host `x86_64-pc-windows-gnu`; `cargo fmt --all -- --check` → `0`; `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings` → `0`; `cargo test --workspace --all-targets --locked` → `0` (80 tests, 10 suites); `cargo build --workspace --release --locked` → `0`; `cargo metadata --format-version 1 --locked --all-features` → `0`; `cargo tree --workspace --all-features --locked` → `0`; `cargo test --workspace --all-targets --locked --offline` → `0`; `cargo build --workspace --release --locked --offline` → `0`. Real compiled binary: `entity-7` + `https://EXAMPLE.com:443/alpha` → `0`, `preflight=ok entity_id=entity-7 base=https://example.com/alpha`; `Main` → `2`, `error: PREFLIGHT_ENTITY_ID_INVALID: invalid-start`.
+**NOT RUN — documentation-only closure; accepted prior code unchanged.** `cargo fmt`, `cargo clippy`, `cargo test`, `cargo build`, metadata/tree inspection and binary reproducibility were deliberately not executed: this order authorizes no source change and no package fetch, and no compiler or dependency installation was performed. The prior run's results at `ff55dc7`/`5ae69bb` are **not** re-presented as fresh evidence. Still `UNVERIFIED`/`NOT RUN` from earlier runs and by design: MSVC-hosted build, `cargo-deny`, Node/browser/Playwright, and the Unix branch of the `R01.A` adversarial test. `R01.B`, `R01.C`, the Stage 01 exit gate, Stage 02+ and all release/deployment work remain outstanding.
 
-**Reproducibility:** two independent builds with separate clean task-owned caches and targets (`rcA/tA`, `rcB/tB`), same pinned GNU target, `RUSTFLAGS` empty in both shells so the tracked `.cargo/config.toml` supplies the flag: both `solo-cli.exe` are `1,242,463` bytes with SHA-256 `363AC93CDD286A1C424A22ACB8D973F6A27A9F473F368E70D34E24399290FF9F` — **raw bytes exactly equal**, no timestamp normalization. It matches the prior run's value, as expected, since only a test source file changed. `Cargo.lock` blob `d64704da…` and `.cargo/config.toml` blob `74a4fb6c…` are unchanged from baseline.
+## Scratch and final state
 
-## Changed files
-
-`crates/solo-cli/tests/cli_smoke.rs` (scratch-root validator plus positive and adversarial tests), `.documents/WIP/workorder-active.md` (Owner-installed text, committed with content unchanged), `.documents/Reports/execution-report.md` (this overwrite). No other permanent path changed: `Cargo.toml`, `Cargo.lock`, crate manifests, `rust-toolchain.toml`, `.cargo/config.toml`, `crates/solo-cli/src/main.rs`, all other Rust files, README/AGENTS/About/Architecture/SOP, ROADMAP, NEXT, OUTLOOK, `.gitignore` and security/license files were untouched. Both edited files are stored LF.
-
-## Limits, deferred scope and cleanup
-
-**UNVERIFIED / NOT RUN:** MSVC-hosted build (no MSVC linker or SDK on this host — never inferred as passing); `cargo-deny`; Node/browser/Playwright and performance measurement; the Unix symlink branch of the adversarial test was not executed here, as no Unix host was used. **Deferred and not passed:** `R01.B` source-level import checker, `R01.C` CI and production-browser suite, `C1`–`C4`, `F01`–`F17`, `RG01`–`RG11`, Stage 02+ publication/routing/site/locale/visibility, and all release/deployment work. `COMPLETE` is factual run status only: `R01.A` is not self-accepted, ACTIVE was not cleared, ROADMAP still carries `R01.A`/`R01.B`/`R01.C`, and NEXT remains the neutral heading.
-
-Cleanup: all task-owned material lived in Solo `.temp/` (pinned toolchain, Cargo caches, target directories, metadata capture, the junction probe) and is removed at run end; the probe fixture and its target were deleted and verified gone, and the real `.temp` entry was never redirected (`reparse=False`) or deleted. No foreign or Owner-owned content was touched and no destructive Git operation was performed.
-
+Task-owned scratch in Solo `.temp/` (two byte-safe baseline blob extractions used for the exact-content comparisons) was deleted at run end; `.temp/` is empty and untracked. The working tree is clean at the reconciliation commit with no staged, unstaged or untracked material, no stash, one worktree, and no destructive Git operation, reset, rebase or force push at any point.
 
