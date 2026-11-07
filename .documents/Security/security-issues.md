@@ -21,7 +21,7 @@ This register exists so that a security finding raised against Solo has one dura
 | Revision assessed | `0a948be028dffbbe2e737900d1df185e8ccfea17` on `main` |
 | Assessment date | 2026-11-07 |
 | Assessor | Implementation Agent, under `SOLO-WO-018 R01`; integrated onto `main` under `SOLO-WO-019 R03` |
-| Independent review | Pending independent Chief Architect `ACCEPT / REVISE / STOP` at the published revision. PR #1 was closed without merging by Owner direction, so this register is reviewed directly on `main` rather than through a pull request |
+| Independent review | **`ACCEPT`** by the independent Chief Architect for the published security-governance documentation at `b460394103887d3916522de9f2ace52aad77bce8` on `main`. PR #1 was closed without merging by Owner direction, so the register was reviewed directly on `main` rather than through a pull request |
 | Repository state observed | 19 tracked files, 503,920 bytes; documentation and governance only |
 | Environments **in** assessed scope | The published Git repository at the revision above, including all tracked files and repository-native configuration |
 | Environments **out** of assessed scope | Any hosting account, DNS/TLS configuration, CMS installation, CI/service configuration, email or form provider, secret store, and any web property not in this repository — none of which exists for Solo yet, and none of which is verifiable from this checkout |
@@ -198,3 +198,4 @@ This register is not a fifth WIP slot: the four WIP files remain exactly `plan-r
 | --- | --- | --- | --- |
 | 2026-11-07 | Implementation Agent (`SOLO-WO-018 R01`) | 1 | Register created; assessed revision `0a948be0` recorded; `SOLO-SEC-2026-001` added as `Not applicable` to the assessed scope with verified source facts, reassessment trigger and proposed preventive controls |
 | 2026-11-07 | Implementation Agent (`SOLO-WO-019 R03`) | 2 | Protocol cross-reference (§1) and the `SOLO-SEC-2026-001` worked trace (§4.10) added; register integrated onto `main` after PR #1 was closed without merging; review status restated against the published revision instead of a pull request. Finding `SOLO-SEC-2026-001` unchanged: still `Not applicable` to the code-free assessed revision |
+| 2026-11-07 | Implementation Agent (`SOLO-WO-020 R01`) | 3 | Administrative closure of `SOLO-WO-019 R03`: the review-status row now records the Chief Architect `ACCEPT` at `b4603941` instead of a pending review. No finding, verdict, source, trigger or proposed control changed; `SOLO-SEC-2026-001` remains `Not applicable` to the code-free assessed revision |
