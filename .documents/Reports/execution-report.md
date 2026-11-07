@@ -6,139 +6,80 @@
 
 | Field | Value |
 | --- | --- |
-| Work order / edition | `SOLO-WO-017` / `R01` — R00.E administrative closure and R00.F NEXT selection |
-| Session date | 2026-11-06 |
-| Classification | **Stage 00 administrative documentation transition only.** No application, toolchain, schema, test, asset, release or deployment activity. |
-| Status | **COMPLETE** |
-| Role | Implementation Agent. No Chief Architect acceptance is asserted, and none is self-issued here. |
-| Accepted basis | Chief Architect independently reviewed the published `SOLO-WO-016 R02` revision `01ba66770701b56922920cf53ffb57589a867e6a` and returned **ACCEPT for documentary codification only** — not for runtime behaviour |
+| Session date | 2026-11-07 |
+| Work order ID as installed | `SOLO-SEC-WO-001` — no edition suffix, no `OWNER-ISSUED` marker |
+| Matching handoff | received in chat, summarising the same order |
+| Status | **STOPPED** — before any implementation write |
+| Classification | Security-assessment / documentation order; not executable in its present form |
+| Starting revision | `52cf68e89b9d0466a41de7b3dae34423be4f7bb4` on `main` = `origin/main` = `git ls-remote` |
 
-**Executable conformance remains outstanding.** The `C1` parser/schema/Unicode/Markdown suites, `C2` delivery behaviour, `C3` import and Rust→TypeScript boundary tests and `C4` executable module/refusal tests are **`UNVERIFIED` / NOT RUN**, and they block future code-bearing acceptance. Administrative closure of the documentary package consumes documentary scope only; it does not validate a parser, prove Unicode or module behaviour, or waive any hold point. Build, HTTP, browser and CI evidence is **NOT APPLICABLE** to this administrative transition and is never reported as passing.
+## Stop decision
 
-## 1. Preflight (observed)
+Execution stopped for two independent reasons. Neither involves a factual dispute about the threat, the repository or the remote; both are authorization-form defects that only the Owner can resolve.
 
-| Check | Observed |
+**B1 — the required path violates the permanent WIP file-purity rule.** The order mandates `.documents/WIP/security-issues.md`. Four binding statements forbid it:
+
+- `AGENTS.md` §5: “`.documents/WIP/` contains **only**” the four named files, and “Never create `WIP/Reports`, `WIP/Work-Orders`, `WIP/Archive`, per-task or dated reports, or any duplicate status folder elsewhere.”
+- Architect SOP §8: “`.documents/WIP/` contains exactly four retained files and no others … **Neither a subdirectory nor any additional plan, work-order, log, archive, tracker or report file is permitted.**” A vulnerability register is exactly such a tracker, and “Only a separately Owner-authorized documentation transition may change this lifecycle.”
+- Architect SOP §6B(g): “No report archive or additional WIP file is created.”
+- Implementation SOP §9: “No other WIP file, archive or parallel report may be created.”
+
+`AGENTS.md` §3 requires a stop rather than a silent weakening when an instruction conflicts with an accepted requirement. The order itself asks for the existing workflow to be respected, so this looks like an unintended path choice rather than an intended governance change — but only the Owner may decide that.
+
+**B2 — the installed order lacks the two execution preconditions.** Implementation SOP §9 requires “the exact `OWNER-ISSUED` `SOLO-WO-*` approved scope in ACTIVE plus its matching Owner handoff,” and §4 requires checking “`OWNER-ISSUED`, the frozen exact scope, the unique `SOLO-WO-*` ID.” In the installed file, `OWNER-ISSUED` occurs **0 times** and the only identifier token is `SOLO-SEC-WO-001`, which does not match `SOLO-WO-*`. Implementation SOP §4.1 is explicit: “If a claimed approval is unverifiable, STOP before edits.”
+
+Stopping preserves real intent rather than inventing authority: nothing was created, amended, renamed, reset, cleaned or deleted, and the installed order is left untouched for the Owner to correct or re-issue.
+
+## What this run did and did not do
+
+Read-only work only, plus this report.
+
+| Action | Result |
 | --- | --- |
-| Physical root | `C:/Users/Sean/Documents/Provelopment/00.foundation-solo` (`git rev-parse --show-toplevel`), the existing checkout |
-| Branch / upstream / remote | `main`, upstream `origin/main`, exactly one remote `origin` = `https://github.com/provelopment/provelopment-foundation-solo.git` |
-| Worktrees | 1 |
-| Required baseline | `01ba66770701b56922920cf53ffb57589a867e6a` |
-| Actual `HEAD` / `origin/main` / `git ls-remote` | all three `01ba66770701b56922920cf53ffb57589a867e6a` — agreed before any edit |
-| WIP inventory | exactly `plan-roadmap.md`, `plan-next.md`, `workorder-active.md`, `plan-outlook.md` |
-| Pre-run dirty state | only `M .documents/WIP/workorder-active.md` — the expected Owner-installed order; no other dirty path |
-| Installed order | `SOLO-WO-017` / `R01`, marker `OWNER-ISSUED`; 20,509 bytes, 108 lines, SHA-256 `069D2C462235A2D356E0DD18BFC80431CDBB8CF5A95567A4CDE5F7168D225DF6`, worktree blob `f072ed46535eee26732da082a47e6139d1b33061`; read in full and matched to the Owner handoff |
-| Baseline committed ACTIVE | blob `f4c9cdeb45e5fa5e75f6bc22f161cdd5c11e52b8` — the `SOLO-WO-016 R02` edition, replaced locally by the Owner-installed WO017 |
-| Baseline canonical blobs | Charter `7b6414659e293e6f196f9750544f1434b0cab34a`, Product Definition `5e7a9a80f6f477e1e17d06074224a2a27fa2603e`, OUTLOOK `cb9c7a610cf3c537557e060ca9656e44a053e69d`, ROADMAP `ab382665a82ce9a280b47f5561dc1b0c36542667` (17,205 bytes, 170 lines), NEXT `92fa562b1af0c54391851aa5c79deb1631127069` (49 bytes: the neutral title plus one LF), report `32d6e37ff025461c1aa3bbd2302e09940bb7271b` — every one matching the order |
-| ROADMAP pre-check | exactly **one** Stage 00 `R00.E` remaining-package bullet (line 9); `R00.F` and `R00.G` bullets present (lines 10–11); Stage 00 `**Exit gate:**` present (line 13); **14** stage headings `Stage 00`–`Stage 13` present; Stage 00 remaining-package bullets = 3 before the transition |
-| Governing documents read | `README.md`, `AGENTS.md`, Product Definition, Charter including §6A, `sop-architect.md` §§6A–8, `sop-implementation.md` §§4–11, all four WIP files and the current canonical report |
+| Repository preflight (`rev-parse --show-toplevel`, branch, `status --porcelain`, `remote -v`, `ls-remote`, worktree count) | root `C:/Users/Sean/Documents/Provelopment/00.foundation-solo`; branch `main`; one worktree; one `origin` = `https://github.com/provelopment/provelopment-foundation-solo.git`; local = remote = `52cf68e` |
+| Read `AGENTS.md`, `README.md`, both SOPs, Charter, Product Definition, all four WIP files, current report, `.github/SECURITY.md` | complete |
+| Inspect the actual code, dependency, CI and deployment surface | **none exists** — see below |
+| Verify the cited advisories against primary sources | **all three confirmed genuine** — see below |
+| Create `.documents/WIP/security-issues.md` | **not created** — forbidden path (B1) |
+| Create a branch, commit the register, push, open a pull request | **not performed** — no valid authorization (B2); no branch, PR or register commit exists |
+| Modify application code, configuration, deployment, `.gitignore` or branch protection | **not performed** |
+| Commit or discard the installed order | **not performed** — committing it would be an unauthorized WIP write and discarding it would destroy Owner material |
 
-No unrelated dirty path, revision divergence, wrong checkout or remote, altered edition or missing authority was found, so no STOP condition arose and nothing was reset, cleaned or discarded.
+## Read-only observations relevant to the requested assessment
 
-## 2. Commits, trees and publication
+Recorded as preflight observations, **not** as a completed assessment. No register entry exists, so nothing here is a closed finding and none of it may be cited as an authorised output of the requested order.
 
-| Step | Commit | Tree | Published evidence |
-| --- | --- | --- | --- |
-| Baseline | `01ba66770701b56922920cf53ffb57589a867e6a` | `00f06f18878d2102454b5c12df083321aa763b95` | starting `origin/main` |
-| **1** — frozen issued order | `35b23621b7e04d5088f86b9b888dfe53d8044c6c` | `b77c8d388057c656a0c409f5e630aafb5be62206` | [commit](https://github.com/provelopment/provelopment-foundation-solo/commit/35b23621b7e04d5088f86b9b888dfe53d8044c6c) — one file; ACTIVE blob `f072ed46`, byte-identical to the installed edition; push `01ba667..35b2362` |
-| **2** — WIP closure transition | `69806b6fd67f05098f1a07569fc45679c1012e00` | `c40fd9cb7bd1779972489e8c544dab10b69b5a82` | [commit](https://github.com/provelopment/provelopment-foundation-solo/commit/69806b6fd67f05098f1a07569fc45679c1012e00) — three WIP files; ROADMAP `a88d39d3`, NEXT `e483a281`, ACTIVE `ea5f20b7`; push `35b2362..69806b6` |
-| **3** — this report | supplied in the chat handback, never embedded here | — | report-only commit published after the transition |
+- **No application surface.** The repository tracks **19 files / 506,866 bytes**: nine `.documents/` files, `AGENTS.md`, `README.md`, `LICENSE`, `.editorconfig`, `.gitattributes`, `.gitignore`, and four `.github/` files. The only non-Markdown tracked files are `LICENSE` and the three dotfiles `.editorconfig`, `.gitattributes` and `.gitignore` — no source code, package manifest, lockfile, container definition, CI workflow, database, authentication layer, secret store or deployment configuration exists, consistent with `AGENTS.md` §7.
+- **WordPress is absent from the assessed scope.** `git grep -i -E 'wordpress|wp-config|wp-content'` over all tracked files matches nothing except the incoming order itself, which merely quotes the advisory. There is no CMS, no web root and no published application version, so the CVE below has **no reachable affected component inside Solo**.
+- **An existing security policy is already in the repository** at `.github/SECURITY.md`: GitHub private vulnerability reporting is enabled and independently verified, and the file deliberately states no supported version, response time or release commitment. Any register must be reconciled with it rather than duplicating or contradicting it.
+- **The cited advisory is real and its facts are accurate.** Verified independently against primary sources this run:
+  - **CVE-2026-119977** — state `PUBLISHED`, assigner Wordfence, published 2026-10-31, updated 2026-11-04; **CVSS 3.1 base 8.1 HIGH** (`AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:H`); **CWE-367** time-of-check/time-of-use race condition; affected WordPress 4.7.0 through the 7.1 branch prior to **7.1.4**; CISA ADP records the KEV entry on **2026-11-03** with SSVC *Exploitation: active*, *Automatable: no*, *Technical Impact: total*; references point at the 7.1.4 fixed sources and the 7.1.4 release note.
+  - **Canadian Centre for Cyber Security advisory AV26-1117**, dated 2026-11-03 — confirmed: “WordPress Core Prior to 7.1.4”, recording the CISA KEV addition of the same CVE on the same date.
+  - **WordPress release archive** — confirms **7.1.4 released 2026-10-28**, matching the order's stated date.
+  - Limitation: the NVD detail page returned only a JavaScript shell with no record content, so **NVD was not independently confirmed** from here; the MITRE/CVE Program record above is the stronger primary source and is unambiguous.
 
-GitHub reports commit 2 as exactly three files: `.documents/WIP/plan-next.md` +12/−0, `.documents/WIP/plan-roadmap.md` +0/−1, `.documents/WIP/workorder-active.md` +0/−107. No other path appears in either content commit.
+## Smallest decision required to unblock
 
-No force push, amend, history rewrite, new branch, clone, extra worktree, PR, merge, tag, release, deployment, provider action, DNS/TLS change, secret access or other-repository write occurred.
+One Owner decision fixes both blockers at once. Recommended: **Option A**, issued as a corrected order with the marker, ID and non-WIP path.
 
-## 3. The authorized transition, with byte proofs
-
-**ROADMAP — one line removed, nothing else.** The order's §3 quotation carries three spaces of Markdown code-block indentation; de-indented, it matched **exactly one** roadmap line (line 9, SHA-256 of the line text `624605794E19FC3F64E041CEC530DB6976739AF0569BB0F18C36C5C36999A491`). Removal was mechanical on the raw bytes, guarded by a uniqueness assertion that would have aborted the run.
-
-| Property | Value |
-| --- | --- |
-| Before | 17,205 bytes, 170 lines, blob `ab382665` |
-| Removed fragment | the single complete `R00.E` bullet plus its terminating LF = **332 bytes** |
-| After | 16,873 bytes, 169 lines, blob `a88d39d3` |
-| Remainder identity | new byte count equals old byte count − 332 exactly, and every other byte is unchanged |
-| `R00.E` occurrences after | 0 |
-| Preserved | `R00.F` bullet, `R00.G` bullet, Stage 00 `**Exit gate:**`, Stage 00 heading and outcome, and **all 14** stage headings `Stage 00`–`Stage 13`; Stage 00 remaining-package bullets fell from 3 to 2 |
-| Git shape | `git diff --numstat` = `0 1` — one deletion, zero additions; no completion summary, history paragraph or replacement text inserted |
-
-**NEXT — the exact §4 candidate.** The candidate was extracted programmatically from the installed order's fenced `markdown` block (its lines 66–78), never retyped, so transcription drift was impossible.
-
-| Property | Value |
-| --- | --- |
-| Extraction | 13 lines from the fenced block, joined with LF plus one terminal LF |
-| Size / lines | 3,184 bytes / 13 lines; exactly one terminal LF, no trailing blank line |
-| SHA-256 | `B4F3F0D50AF98344B724B6113BE7CD4BF8AD8680DFFB818AC3F49DC4AD4C4D8D` — identical before writing and after publication |
-| First / last line | `# Foundation Solo — plan-next (Next Candidate)` / `**Verifiable exit conditions:** … R00.G and the Stage 00 exit gate remain outstanding.` |
-| Content | exactly one candidate, `## R00.F — Contact and integrations`, with its own non-authorizing note; no second candidate, work order or executable authority |
-
-**ACTIVE — neutral header restored.** Final content is exactly `# Foundation Solo — Active Work Order\n`: 40 bytes, one LF, no blank line, acceptance log or other text. Character-exact comparison returned true. Blob `ea5f20b7` is the same neutral header blob used before the R00.E codification order, confirming the identical byte sequence. The frozen `SOLO-WO-017 R01` edition remains published at `35b2362` as `HEAD~1` (`git rev-parse 'HEAD~1:.documents/WIP/workorder-active.md'` = `f072ed46`).
-
-**Preservation verified after the transition.**
-
-| Path | Blob after transition | Required | Result |
-| --- | --- | --- | --- |
-| `.documents/Architecture/ARCHITECTURE.md` | `7b6414659e293e6f196f9750544f1434b0cab34a` | unchanged | preserved |
-| `.documents/About/FOUNDATION-SOLO.md` | `5e7a9a80f6f477e1e17d06074224a2a27fa2603e` | unchanged | preserved |
-| `.documents/WIP/plan-outlook.md` | `cb9c7a610cf3c537557e060ca9656e44a053e69d` | unchanged | preserved |
-| `README.md`, `AGENTS.md`, both SOPs, `.github/**`, licence/hygiene files, all other paths | untouched | unchanged | preserved |
-
-`E01`–`E10`, every `D`/`O` contract and every `C1`–`C4` future runtime hold remain exactly as accepted; no source, dependency, generated contract, test, policy or module change exists. WIP holds exactly the four retained files with no subdirectory, ADR, archive, report copy or evidence ledger.
-
-## 4. Gates G01–G08
-
-| Gate | Concrete evidence | Disposition |
+| Option | What the Owner authorizes | Consequence |
 | --- | --- | --- |
-| **G01 — Authority / preflight** | Installed `SOLO-WO-017 R01` read in full with `OWNER-ISSUED` marker and matching handoff; 20,509 bytes, SHA-256 `069D2C46…DF6`, blob `f072ed46`; root, `main`, one worktree, one correct `origin`, upstream `origin/main`; `HEAD` = `origin/main` = `ls-remote` = `01ba6677`; four-file WIP; only ACTIVE dirty; Charter `7b641465` and Product `5e7a9a80` unchanged. | **PASS** |
-| **G02 — Frozen order** | Commit `35b2362` publishes the entire installed approved scope in a separate commit with ACTIVE blob `f072ed46` byte-identical to the worktree file (`git hash-object` equality asserted true); the earlier `SOLO-WO-016 R02` edition (`f4c9cdeb`) is retained in Git history; no evidence or approval section was appended. | **PASS** |
-| **G03 — ROADMAP purity** | Exactly the one §3 bullet plus its LF deleted (332 bytes); `git diff --numstat` = `0 1`; remainder byte-identical; `R00.E` occurrences 0; `R00.F`, `R00.G`, Stage 00 outcome and exit gate retained; all 14 stage headings retained; nothing added. | **PASS** |
-| **G04 — NEXT readiness** | Exact §4 candidate extracted mechanically from the order: 13 lines, 3,184 bytes, SHA-256 `B4F3F0D5…`, one terminal LF; exactly one candidate; `R00.F` is the first dependency-ready remaining ROADMAP package; `R00.G` not promoted; the candidate states it grants no authority. | **PASS** |
-| **G05 — ACTIVE neutral** | Final ACTIVE is exactly `# Foundation Solo — Active Work Order\n` — 40 bytes, one LF, no other characters, character-exact comparison true, blob `ea5f20b7`; the frozen WO017 edition is confirmed at `HEAD~1` (`f072ed46`). | **PASS** |
-| **G06 — Canonical preservation** | Charter `7b641465` and Product `5e7a9a80` unchanged; `E01`–`E10`, `D`/`O` literals and `C1`–`C4` holds unaltered; OUTLOOK `cb9c7a61` unchanged; no other path touched — no code, dependency, generated contract, test or policy change. | **PASS** |
-| **G07 — Git and report** | Two content commits plus one separate report-only commit, all pushed to the pre-existing `origin/main` with readback; exact changed-path ledger below; final `git status --porcelain` empty, one worktree, one remote; task-owned scratch cleaned. | **PASS** |
-| **G08 — Correct classification** | Only the R00.E documentary package is administratively consumed; `C1`–`C4` remain `UNVERIFIED`/NOT RUN and blocking; Stage 00 stays open with `R00.F` and `R00.G` outstanding; no implementation, provider, release, merge, deployment or runtime-acceptance claim appears in any commit or in this report; no self-acceptance is asserted. | **PASS** |
+| **A — recommended** | Re-issue as `SOLO-WO-018 R01`, marked `OWNER-ISSUED`, with the register at **`.documents/Security/security-issues.md`** (new folder, outside WIP), plus the one-line document-map/authority update that makes Security a named concern | Keeps the four-file WIP invariant and the current authority map intact; the register becomes a first-class durable document |
+| **B** | Keep the register inside `.documents/` but attach it to an existing concern — extend `.github/SECURITY.md` (repository-standard, already permitted as a narrow exception) instead of a new file | No new authority slot, no new folder; smallest possible change, but the register and the reporting policy share one file |
+| **C** | Explicitly amend the WIP lifecycle to permit a fifth retained file | Requires an Owner-authorized lifecycle transition; it would also contradict the “exactly four files” statements in `AGENTS.md` §5, both SOPs and the previous closure order, so at minimum those would need amending in the same authorized scope |
 
-Executable parser/schema/Unicode, browser, build and HTTP tests are **NOT APPLICABLE** to this administrative transition and are recorded as such — never PASS. No gate was marked `FAIL` or `NOT RUN`.
+Whichever option is chosen, the re-issued order should also state: the exact permitted write paths; whether a short-lived branch and pull request are authorized (Architect SOP §6B(c) permits them **only** when an order says so explicitly — the current text does authorize them, so that part is fine); that the report remains the only WIP-adjacent publication and is pushed from `main`; and that merge, release and deployment stay separately unauthorized.
 
-## 5. Changed-path ledger
+Nothing in the assessment scope itself needs to change: the WordPress conclusion will be *Not applicable to assessed scope* with the evidence above, and the remaining register content will necessarily be short because Solo has no code, dependencies or deployment to assess. The order's warning against inflating generic checklist items is therefore easy to honour.
 
-| Path | Operation | Commit |
-| --- | --- | --- |
-| `.documents/WIP/workorder-active.md` | frozen issued `SOLO-WO-017 R01` published byte-for-byte (commit 1), then reset to the neutral one-line header (commit 2) | 1, 2 |
-| `.documents/WIP/plan-roadmap.md` | one line removed (−332 bytes), nothing added | 2 |
-| `.documents/WIP/plan-next.md` | neutral file replaced by the exact bounded `R00.F` candidate (+12 lines) | 2 |
-| `.documents/Reports/execution-report.md` | overwritten with this report | 3 |
+## Repository state after this run
 
-No other path changed in the repository, and no other repository was touched.
+- Published: this report only, as a separate report-only commit on `main`, pushed to the existing `origin`.
+- Branch, pull request and register commit: **none created** — the handoff cannot supply a PR URL, branch name or register commit SHA, because none exist and inventing them would be a false claim.
+- `git status --porcelain` is **not empty**: the single entry is the Owner-installed `M .documents/WIP/workorder-active.md`. This is a justified retention — committing it would be an unauthorized WIP write and discarding it would destroy Owner-owned issuance evidence. The file is preserved byte-for-byte at 11,129 bytes / 69 lines / SHA-256 `DAD338D65F144F11010D2D0B503FBC7FCE944545CF63ABC609B672E08B132372` / blob `e3ff4df8b905727cf156840369e9f6f32c2cf3f8` as installed.
+- One worktree, one remote, no branch other than `main`, no stray scratch: Solo `.temp/` holds only this report's draft parts during the run and is emptied before handoff.
+- No secrets, tokens, personal data, internal hostnames or exploit instructions were written anywhere. The advisory facts above are public, vendor-published and contain no reproduction steps.
 
-## 6. Actions actually performed
+## Next action
 
-| # | Action | Result |
-| --- | --- | --- |
-| 1 | `git rev-parse`, `ls-remote`, `worktree list`, `remote -v`, `status --porcelain`, blob lookups | baseline, root, branch, remote, upstream and WIP inventory established |
-| 2 | Read the installed 108-line order in full plus every governing document | complete context before any edit |
-| 3 | ROADMAP/NEXT/OUTLOOK/Charter/Product/report precondition checks, unique-target assertion and 14-stage-heading count | all matched the order; the code-block indentation difference was identified and resolved by de-indentation, not by guessing |
-| 4 | Commit 1, push, blob-identity assertion, GitHub commit and file readback | `35b2362`, `01ba667..35b2362`, ACTIVE `f072ed46` |
-| 5 | Mechanical ROADMAP line removal with post-write byte accounting; NEXT written from the order's fenced block; ACTIVE reset | −332 bytes exactly, NEXT `B4F3F0D5…`, ACTIVE 40 bytes exact |
-| 6 | Commit 2, push, GitHub commit readback | `69806b6`, `35b2362..69806b6`, three WIP files only |
-| 7 | Preservation, WIP purity, worktree and scratch checks | all clean |
-| 8 | Report overwrite, report-only commit and remote readback | this file; its commit SHA and link appear only in the chat handback |
-
-## 7. Warnings, limitations and disclosures
-
-1. **`C1`–`C4` are not proven and are not waived.** Administrative closure of the R00.E documentary package does not validate a parser, prove Unicode/UTS #39, module behaviour, delivery or import boundaries. Those gates remain blocking for future code-bearing acceptance.
-2. **The order's §3 quotation is indented.** Its code block carries three leading spaces inside the numbered list item; the live ROADMAP bullet has none. The target was matched after removing that indentation and was verified unique before deletion — recorded here rather than silently normalized.
-3. **Three pre-existing prose mismatches were not repaired,** as the order requires: ROADMAP `R03.C`/`R07.C` generic-fallback wording against `O07`/`O09` zero fallback, ROADMAP `R05.B` "discovery" against the manifest-only selector, and the `R00.F`/`R00.G` package-label split between Charter §6.5 and ROADMAP. `R00.F` NEXT follows the ROADMAP label; reconciliation needs its own Owner-authorized scope.
-4. **Several commands exceeded the terminal observation window.** Shell integration did not always report completion; each command's output was read from the terminal and its file effects verified independently by byte/blob inspection. Two Cline `proceed-while-running-*.log` captures were removed at run end.
-5. **Stage 00 remains open.** `R00.F` is a non-authorizing candidate; `R00.G` and the Stage 00 exit gate remain outstanding.
-
-## 8. Repository, worktree and cleanup
-
-- Final `git status --porcelain` empty; branch `main` tracking `origin/main`; exactly one worktree; one `origin`; local `HEAD` = `origin/main` = `ls-remote` at the transition commit.
-- WIP holds exactly the four retained files; no extra WIP file, dossier, archive or report copy was created.
-- Task-owned scratch: three report draft parts in Solo `.temp/` (created and removed this run) and two Cline capture logs (removed). Solo `.temp/` is empty at run end; no unknown or Owner-owned material was deleted; no `.gitignore` change; no `git clean`.
-
-## 9. Publication result and next action
-
-- Frozen order `35b23621b7e04d5088f86b9b888dfe53d8044c6c` and closure transition `69806b6fd67f05098f1a07569fc45679c1012e00` are both published to `origin/main` and read back.
-- This report is committed and pushed separately; its own commit SHA is deliberately absent from this file and is supplied in the chat handback.
-- **Next action: when the Owner declares the closure report ready, the Chief Architect's first action is to fetch this report from GitHub and independently verify the exact final revision, the commits and changed-file boundaries, the WIP bytes, the authoritative Charter and Product blobs, and every gate G01–G08, then issue `ACCEPT` / `REVISE` / `STOP`.** Acceptance of this closure would not accept `R00.F`, `R00.G`, Stage 00 or any executable code, and no agent may install an `R00.F` work order or close Stage 00.
+**Owner decision required (Option A, B or C).** On receipt of a corrected, properly marked `SOLO-WO-*` order I can execute the whole register in one run: assessment, register content, secret hygiene check, `git diff --check`, dedicated branch, push, pull request left unmerged, and this report overwritten. Until then no register entry exists, the WordPress applicability question is answered only as a read-only observation, and the CVE must not be described anywhere as fixed, mitigated or accepted for Solo.
