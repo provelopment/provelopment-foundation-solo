@@ -6,7 +6,6 @@
 
 **Remaining packages**
 
-- **R01.B:** introduce domain/application/port/adapter boundaries and one composition root, with explicit import-boundary enforcement including aliases and re-exports; ports must serve actual use cases rather than decorative abstractions.
 - **R01.C:** establish unit, integration, architecture and production-mode/browser smoke infrastructure plus CI; ensure tests report failures, no hidden compatibility runtime, and reproducible workspace-cleanup behavior.
 
 **Exit gate:** clean-room dependency installation and build, one genuine request-to-application-port or equivalent minimal vertical-slice proof, green static checks and architecture test that fails on deliberately injected forbidden imports. No premature feature shell or provider dependency.
