@@ -7,140 +7,113 @@
 | Field | Value |
 | --- | --- |
 | Date | 2026-11-08 |
-| Work order | **`SOLO-WO-032 R01`** — Stage 01 `R01.B` root-anchoring, scratch-ownership and discovery correction |
-| Owner handoff | Received — align with `README.md`/`AGENTS.md`, execute the installed `SOLO-WO-032 R01` |
-| Trigger | Chief Architect independent **REVISE** of `SOLO-WO-031 R01` (three defects) |
+| Work order | **`SOLO-WO-033 R01`** — Stage 01 `R01.B` discovery-root pre-enumeration correction |
+| Owner handoff | Received — align with `README.md`/`AGENTS.md`, execute the installed `SOLO-WO-033 R01` |
+| Trigger | Chief Architect independent **`REVISE`** of `SOLO-WO-032 R01` (one residual defect) |
 | Verified root | Solo checkout, branch `main`, one worktree, sole `origin` = `provelopment/provelopment-foundation-solo` |
-| Starting HEAD / tree | `c2ab315142f1b1f9cfe45018197d2cfaf934a60e` / `13000e5bdf8fec4c2cc8a4265045f2ba12e0835b` |
-| Corrected source commit / tree | **`0ee1e5f1a8062623b47655040d8773db0b7c9db7`** / **`96be5b0e3a2fbcd295f18ed4e92ea2c3b224fc18`** |
+| Starting HEAD / tree | `9045b1b84ed0a2164564c4aee24d61cc830bbed3` / `7c97e423156b09e35785b5d73d20f479ca9b8890` |
+| Correction commit / tree | **`c34e323ca0b7579430cdb259e4260989c7d1edbb`** / **`addc3cb1f5f43aa5bc9d1c5abc4cf3dc6802cea2`** |
 | Toolchain | `rustc 1.99.1 (58cf8f9c3 2026-10-13)`, `cargo 1.99.1 (5f94df478 2026-08-27)`, host `x86_64-pc-windows-gnu` |
-| **Status** | **`COMPLETE`** — the three findings are corrected and verified locally. Agent work status only, never Architect `ACCEPT`. |
+| **Status** | **`COMPLETE`** — the residual defect is corrected and verified locally. Agent work status only, never Architect `ACCEPT`. |
 
-## Preflight
+## Preflight (H-01)
 
-One checkout on `main` at `c2ab315`, no stash, one worktree, sole `origin`. **All reviewed blobs matched with zero drift**: the report `5bbd0396`, prior ACTIVE `3722a688`, the three previously corrected files (`source.rs` `141261fd`, `mod.rs` `adf2f0be`, `check_architecture_fixtures.rs` `7d20147e`), `graph.rs` `e328dd6a`, `check_architecture.rs` `0bad0e02`, `workspace_graph.rs` `8fa4b4d0`, `cli_smoke.rs` `921cbbe9`, `main.rs` `6faa9fae`, both `Cargo.toml`s, `Cargo.lock` `05a02666`, `rust-toolchain.toml` `9ec55b3b`, `.cargo/config.toml` `74a4fb6c`, README, AGENTS, About, Architecture, both SOPs, and the ROADMAP/NEXT/OUTLOOK blobs. The only pre-existing tracked difference was the Owner's complete installation of this order (24,855 B, blob `2224738b`), preserved byte-for-byte and committed unchanged. WIP held exactly four files with no subdirectory; the agent edited neither ROADMAP, NEXT, OUTLOOK nor cleared ACTIVE.
+One checkout on `main` at `9045b1b`, no stash, one worktree, sole `origin`, one branch checkout. **Twenty-four reviewed blobs matched with zero drift**: README, AGENTS, About, Architecture, both SOPs, root and `solo-cli` manifests, `Cargo.lock`, `rust-toolchain.toml`, `.cargo/config.toml`, `graph.rs`, `mod.rs`, `check_architecture.rs`, `workspace_graph.rs`, `cli_smoke.rs`, `main.rs`, the prior report `e7f73f37`, ROADMAP/NEXT/OUTLOOK, and the two previously corrected files (`source.rs` `8e42f700`, `check_architecture_fixtures.rs` `714fc59b`). The single pre-existing tracked difference was the Owner's complete replacement of ACTIVE with `SOLO-WO-033 R01` (21,738 B, blob `272ef3fc`), preserved byte-for-byte and committed unchanged.
 
-The host had no Rust installation, so the **same pinned** `1.99.1` GNU variant was installed into git-ignored, task-owned `.temp/w032`; `rust-toolchain.toml` and `.cargo/config.toml` were not modified.
+`.documents/WIP/` held exactly four files and no subdirectory. ROADMAP still lists `R01.B` and `R01.C` and **not** `R01.A`; NEXT is its neutral single heading; OUTLOOK is unchanged at 52 B. Neither ROADMAP, NEXT, OUTLOOK nor the ACTIVE text was edited by the agent.
 
+**Known foreign scratch — inventoried, preserved, untouched.** `.temp/rt/tmp/system-commandline-sentinel-files/` contains a 501-byte `dotnet-suggest-registration-git-credential-manager, Version=2.9.1.0, …` file written by an external dotnet/credential-manager service. During this preflight the same service also re-created `.temp/w032/tmp/system-commandline-sentinel-files/` with an identical sentinel after the previous run had removed that directory. Neither path is task-owned; **neither was adopted, modified or deleted**. This run used the independent, freshly created subspace `.temp/w033`, and `discovery_fixtures_are_owned_and_foreign_scratch_is_untouched` asserts the foreign directory is byte-for-byte identical across a full discovery run. Cleanup trigger for the Owner: remove `.temp/rt` and `.temp/w032` once no external service holds them.
 
-## Corrections (G-02, G-03, G-04)
+The host had no Rust installation, so the same pinned `1.99.1` GNU toolchain was installed into git-ignored, task-owned `.temp/w033`; no tracked toolchain or Cargo configuration changed and no global OS setting was touched.
 
-### A. Package-root anchoring before any source use
+## The defect and its correction (H-02, H-03)
 
-A new `CheckoutAnchor` is derived from **locked Cargo metadata** (`workspace_root`) plus the real tree and validated before any package is inspected: the anchor's own original chain must be redirect-free, it must contain an inspectable `[workspace]` manifest and a `.git` entry, and every package root must be lexically exactly `crates/<package>` under it.
+`rust_files_under` previously queued the package root and called `DiscoveryFs::list(&directory)` at the top of the loop, inspecting original entries only for child directories encountered afterwards. A junction at the **initial package root** — or at the `crates` ancestor above it — could therefore have its contents enumerated and inventoried before any refusal. Other defences in the checker did not make that traversal safe.
 
-`FsReader::confine` now takes `(path, root, anchor)` and proves, in this order: lexical containment of the file in the package root and of that root in the anchor; then `inspect_original_chain` over the **unresolved** entries from the volume root through the anchor, the package root and the file — refusing a missing entry, a non-directory intermediate, or any symlink / `FILE_ATTRIBUTE_REPARSE_POINT` (`0x0400`) component; only then `canonicalize` of the file and the package root with an effective-containment comparison. Any failure is a violation (`module-source-escape` or `unreadable-source`), never a silent return. This replaces the defect where only components *below* the package root were inspected, so a self-consistent canonicalisation of a redirected root and its redirected child could look confined. A redirect into another directory **inside the same checkout** is refused exactly like one outside it.
+The new `validate_discovery_directory` runs for **every dequeued directory, including the first package root**, and **before** `fs.list`: lexical containment of the directory in the package root and of that root in the verified checkout anchor; `inspect_original_chain` over the anchor, the package root and the directory, so every unresolved component from the volume root down must exist, be a real directory and carry no symlink or `FILE_ATTRIBUTE_REPARSE_POINT` (`0x0400`); an inspectable `EntryKind::Dir` rather than a file, redirect or unknown kind (via the production seam); and canonical containment of the directory in the root and of the root in the anchor. A failure records a deterministic `module-source-escape` (redirect / wrong kind / out of boundary) or `unreadable-source` (uninspectable / unresolvable) violation and the directory is **neither listed nor descended**.
 
-The same gate covers target roots, library public surfaces, glob re-export readers, `include!` (including `.inc`), `#[path]`, default `mod`, and package discovery. The limitation is unchanged and explicit: this is per-use validation, not a proof against hostile TOCTOU races.
-
-### B. Discovery fails closed
-
-`rust_files_under` was rewritten against a `DiscoveryFs` seam (`list` / `kind` / `redirected`, real implementation `RealDiscoveryFs` using `symlink_metadata` only). For **every** entry, including a non-`.rs` name, the redirect status and the unresolved entry kind are established with explicit `Result` handling: an inspection error is `unreadable-source`; a redirect is `module-source-escape` and is never descended; an entry that is neither file nor directory is refused. `entry.metadata().is_ok_and(...)`, `path.is_dir()`, and the previous "interm inspection failure ⇒ treat as an ordinary non-directory entry" path are gone. A directory selected for traversal is checked with `inspect_original_chain` and against the anchor before descending, and the `target`/hidden-name exclusions are applied only **after** the entry's identity has been inspected safely.
-
-### C. Exclusive, non-destructive fixture ownership
-
-`Scratch::new`/`Drop` (which used `create_dir_all` through unverified ancestors and recursive `remove_dir_all`) is replaced by `OwnedScratch`:
-
-| Concern | Behaviour |
-| --- | --- |
-| Shared `.temp` and `.temp/architecture-fixtures` | inspected as unresolved entries; created exclusively when absent, inspected and **never adopted** when present; a redirected or non-directory shared path is refused |
-| Final fixture root | exclusive `create_dir` at an exact requested name (`create_exact` ⇒ `AlreadyExists` refused even if empty), or at a fresh unique name that retries instead of adopting |
-| Nested dirs and files | `create_dir` one level at a time, each recorded; files written with `create_new` so nothing is overwritten; a link is never created over an existing entry |
-| Teardown | links first with the link-only operation, then owned files, then owned directories **deepest-first** with non-recursive `remove_dir`; `remove_dir_all` is never called, no shared parent is removed, and any failure is reported rather than claimed as clean |
+The pre-existing per-entry fail-closed handling is retained unchanged: `DiscoveryFs::redirected`/`kind`/`list` errors, unknown entry kinds, non-`.rs` metadata errors, junction detection, and the `target`/hidden-name exclusions applied only after safe inspection. `check_unit`, `SourceReader` read confinement, public-surface traversal, module/`#[path]`/`include!` scanning, `cfg_attr` refusal and the graph guard are untouched; `MapReader` fixtures, deterministic ordering and four-package real-tree coverage are preserved. No new permanent file, dependency or policy was introduced.
 
 
-## Adversarial evidence (G-02, G-03, G-04)
+## Adversarial tests through the direct discovery path (H-02, H-03, H-04)
 
-Genuine **Windows directory junctions** (`cmd /C mklink /J`, no elevation, no global policy change) on exclusively owned fixture trees. Identities are repository-relative (`fixture/` = the owned fixture checkout).
+All four new cases are ordinary `#[test]`s in `cargo test --workspace --all-targets --locked`, call the **production** `source::rust_files_under` directly, and instrument the existing `DiscoveryFs` seam rather than a mock policy. Identities are repository-relative (`fixture/` = the owned fixture checkout); genuine redirects are Windows directory junctions created with `cmd /C mklink /J`, no elevation and no policy change.
 
-| Test | Construct | Refusal | Preservation |
-| --- | --- | --- | --- |
-| `a_redirected_package_root_is_refused_before_its_source_is_used` | `fixture/crates/solo-application` is a junction to `fixture/real-target` (inside the same checkout) | `module-source-escape`; **no** `layer-outward-reference`, so the source was never consumed | target bytes and the junction preserved |
-| `a_redirected_package_ancestor_is_refused` | `fixture/crates` is a junction to `fixture/real-crates`, so the package root looks like an ordinary directory after resolution | `module-source-escape`; source never consumed | target preserved |
-| `a_redirected_include_is_refused_before_its_content_is_consumed` | `include!("alias/forbidden.inc")` where `alias` is a junction; the payload is a non-`.rs` fragment containing a forbidden `use` | `include-escape`; no `unparsable-source` and no `layer-outward-reference` | link and target preserved |
-| `a_redirected_path_module_is_refused` / `a_redirected_default_module_is_refused` | `#[path = "alias/escape_mod.rs"]`, and default `mod escaped;`, behind a junction | `module-source-escape`; content never scanned | target preserved |
-| `a_conditional_module_path_is_refused_even_with_a_valid_default` | `#[cfg_attr(windows, path = "alt_win.rs")] mod alternate;` with a genuine `alternate.rs` on disk | `conditional-module-path` | n/a |
-| `a_missing_real_module_source_is_refused` | `mod missing;` | `module-source-unresolved` | n/a |
-| `a_redirected_scratch_ancestor_is_refused_before_any_write` | synthetic `case/checkout/.temp` junction to `case/checkout/target` | `ScratchError::Redirected` **before** any create or write | target still empty; junction preserved |
-| `an_existing_fixture_directory_is_never_adopted_or_deleted` | pre-existing fixture directory holding a sentinel file | `ScratchError::AlreadyExists` | sentinel byte-identical |
-| `a_discovery_metadata_failure_on_a_non_source_entry_is_refused` | injected `redirected()` error for the non-`.rs` name `notes.txt`, through the production walker | `unreadable-source` | n/a |
-| `a_redirected_discovery_directory_is_refused_and_preserved` | `vendor` junction inside a package | `module-source-escape`; the redirected file is never inventoried | target preserved |
-| `the_anchor_requires_a_workspace_manifest_a_git_root_and_crates_layout` | misplaced package root, and an anchor without `.git` | refused; a well-formed checkout anchors | n/a |
-| `legal_in_package_loading_still_succeeds`, `the_real_discovery_accepts_a_clean_package` | nonredirected root with `include!`, `mod`, harmless `cfg_attr` | accepted (no regression) | n/a |
+| Case | Construction | Observed result |
+| --- | --- | --- |
+| **T-01** `a_redirected_discovery_root_is_refused_before_its_first_list` | `fixture/crates/solo-application` is a junction to `fixture/real-target` (inside the same checkout), holding parsable `.rs` with a forbidden `use` | root and child **do** canonicalise consistently (former false positive), the unresolved root **is** a redirect, and the call yields `module-source-escape` with **`list` count = 0**, empty inventory, link and target bytes preserved |
+| **T-02** `a_redirected_discovery_ancestor_is_refused_before_its_first_list` | `fixture/crates` is a junction to `fixture/real-crates`, so the package root looks like an ordinary directory | `module-source-escape`, the package directory is **never listed**, **`list` count = 0**, no file inventoried, link and target untouched |
+| **T-03** `a_queued_directory_is_validated_before_it_is_listed` | seam fails the *second* inspection of one queued child (`src/nested`), modelling a directory that becomes uninspectable after classification | `unreadable-source`, `src/nested` **not listed**, nothing under it inventoried, while the validated root's `lib.rs` is still inventoried |
+| **T-05** `discovery_fixtures_are_owned_and_foreign_scratch_is_untouched` | owned root plus a package-root junction | root is a real non-redirected directory inside `.temp/architecture-fixtures`, the redirect is refused, the link still exists as a link, the target is byte-identical, and `.temp/rt/…/system-commandline-sentinel-files` is byte-for-byte unchanged |
 
-Each of these fails against the previous implementation: the redirected root and ancestor cases would have produced `layer-outward-reference` (content consumed) instead of refusing; the metadata-failure case produced an empty inventory; the collision and redirected-ancestor cases were adopted or created through the link.
-
-**Checker matrix unchanged and green:** 23 forbidden fixtures each report `outcome=refused` with the expected category and checker status `1`; the 5 legal twins are accepted; `--self-test` reports `self-check=passed cases=29`; `--disable` (and any unknown flag) is usage status `2`. Exit `3` remains the "forbidden fixture accepted" failure mode and is asserted structurally (`1 ≠ 3 ≠ 0`, `classify_fixture_result(&[]) == Accepted`), because producing it live would require a checker regression.
+**Retained and re-run (T-04).** `a_redirected_package_root_is_refused_before_its_source_is_used`, `a_redirected_package_ancestor_is_refused`, the redirected `include!`, `#[path]` and default-`mod` cases, `a_conditional_module_path_is_refused_even_with_a_valid_default`, `a_missing_real_module_source_is_refused`, `legal_in_package_loading_still_succeeds`, `a_redirected_scratch_ancestor_is_refused_before_any_write`, `an_existing_fixture_directory_is_never_adopted_or_deleted`, `a_discovery_metadata_failure_on_a_non_source_entry_is_refused`, `a_redirected_discovery_directory_is_refused_and_preserved`, `the_real_discovery_accepts_a_clean_package`, `the_anchor_requires_a_workspace_manifest_a_git_root_and_crates_layout`, the 23 forbidden fixtures, the five legal twins, the bypass self-test and the real-tree contract all pass. Fixture ownership is unchanged: shared parents are inspected and never adopted, fixture roots are exclusive `create_dir`, writes use `create_new`, teardown removes links then owned files then empty directories deepest-first, and `remove_dir_all` is never called.
 
 
-## Verification on the committed identity (G-05, G-06)
+## Verification on the correction commit `c34e323c` (H-05, H-06)
 
 | Command | Exit | Observation |
 | --- | --- | --- |
 | `rustc --version` / `cargo --version` | 0 | `1.99.1 (58cf8f9c3)` / `1.99.1 (5f94df478)`, host `x86_64-pc-windows-gnu` |
 | `cargo fmt --all -- --check` | 0 | no diff |
 | `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings` | 0 | **zero** warnings |
-| `cargo test --workspace --all-targets --locked` | 0 | **11 binaries, 103 tests passed, 0 failed** |
+| `cargo test --workspace --all-targets --locked` | 0 | **11 binaries, 107 tests passed, 0 failed** (103 + 4 new) |
 | `cargo test --locked -p solo-cli --test check-architecture` | 0 | `architecture=legal packages=4 targets=12 files=19 edges=22` |
 | `cargo test --locked -p solo-cli --test check-architecture -- --self-test` | 0 | `self-check=passed cases=29` |
-| `-- --fixture cfg-attr-path` / `--fixture direct-outward` | 1 / 1 | `outcome=refused`, `category_match=true` |
-| `-- --disable` | 2 | usage refusal; no weakening flag exists |
+| `-- --fixture <id>` × 23 registered forbidden ids | 1 each | every one reports `outcome=refused` with `category_match=true`; nothing was weakened to reach this |
+| `-- --disable` (unknown switch) | 2 | usage refusal; no disabling flag exists |
 | `cargo build --workspace --release --locked` | 0 | release binary |
-| `cargo metadata --format-version 1 --locked --all-features` | 0 | 66,227 B, 15 packages, 4 members |
-| `cargo tree --workspace --all-features --locked` | 0 | 24 lines; `syn` only under `solo-cli` (dev) |
+| `cargo metadata --format-version 1 --locked --all-features` | 0 | 4 members, 15 packages |
+| `cargo tree --workspace --all-features --locked` | 0 | `syn` only under `solo-cli` (dev) |
 | `cargo build --workspace --release --locked --offline` | 0 | trusted cache, no network |
-| `cargo test --workspace --all-targets --locked --offline` | 0 | incl. real-tree gate and redirect tests |
+| `cargo test --workspace --all-targets --locked --offline` | 0 | all targets, including the new pre-list cases |
 
-Real-process CLI gates re-run from the release binary: `bootstrap-preflight --entity-id entity-7 --base-url https://EXAMPLE.com:443/alpha` → exit `0`, stdout `preflight=ok entity_id=entity-7 base=https://example.com/alpha`; `--entity-id Main` → exit `2`, stderr `error: PREFLIGHT_ENTITY_ID_INVALID: invalid-start` (no input echo).
+Real-process CLI gates from the release binary: `bootstrap-preflight --entity-id entity-7 --base-url https://EXAMPLE.com:443/alpha` → exit `0`, stdout `preflight=ok entity_id=entity-7 base=https://example.com/alpha`; `--entity-id Main` → exit `2`, stderr `error: PREFLIGHT_ENTITY_ID_INVALID: invalid-start`, no input echoed.
 
-**Reproducibility** — two independent fresh-registry-cache **and** fresh-target-directory `x86_64-pc-windows-gnu` release builds of this committed identity, under the unchanged tracked `.cargo/config.toml`:
+**Reproducibility** — two independent fresh-`CARGO_HOME` **and** fresh-`CARGO_TARGET_DIR` `x86_64-pc-windows-gnu` release builds of this commit under the unchanged tracked `.cargo/config.toml`:
 
 | Build | Exit | Bytes | Raw SHA-256 |
 | --- | --- | --- | --- |
 | A | 0 | 1,242,463 | `363AC93CDD286A1C424A22ACB8D973F6A27A9F473F368E70D34E24399290FF9F` |
 | B | 0 | 1,242,463 | `363AC93CDD286A1C424A22ACB8D973F6A27A9F473F368E70D34E24399290FF9F` |
 
-`identical = true`, compared as raw bytes with no header normalisation. **Flag preconditions verified, not assumed:** `RUSTFLAGS` is **absent** (not empty) and `CARGO_ENCODED_RUSTFLAGS` is absent, so the tracked `target.x86_64-pc-windows-gnu.rustflags = ["-C", "link-arg=-Wl,--no-insert-timestamp"]` is the effective flag source. No ephemeral linker flag was added.
+`identical = true` between the two **new** runs, compared as raw bytes with no header normalisation. `RUSTFLAGS` and `CARGO_ENCODED_RUSTFLAGS` were verified **absent** (not set to empty), so the tracked `-C link-arg=-Wl,--no-insert-timestamp` remains the effective flag source; no ephemeral linker flag was added. The hash coincides with the prior run's binary, which is expected and independently confirms that only test-only code changed.
 
-**Unchanged-blob audit:** `Cargo.lock` `05a02666`, root `Cargo.toml` `14505be4`, `crates/solo-cli/Cargo.toml` `1ca5e114`, `rust-toolchain.toml` `9ec55b3b`, `.cargo/config.toml` `74a4fb6c`, `graph.rs` `e328dd6a`, `check_architecture.rs` `0bad0e02`, `workspace_graph.rs` `8fa4b4d0`, `cli_smoke.rs` `921cbbe9`, `main.rs` `6faa9fae`, and the ROADMAP/NEXT/OUTLOOK blobs are identical to the reviewed baseline. The release executable is also bit-identical to the previously evidenced binary, which independently confirms that no production source changed.
+**Read-only drift audit:** `Cargo.lock` `05a02666`, both manifests, `rust-toolchain.toml`, `.cargo/config.toml`, `mod.rs` `89dfea91`, `graph.rs` `e328dd6a`, `check_architecture.rs` `0bad0e02`, `workspace_graph.rs` `8fa4b4d0`, `cli_smoke.rs` `921cbbe9`, `main.rs` `6faa9fae`, README/AGENTS/About/Architecture/SOPs and ROADMAP/NEXT/OUTLOOK are all identical to the reviewed baseline.
 
 
-## Gates (G-07)
+## Gates (H-07)
 
 | Gate | Evidence | Result |
 | --- | --- | --- |
-| **G-01 Authority and scope** | Exact starting HEAD/tree, 23-blob preflight with zero drift, one checkout, Owner-issued ACTIVE committed unchanged, permanent ledger stayed at five paths (three source/test + ACTIVE + report), ROADMAP/NEXT/OUTLOOK untouched | **PASS** |
-| **G-02 Package-root anchoring** | `CheckoutAnchor` from locked metadata + Git root + `crates/<package>` layout; unresolved entry chain from the volume root through anchor and package root inspected before use; genuine redirected root and ancestor **inside the same checkout** refused with target bytes preserved | **PASS** |
-| **G-03 Discovery fail-closed** | Every entry, including non-`.rs`, has unresolved kind and redirect status established with explicit errors; injected metadata failure produces `unreadable-source`; a redirected directory is refused before descent and never inventoried; a clean package is still accepted | **PASS** |
-| **G-04 Scratch ownership and cleanup** | Unresolved `.temp` and fixture parent validated (created exclusively or inspected, never adopted); exact-name collision refused with the sentinel intact; redirected synthetic `.temp` refused before any write; teardown links → files → empty dirs, deepest-first, no `remove_dir_all`; zero residue | **PASS** |
-| **G-05 Checker regression** | All 4 packages / 12 targets / 19 files checked; 23 negatives + 5 legal twins green; conditional, include, `#[path]`, default-module and missing-source refusals intact; exit mapping and CLI/graph suites green | **PASS** |
-| **G-06 Pinned toolchain and reproducibility** | fmt, strict Clippy (zero warnings), 103 locked tests, release/metadata/tree/offline PASS, raw byte-identical independent builds, flag-override absence evidenced, lock and manifests unchanged | **PASS** |
-| **G-07 Factual report and publication** | One canonical report, exact changed paths and results, task scratch cleared (pre-existing foreign item disclosed), no secrets, clean local tree, one final push and remote verification | **PASS** |
+| **H-01 Authority and diff** | Exact HEAD/tree, 24 reviewed blobs with zero drift, one checkout, one Owner-installed ACTIVE difference committed unchanged, exactly the four permitted permanent paths touched, four WIP slots intact and ROADMAP/NEXT/OUTLOOK untouched | **PASS** |
+| **H-02 Root pre-enumeration** | Direct real `rust_files_under`: redirected initial package root refused with `module-source-escape`, **`list` count 0**, empty inventory, link and target preserved; the same case fails on the pre-correction code with `list` count 1 | **PASS** |
+| **H-03 Ancestors and queued dirs** | Redirected `crates` ancestor refused with **`list` count 0**; every dequeued directory validated before `list` (queued-directory case refused `unreadable-source` and never enumerated); non-`.rs` metadata-error coverage retained | **PASS** |
+| **H-04 Ownership and existing positives** | `OwnedScratch` collision and redirected-ancestor tests pass; legal discovery and in-package source loading pass; foreign `.temp/rt` sentinel byte-identical across the run; zero task residue | **PASS** |
+| **H-05 Checker and CLI regression** | Legal four-crate real check, 23 forbidden fixtures with `outcome=refused`/`category_match=true`, five legal twins, bypass self-test, graph negatives, CLI success and refusal all green; no reduced scanning surface | **PASS** |
+| **H-06 Toolchain and reproducibility** | Pinned `1.99.1` GNU, fmt clean, strict Clippy zero warnings, 107 locked tests, offline test and release build, metadata/tree, two raw-byte-identical independent releases, absent flag overrides, unchanged lock and dependencies | **PASS** |
+| **H-07 Report and publication** | One accurate report, diff confined to the allow-list, clean checkout, safe scratch disposition, one final push and exact remote readback | **PASS** |
 
 ## Limitations — stated, not inferred
 
-- **Windows GNU only.** MSVC-hosted and Unix builds remain `UNVERIFIED`/`NOT RUN`; the Unix symlink branch of the fixture helpers was not executed.
-- **Redirect type.** Evidenced with Windows directory junctions; file symlinks and mount-point reparse types were not exercised.
-- **Time-of-check/time-of-use.** Anchoring and confinement prove ownership of the destination at the moment it is checked; no OS-supported locking evidence is offered and race freedom is **not** claimed.
+- **Windows GNU only.** MSVC-hosted and Unix builds are `UNVERIFIED`/`NOT RUN`; the Unix symlink branch of the fixture helpers and the Unix redirect tests were not executed on this host.
+- **Redirect types.** Evidenced with Windows directory junctions; file symlinks and mount-point reparse types were not exercised.
+- **T-03 determinism.** A queued directory that becomes uninspectable is modelled by a deterministic injected seam failure rather than an unsafe live race, because creating a real queued-directory redirect mid-walk is not reproducible; the failure travels the production pre-list code path.
+- **Time-of-check/time-of-use.** Pre-enumeration validation proves ownership at the moment of checking; no OS-supported locking evidence is offered and race freedom is **not** claimed.
 - **`cargo-deny` / advisory scanning: `NOT RUN`.** The `unicode-ident` Unicode-3.0 `NOTICE` obligation remains outstanding for release packaging.
-- **Exit `3`** is asserted structurally rather than observed live, by definition of it being the failure mode.
-- **`R01.C`, CI, browser, HTTP, provider, Stage 02+, release and deployment: `NOT RUN`.** Full Stage 01 acceptance is **not** claimed; `R01.B` remains in ROADMAP and ACTIVE is not cleared.
+- **R01.C, CI, browser, HTTP, provider, Stage 02+, merge, release and deployment: `NOT RUN`.** Full Stage 01 acceptance is not claimed.
 
-## Changed-path ledger (commit `0ee1e5f1`, tree `96be5b0e`)
+## Changed-path ledger (commit `c34e323c`, tree `addc3cb1`)
 
 | Path | Change | Blob |
 | --- | --- | --- |
-| `crates/solo-cli/tests/architecture_checks/source.rs` | `CheckoutAnchor` and original-chain anchoring in `SourceReader::confine`; anchored propagation through target roots, public surfaces, glob readers, `include!`, `#[path]`, default modules and discovery; fail-closed `DiscoveryFs` walker | `8e42f700` |
-| `crates/solo-cli/tests/architecture_checks/mod.rs` | Passes the metadata-derived `workspace_root` anchor into `check_packages`; fails closed when metadata reports none | `89dfea91` |
-| `crates/solo-cli/tests/check_architecture_fixtures.rs` | `OwnedScratch` exclusive ownership and non-recursive teardown; redirected package-root, ancestor, discovery and scratch-ancestor regressions; collision preservation; injected metadata-failure case | `714fc59b` |
-| `.documents/WIP/workorder-active.md` | Owner-installed order, bytes unchanged, committed | `2224738b` |
+| `crates/solo-cli/tests/architecture_checks/source.rs` | `validate_discovery_directory` pre-enumeration gate applied to every dequeued directory before `list`; no other policy change | `92f6e0e3` |
+| `crates/solo-cli/tests/check_architecture_fixtures.rs` | Direct-discovery regressions: recording seam with a `list` counter, redirected root and ancestor pre-list cases, queued-directory pre-list case, ownership/foreign-scratch preservation | `93fe5733` |
+| `.documents/WIP/workorder-active.md` | Owner-installed `SOLO-WO-033 R01`, bytes unchanged, committed | `272ef3fc` |
 
-No production Rust file, manifest, `Cargo.lock`, `graph.rs`, `check_architecture.rs`, workspace configuration, toolchain file, governing document or other repository was modified.
+## WIP state and scratch disposition
 
-## WIP state and scratch
+`.documents/WIP/` still holds exactly four files with no subdirectory; ROADMAP keeps `R01.B` and `R01.C` (no pruning), NEXT is its neutral heading, ACTIVE still holds the complete Owner-issued `SOLO-WO-033 R01` and was not cleared, OUTLOOK unchanged.
 
-`.documents/WIP/` still holds exactly four files with no subdirectory. ROADMAP retains `R01.B` and `R01.C` (no pruning); NEXT is the neutral heading; ACTIVE still holds the complete Owner-issued `SOLO-WO-032 R01` and was not cleared; OUTLOOK is unchanged.
+Task-owned scratch `.temp/w033` (pinned toolchain, two reproducibility caches and targets, logs, fixture subtrees) was created by this run and removed at the end; `.temp/architecture-fixtures` is the shared fixture parent, left in place and verified empty because it is not task-owned. Pre-existing foreign `.temp/rt` and `.temp/w032` sentinels were preserved untouched and are disclosed above with their cleanup trigger. No unknown or Owner material was deleted, no redirect target was used as a cleanup root, and no destructive Git command was issued.
 
-Owned scratch inventory and outcome: `.temp/w032` (pinned toolchain, two reproducibility caches/targets, logs, fixture subtrees) was created by this run and removed at the end. `.temp/architecture-fixtures` is the shared fixture parent, left in place and verified **empty** (0 entries) because it is shared and not task-owned. `.temp/rt` is the pre-existing foreign item described above, deliberately preserved and disclosed with its cleanup trigger. No unknown or Owner material was deleted, no redirect target was ever used as a cleanup root, and no destructive Git command was issued.
-
-**Pre-existing foreign scratch, disclosed and preserved.** `.temp/rt/tmp/system-commandline-sentinel-files/` contains a 501-byte `dotnet-suggest-registration-git-credential-manager, Version=2.9.1.0, …` file written by a dotnet/credential-manager service during the previous run, which pointed `TEMP` there. It is not repository content, it is not task-owned this run, and it was **left untouched**; this run used an isolated `TEMP` under `.temp/w032/tmp`. Cleanup trigger: the Owner may delete `.temp/rt` once no service holds that file.
+**Empirical proof that the correction is load-bearing.** With only the new `validate_discovery_directory` call temporarily replaced by `Ok(())` and nothing else changed, the three pre-list regressions failed, and the root case reported `no directory may be enumerated once the root is refused: [".temp/architecture-fixtures/discovery-root-pre-list-…/checkout/crates/solo-application"]` with `left: 1, right: 0` — i.e. the old code enumerated the redirected root exactly once. The file was then restored and verified byte-identical (`92f6e0e3`) before committing.
