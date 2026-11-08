@@ -6,101 +6,116 @@
 
 | Field | Value |
 | --- | --- |
-| Date (UTC) | 2026-11-08, approximately 05:20–05:35 |
-| Work order | **`SOLO-WO-035 R02`** — R01.C CI Evidence Correction (revision of `SOLO-WO-035`, not new scope) |
-| Owner handoff | Received — align with `README.md`/`AGENTS.md`, execute the installed `SOLO-WO-035 R02` |
+| Date (UTC) | 2026-11-08, approximately 06:05–06:25 |
+| Work order | **`SOLO-WO-036 R01`** — Accepted CI Reconciliation and Component-Security Gate |
+| Nature | Administrative WIP reconciliation plus **read-only** security evidence. No source, test, manifest, lockfile, workflow, scanner, dependency, action pin or repository setting was changed. |
+| Owner handoff | Received — align with `README.md`/`AGENTS.md`, execute the installed `SOLO-WO-036 R01` |
 | Repository / branch / remote | `provelopment/provelopment-foundation-solo` / `main` / sole `origin` |
-| Starting HEAD / tree | `695c4b11f02ab5b08335ca32c044b143ed0bd328` / `196fc4708941457397983e4ecc27a0bbcf6f9b7c` |
-| Corrected-workflow revision | **`7e4b84d5844682ba1d55dde6db1af177692bde45`**, tree `91218a436f16345a7fffd8a8fdb5230f242f9ccd` |
-| **Status** | **`COMPLETE`** for the R02 evidence correction. **Not** an Architect `ACCEPT`, **not** an R01.C closure, **not** a Stage 01 closure, **not** a release. |
+| Starting HEAD / tree | `283066652c71c848e4d68daa4d5499aeae0075a4` / `aa4364c264db5d423c18b598eba716179daf9dba` |
+| Issuance-history commit (A) | `7cd22d30bdda5d697b0988f05b32c58df1528ac7`, tree `ee40991efa2808f751e5c75fafc82f36e7defaa1` |
+| Reconciliation commit (B) | `39edf990c6923da8594eb9abae39fda5511b220e`, tree `64fe64b204a1c4e4c177dfea953daeb79a631990` |
+| **Status** | **`COMPLETE`** for the authorized administrative reconciliation and read-only survey. **Not** an Architect `ACCEPT`, **not** a vulnerability-scan `PASS`, **not** an R01.C or Stage 01 closure, **not** a release. |
 
 ## Preflight
 
-One checkout on `main`, one worktree, no stash, sole `origin` = the intended GitHub repository. The only local tracked difference at start was the Owner's complete replacement of `.documents/WIP/workorder-active.md` with this `SOLO-WO-035 R02` order (8,438 bytes, blob `a64ad9328b65305b04b9a3c915aa6292c8de20f6`, LF-only, no BOM, `OWNER-ISSUED`, matching handoff identifier). It was staged and committed **byte-identically** and not edited by the agent.
+Verified before any write: one Solo checkout, one worktree, sole `origin` = the intended public repository, branch `main`, no stash, and a clean index except the Owner's replacement of `.documents/WIP/workorder-active.md`. All five reviewed baseline blobs matched with zero drift — Architect SOP `8760be323b6ed85695a9dcffd3e52f94628f0f07`, ROADMAP `6f753fdbfc34a08568f238769b558e93422688a6`, NEXT `92fa562b1af0c54391851aa5c79deb1631127069`, OUTLOOK `cb9c7a610cf3c537557e060ca9656e44a053e69d`, previous report `d12453a7560e302840b3e2266c96304b2562ac0d`.
 
-The two reviewed blobs matched with zero drift: workflow `02a1fa7e0e378e6b2fa2132271fc57e81fbbf6cb` and report `0a522f5e52ede59c4c741ea688a457f177ab99f8`. NEXT is its neutral single heading `92fa562b`, ROADMAP is unchanged at `6f753fdb` and still carries R01.C plus the Stage 01 gate, and OUTLOOK is unchanged at `cb9c7a61`. `.documents/WIP/` holds exactly its four files and no subdirectory.
+The installed order was 14,888 bytes, blob `937d0cd12e4154ad7ed99a0d2af8b888fd80e97e`, LF-only, no BOM, carrying `OWNER-ISSUED` and the matching `SOLO-WO-036 R01` handoff identifier. It was committed **byte-identically** (commit A) and never edited by the agent.
 
-## The two corrections, and their verified basis
+## Committed revisions and scoped diff
 
-Both defects were found by Chief Architect review of the `R01` evidence; neither was a functional CI or product defect.
-
-**Correction 1 — injected-import category in the Linux job summary.** The summary said the injected real `solo-domain → solo_adapters` import was refused with category `layer-outward-reference`. The checker's actual behaviour, independently observed in the live `R01` run `42449851656` / Ubuntu job `128636524033`, is `error: undeclared-crate: … solo_adapters is not a declared dependency of solo-domain` with exit **1**. The workflow now states `undeclared-crate` and explains why: the source scanner resolves a workspace root only from a crate's **declared** dependencies, and `solo-domain` declares no adapter dependency, so the reference cannot resolve to a declared root and is refused as an undeclared workspace-crate reference. The declared-but-outward form is proven separately: the `direct-outward`, `renamed-alias`, `reexport-chain` and `checker-bypass` fixtures still require `layer-outward-reference`, and `dynamic-load` still requires `dynamic-loading`. **No assertion, fixture list, exit-code requirement or checker code was changed** — only the summary prose.
-
-| | Before | After |
+| Commit | Content | Paths |
 | --- | --- | --- |
-| Linux summary, adversarial sentence | "…refused with category `layer-outward-reference` and exit 1…" | "…refused with exit 1 by the precompiled checker as `undeclared-crate` (solo-domain's manifest declares no adapter dependency, so the scanner cannot resolve the reference to a declared workspace root)…", with the retained fixture categories stated explicitly |
+| **A** `7cd22d3` | Owner-installed `SOLO-WO-036 R01` recorded unchanged as issuance history (committed ACTIVE blob = `937d0cd1`, identical to the installed file) | 1 |
+| **B** `39edf99` | The authorized reconciliation | 3 |
+| **C** | ACTIVE neutralized to exactly `# Foundation Solo — Active Work Order\n` (40 bytes, one LF, no BOM), performed only after B was published and both CI jobs had passed | 1 |
+| **D** | This report, overwritten in place | 1 |
+
+Diff against the starting commit touches **four** paths — `.documents/SOP/sop-architect.md`, `.documents/WIP/plan-roadmap.md`, `.documents/WIP/plan-next.md`, `.documents/WIP/workorder-active.md` — plus this report in its own final commit. Nothing else in the repository changed: the workflow, `Cargo.toml`, `Cargo.lock`, every crate manifest and source, `rust-toolchain.toml`, `.cargo/config.toml`, `README.md`, `AGENTS.md`, About/Architecture, Implementation SOP, `.github/` security files and OUTLOOK are byte-identical to the baseline.
+
+## Documentary reconciliation (each change checked character-for-character against the order)
+
+**`.documents/SOP/sop-architect.md` — §7B only.** The new **(e1) Current component-security and supply-chain assessment** paragraph is inserted immediately after **(e) Engineering hygiene** and immediately before **(f) Accessibility and performance**, matching the order's text exactly (1,745 characters, verified equal). Nothing else in §7B changed: the A1 preface, **(a)**–**(d)**, **(f)**–**(h)**, the scope-applicability paragraph, the disposition test and the existing A1 security standard are intact and un-renumbered. The obligation is forward-looking: it binds subsequent code-bearing reviews, including packages added later, and does not purport to certify the present repository.
+
+**`.documents/WIP/plan-roadmap.md` — Stage 01 only.** The single `- **R01.C:**` remaining-package line is replaced, and the Stage 01 exit-gate line is replaced; both verified equal to the order's text. R01.C now names the outstanding security/advisory and supply-chain verification instead of re-describing the accepted Rust CI/tooling work, and the exit gate adds a fresh exact-version security assessment with an explicit NOT RUN browser statement. The remaining 154 lines — every other stage, package identifier, prerequisite, later-stage security obligation and exit gate — are unchanged. **R01.C and Stage 01 remain open.** No historical completion diary was added.
+
+**`.documents/WIP/plan-next.md` — replaced.** Exactly the order's 11-line candidate, `R01.C — Version-Aware Component Security and CI Advisory Gate`, UTF-8, LF, single final newline (2,037 bytes; an extra trailing blank line introduced during editing was corrected so the file ends with one newline). It is a candidate only: non-executable until a separate Owner-issued order exists.
+
+**`.documents/WIP/workorder-active.md`.** First the installed text as issuance history (A), then — after reconciliation, the path audit and successful publication checks — the sole neutral heading (C). No approved scope was ever rewritten.
 
 
-| | Before | After |
-| --- | --- | --- |
-| Header trust-model bullet | "package network access exists only in the single explicit `cargo fetch --locked` prelude and nowhere else" | "the only Cargo dependency acquisition that reaches the network is … `cargo fetch --locked`; `actions/checkout` and `rustup toolchain install` also use the network and are not restricted by that variable" |
-| `env` comment | `# Default-deny network: …` | `# Cargo-level default: offline. … This is a Cargo setting; it does not restrict the network for checkout or for toolchain installation.` |
-| Fetch step comment | "The ONLY package-network acquisition…" | "The only Cargo dependency acquisition that uses the network… That is a Cargo setting: checkout and toolchain installation are unaffected by it." |
-| Fetch step label | `Fetch locked packages (sole network prelude)` | `Fetch locked packages (only network-enabled Cargo acquisition)` |
-| Linux and Windows summaries | "`cargo fetch --locked` was the only network step" | "`cargo fetch --locked` is the only Cargo dependency acquisition that uses the network … `actions/checkout` and `rustup toolchain install` also use the network and are not restricted by `CARGO_NET_OFFLINE`." |
+## Component security and supply-chain survey (§4)
 
-## Functional-equivalence audit
+This is a **read-only, point-in-time survey**, not an automated audit and not a `PASS`. The Architect's preliminary 2026-11-08 notes were treated strictly as **research leads**; every row below was independently re-queried by the agent on 2026-11-08.
 
-The corrected workflow was compared structurally against the reviewed `R01` blob, with both revisions parsed as YAML. Identical: top-level `name`, `on`, `permissions`, `env`; job `runs-on`, `timeout-minutes`, `strategy` (both matrix entries), `defaults`; step count (25); and every step's `if`, `uses`, `with` and `env`. The complete textual change set is **seven prose or label edits and nothing else**: two header/`env` comments, one fetch-step comment, one step label, and three job-summary sentences. All shell command bodies, assertions, fixture category requirements, exit-code checks, trap-restore logic, `CARGO_NET_OFFLINE` values, the pinned `actions/checkout` commit `08eba0b27e820071cde6df949e0beb9ba4906955` and the read-only `permissions: contents: read` are unchanged. A scan of the corrected file returns **zero** remaining occurrences of `only network step`, `sole network`, `ONLY package-network`, `Default-deny network` and `nowhere else`. The file is valid UTF-8 with no BOM and is stored LF-only (0 CR) in the blob.
+**Source freshness (as read this run).** RustSec advisory database at Git commit `309392b18f6b17022f82c701f300433126901068`, committed 2026-11-06T15:34:32Z — the same revision the Architect cited, and still the repository head. GitHub Advisory Database (the public OSV-mirrored feed) queried per package on 2026-11-08. crates.io registry metadata read per exact version on 2026-11-08.
 
-## GitHub Actions evidence
+**Graph shape.** Four first-party crates plus **eleven** registry packages. `solo-domain`, `solo-application` and `solo-adapters` declare **zero** external dependencies; every registry edge belongs to `solo-cli` and every one of them is a **dev/test** edge — `serde_json` and `syn` are declared `[dev-dependencies]` and the other nine are their transitive closure. Consequence: **runtime exposure of all eleven is nil**; they are compiled and executed only in the test/build graph. All eleven `source` entries are `registry+https://github.com/rust-lang/crates.io-index` — no git, path or third-party registry — and `.cargo/config.toml` contains no registry or source replacement. `build.rs` exists nowhere in the workspace, so no first-party build script runs; the proc-macro crates (`proc-macro2`, `quote`, `syn`, `serde_derive`) still execute compile-time code in the dev graph.
 
-**This `R02` correction revision — `7e4b84d` — was genuinely re-evaluated, not inferred.**
-
-| Fact | Value |
-| --- | --- |
-| Run | `42450799364` (#6) at `7e4b84d5844682ba1d55dde6db1af177692bde45` |
-| Ubuntu job | `128639394487` — **conclusion `success`**, 05:26:43Z → 05:27:15Z (32 s) |
-| Windows job | `128639394660` — **conclusion `success`**, 05:26:44Z → 05:27:41Z (57 s) |
-| Run link | <https://github.com/provelopment/provelopment-foundation-solo/actions/runs/42450799364> |
-
-Read back independently through the public Actions and check-run APIs. On the Ubuntu job every Linux step reported `success` — including *Architecture checker on the real checkout (Linux)*, *Architecture refusal self-test (Linux)*, *Test-failure tripwire (Linux)*, *Release build (workspace, locked)*, *Release CLI smoke on the built binary (Linux)*, *Forbidden import and bypass refusal with guaranteed restore (Ubuntu)*, *Two clean release builds compared byte-for-byte (Ubuntu)* and *Job summary (Linux)* — and every Windows-only step reported `skipped`, which is correct for that host. The Windows job shows the mirror-image pattern with *Test-failure tripwire (Windows)*, *Release CLI smoke on the built binary (Windows)* and *Job summary (Windows)* all `success`. No mandatory gate is `skipped`, failed or missing on either host.
-
-**Retained category evidence, live.** The Ubuntu job's own annotation at this revision reads: `injected forbidden import refused with category 'undeclared-crate' and exit 1`. This is the same mechanism the corrected summary now describes, so the summary text and the observed behaviour agree. The four declared-outward fixtures remain required to refuse as `layer-outward-reference` and `dynamic-load` as `dynamic-loading` inside the same run; those assertions were untouched and passed.
-
-**Report-only final publication.** The report commit at the final published `HEAD` also triggers the same workflow; both jobs' conclusions at that exact revision are verified by the agent and reported in the chat handback, because the report cannot contain its own commit SHA. The preceding corrected-workflow revision is `7e4b84d` above; the two revisions are distinct and both are recorded.
-
-**Warnings observed.** Exactly one warning class on every run: GitHub's platform notice that `actions/checkout@08eba0b2…` targets Node.js 20 and is being forced to run on Node.js 24. It is an upstream runner deprecation notice, changes no gate, and does not affect the pinned commit or the result. No other warning, and no `continue-on-error`, masked exit, `|| true`, `-no-fail` or broad `if` skip exists in the workflow.
+| Component | Version | Role | RustSec `309392b1` | GHSA/OSV 2026-11-08 | crates.io state | Disposition |
+| --- | --- | --- | --- | --- | --- | --- |
+| `itoa` | 1.0.18 | dev/transitive | no advisory directory | 0 advisories | not yanked; MIT OR Apache-2.0 | `NO LISTED ADVISORY` |
+| `memchr` | 2.8.3 | dev/transitive | no advisory directory | 0 advisories | not yanked; Unlicense OR MIT | `NO LISTED ADVISORY` |
+| `proc-macro2` | 1.0.107 | dev/transitive (build-time proc-macro) | no advisory directory | 0 advisories | not yanked; MIT OR Apache-2.0 | `NO LISTED ADVISORY` |
+| `quote` | 1.0.47 | dev/transitive (build-time proc-macro) | no advisory directory | 0 advisories | not yanked; MIT OR Apache-2.0 | `NO LISTED ADVISORY` |
+| `serde` | 1.0.229 | dev/transitive | no advisory directory | 0 advisories | not yanked; MIT OR Apache-2.0 | `NO LISTED ADVISORY` |
+| `serde_core` | 1.0.229 | dev/transitive | no advisory directory | 0 advisories | not yanked; MIT OR Apache-2.0 | `NO LISTED ADVISORY` |
+| `serde_derive` | 1.0.229 | dev/transitive (build-time proc-macro) | no advisory directory | 0 advisories | not yanked; MIT OR Apache-2.0 | `NO LISTED ADVISORY` |
+| `serde_json` | 1.0.154 | **dev only**, declared test-only | no advisory directory | 0 advisories | not yanked; MIT OR Apache-2.0 | `NO LISTED ADVISORY` |
+| `syn` | 3.0.9 | **dev only**, architecture-checker parser | no advisory directory | 0 advisories | not yanked; MIT OR Apache-2.0 | `NO LISTED ADVISORY` |
+| `unicode-ident` | 1.0.27 | dev/transitive | no advisory directory | 0 advisories | not yanked; (MIT OR Apache-2.0) **AND Unicode-3.0** | `NO LISTED ADVISORY`; NOTICE prerequisite open |
+| `zmij` | 1.0.23 | dev/transitive | no advisory directory | 0 advisories | not yanked; MIT | `NO LISTED ADVISORY` |
 
 
-## What was rerun under `R02`, and what is prior `R01` evidence
+**Provenance cross-check.** All eleven checksums reported by crates.io for these exact versions equal the `Cargo.lock` checksums character-for-character (`8f42a60c…` itoa, `cf8baf1c…` memchr, `985e7ec9…` proc-macro2, `1fbf4db1…` quote, `4148590a…` serde, `67dca2c9…` serde_core, `e7a5d712…` serde_derive, `e7e9cc8b…` serde_json, `d78c8dee…` syn, `a2c754d6…` unicode-ident, `29666d0a…` zmij). Ten are published by one long-established maintainer (`dtolnay`), one by `BurntSushi`; no package shows a recent publisher change or a look-alike name.
 
-The order requires this distinction explicitly, so it is stated plainly.
+**Malicious / typosquatted components.** The Rust Security Response Team notice of 2026-08-20 (`https://blog.rust-lang.org/2026/08/20/supply-chain-attack-on-arrayref/`, read this run) names `proc-macro1`, `proc-macro-en`, `aovine`, `arone`, `aronenao`, `tinymember` (all versions), plus `append-only-vec@0.1.9`, `arrayref@0.3.10` and `internment@0.8.7`. First-hand check: RustSec does carry entries for these — `RUSTSEC-2026-0265` (proc-macro1), `RUSTSEC-2026-0262` (append-only-vec), `RUSTSEC-2026-0260` (arrayref), `RUSTSEC-2026-0266`/`2021-0036`/`2020-0017` (internment). **None of those package names appears in the locked graph**, verified against the `Cargo.lock` inventory rather than inferred; `proc-macro2` is the legitimate distinct crate. `FINDING: none`.
 
-| Evidence | Under `R02` |
-| --- | --- |
-| Both-host GitHub Actions gate suite at the corrected workflow | **re-executed** at `7e4b84d` (run `42450799364`), both jobs green |
-| Ubuntu injected-import refusal category | **re-executed** at `7e4b84d`; annotation records `undeclared-crate` with exit 1 |
-| Ubuntu two clean release builds and byte comparison | **re-executed** at `7e4b84d` (step `success`) |
-| Both-host release CLI byte-exact smoke | **re-executed** at `7e4b84d` (steps `success`) |
-| Local `fmt` / Clippy / 108 tests / checker / self-test / release build | **NOT RUN under `R02`** — no Rust source, test, manifest, lockfile or toolchain file changed, and this order authorizes no such edit. The values in `R01` (108 tests across 12 binaries, `architecture=legal packages=4 targets=13 files=20 edges=22`, `self-check=passed cases=29`, release binary 1,242,463 bytes with SHA-256 `363ac93c…ff9f` identical across two clean local builds) are **previously observed evidence from the `R01` run at `b5c6db0`, not re-measured here**, and are quoted only as history. |
-| Local reproducibility (Windows-GNU pair) | **NOT RUN under `R02`**, same reason; the `R01` measurement stands as history only |
+**Toolchain.** `rust-toolchain.toml` pins `channel = "1.99.1"` with `rustfmt` and `clippy`. RustSec has no `crates/std` directory at `309392b1`, and GitHub advisories for package `std` returned zero, so the pinned compiler/std pair is `NO LISTED ADVISORY` at these two sources. The Architect's `CVE-2026-5223` lead was checked against the actual advisory — `GHSA-jq42-7mfv-hm57`, **medium**, "Cargo crates in third party registries can override the cached source of other crates", vulnerable range `< 0.97.0` (all Cargo shipped before Rust 1.96.0), and the advisory states explicitly that **crates.io users are not affected** because crates.io forbids symlinks. The pinned channel postdates the fix and the project uses only crates.io, so the finding is **`NOT APPLICABLE`** on both counts. Limitation: the toolchain binaries were **not executed** — no toolchain install was authorized — so version evidence is the pinned channel file, not `cargo --version` output.
 
-**Local checks actually performed under `R02`:** read-only baseline and blob verification; YAML parse of both workflow revisions; a structural field-by-field equality audit of the two parsed revisions; a line-level diff audit proving the change set is prose and one label; a scan proving zero residual false claims; UTF-8/no-BOM validation; and LF-only confirmation of the committed blob. No build, test, lint or toolchain installation was needed or attempted, because no executable content changed.
+**CI action, runners and build inputs.** The workflow uses immutably pinned `actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955` (v4.3.0) with `persist-credentials: false`, job permissions `contents: read`, no secrets and no other external action. First-hand: the action's repository publishes **zero** security advisories; its current release is `v7.0.1` (2026-07-20). Every run emits GitHub's Node-20 deprecation warning for the pinned v4.3.0 — a **follow-up upgrade review**, not evidence of an exploitable vulnerability, and no pin change is authorized here. Hosted `ubuntu-24.04` and `windows-2025` images are platform-managed and not digest-pinned by this repository: **`UNVERIFIED`** as an independently audited component.
 
-## Acceptance mapping
+**Licences.** All eleven are permissive (MIT, Apache-2.0 or Unlicense); `unicode-ident` additionally carries **Unicode-3.0**, so its attribution/NOTICE obligation remains an open release prerequisite recorded in Architecture §6C. No copyleft component exists, so no licence-policy exception is required.
 
-| Requirement | Evidence | Result |
-| --- | --- | --- |
-| `undeclared-crate` summary agrees with the actual checker | Summary corrected; live annotation at `7e4b84d` reports `undeclared-crate` with exit 1 | **PASS** |
-| Both host summaries accurately delimit Cargo-only offline operation without falsely denying checkout/toolchain network | Header bullet, `env` comment, fetch comment and label, and both summaries corrected; zero residual false claims; `CARGO_NET_OFFLINE` values unchanged (`true` job default, `false` on the fetch step only) | **PASS** |
-| Report consistent, no overstated network claim | This report states the narrower Cargo-scoped claim throughout | **PASS** |
-| No functional code/CI behaviour or unauthorized path change | Structural equality of all functional fields; seven prose/label edits only; changed paths are exactly the workflow, this report, and the unchanged installed ACTIVE | **PASS** |
-| Both hosts pass the corrected workflow | Run `42450799364`: `success` / `success`, all applicable required steps ran | **PASS** |
-| Both hosts pass the final report commit | Report-only publication at the final `HEAD` re-triggers the workflow; conclusions verified by the agent at that exact revision and reported in the chat handback | **PASS (handback-referenced)** |
-| No hidden failed or skipped mandatory gate | Step tables show only host-inapplicable `skipped` steps; no mandatory step skipped | **PASS** |
-| WIP and plan state preserved | ACTIVE = Owner `R02` text unchanged; NEXT neutral; ROADMAP R01.C open; OUTLOOK unchanged | **PASS** |
+**First-party attack surfaces.** Four crates, all carrying `#![forbid(unsafe_code)]` — no `unsafe` block exists. `src/` contains no process spawn, no network type, no filesystem write and no filesystem read; the CLI's only inputs are local paths supplied by the caller, and the test-only checker reads repository files and invokes fixed toolchain commands. Negative and refusal behaviour continues to be enforced by the 29-case fixture self-test and the injected forbidden-import probe.
 
-## State, scratch and remaining obligations
 
-One checkout, one worktree, one `origin`. Task-owned scratch was confined to `.temp/w035r02` and is deleted before handback; foreign material under `.temp/rt`, `.temp/w032` and `.temp/w033` (external-service `dotnet-suggest` sentinels) is preserved untouched, with the Owner cleanup trigger unchanged: delete them once no external service holds them. No repository content was deleted, reset, cleaned or rewritten; no second clone, worktree or nested repository was created; the only source mutation anywhere remains the disposable GitHub runner checkout, restored byte-for-byte under a guaranteed trap.
+## Checks deliberately not run
 
-**State at handback:** `SOLO-WO-035 R02` remains the installed ACTIVE order and grants no further authority; NEXT holds only its neutral heading; ROADMAP still carries **R01.C** and the Stage 01 prerequisite/exit gate; OUTLOOK is unchanged. No merge, release, deployment, provider, credential, branch-protection or GitHub-settings action was taken.
+- **No automated advisory scanner ran.** `cargo audit`, `cargo deny`, `cargo vet` and OSV-Scanner are all **`NOT RUN`**: no scanner installation or execution is authorized by this order, and no automated security gate exists in CI — that absence is precisely the R01.C gap now recorded in ROADMAP and NEXT. The per-component findings above are a hand-checked survey against two public databases, not a lock-file scan.
+- **No build, test, lint or metadata command ran.** No dependency, toolchain or action install, upgrade or pin change; `cargo --version`, `cargo metadata`, `cargo build`, `cargo test`, Clippy and rustfmt were **not** executed, because no executable content changed and no toolchain work is in scope.
+- **OSV.dev could not be queried directly.** Its package query API is POST-only, which this read-only environment cannot issue; GitHub's advisory database, which feeds OSV for the Rust ecosystem, was used instead and its per-package results are recorded above. That substitution is a **source limitation, not a clearance**.
+- **Not attempted:** SBOM generation, licence-policy evaluation, runner-image inventory or attestation, `rustc` release-note/CVE triage beyond RustSec and GHSA, and any scheduled or continuous re-check.
 
-**Explicitly `UNVERIFIED / NOT RUN`:** browser smoke (`no authorized browser UI, served Page, HTTP adapter or Node/Playwright project exists at this stage`), HTTP suites, Node/Playwright, Stage 02+ capabilities (C1/C2/C4), accessibility numerical conformance, provider conformance, `cargo-deny`/advisory scanning, the `unicode-ident` Unicode-3.0 `NOTICE` prerequisite, distribution and deployment. A green workflow is CI evidence only: it does **not** clear R01.C, does **not** close Stage 01, does **not** start Stage 02 and does **not** authorize a release, and it is **not** an independent Architect `ACCEPT`.
+## Current security gaps (unchanged by this run)
 
-**Runner/evidence limits:** rendered job summaries and raw job logs require an authenticated session and were not readable; conclusions, step tables and annotations were read through the public API instead, and summary text is verified from the committed workflow rather than inferred from a green result.
+1. CI contains **no** advisory or supply-chain gate, so a future vulnerable or malicious dependency would not fail the build. R01.C remains open for exactly this reason.
+2. The pinned `actions/checkout` v4.3.0 is a superseded major with a live Node-20 deprecation warning; replacement needs its own authorized scope and verification.
+3. Release attribution prerequisites are still unmet: copyright holders, `NOTICE` content including the Unicode-3.0 obligation for `unicode-ident`, a named Security Maintainer, and the release/support table.
+4. Hosted runner images are not digest-pinned, so runner drift is outside this repository's control and unverified.
+5. No SBOM and no dependency-source or licence policy check exists in CI.
+6. This survey is **point-in-time** (2026-11-08). A new advisory published afterwards will not be noticed automatically, and no scheduled re-check exists.
 
-**Single next step:** return **"agent report ready"** for a new independent Chief Architect `ACCEPT / REVISE / STOP` review.
+## Publication verification
 
-**Correction 2 — the network boundary.** The report and both job summaries claimed `cargo fetch --locked` was *the only network step*. That is false at the system level: `actions/checkout` and `rustup toolchain install` also use the network. What is true is narrower and now stated precisely: `cargo fetch --locked` is the only **network-enabled Cargo dependency acquisition**, and after it every Cargo command runs offline under `CARGO_NET_OFFLINE=true` with `--locked`. Directly related prose was corrected for the same reason: the job `env` comment previously read `Default-deny network` (a Cargo setting described as a system-wide network restriction) and the step label read `(sole network prelude)`. **No environment variable value, command, action pin, permission, trigger, matrix, test condition or failure-propagation behaviour was changed** — only prose and one step label.
+**Reconciliation revision `39edf99` — genuinely re-evaluated.** Run `42453986582`: `verify (ubuntu-24.04)` job `128648975130` **success** (06:15:25Z → 06:15:52Z, 27 s) and `verify (windows-2025)` job `128648975007` **success** (06:15:25Z → 06:16:15Z, 50 s). Run link: <https://github.com/provelopment/provelopment-foundation-solo/actions/runs/42453986582>. Every applicable mandatory step ran and passed; only host-inapplicable steps are `skipped`. A documentation-only change did not weaken or bypass any gate.
+
+**Final published HEAD.** The ACTIVE-neutralization commit and this report commit are published after that verification; both jobs' conclusions at the exact final `HEAD` were re-checked and are reported in the chat handback, because the report cannot contain its own commit SHA. Remote `origin/main` equals the local HEAD, tree and both-host conclusions are recorded there.
+
+**Warnings.** One warning class only: GitHub's platform notice that the pinned `actions/checkout` targets Node.js 20 and is forced onto Node.js 24. No `continue-on-error`, masked exit, `|| true` or broad `if` skip exists in the workflow.
+
+## WIP state at handback
+
+`SOLO-WO-036 R01` is executed and its slot is **neutralized** — ACTIVE holds only `# Foundation Solo — Active Work Order`, so no implementation authority is in force and this report grants none. NEXT holds exactly one non-executable candidate (the R01.C version-aware component-security and CI advisory gate) and is not executable without a separate Owner-issued order. ROADMAP still carries **R01.C** and the Stage 01 prerequisite/exit gate, both **open**. OUTLOOK is unchanged. WIP contains exactly its four files and no subdirectory, extra report or archive.
+
+## Scratch, safety and scope
+
+Task-owned scratch was confined to `.temp/w036` and removed before handback. Foreign material under `.temp/rt`, `.temp/w032` and `.temp/w033` (external-service `dotnet-suggest` sentinels) is preserved untouched; the Owner cleanup trigger is unchanged — delete them once no external service holds them. No repository content was deleted, reset, cleaned or rewritten; no clone, second worktree, branch, PR, force-update, dependency install, provider call, secret access, setting change, merge, release or deployment occurred. Changed paths are exactly the four ledger paths plus this report.
+
+## Handback
+
+No unresolved material security risk, false report or invalid WIP transition was found, and no mandatory CI check failed; nothing was suppressed or simulated. `cargo audit` and every other scanner remain **`NOT RUN`**, the browser/HTTP/Node/Playwright evidence remains **`NOT RUN`** for want of an authorized surface, and no release or deployment exists.
+
+**Next step:** return **"agent report ready"** for independent Chief Architect review of the exact final published revision.
+
+**`.documents/WIP/plan-outlook.md`.** Untouched. WIP holds exactly its four files and no subdirectory or extra report.
