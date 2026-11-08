@@ -150,9 +150,11 @@ jobs:
 
       # ---------------------------------------------------------------------------
       # Component security gate. This step is network-capable: it downloads the pinned
-      # scanner archive from its official GitHub release and fetches the current RustSec
-      # advisory database. That is the security/advisory data path, not product dependency
-      # acquisition; `cargo-deny` then reads the already-fetched locked product graph.
+      # scanner archive from its official GitHub release — falling back, only after a
+      # transient primary failure, to the official GitHub release-asset API endpoint for the
+      # same pinned asset ID — and fetches the current RustSec advisory database. That is the
+      # security/advisory data path, not product dependency acquisition; `cargo-deny` then
+      # reads the already-fetched locked product graph.
       # Ordinary product Cargo commands remain offline under CARGO_NET_OFFLINE=true.
       # Any failure below (download, digest, archive safety, version, data freshness,
       # policy finding, lock or tree mutation) fails the job.
@@ -165,7 +167,9 @@ jobs:
           DENY_VERSION="0.20.2"
           DENY_ASSET="cargo-deny-${DENY_VERSION}-x86_64-unknown-linux-musl.tar.gz"
           DENY_SHA256="9f12ed4c49936e09b48bf862b595cde2fe64fcbd9d74dfacac6131ca824c8d5f"
+          DENY_ASSET_ID="471598214"
           DENY_URL="https://github.com/EmbarkStudios/cargo-deny/releases/download/${DENY_VERSION}/${DENY_ASSET}"
+          DENY_API_URL="https://api.github.com/repos/EmbarkStudios/cargo-deny/releases/assets/${DENY_ASSET_ID}"
           WORK="$RUNNER_TEMP/deny-gate"
           ARCHIVE="$WORK/archive/$DENY_ASSET"
 
@@ -179,9 +183,45 @@ jobs:
           # inside a finite 120 s retry window. It bypasses no integrity or advisory gate,
           # does not make the network offline, and cannot guarantee that the external CDN
           # is available; an exhausted budget still fails this mandatory job.
-          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+          if PRIMARY_HTTP_CODE="$(curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
             --connect-timeout 10 --max-time 30 --retry 4 --retry-max-time 120 --retry-connrefused \
-            --output "$ARCHIVE" "$DENY_URL" || fail "cargo-deny archive download failed"
+            --write-out '%{http_code}' \
+            --output "$ARCHIVE" "$DENY_URL")"; then
+            PRIMARY_CURL_EXIT=0
+          else
+            PRIMARY_CURL_EXIT=$?
+          fi
+          # Acquisition has one primary route (the official release download above) and,
+          # only after a transient primary failure, one fallback route: the official GitHub
+          # release-asset API endpoint for this same pinned asset ID. Both are GitHub-hosted
+          # HTTPS delivery of the same archive and may share a CDN, so neither route is
+          # promised to be available. The SHA-256 below, not the route, decides what was
+          # acquired. A completed transfer with wrong bytes fails there and is never retried
+          # through the other route, and a nontransient primary failure (TLS/certificate
+          # rejection, forbidden protocol, unsupported option, malformed reply, or HTTP
+          # 401/403/404/410) fails immediately without falling back.
+          if [ "$PRIMARY_CURL_EXIT" -ne 0 ]; then
+            TRANSIENT=0
+            case "$PRIMARY_CURL_EXIT" in
+              6|7|18|28|52|56) TRANSIENT=1 ;;
+              22) case "$PRIMARY_HTTP_CODE" in 429|5[0-9][0-9]) TRANSIENT=1 ;; esac ;;
+            esac
+            echo "primary_scanner_route=failed curl_exit=$PRIMARY_CURL_EXIT http=$PRIMARY_HTTP_CODE transient=$TRANSIENT"
+            [ "$TRANSIENT" = "1" ] \
+              || fail "cargo-deny archive download failed nontransiently (curl exit $PRIMARY_CURL_EXIT, http $PRIMARY_HTTP_CODE)"
+            rm -f "$ARCHIVE"
+            # The fallback keeps the same finite budgets, pins HTTPS for the initial request
+            # and for every redirect, and sends no token or other credential.
+            FALLBACK_HTTP_CODE="$(curl --fail --silent --show-error --location \
+              --proto '=https' --proto-redir '=https' --tlsv1.2 \
+              --connect-timeout 10 --max-time 30 --retry 4 --retry-max-time 120 --retry-connrefused \
+              --header 'Accept: application/octet-stream' \
+              --header 'X-GitHub-Api-Version: 2022-11-28' \
+              --write-out '%{http_code}' \
+              --output "$ARCHIVE" "$DENY_API_URL")" \
+              || fail "cargo-deny release-asset API fallback download failed (http $FALLBACK_HTTP_CODE)"
+            echo "official_api_fallback_used=1 http=$FALLBACK_HTTP_CODE"
+          fi
 
           ACTUAL_SHA256="$(sha256sum "$ARCHIVE" | cut -d' ' -f1)"
           [ "$ACTUAL_SHA256" = "$DENY_SHA256" ] \
@@ -255,7 +295,9 @@ jobs:
           $DenyVersion = '0.20.2'
           $DenyAsset = "cargo-deny-$DenyVersion-x86_64-pc-windows-msvc.tar.gz"
           $DenySha256 = '975a22143262fd27476d19ee00c7af67978426e40e1dee94eed6bbade1cf87dc'
+          $DenyAssetId = '471599057'
           $DenyUrl = "https://github.com/EmbarkStudios/cargo-deny/releases/download/$DenyVersion/$DenyAsset"
+          $DenyApiUrl = "https://api.github.com/repos/EmbarkStudios/cargo-deny/releases/assets/$DenyAssetId"
           $Work = Join-Path $env:RUNNER_TEMP 'deny-gate'
           $Archive = Join-Path $Work "archive\$DenyAsset"
 
@@ -267,10 +309,43 @@ jobs:
           # at most four retries inside a finite 120 s window. No integrity or advisory gate
           # is bypassed, the network is not made offline, and an exhausted budget still fails
           # this mandatory job through the existing exit-status check below.
-          curl.exe --fail --silent --show-error --location --proto '=https' --tlsv1.2 `
+          # Same two official routes as the Linux host: one primary release download and,
+          # only after a transient primary failure, one GitHub release-asset API fallback
+          # for this same pinned asset ID. Both are GitHub-hosted HTTPS delivery and may
+          # share a CDN, so neither is promised available; the digest below decides what was
+          # acquired, a wrong-digest transfer is never retried through the other route, and
+          # a nontransient primary failure fails at once without falling back.
+          $PrimaryHttpCode = (curl.exe --fail --silent --show-error --location --proto '=https' --tlsv1.2 `
             --connect-timeout 10 --max-time 30 --retry 4 --retry-max-time 120 --retry-connrefused `
-            --output $Archive $DenyUrl
-          if ($LASTEXITCODE -ne 0) { throw "cargo-deny archive download failed (exit $LASTEXITCODE)" }
+            --write-out '%{http_code}' `
+            --output $Archive $DenyUrl)
+          $PrimaryCurlExit = $LASTEXITCODE
+          if ($PrimaryCurlExit -ne 0) {
+            $Transient = $false
+            if ($PrimaryCurlExit -in 6, 7, 18, 28, 52, 56) {
+              $Transient = $true
+            } elseif ($PrimaryCurlExit -eq 22 -and ($PrimaryHttpCode -eq '429' -or $PrimaryHttpCode -match '^5\d\d$')) {
+              $Transient = $true
+            }
+            Write-Host "primary_scanner_route=failed curl_exit=$PrimaryCurlExit http=$PrimaryHttpCode transient=$Transient"
+            if (-not $Transient) {
+              throw "cargo-deny archive download failed nontransiently (curl exit $PrimaryCurlExit, http $PrimaryHttpCode)"
+            }
+            if (Test-Path -LiteralPath $Archive) { Remove-Item -LiteralPath $Archive -Force }
+            # The fallback keeps the same finite budgets, pins HTTPS for the initial request
+            # and for every redirect, and sends no token or other credential.
+            $FallbackHttpCode = (curl.exe --fail --silent --show-error --location `
+              --proto '=https' --proto-redir '=https' --tlsv1.2 `
+              --connect-timeout 10 --max-time 30 --retry 4 --retry-max-time 120 --retry-connrefused `
+              --header 'Accept: application/octet-stream' `
+              --header 'X-GitHub-Api-Version: 2022-11-28' `
+              --write-out '%{http_code}' `
+              --output $Archive $DenyApiUrl)
+            if ($LASTEXITCODE -ne 0) {
+              throw "cargo-deny release-asset API fallback download failed (curl exit $LASTEXITCODE, http $FallbackHttpCode)"
+            }
+            Write-Host "official_api_fallback_used=1 http=$FallbackHttpCode"
+          }
 
           $ActualSha256 = (Get-FileHash -LiteralPath $Archive -Algorithm SHA256).Hash.ToLowerInvariant()
           if ($ActualSha256 -ne $DenySha256) {
@@ -827,7 +902,7 @@ jobs:
             echo ""
             echo "Source-level adversarial evidence: a genuine forbidden domain→adapter import was injected into the disposable runner checkout and refused with exit 1 by the precompiled checker as \`undeclared-crate\` (solo-domain's manifest declares no adapter dependency, so the scanner cannot resolve the reference to a declared workspace root), then restored byte-for-byte. The declared-but-outward fixtures are separately required to refuse as \`layer-outward-reference\` and dynamic loading as \`dynamic-loading\`. Two independent clean release builds were compared on raw bytes."
             echo ""
-            echo "Network provenance: network-capable operations on this host are \`actions/checkout\` (v7.0.1, full-SHA pinned), \`rustup toolchain install\`, the single network-enabled locked product-dependency fetch (\`cargo fetch --locked\`), this component security gate (verified scanner-archive download plus current RustSec advisory-data refresh), and the Ubuntu-only disposable \`RUSTSEC-2026-0009\` fixture, which resolves a throwaway manifest with \`cargo generate-lockfile\`. Production dependency acquisition is limited to the locked fetch; the advisory refresh is the security data path; the fixture is test-only and its crate is never compiled. Ordinary product build, lint, test and check commands after the locked fetch ran with \`CARGO_NET_OFFLINE=true\` and \`--locked\` where applicable. Neither the advisory refresh nor the fixture is offline, and no Cargo environment variable is claimed to deny the network system-wide."
+            echo "Network provenance: network-capable operations on this host are \`actions/checkout\` (v7.0.1, full-SHA pinned), \`rustup toolchain install\`, the single network-enabled locked product-dependency fetch (\`cargo fetch --locked\`), this component security gate (verified scanner-archive download — the official release URL first, and the official GitHub release-asset API for the same pinned asset ID only after a transient primary failure — plus current RustSec advisory-data refresh), and the Ubuntu-only disposable \`RUSTSEC-2026-0009\` fixture, which resolves a throwaway manifest with \`cargo generate-lockfile\`. Production dependency acquisition is limited to the locked fetch; the advisory refresh is the security data path; the fixture is test-only and its crate is never compiled. Ordinary product build, lint, test and check commands after the locked fetch ran with \`CARGO_NET_OFFLINE=true\` and \`--locked\` where applicable. Neither the advisory refresh nor the fixture is offline, and no Cargo environment variable is claimed to deny the network system-wide."
             echo ""
             echo "**Browser smoke: UNVERIFIED / NOT RUN — no authorized browser UI, served Page, HTTP adapter or Node/Playwright project exists at this stage**"
             echo ""
@@ -865,7 +940,7 @@ jobs:
             '',
             'Gates verified on this host: locked dependency fetch, four-crate workspace/package set, component security gate (`cargo-deny 0.20.2`: advisories, bans, licenses, sources), format, strict Clippy, all-target tests, real-tree architecture checker, 23-fixture refusal self-test, failure tripwire (normal pass plus required injected failure), release build, and byte-exact release CLI accepted/refused smoke.',
             '',
-            'Network provenance: network-capable operations on this host are `actions/checkout` (v7.0.1, full-SHA pinned), `rustup toolchain install`, the single network-enabled locked product-dependency fetch (`cargo fetch --locked`) and this component security gate (verified scanner-archive download plus current RustSec advisory-data refresh). Production dependency acquisition is limited to the locked fetch; the advisory refresh is the security data path. The Ubuntu-only disposable RUSTSEC-2026-0009 fixture, which resolves a throwaway manifest with `cargo generate-lockfile`, does not run on this host. Ordinary product build, lint, test and check commands after the locked fetch ran with `CARGO_NET_OFFLINE=true` and `--locked` where applicable. The advisory refresh is not offline, and no Cargo environment variable is claimed to deny the network system-wide.',
+            'Network provenance: network-capable operations on this host are `actions/checkout` (v7.0.1, full-SHA pinned), `rustup toolchain install`, the single network-enabled locked product-dependency fetch (`cargo fetch --locked`) and this component security gate (verified scanner-archive download — the official release URL first, and the official GitHub release-asset API for the same pinned asset ID only after a transient primary failure — plus current RustSec advisory-data refresh). Production dependency acquisition is limited to the locked fetch; the advisory refresh is the security data path. The Ubuntu-only disposable RUSTSEC-2026-0009 fixture, which resolves a throwaway manifest with `cargo generate-lockfile`, does not run on this host. Ordinary product build, lint, test and check commands after the locked fetch ran with `CARGO_NET_OFFLINE=true` and `--locked` where applicable. The advisory refresh is not offline, and no Cargo environment variable is claimed to deny the network system-wide.',
             '',
             '**Browser smoke: UNVERIFIED / NOT RUN — no authorized browser UI, served Page, HTTP adapter or Node/Playwright project exists at this stage**',
             '',
