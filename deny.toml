@@ -61,6 +61,13 @@ ignore = false
 # rely on a wildcard requirement.
 multiple-versions = "deny"
 wildcards = "deny"
+# Documented cargo-deny scope for path/git requirements only: the four first-party
+# crates are private (publish = false) and depend on each other by path with no
+# version requirement, so `wildcards = "deny"` would otherwise report our own
+# workspace edges. This exemption is limited to path/git sources in private crates
+# and to path/git dev-dependencies; every registry requirement stays under
+# `wildcards = "deny"`, and `bans.allow` remains empty.
+allow-wildcard-paths = true
 highlight = "all"
 allow = []
 # Known 2026 malicious or spoofed packages: every version is banned.
