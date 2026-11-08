@@ -858,3 +858,134 @@ fn diagnostics_never_echo_authored_input() {
     );
     assert!(!rendered.contains("DE DE"));
 }
+
+/// Temporary diagnostic: names every R02.A case that fails, in one run.
+///
+/// Test output is captured by the harness, so this writes workflow commands
+/// straight to the process stderr, which the runner publishes as annotations.
+/// It is removed once the failing cases are identified and fixed.
+#[test]
+fn r02a_diagnostic_report() {
+    use std::io::Write;
+
+    let cases: [(&str, fn()); 27] = [
+        (
+            "builds_minimal_single_entity_graph",
+            builds_minimal_single_entity_graph,
+        ),
+        (
+            "builds_expanded_graph_with_multiple_facets_sites_and_pages",
+            builds_expanded_graph_with_multiple_facets_sites_and_pages,
+        ),
+        (
+            "refuses_empty_graph_and_invents_no_starter_seed",
+            refuses_empty_graph_and_invents_no_starter_seed,
+        ),
+        ("refuses_facet_without_site", refuses_facet_without_site),
+        ("refuses_site_without_page", refuses_site_without_page),
+        (
+            "refuses_page_without_representation",
+            refuses_page_without_representation,
+        ),
+        (
+            "refuses_duplicate_facet_id_inside_the_one_entity",
+            refuses_duplicate_facet_id_inside_the_one_entity,
+        ),
+        (
+            "refuses_duplicate_site_id_within_one_facet",
+            refuses_duplicate_site_id_within_one_facet,
+        ),
+        (
+            "refuses_duplicate_page_id_within_one_site",
+            refuses_duplicate_page_id_within_one_site,
+        ),
+        (
+            "accepts_the_same_token_under_different_parents",
+            accepts_the_same_token_under_different_parents,
+        ),
+        (
+            "accepts_the_same_token_at_different_levels",
+            accepts_the_same_token_at_different_levels,
+        ),
+        (
+            "validates_every_non_entity_identity_level",
+            validates_every_non_entity_identity_level,
+        ),
+        (
+            "accepts_and_refuses_the_identifier_length_boundary",
+            accepts_and_refuses_the_identifier_length_boundary,
+        ),
+        (
+            "identity_is_independent_of_labels_addresses_and_locale_fixtures",
+            identity_is_independent_of_labels_addresses_and_locale_fixtures,
+        ),
+        (
+            "resolves_page_only_by_complete_lineage",
+            resolves_page_only_by_complete_lineage,
+        ),
+        (
+            "refuses_a_second_entity_and_unresolvable_ancestors",
+            refuses_a_second_entity_and_unresolvable_ancestors,
+        ),
+        (
+            "resolves_representation_and_refuses_an_absent_locale_key",
+            resolves_representation_and_refuses_an_absent_locale_key,
+        ),
+        (
+            "refuses_duplicate_locale_key_on_one_page",
+            refuses_duplicate_locale_key_on_one_page,
+        ),
+        (
+            "accepts_the_same_locale_key_on_different_pages",
+            accepts_the_same_locale_key_on_different_pages,
+        ),
+        (
+            "refuses_bare_language_keys_without_completing_them",
+            refuses_bare_language_keys_without_completing_them,
+        ),
+        (
+            "refuses_malformed_locale_keys",
+            refuses_malformed_locale_keys,
+        ),
+        (
+            "accepts_one_hundred_representations_and_refuses_one_more",
+            accepts_one_hundred_representations_and_refuses_one_more,
+        ),
+        (
+            "accepts_five_hundred_pages_and_refuses_one_more",
+            accepts_five_hundred_pages_and_refuses_one_more,
+        ),
+        (
+            "refuses_a_graph_larger_than_the_accepted_node_budget",
+            refuses_a_graph_larger_than_the_accepted_node_budget,
+        ),
+        (
+            "preserves_authored_order_instead_of_sorting_it",
+            preserves_authored_order_instead_of_sorting_it,
+        ),
+        (
+            "refuses_duplicates_independently_of_declaration_order",
+            refuses_duplicates_independently_of_declaration_order,
+        ),
+        (
+            "diagnostics_never_echo_authored_input",
+            diagnostics_never_echo_authored_input,
+        ),
+    ];
+
+    let mut failures = Vec::new();
+    for (name, case) in cases {
+        if std::panic::catch_unwind(case).is_err() {
+            failures.push(name);
+            let mut stderr = std::io::stderr();
+            let _ = writeln!(stderr, "::error::R02A-FAIL {name}");
+        }
+    }
+
+    let mut stderr = std::io::stderr();
+    let _ = writeln!(stderr, "::error::R02A-SUMMARY failed={}", failures.len());
+    assert!(
+        failures.is_empty(),
+        "R02.A diagnostic found failing cases: {failures:?}"
+    );
+}
