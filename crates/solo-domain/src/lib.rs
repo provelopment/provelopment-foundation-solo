@@ -6,7 +6,7 @@
 //! inward-only dependency direction of the accepted Hexagonal contract is
 //! mechanically checkable.
 //!
-//! Two value objects are provided:
+//! Three value objects and one validated graph are provided:
 //!
 //! * [`EntityIdV1`] — the validated, language-neutral Entity identifier of the
 //!   accepted one-Entity model. It is never derived from a public address,
@@ -15,14 +15,25 @@
 //!   separately authored public base URL contract. This is a preflight check,
 //!   not the future full §6.2J URL profile, and no address it refuses may be
 //!   reported as prohibited by the product Charter.
+//! * [`EfsOwnershipGraph`] — the validated `R02.A` single-Entity ownership
+//!   structure. Facets, Sites, Pages and representation membership keys are
+//!   validated and refused rather than repaired, direct containment is the only
+//!   parentage, and locale keys are membership keys rather than validated tags.
 
 #![forbid(unsafe_code)]
 
 mod base_candidate;
+mod efs_ownership;
 mod entity_id;
 
 pub use base_candidate::{
     BaseCandidateDetail, BaseCandidateError, BaseCandidateErrorKind, BaseCandidateV1, BaseScheme,
     MAX_HOST_OCTETS, MAX_LABEL_OCTETS, MAX_PREFIX_SEGMENTS,
+};
+pub use efs_ownership::{
+    EfsGraphError, EfsGraphErrorKind, EfsLevel, EfsLineageError, EfsLineageErrorKind,
+    EfsNodeIdError, EfsOwnershipDraft, EfsOwnershipGraph, EfsPageTarget, FacetDraft, FacetIdV1,
+    FacetNode, LocaleKeyError, LocaleKeyErrorKind, LocaleKeyV1, MAX_EFS_NODES, MAX_PAGES,
+    MAX_REPRESENTATIONS_PER_PAGE, PageDraft, PageIdV1, PageNode, SiteDraft, SiteIdV1, SiteNode,
 };
 pub use entity_id::{ENTITY_ID_MAX_BYTES, EntityIdError, EntityIdErrorKind, EntityIdV1};
