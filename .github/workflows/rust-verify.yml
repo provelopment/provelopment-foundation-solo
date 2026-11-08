@@ -8,8 +8,10 @@
 #   * read-only token (`permissions: contents: read`), no secrets, no write-capable step;
 #   * the only external action is `actions/checkout` pinned to one full commit SHA with
 #     credentials not persisted;
-#   * `CARGO_NET_OFFLINE=true` is the job default, so package network access exists only
-#     in the single explicit `cargo fetch --locked` prelude and nowhere else;
+#   * `CARGO_NET_OFFLINE=true` is the Cargo-level job default, so the only Cargo
+#     dependency acquisition that reaches the network is the single explicit
+#     `cargo fetch --locked` prelude. `actions/checkout` and `rustup toolchain
+#     install` also use the network and are not restricted by that variable;
 #   * every mandatory gate is a visible, failure-propagating step: no `continue-on-error`,
 #     no masked exit code, no `|| true`, no broad `if` skip.
 name: rust-verify
@@ -25,7 +27,9 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
-  # Default-deny network: only the locked fetch step overrides this to "false".
+  # Cargo-level default: offline. Only the locked fetch step overrides this to "false".
+  # This is a Cargo setting; it does not restrict the network for checkout or for
+  # toolchain installation.
   CARGO_NET_OFFLINE: "true"
   RUST_BACKTRACE: "1"
 
@@ -107,11 +111,12 @@ jobs:
           rustc --version --verbose
 
       # ---------------------------------------------------------------------------
-      # The ONLY package-network acquisition. Everything after this step runs with
-      # the job-level CARGO_NET_OFFLINE=true, so a needed-but-unfetched crate is a
-      # hard failure instead of a silent download.
+      # The only Cargo dependency acquisition that uses the network. Everything after
+      # this step runs with the job-level CARGO_NET_OFFLINE=true, so a Cargo crate that
+      # is needed but unfetched is a hard failure instead of a silent download. That is
+      # a Cargo setting: checkout and toolchain installation are unaffected by it.
       # ---------------------------------------------------------------------------
-      - name: Fetch locked packages (sole network prelude)
+      - name: Fetch locked packages (only network-enabled Cargo acquisition)
         env:
           CARGO_NET_OFFLINE: "false"
         run: cargo fetch --locked
@@ -504,9 +509,9 @@ jobs:
             echo ""
             echo "Gates verified on this host: locked dependency fetch, four-crate workspace/package set, format, strict Clippy, all-target tests, real-tree architecture checker, 23-fixture refusal self-test, failure tripwire (normal pass plus required injected failure), release build, and byte-exact release CLI accepted/refused smoke."
             echo ""
-            echo "Source-level adversarial evidence: a genuine forbidden domain→adapter import was injected into the disposable runner checkout, refused with category \`layer-outward-reference\` and exit 1 by the precompiled checker, then restored byte-for-byte. Two independent clean release builds were compared on raw bytes."
+            echo "Source-level adversarial evidence: a genuine forbidden domain→adapter import was injected into the disposable runner checkout and refused with exit 1 by the precompiled checker as \`undeclared-crate\` (solo-domain's manifest declares no adapter dependency, so the scanner cannot resolve the reference to a declared workspace root), then restored byte-for-byte. The declared-but-outward fixtures are separately required to refuse as \`layer-outward-reference\` and dynamic loading as \`dynamic-loading\`. Two independent clean release builds were compared on raw bytes."
             echo ""
-            echo "Dependency provenance: \`cargo fetch --locked\` was the only network step; every later Cargo command ran with \`CARGO_NET_OFFLINE=true\` and \`--locked\`."
+            echo "Dependency provenance: \`cargo fetch --locked\` is the only Cargo dependency acquisition that uses the network; every later Cargo command ran with \`CARGO_NET_OFFLINE=true\` and \`--locked\`. \`actions/checkout\` and \`rustup toolchain install\` also use the network and are not restricted by \`CARGO_NET_OFFLINE\`."
             echo ""
             echo "**Browser smoke: UNVERIFIED / NOT RUN — no authorized browser UI, served Page, HTTP adapter or Node/Playwright project exists at this stage**"
             echo ""
@@ -531,7 +536,7 @@ jobs:
             '',
             'Gates verified on this host: locked dependency fetch, four-crate workspace/package set, format, strict Clippy, all-target tests, real-tree architecture checker, 23-fixture refusal self-test, failure tripwire (normal pass plus required injected failure), release build, and byte-exact release CLI accepted/refused smoke.',
             '',
-            'Dependency provenance: `cargo fetch --locked` was the only network step; every later Cargo command ran with `CARGO_NET_OFFLINE=true` and `--locked`.',
+            'Dependency provenance: `cargo fetch --locked` is the only Cargo dependency acquisition that uses the network; every later Cargo command ran with `CARGO_NET_OFFLINE=true` and `--locked`. `actions/checkout` and `rustup toolchain install` also use the network and are not restricted by `CARGO_NET_OFFLINE`.',
             '',
             '**Browser smoke: UNVERIFIED / NOT RUN — no authorized browser UI, served Page, HTTP adapter or Node/Playwright project exists at this stage**',
             '',
