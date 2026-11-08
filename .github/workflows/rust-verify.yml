@@ -1,8 +1,10 @@
 # Foundation Solo — reproducible verification for the existing four-crate Rust slice.
 #
 # Scope: CI/tooling only. This workflow builds, lints, tests and smoke-tests the
-# accepted crate graph and the accepted fail-closed architecture checker. It adds no
-# product feature, no runtime, no HTTP surface, no browser target and no deployment.
+# accepted crate graph, runs the accepted fail-closed architecture checker, and runs
+# a fail-closed component security gate (`cargo-deny` over advisories, bans, licenses
+# and sources). It adds no product feature, no runtime, no HTTP surface, no browser
+# target and no deployment.
 #
 # Trust model, deliberately narrow:
 #   * read-only token (`permissions: contents: read`), no secrets, no write-capable step;
@@ -10,8 +12,13 @@
 #     credentials not persisted;
 #   * `CARGO_NET_OFFLINE=true` is the Cargo-level job default, so the only Cargo
 #     dependency acquisition that reaches the network is the single explicit
-#     `cargo fetch --locked` prelude. `actions/checkout` and `rustup toolchain
-#     install` also use the network and are not restricted by that variable;
+#     `cargo fetch --locked` prelude. `actions/checkout`, `rustup toolchain install`
+#     and the security gate's own data refresh are not restricted by that variable;
+#   * the security gate is the only other networked step: it downloads the pinned
+#     `cargo-deny 0.20.2` release archive (SHA-256 verified before extraction) from the
+#     scanner's official GitHub release and fetches the current RustSec advisory
+#     database. Application Cargo work stays offline; the advisory refresh is never
+#     described as offline;
 #   * every mandatory gate is a visible, failure-propagating step: no `continue-on-error`,
 #     no masked exit code, no `|| true`, no broad `if` skip.
 name: rust-verify
@@ -21,15 +28,21 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # Recheck advisory data even when no source changed: a new RustSec entry must be able
+  # to fail this repository without a commit. Off the top of the hour by design.
+  schedule:
+    - cron: "17 4 * * *"
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 env:
   CARGO_TERM_COLOR: always
-  # Cargo-level default: offline. Only the locked fetch step overrides this to "false".
-  # This is a Cargo setting; it does not restrict the network for checkout or for
-  # toolchain installation.
+  # Cargo-level default: offline. Only the locked fetch step and the security gate's
+  # advisory-data refresh override this to "false". This is a Cargo setting; it does
+  # not restrict the network for checkout, toolchain installation or the scanner
+  # archive download.
   CARGO_NET_OFFLINE: "true"
   RUST_BACKTRACE: "1"
 
@@ -53,8 +66,12 @@ jobs:
         shell: ${{ matrix.shell }}
 
     steps:
+      # actions/checkout v7.0.1 (tag verified 2026-11-08), full commit SHA pin.
+      # v7 declares `runs.using: node24` and needs runner v2.327.1 or newer; the
+      # hosted ubuntu-24.04 and windows-2025 images satisfy that. Credentials are
+      # still not persisted and the job token remains `contents: read`.
       - name: Checkout (pinned full commit SHA, credentials not persisted)
-        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
 
@@ -120,6 +137,260 @@ jobs:
         env:
           CARGO_NET_OFFLINE: "false"
         run: cargo fetch --locked
+
+      # ---------------------------------------------------------------------------
+      # Component security gate. This is the one step besides the locked product
+      # fetch that reaches the network: it downloads the pinned scanner archive from
+      # its official GitHub release and fetches the current RustSec advisory database.
+      # Every application Cargo command stays offline under CARGO_NET_OFFLINE=true.
+      # Any failure below (download, digest, archive safety, version, data freshness,
+      # policy finding, lock or tree mutation) fails the job.
+      # ---------------------------------------------------------------------------
+      - name: Component security gate — cargo-deny 0.20.2 (Linux, verified archive)
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+
+          DENY_VERSION="0.20.2"
+          DENY_ASSET="cargo-deny-${DENY_VERSION}-x86_64-unknown-linux-musl.tar.gz"
+          DENY_SHA256="9f12ed4c49936e09b48bf862b595cde2fe64fcbd9d74dfacac6131ca824c8d5f"
+          DENY_URL="https://github.com/EmbarkStudios/cargo-deny/releases/download/${DENY_VERSION}/${DENY_ASSET}"
+          WORK="$RUNNER_TEMP/deny-gate"
+          ARCHIVE="$WORK/archive/$DENY_ASSET"
+
+          fail() { echo "::error::$*"; exit 1; }
+
+          rm -rf "$WORK"
+          mkdir -p "$WORK/archive" "$WORK/tool"
+
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+            --output "$ARCHIVE" "$DENY_URL" || fail "cargo-deny archive download failed"
+
+          ACTUAL_SHA256="$(sha256sum "$ARCHIVE" | cut -d' ' -f1)"
+          [ "$ACTUAL_SHA256" = "$DENY_SHA256" ] \
+            || fail "cargo-deny archive digest mismatch: $ACTUAL_SHA256"
+
+          MEMBERS="$(tar -tzf "$ARCHIVE")" || fail "cargo-deny archive listing failed"
+          printf '%s\n' "$MEMBERS" | grep -Eq '^[A-Za-z0-9._/-]+$' \
+            || fail "unsafe characters in cargo-deny archive member names"
+          if printf '%s\n' "$MEMBERS" | grep -Eq '(^/|^[A-Za-z]:|(^|/)\.\.(/|$))'; then
+            fail "cargo-deny archive contains a member that escapes the extraction root"
+          fi
+
+          tar -xzf "$ARCHIVE" -C "$WORK/tool" --no-same-owner --no-same-permissions \
+            || fail "cargo-deny extraction failed"
+          BIN="$(find "$WORK/tool" -maxdepth 2 -type f -name cargo-deny -print -quit)"
+          [ -n "$BIN" ] || fail "cargo-deny binary not found after extraction"
+          REPORTED_VERSION="$("$BIN" --version)"
+          [ "$REPORTED_VERSION" = "cargo-deny $DENY_VERSION" ] \
+            || fail "unexpected scanner version: $REPORTED_VERSION"
+          echo "scanner=$REPORTED_VERSION archive_sha256=$ACTUAL_SHA256"
+
+          LOCK_BEFORE="$(sha256sum Cargo.lock | cut -d' ' -f1)"
+
+          # Fresh advisory data on every run. A failed or missing fetch is a failed
+          # gate: there is no offline, frozen or cached-snapshot fallback below.
+          "$BIN" -L info fetch db 2>&1 | tee "$WORK/fetch.log" \
+            || fail "RustSec advisory database fetch failed"
+          DB_DIR="$(find "${CARGO_HOME:-$HOME/.cargo}/advisory-dbs" -maxdepth 2 \
+            -type d -name .git -print -quit | xargs -r dirname)"
+          [ -n "$DB_DIR" ] || fail "no advisory database checkout found after fetch"
+          DB_COMMIT="$(git -C "$DB_DIR" rev-parse HEAD)"
+          DB_COMMIT_DATE="$(git -C "$DB_DIR" log -1 --format=%cI)"
+          DB_FETCHED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+          # Every policy class runs separately against the real locked workspace, so a
+          # failure names its own class and cannot be masked by another check's exit.
+          for CLASS in advisories bans licenses sources; do
+            "$BIN" --config "$GITHUB_WORKSPACE/deny.toml" \
+              --manifest-path "$GITHUB_WORKSPACE/Cargo.toml" \
+              --locked --all-features check "$CLASS" --show-stats 2>&1 \
+              | tee "$WORK/check-$CLASS.log" \
+              || fail "cargo-deny check $CLASS failed for the locked workspace graph"
+          done
+
+          LOCK_AFTER="$(sha256sum Cargo.lock | cut -d' ' -f1)"
+          [ "$LOCK_AFTER" = "$LOCK_BEFORE" ] \
+            || fail "Cargo.lock changed during the security gate"
+          [ -z "$(git status --porcelain)" ] \
+            || fail "working tree is dirty after the security gate"
+
+          {
+            echo "DENY_SCANNER_VERSION=$REPORTED_VERSION"
+            echo "DENY_SCANNER_ASSET=$DENY_ASSET"
+            echo "DENY_SCANNER_SHA256=$ACTUAL_SHA256"
+            echo "DENY_DB_COMMIT=$DB_COMMIT"
+            echo "DENY_DB_COMMIT_DATE=$DB_COMMIT_DATE"
+            echo "DENY_DB_FETCHED_AT=$DB_FETCHED_AT"
+            echo "DENY_LOCK_SHA256=$LOCK_AFTER"
+          } >> "$GITHUB_ENV"
+          echo "security_gate=pass db_commit=$DB_COMMIT fetched_at=$DB_FETCHED_AT"
+
+      # Same gate, same pinned artifact and same policy, implemented for the Windows
+      # host. Identical assertions in the host's native shell; no weakened variant.
+      - name: Component security gate — cargo-deny 0.20.2 (Windows, verified archive)
+        if: runner.os == 'Windows'
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $DenyVersion = '0.20.2'
+          $DenyAsset = "cargo-deny-$DenyVersion-x86_64-pc-windows-msvc.tar.gz"
+          $DenySha256 = '975a22143262fd27476d19ee00c7af67978426e40e1dee94eed6bbade1cf87dc'
+          $DenyUrl = "https://github.com/EmbarkStudios/cargo-deny/releases/download/$DenyVersion/$DenyAsset"
+          $Work = Join-Path $env:RUNNER_TEMP 'deny-gate'
+          $Archive = Join-Path $Work "archive\$DenyAsset"
+
+          if (Test-Path -LiteralPath $Work) { Remove-Item -LiteralPath $Work -Recurse -Force }
+          New-Item -ItemType Directory -Path (Join-Path $Work 'archive') -Force | Out-Null
+          New-Item -ItemType Directory -Path (Join-Path $Work 'tool') -Force | Out-Null
+
+          curl.exe --fail --silent --show-error --location --proto '=https' --tlsv1.2 `
+            --output $Archive $DenyUrl
+          if ($LASTEXITCODE -ne 0) { throw "cargo-deny archive download failed (exit $LASTEXITCODE)" }
+
+          $ActualSha256 = (Get-FileHash -LiteralPath $Archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($ActualSha256 -ne $DenySha256) {
+            throw "cargo-deny archive digest mismatch: $ActualSha256"
+          }
+
+          $Members = & tar -tzf $Archive
+          if ($LASTEXITCODE -ne 0) { throw "cargo-deny archive listing failed (exit $LASTEXITCODE)" }
+          foreach ($Member in $Members) {
+            if ($Member -notmatch '^[A-Za-z0-9._/-]+$') {
+              throw "unsafe characters in cargo-deny archive member name: $Member"
+            }
+            if ($Member -match '^/|^[A-Za-z]:|(^|/)\.\.(/|$)') {
+              throw "cargo-deny archive member escapes the extraction root: $Member"
+            }
+          }
+
+          & tar -xzf $Archive -C (Join-Path $Work 'tool')
+          if ($LASTEXITCODE -ne 0) { throw "cargo-deny extraction failed (exit $LASTEXITCODE)" }
+
+          $Bin = Get-ChildItem -LiteralPath (Join-Path $Work 'tool') -Recurse -File -Filter 'cargo-deny.exe' |
+            Select-Object -First 1
+          if (-not $Bin) { throw "cargo-deny.exe not found after extraction" }
+          $ReportedVersion = & $Bin.FullName --version
+          if ($LASTEXITCODE -ne 0 -or $ReportedVersion -ne "cargo-deny $DenyVersion") {
+            throw "unexpected scanner version: $ReportedVersion"
+          }
+          Write-Output "scanner=$ReportedVersion archive_sha256=$ActualSha256"
+
+          $LockBefore = (Get-FileHash -LiteralPath 'Cargo.lock' -Algorithm SHA256).Hash.ToLowerInvariant()
+
+          & $Bin.FullName -L info fetch db 2>&1 | Tee-Object -FilePath (Join-Path $Work 'fetch.log')
+          if ($LASTEXITCODE -ne 0) { throw "RustSec advisory database fetch failed (exit $LASTEXITCODE)" }
+
+          $DbRoot = if ($env:CARGO_HOME) { Join-Path $env:CARGO_HOME 'advisory-dbs' }
+            else { Join-Path $env:USERPROFILE '.cargo/advisory-dbs' }
+          $GitDir = Get-ChildItem -LiteralPath $DbRoot -Recurse -Depth 2 -Force -Directory -Filter '.git' |
+            Select-Object -First 1
+          if (-not $GitDir) { throw "no advisory database checkout found after fetch under $DbRoot" }
+          $DbDir = $GitDir.Parent.FullName
+          $DbCommit = (& git -C $DbDir rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or -not $DbCommit) { throw "cannot resolve the fetched advisory database commit" }
+          $DbCommitDate = (& git -C $DbDir log -1 --format=%cI).Trim()
+          $DbFetchedAt = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
+
+          foreach ($Class in @('advisories', 'bans', 'licenses', 'sources')) {
+            & $Bin.FullName --config 'deny.toml' --manifest-path 'Cargo.toml' --locked --all-features `
+              check $Class --show-stats 2>&1 | Tee-Object -FilePath (Join-Path $Work "check-$Class.log")
+            if ($LASTEXITCODE -ne 0) {
+              throw "cargo-deny check $Class failed (exit $LASTEXITCODE) for the locked workspace graph"
+            }
+          }
+
+          $LockAfter = (Get-FileHash -LiteralPath 'Cargo.lock' -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($LockAfter -ne $LockBefore) { throw "Cargo.lock changed during the security gate" }
+          $Dirty = & git status --porcelain
+          if ($LASTEXITCODE -ne 0) { throw "git status failed after the security gate" }
+          if ($Dirty) { throw "working tree is dirty after the security gate: $Dirty" }
+
+          @(
+            "DENY_SCANNER_VERSION=$ReportedVersion",
+            "DENY_SCANNER_ASSET=$DenyAsset",
+            "DENY_SCANNER_SHA256=$ActualSha256",
+            "DENY_DB_COMMIT=$DbCommit",
+            "DENY_DB_COMMIT_DATE=$DbCommitDate",
+            "DENY_DB_FETCHED_AT=$DbFetchedAt",
+            "DENY_LOCK_SHA256=$LockAfter"
+          ) | Add-Content -LiteralPath $env:GITHUB_ENV
+          Write-Output "security_gate=pass db_commit=$DbCommit fetched_at=$DbFetchedAt"
+
+      # ---------------------------------------------------------------------------
+      # Deliberate advisory negative probe (Ubuntu only). Proves that the same pinned
+      # scanner and the same freshly fetched RustSec database detect a real published
+      # advisory. The fixture is a disposable manifest in $RUNNER_TEMP: no Git
+      # repository, no production crate, no mutation of the real lockfile, and the
+      # crate's code is never compiled or executed. The step fails closed if the probe
+      # succeeds unexpectedly, if the expected advisory is missing, or if the failure
+      # is unrelated to that advisory.
+      # ---------------------------------------------------------------------------
+      - name: Advisory negative probe — RUSTSEC-2026-0009 (Ubuntu only)
+        if: runner.os == 'Linux'
+        env:
+          CARGO_NET_OFFLINE: "false"
+        run: |
+          set -euo pipefail
+
+          WORK="$RUNNER_TEMP/deny-gate"
+          ARCHIVE="$WORK/archive/cargo-deny-0.20.2-x86_64-unknown-linux-musl.tar.gz"
+          BIN="$(find "$WORK/tool" -maxdepth 2 -type f -name cargo-deny -print -quit)"
+          FIXTURE="$RUNNER_TEMP/deny-negative-probe"
+          fail() { echo "::error::$*"; exit 1; }
+
+          # The scanner and archive verified by the previous step must still be intact.
+          [ -n "$BIN" ] || fail "cargo-deny binary missing for the negative probe"
+          [ "$("$BIN" --version)" = "cargo-deny 0.20.2" ] \
+            || fail "negative probe scanner version mismatch"
+          [ "$(sha256sum "$ARCHIVE" | cut -d' ' -f1)" = "9f12ed4c49936e09b48bf862b595cde2fe64fcbd9d74dfacac6131ca824c8d5f" ] \
+            || fail "negative probe archive digest mismatch"
+
+          # RUSTSEC-2026-0009 affects time >=0.3.6, <0.3.47 (patched >=0.3.47); 0.3.46 is
+          # therefore genuinely affected. Only the manifest is resolved: the pinned
+          # `time` source is fetched, not compiled.
+          rm -rf "$FIXTURE"
+          mkdir -p "$FIXTURE/src"
+          cat > "$FIXTURE/Cargo.toml" <<'TOML'
+          [package]
+          name = "advisory-negative-probe"
+          version = "0.0.0"
+          edition = "2021"
+          publish = false
+
+          [dependencies]
+          time = "=0.3.46"
+          TOML
+          printf 'fn main() {}\n' > "$FIXTURE/src/main.rs"
+
+          ( cd "$FIXTURE" && cargo generate-lockfile ) || fail "fixture lockfile generation failed"
+          grep -q '^name = "time"$' "$FIXTURE/Cargo.lock" || fail "fixture does not resolve the time crate"
+          grep -q '^version = "0.3.46"$' "$FIXTURE/Cargo.lock" || fail "fixture did not lock time 0.3.46"
+
+          set +e
+          "$BIN" --config "$GITHUB_WORKSPACE/deny.toml" --manifest-path "$FIXTURE/Cargo.toml" \
+            check advisories --show-stats 2>&1 | tee "$WORK/negative-probe.log"
+          PROBE_STATUS="${PIPESTATUS[0]}"
+          set -e
+
+          if [ "$PROBE_STATUS" -eq 0 ]; then
+            fail "negative probe passed unexpectedly: the advisory gate did not refuse a known-vulnerable fixture"
+          fi
+          grep -q 'RUSTSEC-2026-0009' "$WORK/negative-probe.log" \
+            || fail "negative probe did not report the expected RUSTSEC-2026-0009 advisory"
+          grep -Eq 'error\[(vulnerability|yanked|unmaintained|unsound|notice)\]' "$WORK/negative-probe.log" \
+            || fail "negative probe failure is not an advisory-class diagnostic"
+
+          rm -rf "$FIXTURE"
+          [ -z "$(git status --porcelain)" ] || fail "working tree is dirty after the negative probe"
+          {
+            echo "DENY_PROBE_ADVISORY=RUSTSEC-2026-0009"
+            echo "DENY_PROBE_CRATE=time@0.3.46"
+            echo "DENY_PROBE_EXIT=$PROBE_STATUS"
+            echo "DENY_PROBE_RESULT=refused"
+          } >> "$GITHUB_ENV"
+          echo "negative_probe=refused exit=$PROBE_STATUS advisory=RUSTSEC-2026-0009"
+
+
 
       # ---------------------------------------------------------------------------
       # Workspace identity gate: the real workspace must still be exactly the four
@@ -506,16 +777,29 @@ jobs:
             echo "| cargo | \`$(cargo --version)\` |"
             echo "| runner | \`${{ runner.os }} ${{ runner.arch }} ${ImageOS:-unknown}-${ImageVersion:-unknown}\` |"
             echo "| release_exe_sha256 | \`$(sha256sum '${{ matrix.cli_path }}' | cut -d' ' -f1)\` |"
+            echo "| checkout_action | \`actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1\` (v7.0.1) |"
+            echo "| security_scanner | \`${DENY_SCANNER_VERSION:-NOT RUN}\` from \`${DENY_SCANNER_ASSET:-n/a}\` |"
+            echo "| security_scanner_sha256 | \`${DENY_SCANNER_SHA256:-NOT RUN}\` (verified before extraction) |"
+            echo "| security_policy | \`deny.toml\` — advisories, bans, licenses, sources (fail-closed, no ignores) |"
+            echo "| security_gate_result | passed: advisories, bans, licenses and sources each reported ok |"
+            echo "| rustsec_db_commit | \`${DENY_DB_COMMIT:-NOT RUN}\` |"
+            echo "| rustsec_db_commit_date | \`${DENY_DB_COMMIT_DATE:-NOT RUN}\` |"
+            echo "| rustsec_db_fetched_at_utc | \`${DENY_DB_FETCHED_AT:-NOT RUN}\` |"
+            echo "| lock_sha256_after_security_gate | \`${DENY_LOCK_SHA256:-NOT RUN}\` |"
+            echo "| advisory_negative_probe | \`${DENY_PROBE_ADVISORY:-NOT RUN}\` on \`${DENY_PROBE_CRATE:-n/a}\` refused with exit \`${DENY_PROBE_EXIT:-n/a}\` |"
+            echo "| fail_injection_marker | architecture tripwire refused its injected failure; advisory probe refused its known-vulnerable fixture |"
+            echo "| warning_skip_inventory | no \`continue-on-error\`, no masked exit, no \`\|\| true\`; only host-inapplicable steps are \`skipped\`; the platform Node-20 notice is retired by the checkout v7.0.1 pin |"
+
             echo ""
-            echo "Gates verified on this host: locked dependency fetch, four-crate workspace/package set, format, strict Clippy, all-target tests, real-tree architecture checker, 23-fixture refusal self-test, failure tripwire (normal pass plus required injected failure), release build, and byte-exact release CLI accepted/refused smoke."
+            echo "Gates verified on this host: locked dependency fetch, four-crate workspace/package set, component security gate (\`cargo-deny 0.20.2\`: advisories, bans, licenses, sources), format, strict Clippy, all-target tests, real-tree architecture checker, 23-fixture refusal self-test, failure tripwire (normal pass plus required injected failure), release build, and byte-exact release CLI accepted/refused smoke."
             echo ""
             echo "Source-level adversarial evidence: a genuine forbidden domain→adapter import was injected into the disposable runner checkout and refused with exit 1 by the precompiled checker as \`undeclared-crate\` (solo-domain's manifest declares no adapter dependency, so the scanner cannot resolve the reference to a declared workspace root), then restored byte-for-byte. The declared-but-outward fixtures are separately required to refuse as \`layer-outward-reference\` and dynamic loading as \`dynamic-loading\`. Two independent clean release builds were compared on raw bytes."
             echo ""
-            echo "Dependency provenance: \`cargo fetch --locked\` is the only Cargo dependency acquisition that uses the network; every later Cargo command ran with \`CARGO_NET_OFFLINE=true\` and \`--locked\`. \`actions/checkout\` and \`rustup toolchain install\` also use the network and are not restricted by \`CARGO_NET_OFFLINE\`."
+            echo "Network provenance: only three steps use the network — \`actions/checkout\` (v7.0.1, full-SHA pinned), \`rustup toolchain install\`, and the component security gate (pinned scanner archive download plus a current RustSec advisory-database fetch). \`cargo fetch --locked\` is the only network-enabled Cargo dependency acquisition; every other Cargo command ran with \`CARGO_NET_OFFLINE=true\` and \`--locked\`. The advisory refresh is never claimed to be offline."
             echo ""
             echo "**Browser smoke: UNVERIFIED / NOT RUN — no authorized browser UI, served Page, HTTP adapter or Node/Playwright project exists at this stage**"
             echo ""
-            echo "**Also not covered here:** Stage 02+ capabilities (C1/C2/C4), full HTTP and browser suites, accessibility numerical conformance, provider conformance, security advisory scanning (\`cargo-deny\`), release/distribution and deployment. A green run is CI evidence only and does not close R01.C, Stage 01 or authorize a release."
+            echo "**Also not covered here:** Stage 02+ capabilities (C1/C2/C4), full HTTP and browser suites, accessibility numerical conformance, provider conformance, OSV/GHSA corroboration of RustSec inside this gate (recorded separately in the execution report), hosted-runner image internals, release/distribution and deployment. A green run is CI evidence only and does not close R01.C, Stage 01 or authorize a release."
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Job summary (Windows)
@@ -533,14 +817,27 @@ jobs:
             "| cargo | ``$(cargo --version)`` |",
             "| runner | ``${{ runner.os }} ${{ runner.arch }} $env:ImageOS-$env:ImageVersion`` |",
             "| release_exe_sha256 | ``$((Get-FileHash '${{ matrix.cli_path }}' -Algorithm SHA256).Hash.ToLower())`` |",
+            "| checkout_action | ``actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1`` (v7.0.1) |",
+            "| security_scanner | ``$($env:DENY_SCANNER_VERSION)`` from ``$($env:DENY_SCANNER_ASSET)`` |",
+            "| security_scanner_sha256 | ``$($env:DENY_SCANNER_SHA256)`` (verified before extraction) |",
+            '| security_policy | `deny.toml` — advisories, bans, licenses, sources (fail-closed, no ignores) |',
+            '| security_gate_result | passed: advisories, bans, licenses and sources each reported ok |',
+            "| rustsec_db_commit | ``$($env:DENY_DB_COMMIT)`` |",
+            "| rustsec_db_commit_date | ``$($env:DENY_DB_COMMIT_DATE)`` |",
+            "| rustsec_db_fetched_at_utc | ``$($env:DENY_DB_FETCHED_AT)`` |",
+            "| lock_sha256_after_security_gate | ``$($env:DENY_LOCK_SHA256)`` |",
+            '| advisory_negative_probe | `NOT APPLICABLE` on this host — the advisory negative probe runs on Ubuntu only |',
+            '| fail_injection_marker | architecture tripwire refused its injected failure on this host |',
+            '| warning_skip_inventory | no `continue-on-error`, no masked exit, no `|| true`; only host-inapplicable steps are `skipped`; the platform Node-20 notice is retired by the checkout v7.0.1 pin |',
+
             '',
-            'Gates verified on this host: locked dependency fetch, four-crate workspace/package set, format, strict Clippy, all-target tests, real-tree architecture checker, 23-fixture refusal self-test, failure tripwire (normal pass plus required injected failure), release build, and byte-exact release CLI accepted/refused smoke.',
+            'Gates verified on this host: locked dependency fetch, four-crate workspace/package set, component security gate (`cargo-deny 0.20.2`: advisories, bans, licenses, sources), format, strict Clippy, all-target tests, real-tree architecture checker, 23-fixture refusal self-test, failure tripwire (normal pass plus required injected failure), release build, and byte-exact release CLI accepted/refused smoke.',
             '',
-            'Dependency provenance: `cargo fetch --locked` is the only Cargo dependency acquisition that uses the network; every later Cargo command ran with `CARGO_NET_OFFLINE=true` and `--locked`. `actions/checkout` and `rustup toolchain install` also use the network and are not restricted by `CARGO_NET_OFFLINE`.',
+            'Network provenance: only three steps use the network — `actions/checkout` (v7.0.1, full-SHA pinned), `rustup toolchain install`, and the component security gate (pinned scanner archive download plus a current RustSec advisory-database fetch). `cargo fetch --locked` is the only network-enabled Cargo dependency acquisition; every other Cargo command ran with `CARGO_NET_OFFLINE=true` and `--locked`. The advisory refresh is never claimed to be offline.',
             '',
             '**Browser smoke: UNVERIFIED / NOT RUN — no authorized browser UI, served Page, HTTP adapter or Node/Playwright project exists at this stage**',
             '',
-            '**Also not covered here:** Stage 02+ capabilities (C1/C2/C4), full HTTP and browser suites, accessibility numerical conformance, provider conformance, security advisory scanning (`cargo-deny`), release/distribution and deployment. A green run is CI evidence only and does not close R01.C, Stage 01 or authorize a release.'
+            '**Also not covered here:** Stage 02+ capabilities (C1/C2/C4), full HTTP and browser suites, accessibility numerical conformance, provider conformance, OSV/GHSA corroboration of RustSec inside this gate (recorded separately in the execution report), hosted-runner image internals, release/distribution and deployment. A green run is CI evidence only and does not close R01.C, Stage 01 or authorize a release.'
           )
           Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Value ($lines -join "`n")
           Write-Output "summary=written"

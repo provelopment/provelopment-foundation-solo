@@ -1,0 +1,93 @@
+# Foundation Solo — fail-closed component security policy for the accepted workspace.
+#
+# Scope: the four first-party Rust crates and their complete normal/build/dev/test
+# registry graph. Written against the `cargo-deny 0.20.2` schema (the tool selected by
+# Architecture §6A.2) and verified against that exact release; no newer or older
+# schema key is used.
+#
+# Policy rule: nothing is suppressed. There is no `ignore`, no `skip`, neither
+# `skip-tree` nor `exceptions`, no reduced severity threshold, no package exclusion
+# and no `continue-on-error`. A finding fails the run unless the Owner separately
+# decides otherwise; this file never pre-authorises a risk acceptance.
+
+[graph]
+# Cover both hosted operating-system dependency variants and the GNU Windows target
+# the project actually builds, so no target-specific edge escapes the checks.
+targets = [
+    "x86_64-unknown-linux-gnu",
+    "x86_64-unknown-linux-musl",
+    "x86_64-pc-windows-gnu",
+    "x86_64-pc-windows-msvc",
+]
+# Feature unification is deliberately complete: an optional or feature-gated edge
+# must not hide an advisory. Dev and build dependencies are never excluded.
+all-features = true
+
+[advisories]
+# The official current RustSec advisory database, cloned and fetched on every run.
+# `--offline`, `--frozen` and any stale-snapshot option are never used, so a fetch
+# failure or a missing database fails the gate instead of reusing old data.
+db-urls = ["https://github.com/RustSec/advisory-db"]
+db-path = "$CARGO_HOME/advisory-dbs"
+# A yanked locked version is a hard failure, not a warning.
+yanked = "deny"
+# Unmaintained and unsound notices are hard failures for any crate in the graph,
+# direct or transitive, workspace or third-party.
+unmaintained = "all"
+unsound = "all"
+# An ignore entry that matches nothing would be a silent policy hole.
+unused-ignored-advisory = "deny"
+ignore = []
+
+[licenses]
+# Exactly the licences present in the verified locked graph. Any new or changed
+# licence fails the gate until it is reviewed here — this is not a blanket allow.
+allow = [
+    "Apache-2.0",
+    "MIT",
+    "Unlicense",
+    # `unicode-ident` is (MIT OR Apache-2.0) AND Unicode-3.0. The Unicode-3.0
+    # attribution/NOTICE obligation remains an open release prerequisite.
+    "Unicode-3.0",
+]
+exceptions = []
+
+[licenses.private]
+# First-party crates are unpublished (publish = false) but are still licence-checked.
+ignore = false
+
+[bans]
+# A second version of the same crate must not appear silently, and no dependency may
+# rely on a wildcard requirement.
+multiple-versions = "deny"
+wildcards = "deny"
+highlight = "all"
+allow = []
+# Known 2026 malicious or spoofed packages: every version is banned.
+deny = [
+    { crate = "proc-macro1", reason = "malicious crate from the 2026-08-20 supply-chain incident" },
+    { crate = "proc-macro-en", reason = "malicious crate from the 2026-08-20 supply-chain incident" },
+    { crate = "aovine", reason = "malicious crate from the 2026-08-20 supply-chain incident" },
+    { crate = "arone", reason = "malicious crate from the 2026-08-20 supply-chain incident" },
+    { crate = "aronenao", reason = "malicious crate from the 2026-08-20 supply-chain incident" },
+    { crate = "tinymember", reason = "malicious crate from the 2026-08-20 supply-chain incident" },
+    # Otherwise legitimate packages: only the exact compromised releases are banned.
+    { crate = "arrayref@0.3.10", reason = "compromised release published 2026-08-20T07:15:00Z and withdrawn" },
+    { crate = "internment@0.8.7", reason = "compromised release published 2026-08-20T07:34:07Z and withdrawn" },
+    { crate = "append-only-vec@0.1.9", reason = "compromised release published 2026-08-20T07:37:49Z and withdrawn" },
+]
+skip = []
+skip-tree = []
+
+[sources]
+# Only the official crates.io registry may provide a dependency. An unknown registry
+# or any git source fails the run.
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []
+
+[sources.allow-org]
+github = []
+gitlab = []
+bitbucket = []
