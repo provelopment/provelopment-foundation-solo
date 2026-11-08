@@ -427,11 +427,23 @@ jobs:
           injected=$?
           cat "$RUNNER_TEMP/injected-source.txt"
           if [ "$injected" -ne 1 ]; then echo "::error::injected forbidden import exited $injected, expected 1"; exit 1; fi
+          # A reference from solo-domain to the adapter crate is refused by the source
+          # scanner's root classification. Because solo-domain's manifest declares no
+          # adapter dependency, the reference cannot be resolved to a declared workspace
+          # root, so the bounded category for THIS injected form is `undeclared-crate`
+          # (the same rule that catches the accepted `undeclared-crate` fixture). The
+          # declared-but-outward form is separately required below to be refused as
+          # `layer-outward-reference` by the direct-outward/renamed-alias/reexport-chain
+          # fixtures, and dynamic loading as `dynamic-loading`.
           injected_category=$(sed -n 's/^error: \([a-z-]*\): .*/\1/p' "$RUNNER_TEMP/injected-source.txt" | head -n 1)
           echo "injected_refusal_category=$injected_category"
-          echo "::notice::injected forbidden import refused with category '$injected_category'"
-          grep -q 'layer-outward-reference' "$RUNNER_TEMP/injected-source.txt" \
-            || { echo "::error::injected source refused without the expected category (saw '$injected_category')"; exit 1; }
+          echo "::notice::injected forbidden import refused with category '$injected_category' and exit $injected"
+          if [ "$injected_category" != 'undeclared-crate' ]; then
+            echo "::error::injected source refused as '$injected_category', expected the bounded undeclared-crate category"
+            exit 1
+          fi
+          grep -q 'solo-domain' "$RUNNER_TEMP/injected-source.txt" \
+            || { echo "::error::refusal did not name the injected solo-domain unit"; exit 1; }
 
           restore
           restored_sha=$(sha256sum "$target_file" | cut -d' ' -f1)
