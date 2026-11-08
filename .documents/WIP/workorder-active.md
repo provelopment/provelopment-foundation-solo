@@ -1,145 +1,117 @@
 # Foundation Solo — Active Work Order
 
-## SOLO-WO-033 R01 — Stage 01 R01.B Discovery-Root Pre-Enumeration Correction
+## SOLO-WO-034 R01 — Accepted R01.B Administrative Closure and R01.C NEXT Selection
 
 ## Approved Scope — OWNER-ISSUED
 
-### 1. Objective and reviewed starting identity
+### 1. Objective, acceptance basis and immutable starting identity
 
-Correct **only** the residual fail-closed directory-discovery defect from the Chief Architect's independent `REVISE` of `SOLO-WO-032 R01`. This is a narrow corrective execution of the **same unfinished R01.B obligation**; it neither reopens accepted R01.A nor implements R01.C. The existing architecture checker, production CLI, graph guard, source confinement, conditional-module refusal, and exclusive scratch ownership are preserved.
+Perform the **administrative closure only** of the independently accepted Stage 01 **R01.B — Hexagonal Source-Boundary Enforcement**, then choose the earliest remaining dependency-ready ROADMAP package, **R01.C**, as the single NEXT candidate. Remove exactly the accepted R01.B ROADMAP obligation; preserve the still-open Stage 01 gate and all remaining work; replace the executed ACTIVE order with the neutral ACTIVE heading. This is **not** R01.C implementation and **not** Stage 01 acceptance.
 
-**Specific defect.** `crates/solo-cli/tests/architecture_checks/source.rs` currently initializes `rust_files_under` with the package root queued and calls `DiscoveryFs::list(&directory)` immediately at the start of the loop. Its original-entry redirect inspection occurs only later, for encountered child directories. A junction/symlink at the **initial package root** (or an ancestor) may therefore have its contents listed or inventoried before this discovery routine refuses it. The overall real-tree checker has other defenses, but this discovery path **independently** must validate the directory before enumeration; later refusals do not make prior traversal safe.
+**Chief Architect disposition:** `ACCEPT` for `SOLO-WO-033 R01` at the published GitHub revision `36a88be5c4a8eb1337cd66fc12cc09456920c9d0`. Together with the previous inspected R01.B implementation and bounded corrections (`SOLO-WO-030` through `SOLO-WO-033`), that disposition authorizes proposing closure **only after** the Owner installs this complete order and explicitly hands off matching `SOLO-WO-034 R01`. The agent must not independently grant acceptance, infer closure authority from a report, or rewrite the past. Accepted evidence is historical and remains in Git; do not insert completion commentary into WIP.
 
-**Outcome required:** verify the unresolved original entry chain and checkout/package containment of **every dequeued directory, including the first package root**, before `list`, and return a stable bounded violation without listing or descending when an entry is redirected, uninspectable, missing, wrong-kind, or outside its trusted boundary. Prove the ordering with genuine redirected-root and redirected-ancestor tests that call the **production `rust_files_under` routine** directly, not just `check_unit`; preserve legal discovery and the prior negative matrix. Never mutate the actual `crates/` or `.temp/` entries to fabricate a test.
-
-| Reviewed identity | Exact value |
+| Baseline identity | Exact value |
 | --- | --- |
-| Repository / branch | `provelopment/provelopment-foundation-solo` / existing local `main` |
-| Starting HEAD | `9045b1b84ed0a2164564c4aee24d61cc830bbed3` |
-| Starting tree | `7c97e423156b09e35785b5d73d20f479ca9b8890` |
-| Last source commit | `0ee1e5f1a8062623b47655040d8773db0b7c9db7` |
-| Current canonical report blob | `.documents/Reports/execution-report.md` — `e7f73f3744f3b739921e43c775cf8f597bc6d4dc` |
-| Current ACTIVE blob | `.documents/WIP/workorder-active.md` — `2224738b40aa030452a0cce2bfd30421b31a0559` (`SOLO-WO-032 R01`) |
-| Checker source blob | `crates/solo-cli/tests/architecture_checks/source.rs` — `8e42f700408d490a45471062fe6cef5154c7415f` |
-| Real fixture-test blob | `crates/solo-cli/tests/check_architecture_fixtures.rs` — `714fc59bc200b4b483f585bab87c6f9c08dc09ae` |
-| Shared checker module blob | `crates/solo-cli/tests/architecture_checks/mod.rs` — `89dfea91bd82a9b5623f6d437ec787f42fe4aa3b` (read only) |
-| ROADMAP / NEXT / OUTLOOK blobs | `d01780d4af965b342521e3594f7a1e4a7dfc551d` / `92fa562b1af0c54391851aa5c79deb1631127069` / `cb9c7a610cf3c537557e060ca9656e44a053e69d` |
+| Sole target repository / branch | `provelopment/provelopment-foundation-solo` / existing `main` |
+| Starting GitHub HEAD | `36a88be5c4a8eb1337cd66fc12cc09456920c9d0` |
+| Starting GitHub tree | `0ec9166d7c0bf5196c8d645338eed2e3e18cee8d` |
+| Accepted final R01.B source correction | `c34e323ca0b7579430cdb259e4260989c7d1edbb` / tree `addc3cb1f5f43aa5bc9d1c5abc4cf3dc6802cea2` |
+| Final published R01.B report | `.documents/Reports/execution-report.md`: blob `7852156e16e898dec765e4dceca8bf30eec3624a` |
+| Previous committed ACTIVE | `.documents/WIP/workorder-active.md`: blob `272ef3fca5c812b2839c682486aaa962b2e8e60c` (`SOLO-WO-033 R01`) |
+| ROADMAP | `.documents/WIP/plan-roadmap.md`: blob `d01780d4af965b342521e3594f7a1e4a7dfc551d` |
+| NEXT | `.documents/WIP/plan-next.md`: blob `92fa562b1af0c54391851aa5c79deb1631127069` (neutral, 49 bytes) |
+| OUTLOOK | `.documents/WIP/plan-outlook.md`: blob `cb9c7a610cf3c537557e060ca9656e44a053e69d` (neutral, 52 bytes) |
+| Checker source / real fixture tests | `crates/solo-cli/tests/architecture_checks/source.rs` `92f6e0e3dea70857cd2ce242741c2c32ed26eed4`; `crates/solo-cli/tests/check_architecture_fixtures.rs` `93fe5733dbc1379e6b29f142275b77293022c0ec` |
+| Checker shared module / graph | `crates/solo-cli/tests/architecture_checks/mod.rs` `89dfea91bd82a9b5623f6d437ec787f42fe4aa3b`; `graph.rs` `e328dd6a9f54c47e3eae60053446d52edacc74b7` |
+| Toolchain/locked graph | `rust-toolchain.toml` `9ec55b3b621dbc75fc68817cd51b96e407d3c94c`; `Cargo.lock` `05a02666894f4f0bf5528acf118a049e5edb853e` |
 
-The previous agent's `COMPLETE` report is **not** Chief Architect acceptance. R01.B and R01.C remain in ROADMAP; NEXT contains only its neutral heading; ACTIVE remains `SOLO-WO-032 R01` until the Owner installs this complete order. No automatic acceptance or closure is permitted.
+Read `README.md`, `AGENTS.md`, `.documents/About/FOUNDATION-SOLO.md`, `.documents/Architecture/ARCHITECTURE.md`, both SOPs, all four WIP files and the **one** canonical execution report in their required order, followed by only the relevant accepted R01.B source/test evidence. Binding: Architect SOP §§6, 6A, 6B, 7, 7A, 7B, 8; Implementation SOP §§4–5C, 8–10. This order grants **no** independent policy-making permission and does not supersede their safety, Git or file-purity rules.
 
-Read in the mandated order: `README.md`, `AGENTS.md`, About, Architecture, Architect SOP, Implementation SOP, all four WIP files, the canonical report, then the relevant Rust source/tests. Obey Architecture §§6A.2–6A.4; Architect SOP §§6, 6A, 6B, 7A, 7B, 8; Implementation SOP §§4–7A. These documents are read-only and this work order does not amend them. **Authority exists only after the Owner installs this exact `OWNER-ISSUED` ACTIVE text and gives the matching `SOLO-WO-033 R01` handoff.**
+### 2. Authority, repository, safety and parity preflight
 
-### 2. Preflight, ownership and issue safety
+Before any **write**, install, package fetch or source execution:
 
-Work only in the **one existing Solo checkout**, expected locally at `C:\Users\Sean\Documents\Provelopment\00.foundation-solo`, but establish the actual Git root rather than assuming an accessible path. **Before writing, installing, fetching or running source:**
+1. Verify the one **existing** Solo checkout (Owner-local location previously reported as `C:\Users\Sean\Documents\Provelopment\00.foundation-solo`, but derive the actual location from Git). Confirm `origin` is the intended Solo GitHub repository, branch `main`, exactly the HEAD and tree above, remote tracking, one worktree, no hidden second checkout/branch worktree, stash, unresolved conflict or unsafe link/reparse path. Inventory tracked/staged/unstaged/untracked/ignored files without deleting, resetting, cleaning or altering anything. Never write to `provelopment-root`, `provelopment-foundation`, `provelopment-web-1` or any other repository.
+2. Confirm the **only** expected pre-existing tracked change from that baseline is the Owner's installation of the **complete** `SOLO-WO-034 R01` text into `.documents/WIP/workorder-active.md`; confirm `OWNER-ISSUED` and the matching Owner handoff. Preserve the Owner-installed file **byte for byte** in the initial local preservation commit. Do not proceed on another order, unidentified worktree dirt, altered report/ROADMAP/NEXT/OUTLOOK, or unexpected remote HEAD.
+3. Verify WIP holds **exactly four files and no directory**: `plan-roadmap.md`, `plan-next.md`, `workorder-active.md`, `plan-outlook.md`. Baseline ROADMAP contains **one** R01.B bullet and **one** R01.C bullet, no R01.A, unchanged Stage 01 prerequisite/exit gate, and all other stages; NEXT has only `# Foundation Solo — plan-next (Next Candidate)\n`; OUTLOOK has only its existing heading. No second order or candidate is active.
+4. Verify the blobs named in §1, plus read-only identities: `README.md` `3f3005d680d9ed182a02e574744054aaae55deb2`; `AGENTS.md` `32562b6730e26a37b9febae63efd7d5c6a5866ac`; About `1d80f62769053ba4e6ca51adf2d11c68e724c30e`; Architecture `03e8923f834b50fc28e1b56e70f73017525cfa5b`; Architect SOP `8760be323b6ed85695a9dcffd3e52f94628f0f07`; Implementation SOP `a577116082bf8133a6056667aa52fe4ffc2ae94d`; root `Cargo.toml` `14505be49a281ba0495eabea5ca386548cc36347`; `crates/solo-cli/Cargo.toml` `1ca5e114a6e034aae386ea9d7adab3a81b4ae8bc`; `.cargo/config.toml` `74a4fb6c0f595ebc64841b26e7961967294f7d3e`; `crates/solo-cli/tests/check_architecture.rs` `0bad0e027f41b6cf6029df38174fc15531c187da`; `workspace_graph.rs` `8fa4b4d0bde840782abb0c9e24c84bac8f06c947`; `cli_smoke.rs` `921cbbe91fb0a75919014e91455fbc080dfd111c`; production `crates/solo-cli/src/main.rs` `6faa9fae29351123a49d45c5637ac4fbb1b615c8`.
+5. Perform an **observational architecture/product-document parity check**, not a rewrite: the accepted four-crate inward-only Rust/hexagonal structure, the single CLI composition root and BootstrapPreflight vertical slice, pinned Rust/Cargo/dependency rules, the real Cargo graph and fail-closed `syn` source-boundary enforcement and its negative fixtures are consistent with the extant Architecture §§5A, 6A.2–6A.4 and About. R01.B adds **no new Owner-approved product contract** requiring a separate authority change. If a meaningful accepted durable rule is missing or contradicted, **STOP** and request a separately specified documentation correction; do not silently add a fifth permanent path. Do not turn historical test observations into architecture doctrine.
+6. Inspect the already disclosed **foreign scratch**, including `.temp/rt` and `.temp/w032` if present. They are **not** part of this closure and must be preserved; do not delete them or remove shared `.temp`. Any current task scratch must be positively owned and cleaned under SOP §6A/§5A, with a truthful disposition.
 
-1. Verify local `main` at the exact starting HEAD/tree, its tracking and sole `origin` identity, exactly one worktree/checkout, no nested or shadow repository, no unexpected staged/unstaged tracked changes, no stash, and inspect untracked/ignored state and redirect/reparse ownership. Never reset, clean, checkout, rebase, discard unknown files or create a second clone/worktree/branch.
-2. The **only permitted pre-existing tracked difference** from HEAD is the Owner's replacement of the prior ACTIVE text by this **complete** `SOLO-WO-033 R01` order. Confirm `OWNER-ISSUED`, matching Owner handoff, exact scope and full file integrity. Preserve the installed ACTIVE bytes unchanged throughout execution; carry them into the source commit. Any other unexplained tracked drift is a STOP.
-3. `.documents/WIP/` has **exactly** `plan-roadmap.md`, `plan-next.md`, `workorder-active.md`, `plan-outlook.md`, without additional file/subdirectory. ROADMAP still lists R01.B and R01.C, not R01.A; NEXT is the neutral single heading; OUTLOOK unchanged. Neither ROADMAP, NEXT, OUTLOOK nor ACTIVE content may be edited by the agent.
-4. Verify the exact reviewed report/source/fixtures/WIP blobs above and the following additional read-only identities before implementation:
+### 3. Exact administrative transformation — no implementation
 
-| Baseline read-only path | Git blob SHA |
-| --- | --- |
-| `README.md` | `3f3005d680d9ed182a02e574744054aaae55deb2` |
-| `AGENTS.md` | `32562b6730e26a37b9febae63efd7d5c6a5866ac` |
-| `.documents/About/FOUNDATION-SOLO.md` | `1d80f62769053ba4e6ca51adf2d11c68e724c30e` |
-| `.documents/Architecture/ARCHITECTURE.md` | `03e8923f834b50fc28e1b56e70f73017525cfa5b` |
-| `.documents/SOP/sop-architect.md` | `8760be323b6ed85695a9dcffd3e52f94628f0f07` |
-| `.documents/SOP/sop-implementation.md` | `a577116082bf8133a6056667aa52fe4ffc2ae94d` |
-| `Cargo.toml` | `14505be49a281ba0495eabea5ca386548cc36347` |
-| `Cargo.lock` | `05a02666894f4f0bf5528acf118a049e5edb853e` |
-| `crates/solo-cli/Cargo.toml` | `1ca5e114a6e034aae386ea9d7adab3a81b4ae8bc` |
-| `rust-toolchain.toml` | `9ec55b3b621dbc75fc68817cd51b96e407d3c94c` |
-| `.cargo/config.toml` | `74a4fb6c0f595ebc64841b26e7961967294f7d3e` |
-| `crates/solo-cli/tests/architecture_checks/graph.rs` | `e328dd6a9f54c47e3eae60053446d52edacc74b7` |
-| `crates/solo-cli/tests/architecture_checks/mod.rs` | `89dfea91bd82a9b5623f6d437ec787f42fe4aa3b` |
-| `crates/solo-cli/tests/check_architecture.rs` | `0bad0e027f41b6cf6029df38174fc15531c187da` |
-| `crates/solo-cli/tests/workspace_graph.rs` | `8fa4b4d0bde840782abb0c9e24c84bac8f06c947` |
-| `crates/solo-cli/tests/cli_smoke.rs` | `921cbbe91fb0a75919014e91455fbc080dfd111c` |
-| `crates/solo-cli/src/main.rs` | `6faa9fae29351123a49d45c5637ac4fbb1b615c8` |
+**A. Preserve the issued order in Git history.** After verifying §2 and while this full Owner-installed order is the **only** expected tracked change, stage that file alone and create a **local-only** preservation commit (no intermediate push). Its exact blob must be the Owner-installed bytes. Keep the complete issued order in Git history. This is the same accountable closure mechanism used for accepted R01.A (`SOLO-WO-029 R01`). No other file may enter that preservation commit.
 
-5. Explicitly inventory the **known pre-existing foreign scratch** in `.temp/rt/tmp/system-commandline-sentinel-files/` mentioned in the prior canonical report. It is **not task-owned**, is not this package's deliverable, and must **not** be deleted or adopted. Ensure task-owned caches/tests use an independent, verified `.temp/` subspace. If an occupied/redirected scratch ancestor cannot be proven safe, STOP. No background cleanup of the Owner's or external process's material is authorized.
-6. Establish the exact pinned Rust `1.99.1` GNU toolchain and already locked registry graph; installation if necessary only into positively owned Solo task scratch, without changing tracked toolchain/config or the global OS. No new package/version is authorized.
-
-### 3. Single targeted source correction
-
-Edit only `crates/solo-cli/tests/architecture_checks/source.rs` for this technical change. In `rust_files_under(root, label, anchor, fs)`:
-
-- **Before the initial `fs.list(root)`**, prove (a) the lexically normalized `root` is the intended package directory under `anchor`, (b) the checkout anchor/root and all original unresolved path entries leading through `crates` and the package root are real and nonredirected, (c) the directory is an inspectable **directory** rather than a file/redirect/unknown entry, and (d) canonical/effective containment is safe where needed. Reuse the already selected `inspect_original_chain`, `FsReader::confine`, `CheckoutAnchor` and/or the production `DiscoveryFs` seam as appropriate rather than inventing a second policy. Use the verified anchor passed by the caller; never adopt a redirected or self-canonicalized package root as its own authority.
-- Apply the **same pre-enumeration check to every directory removed from the pending queue**, not just the initial root or newly discovered child. Perform it *before* `fs.list(&directory)`. If it fails, record a deterministic repository-relative `module-source-escape` for redirection/out-of-root cases, or `unreadable-source` for an uninspectable/unresolvable directory, and do not list/descend into that directory. Never downgrade a failed pre-enumeration check to a warning or skip without a violation.
-- Preserve the existing per-entry fail-closed handling for `DiscoveryFs::redirected`, `kind`, `list`, unknown entry kinds, non-`.rs` metadata errors, symlink/junction detection and known hidden/`target` exclusions. Entries are not exempt from inspection merely because their names are ignored. Do not weaken `check_unit`, the source reader's existing read confinement, public-surface traversal, module/path/include scanning, `cfg_attr` refusal or the graph guard.
-- Preserve deterministic ordering, bounded non-secret diagnostics, real-tree coverage of four packages/declared targets, `MapReader` in-memory fixtures, and genuine positive loading. Do not claim hostile TOCTOU race freedom. If a safe change needs another permanent file or new dependency, **STOP** rather than expanding scope.
-
-**Acceptance hinge:** a redirected package root must be refused by **discovery itself, before even its first `list` call**; refusal elsewhere in `check-architecture` does not replace this proof.
-
-### 4. Adversarial and positive tests — direct discovery path
-
-Edit only `crates/solo-cli/tests/check_architecture_fixtures.rs` for tests. Reuse the established `OwnedScratch` lifecycle, safe exclusive scratch creation, genuine Windows `mklink /J` / Unix directory symlink helpers and target-preservation snapshot mechanism. Do **not** manipulate the real `.temp`, `crates` or Git root. Tests must run as ordinary `#[test]` in `cargo test --workspace --all-targets --locked`.
-
-**T-01 — Redirected initial package root.** Construct a genuine junction/symlink at `fixture-checkout/crates/solo-application` pointing to another **in-fixture-checkout** directory with ordinary parsable `.rs` source. Show that root and child canonicalize consistently (the former false-positive scenario), and that the unresolved original root is a redirect. Call the production `source::rust_files_under(&package_root, label, &fixture_checkout, &inspector)` **directly** with `RealDiscoveryFs` or a transparent recording wrapper that delegates to it. Require an actual `module-source-escape`, **no inventoried redirected `.rs` file**, and unchanged link/target bytes. Make the proof stronger by instrumenting the existing `DiscoveryFs` `list` call and asserting **zero calls for that refused root**; a list performed before a later error is a test failure.
-
-**T-02 — Redirected package ancestor.** Repeat the direct discovery test with `fixture-checkout/crates` as the real redirected component (package-root entry appears ordinary after resolution). Assert the same category, **no enumeration of the redirected package directory**, and untouched target/link. Target may be within the owned fixture checkout, but no file through that link may be consumed.
-
-**T-03 — Fail-closed queued directory.** Show that the walker validates each dequeued non-root directory before calling `list`, not solely when it is appended to the queue. Use a deterministic injected `DiscoveryFs` seam if needed to represent a queued directory becoming uninspectable/redirected after initial classification; the pre-enumeration validation must observe the real condition and return a violation without enumerating it. Do not rely on unreliable timing races or change the production routine to accommodate a mock-only result. If a real queued-directory redirect cannot be created safely, provide a bounded deterministic equivalent exercised through production pre-list code and state the limitation.
-
-**T-04 — Existing cases remain load bearing.** Preserve and run the prior genuine root/ancestor source-checker tests, `include!`, `#[path]`, default `mod` redirect tests, conditional `cfg_attr` tests with a valid default, missing source refusal, legal nested module and in-package include, scratch ancestor/collision preservation, injected non-`.rs` metadata-failure test, redirected discovery-child refusal and legal discovery. The 23 forbidden checker fixtures must still report **the expected category** with `outcome=refused`, exit `1`; five legal twins and default real-tree check must remain legal; `--self-test` must still fail on disabling/short-circuiting the guard. The unexpected-acceptance exit `3` must remain distinct from refusal `1` and usage `2`.
-
-**T-05 — Safety evidence.** Tests must positively prove fixture roots were exclusive, no redirected path became a cleanup root, no foreign file was changed/deleted, the real junction/redirect actually existed, and only their own links/files/empty directories were removed. If genuine redirection is unavailable on the test host, the mandatory test is **UNVERIFIED / STOP** rather than claimed PASS. Preserve the disclosed foreign `.temp/rt` content untouched.
-
-### 5. Exact permanent path and operation permissions
-
-Only the following **four** permanent paths may change:
-
-| Path | Authorized action |
-| --- | --- |
-| `.documents/WIP/workorder-active.md` | **Owner-installed** `SOLO-WO-033 R01` replacement; preserve its text byte-for-byte and commit it |
-| `crates/solo-cli/tests/architecture_checks/source.rs` | Narrow pre-enumeration source-discovery correction, no broader checker rewrite |
-| `crates/solo-cli/tests/check_architecture_fixtures.rs` | Direct discovery-root/ancestor/pre-list regressions and their narrowly necessary test helper |
-| `.documents/Reports/execution-report.md` | Overwrite **one** canonical factual run report |
-
-Everything else is **read-only**: ROADMAP, NEXT, OUTLOOK, all other WIP entries, `mod.rs`, `graph.rs`, `check_architecture.rs`, `workspace_graph.rs`, production Rust code, every manifest, `Cargo.lock`, toolchain/config, README/AGENTS, About, Architecture, SOPs, security/license/CI/browser files, other repositories and Owner data. No new tracked fixture file/subdirectory, alternate checker, WIP log/archive, second report or dependency update.
-
-Allowed operations: read-only safe Git/file preflight; bounded code/tests in the two approved Rust files; pinned Rust/locked-dependency operations in verified task-owned scratch; genuine temporary regression fixtures under the established safe Solo `.temp/` hierarchy; local fmt/Clippy/test/Cargo metadata/release reproducibility checks; local Git commits of allow-listed paths only; and **one final push** of completed safe commits to existing `origin/main`, with remote readback, under Architect SOP §6B.
-
-Denied: intermediate pushes or direct GitHub file mutations, extra branches/clones/worktrees, new remote, PR/merge, force-push/reset/rebase/destructive clean, global OS or registry modifications, unapproved dependencies/versions, foreign scratch cleanup, other-repo writes, CI/browser/HTTP/provider operations, R01.C, publication/release/deployment, and R01.B WIP administrative closure. Unknown operations require an explicit new Owner decision.
-
-### 6. Verification gates and required report
-
-After editing and focused local adversarial checks, commit the two source/test edits **together with the unchanged Owner-installed ACTIVE** as the corrected source identity. Run verification on that **committed** source. Record exact commands and process exits, not just summary labels:
+**B. ROADMAP — remove exactly one accepted R01.B bullet.** In `.documents/WIP/plan-roadmap.md`, delete the **single entire line**, including its line terminator, that is exactly:
 
 ```text
-rustc --version
-cargo --version
-cargo fmt --all -- --check
-cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
-cargo test --workspace --all-targets --locked
-cargo test --locked -p solo-cli --test check-architecture
-cargo test --locked -p solo-cli --test check-architecture -- --self-test
-cargo build --workspace --release --locked
-cargo metadata --format-version 1 --locked --all-features
-cargo tree --workspace --all-features --locked
+- **R01.B:** introduce domain/application/port/adapter boundaries and one composition root, with explicit import-boundary enforcement including aliases and re-exports; ports must serve actual use cases rather than decorative abstractions.
 ```
 
-Run focused new root/ancestor/pre-list cases and previous architecture, graph and CLI smoke regressions. Execute each registered forbidden `--fixture <id>` with observed `outcome=refused`, correct category and checker exit `1`, not merely `status != 0`; verify unknown switch returns usage `2`. Verify CLI release success (`bootstrap-preflight --entity-id entity-7 --base-url https://EXAMPLE.com:443/alpha` ⇒ `0`, `preflight=ok entity_id=entity-7 base=https://example.com/alpha`) and input refusal (`--entity-id Main` ⇒ `2`, safe exact stderr). Once trusted caches exist, also run locked **offline** test and release build. No test may be ignored or conditionally skipped to manufacture PASS.
+Do not rewrite, reflow, rename or reorder anything else. Verify that removing this one line from the baseline byte stream reproduces the new ROADMAP **byte for byte**. Preserve R01.C, the Stage 01 heading/prerequisite/exit gate, every later stage, Markdown spacing and LF policy unchanged. Do **not** mark Stage 01 accepted or add a completed R01.B narrative: the pending R01.C package and Stage 01 exit gate remain.
 
-**Reproducibility:** two independent, fresh-`CARGO_HOME` and fresh-`CARGO_TARGET_DIR` `x86_64-pc-windows-gnu` release builds using unchanged pinned Rust `1.99.1` and tracked `.cargo/config.toml`, comparing raw executable length and SHA-256. Confirm `RUSTFLAGS` and `CARGO_ENCODED_RUSTFLAGS` are **absent**, not set to empty values (empty `RUSTFLAGS` can shadow the tracked deterministic linker flags). No ephemeral linker flag or PE-header normalization. Verify identical hashes between **the two new runs**; previous hash is context, never a substitute for new execution. Keep MSVC/Unix, advisory scan, CI/browser, release and provider limits factually distinguished from tests actually run.
+**C. NEXT — select one dependency-ready R01.C candidate, not an order.** Replace the neutral NEXT with **exactly** the following UTF-8, BOM-free, LF-only block, with one final LF, no extra commentary:
 
-| Gate | Passing evidence |
+```markdown
+# Foundation Solo — plan-next (Next Candidate)
+
+## Stage 01 — R01.C: Verification Infrastructure and CI
+
+**Objective:** Establish the remaining Stage 01 unit, integration, architecture, production-mode and browser-smoke verification infrastructure plus reproducible CI, with failures observable rather than hidden, for the existing Foundation Solo Rust skeleton. Do not treat readiness for a browser smoke test as authority to create a browser product.
+
+**Prerequisites and readiness:** Stage 00 architecture/toolchain choices and Stage 01 R01.A are accepted. Stage 01 R01.B was independently accepted at GitHub revision `36a88be5c4a8eb1337cd66fc12cc09456920c9d0`. The Rust 2024 four-crate workspace (`solo-domain`, `solo-application`, `solo-adapters`, `solo-cli`), pinned `rustc 1.99.1`, shared `Cargo.lock`, real `BootstrapPreflightV1` CLI-to-application vertical slice, inward-only Cargo graph checker and fail-closed `syn =3.0.9` source checker already exist. Agent-reported GNU host regressions include 107 passing tests and two raw-identical release builds; those are historical, not newly rerun CI evidence. CI and browser-smoke infrastructure have not yet been implemented or accepted.
+
+**Candidate scope and deliverables:** Design a bounded Rust build/test CI workflow and corresponding local reproducibility checks, exercising the existing unit, integration, real CLI, production-mode release-binary and architecture refusal gates with locked dependencies. Add negative/mutation evidence that the CI/test gate fails on a deliberately forbidden edge, failed test or bypass instead of reporting false success; preserve the sole CLI composition root, current port/adapter boundary and safe scratch cleanup without a hidden compatibility runtime. Specify honest browser smoke infrastructure/readiness for a future actual browser entry point; do not fabricate browser evidence, launch an HTTP service or build a UI solely to create a smoke target. Include explicit supported-host coverage and exact non-run limitations. This is a planning candidate only: every implementation path and external CI operation requires a new separately Owner-issued order.
+
+**Verifiable exit conditions:** A fresh clean-room checkout can obtain the exact approved locked toolchain/dependencies and reproduce format, strict lint, unit/integration/architecture, source-negative and production CLI smoke gates through CI; meaningful failure injection produces a failing CI status. No suppressed warnings, ignored test failures, undisclosed network dependency, phantom browser success, second runtime or unsafe cleanup. Browser-specific tests remain explicitly unverified until a genuine authorized browser surface exists. R01.C and the Stage 01 exit gate remain open pending independent acceptance; no Stage 02+, provider, deployment, release or public distribution work.
+```
+
+This text is **non-executable** by design. It identifies the next work package without granting permission to install CI, modify `.github/`, build browser features, provision accounts or run any future stage. No separate R01.C work order may be issued or executed as part of this closure run.
+
+**D. ACTIVE — neutralize after preservation.** Replace `.documents/WIP/workorder-active.md` with **exactly** this one-line, 40-byte UTF-8 LF-terminated text (no BOM, no blank second line):
+
+```text
+# Foundation Solo — Active Work Order
+```
+
+The accepted R01.B history remains recoverable from the earlier local preservation commit and prior published commits, not from a live WIP slot. No `SOLO-WO-033`, `SOLO-WO-034`, execution status, Architect disposition, placeholder or justification remains in the neutral ACTIVE file. Its emptiness means no current implementation authority, **not** a project pause.
+
+**E. OUTLOOK and durable contracts.** Leave `.documents/WIP/plan-outlook.md`, About, Architecture, SOPs, README, AGENTS, production source, Cargo configuration and all other files completely unchanged. Record the parity check in the canonical report; if the governing contract is actually inconsistent, **STOP**, do not expand the edit scope by interpretation.
+
+### 4. Exact permitted permanent paths and Git/operational authority
+
+| Path | Operation allowed |
 | --- | --- |
-| **H-01 — Authority and diff** | Exact HEAD/tree and reviewed blobs; one checkout; one Owner-installed ACTIVE difference; exactly four changed permanent paths (if all used); WIP inventory and untouched ROADMAP/NEXT/OUTLOOK |
-| **H-02 — Root pre-enumeration** | Direct real `rust_files_under` genuinely redirected initial package root refuses before **any** `DiscoveryFs::list`; no inventory; preserved target and link |
-| **H-03 — Ancestors and queued dirs** | Direct discovery refuses redirected `crates` ancestor; every queued directory validated before `list`; injected/pre-list negative cannot be bypassed; original metadata-error coverage preserved |
-| **H-04 — Ownership and existing positives** | Existing exclusive `OwnedScratch` collision/redirect tests pass; legal discovery and in-package source loading still pass; no foreign scratch touched, no task residue |
-| **H-05 — Checker and CLI regression** | Legal four-crate real check, all 23 forbidden fixtures and five legal twins, bypass, graph negatives and actual CLI success/refusal green; no reduced scanning surface |
-| **H-06 — Toolchain/reproducibility** | Pinned compiler, fmt, strict warning-free Clippy, locked/offline tests and build, metadata/tree, two raw-byte-identical independent Windows GNU releases and unchanged lock/dependencies |
-| **H-07 — Report/publication** | One accurate report, diff allowlist, clean checkout, safe scratch disposition, one final push and exact remote HEAD/tree readback |
+| `.documents/WIP/workorder-active.md` | Preserve Owner-installed complete `SOLO-WO-034 R01` byte-for-byte in the first local commit, then replace it with the exact neutral heading in the closure commit |
+| `.documents/WIP/plan-roadmap.md` | Delete **only** the one exact R01.B bullet in §3B; byte-identical remainder required |
+| `.documents/WIP/plan-next.md` | Replace the neutral candidate slot with the exact R01.C block in §3C, with no other candidate |
+| `.documents/Reports/execution-report.md` | Overwrite exactly the one canonical report with factual closure/validation/publication evidence |
 
-Overwrite **only** `.documents/Reports/execution-report.md`, stating work-order ID, Owner handoff, exact starting HEAD/tree, correction commit/tree, file blob ledger, actual root/ancestor test construction and **pre-list count**, evidence that the original redirect existed and material remained untouched, categories and positive cases, exact test/process commands/exits, binary hashes/flags, read-only file drift audit, known foreign `.temp/rt` preservation, task-owned cleanup outcome, OS/toolchain/advisory limits and H-01–H-07 `PASS`/`FAIL`/`UNVERIFIED` statuses. Agent status `COMPLETE` is not Architect `ACCEPT`. Do not embed the report commit SHA in its own content; hand the final GitHub SHA back in chat.
+Every other permanent path is **read-only**, including OUTLOOK, About, Architecture, both SOPs, all Rust files/tests, Cargo manifests/lock, `.cargo/`, `rust-toolchain.toml`, README/AGENTS, other repositories, CI/browser/security/licensing and `.gitignore`. No extra WIP files, archived orders, report copies, product edits, CI setup or changes to unrelated stages.
 
-Sequence: safe preflight → bounded edits → focused negatives → local source/ACTIVE commit → full gates **on that commit** → report overwrite and commit → safe owned-scratch cleanup plus diff/working-tree audit → **one final push** to `origin/main` → remote identity verification. Follow SOP §6B, no intermediate publication. A mandatory failure is `STOP`/`FAILED` with truthful safe reporting, not permission to publish unsafe incomplete code.
+**Expressly permitted** after the matching Owner handoff: read-only verification; the **three bounded local commits** described in §§3A and 5 (issued-order preservation, WIP reconciliation, canonical report); staging only authorized files; overwriting the single report; use of positively owned disposable Solo `.temp/` or actual current Cline-provided task scratch for safe byte/hash comparisons with cleanup; one **final** ordinary push to the already configured `origin/main` and remote readback under Architect SOP §6B. More than three local commits are permitted **only** if §6B safety requires them and every committed path still matches this ledger; explain any variance. Do not conduct an intermediate push.
 
-### 7. STOP conditions and future boundaries
+**Not permitted:** build/toolchain installation or fetch, new packages/dependencies, product/source/test modification, CI/workflow write, provider or credential operations, second clone/worktree/checkout, branch/PR/merge, force push, reset/clean/rebase/history rewrite, deletion of unrelated or foreign scratch, broad file formatting, any release/deployment, or R01.C implementation. Documentation closure does **not** require pretending to rerun previously accepted Rust tests. Local read-only Git/diff/hash checks are expected; all code-bearing checks are `NOT RUN` with a scope reason.
 
-STOP on wrong baseline, missing full Owner-issued ACTIVE and matching handoff, multiple checkout/worktrees, unexplained drift or unsafe scratch, a root/ancestor/listing escape not refused before enumeration, inability to prove a genuine redirect or proper ownership, missing or weakened regression tests, unauthorized path/dependency, failed pinned toolchain/locked/offline/reproducibility gate, unclean task-owned scratch or unsafe Git publication. Do not weaken the checker to conceal the defect; report the smallest specific blocking Owner decision if permission expansion is actually necessary.
+### 5. Validation gates, canonical report and final publication
 
-**R01.B stays in ROADMAP and ACTIVE remains this complete order until a later independent Architect `ACCEPT` and distinct Owner-authorized closure.** R01.C and the full Stage 01 exit remain pending. No next implementation work, release, merge or deployment is authorized by this corrective order.
+After the local preservation commit, perform only §3B–E, locally commit those WIP reconciliation changes, and run byte-level checks against the immutable starting Git blobs. Overwrite/commit the **single** canonical report; verify exact combined diff and working-tree safety, then push once and verify GitHub HEAD/tree. Follow the SOP's single Git procedure rather than inventing an alternate sequence. A safe report-only `STOPPED` publication may be appropriate under §7A; do not publish unauthorized or unsafe incomplete closure.
+
+| Gate | Mandatory evidence for PASS |
+| --- | --- |
+| **J-01 — Accepted identity and authority** | Published accepted revision/head/tree and R01.B `ACCEPT`, Owner-issued ID-matched full ACTIVE, one clean Solo checkout apart from Owner installation, no unexpected changed paths or foreign-data risk |
+| **J-02 — ROADMAP exact reduction** | Original R01.B line occurs once and is removed once; old ROADMAP minus that line equals new ROADMAP bytes; R01.C, Stage 01 gate and all later stage bytes unchanged |
+| **J-03 — NEXT readiness and purity** | NEXT matches §3C **byte for byte**, contains exactly one R01.C candidate and no execution authority, R01.B no longer listed as pending NEXT |
+| **J-04 — ACTIVE/WIP closure** | Preservation commit contains Owner-installed full order unchanged; final ACTIVE is exact 40-byte neutral heading; exactly four WIP files, no subdirectory; OUTLOOK blob unchanged |
+| **J-05 — Parity and no implementation drift** | Architecture/About/SOP parity checked and unchanged; only four permitted documentation paths differ from baseline; code/Cargo/lock/toolchain/checker identities identical; Rust/CI/browser checks honestly marked NOT RUN, not passed by reuse |
+| **J-06 — Report, scratch and publication** | One report with exact hashes and factual gate observations; owned temp cleaned or precise unresolved blocker; foreign scratch preserved; clean final checkout; one final push and matching remote `main` HEAD/tree verified |
+
+**Report content** at `.documents/Reports/execution-report.md`: ISO date and `SOLO-WO-034 R01`, Owner handoff and actual root/branch, baseline HEAD/tree and accepted R01.B review identity, exact Owner-installed ACTIVE blob and local preservation commit, byte-exact ROADMAP removed line, NEXT match, ACTIVE neutral-byte proof, WIP inventory and OUTLOOK unchanged, parity audit, changed-path and unchanged-blob ledger, local Git and verification commands/results, status `COMPLETE`/`STOPPED`/`FAILED`, scratch inventory/preservation/cleanup, one-final-push and remote identity verification, explicit remaining R01.C/Stage 01 obligations and implementation exclusions. The report must **not** contain its own final report-commit SHA, private absolute paths, secrets or credentials; return that SHA and GitHub report link only in the agent chat handback. No second report, history paragraph in a WIP file or completed-stage badge.
+
+Report every applicable gate as `PASS`, `FAIL`, `UNVERIFIED` or `NOT APPLICABLE` with reason. Do not re-run Rust builds merely to inflate closure evidence; do not import agent-reported past GNU checks as freshly run results. MSVC, Unix, security advisory scanning and browser smoke remain historical `UNVERIFIED`/`NOT RUN` where relevant, and **R01.C plus Stage 01 exit gate remain unfinished**.
+
+**Final sequence:** safe preflight → initial local preservation commit of the installed ACTIVE → minimal ROADMAP/NEXT/ACTIVE reconciliation → local reconciliation commit → exact byte/blob, four-file WIP and parity checks → canonical report overwrite and commit → final diff/clean-tree/scratch audit → **one final push** to `origin/main` → verify published SHA/tree and report. Do not clear, accept or implement R01.C in this run.
+
+### 6. STOP conditions
+
+STOP without unrelated edits or destructive commands on mismatched Owner order, HEAD/tree drift, second checkout, non-Owner dirty changes, wrong/duplicate ROADMAP bullet, unexpected WIP file or active candidate, unverifiable byte preservation, changed OUTLOOK, substantive architecture/About contradiction, missing accepted authority, unowned scratch/redirect risk, changed read-only source/Cargo/config/SOP files, unsafe Git publication or absent permissions. Preserve all unknown and Owner-owned material. When safe, publish a truthful `STOPPED` report under the standing single-report rule; otherwise give the exact blocker and the minimum Owner decision needed. Never manufacture a green closure or claim a release, Stage 01 acceptance or next-order authority.
