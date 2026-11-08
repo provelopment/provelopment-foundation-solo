@@ -10,15 +10,22 @@
 #   * read-only token (`permissions: contents: read`), no secrets, no write-capable step;
 #   * the only external action is `actions/checkout` pinned to one full commit SHA with
 #     credentials not persisted;
-#   * `CARGO_NET_OFFLINE=true` is the Cargo-level job default, so the only Cargo
-#     dependency acquisition that reaches the network is the single explicit
-#     `cargo fetch --locked` prelude. `actions/checkout`, `rustup toolchain install`
-#     and the security gate's own data refresh are not restricted by that variable;
-#   * the security gate is the only other networked step: it downloads the pinned
-#     `cargo-deny 0.20.2` release archive (SHA-256 verified before extraction) from the
-#     scanner's official GitHub release and fetches the current RustSec advisory
-#     database. Application Cargo work stays offline; the advisory refresh is never
-#     described as offline;
+#   * `CARGO_NET_OFFLINE=true` is the Cargo-level job default. It is a Cargo setting: it
+#     does not restrict `actions/checkout` or `rustup toolchain install`, and each step
+#     that needs the network overrides it explicitly. The network-capable operations of
+#     this workflow are: checkout; toolchain installation; the single explicit
+#     network-enabled locked product-dependency fetch (`cargo fetch --locked`), which is
+#     the only place this workspace's Cargo dependencies are acquired; the component
+#     security gate, which downloads the pinned `cargo-deny 0.20.2` release archive
+#     (SHA-256 verified before extraction) from the scanner's official GitHub release and
+#     fetches the current RustSec advisory database; and, on Ubuntu only, the disposable
+#     `RUSTSEC-2026-0009` fixture, which resolves a throwaway `time 0.3.46` manifest with
+#     `cargo generate-lockfile` and is never compiled, never part of this workspace and
+#     never allowed to touch the real lockfile;
+#   * ordinary product build, lint, test and check commands after the locked fetch run
+#     with `CARGO_NET_OFFLINE=true` and `--locked` where applicable. Neither the advisory
+#     refresh nor the disposable fixture is offline, and this file makes no claim that a
+#     Cargo environment variable denies the network system-wide;
 #   * every mandatory gate is a visible, failure-propagating step: no `continue-on-error`,
 #     no masked exit code, no `|| true`, no broad `if` skip.
 name: rust-verify
@@ -39,10 +46,10 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
-  # Cargo-level default: offline. Only the locked fetch step and the security gate's
-  # advisory-data refresh override this to "false". This is a Cargo setting; it does
-  # not restrict the network for checkout, toolchain installation or the scanner
-  # archive download.
+  # Cargo-level default: offline. Overridden to "false" by the network-enabled locked
+  # product fetch, by the security gate's scanner download and advisory-data refresh, and
+  # by the Ubuntu-only disposable advisory fixture. This is a Cargo setting; it does not
+  # restrict checkout, toolchain installation or the scanner archive download.
   CARGO_NET_OFFLINE: "true"
   RUST_BACKTRACE: "1"
 
@@ -128,10 +135,13 @@ jobs:
           rustc --version --verbose
 
       # ---------------------------------------------------------------------------
-      # The only Cargo dependency acquisition that uses the network. Everything after
-      # this step runs with the job-level CARGO_NET_OFFLINE=true, so a Cargo crate that
-      # is needed but unfetched is a hard failure instead of a silent download. That is
-      # a Cargo setting: checkout and toolchain installation are unaffected by it.
+      # The network-enabled acquisition of this workspace's locked product dependencies.
+      # Product build, lint, test and check commands after it run with the job-level
+      # CARGO_NET_OFFLINE=true, so a crate that is needed but unfetched is a hard failure
+      # instead of a silent download. Later steps that are network-capable are named where
+      # they appear: the security gate's scanner download and advisory-data refresh, and
+      # the Ubuntu-only disposable advisory fixture. This is a Cargo setting: checkout and
+      # toolchain installation are unaffected by it.
       # ---------------------------------------------------------------------------
       - name: Fetch locked packages (only network-enabled Cargo acquisition)
         env:
@@ -139,10 +149,11 @@ jobs:
         run: cargo fetch --locked
 
       # ---------------------------------------------------------------------------
-      # Component security gate. This is the one step besides the locked product
-      # fetch that reaches the network: it downloads the pinned scanner archive from
-      # its official GitHub release and fetches the current RustSec advisory database.
-      # Every application Cargo command stays offline under CARGO_NET_OFFLINE=true.
+      # Component security gate. This step is network-capable: it downloads the pinned
+      # scanner archive from its official GitHub release and fetches the current RustSec
+      # advisory database. That is the security/advisory data path, not product dependency
+      # acquisition; `cargo-deny` then reads the already-fetched locked product graph.
+      # Ordinary product Cargo commands remain offline under CARGO_NET_OFFLINE=true.
       # Any failure below (download, digest, archive safety, version, data freshness,
       # policy finding, lock or tree mutation) fails the job.
       # ---------------------------------------------------------------------------
@@ -228,7 +239,9 @@ jobs:
           echo "security_gate=pass db_commit=$DB_COMMIT fetched_at=$DB_FETCHED_AT"
 
       # Same gate, same pinned artifact and same policy, implemented for the Windows
-      # host. Identical assertions in the host's native shell; no weakened variant.
+      # host. Identical assertions in the host's native shell; no weakened variant. This
+      # host's instance is network-capable for the same two reasons: the pinned scanner
+      # archive download and the RustSec advisory-data refresh.
       - name: Component security gate — cargo-deny 0.20.2 (Windows, verified archive)
         if: runner.os == 'Windows'
         run: |
@@ -324,8 +337,11 @@ jobs:
       # scanner and the same freshly fetched RustSec database detect a real published
       # advisory. The fixture is a disposable manifest in $RUNNER_TEMP: no Git
       # repository, no production crate, no mutation of the real lockfile, and the
-      # crate's code is never compiled or executed. The step fails closed if the probe
-      # succeeds unexpectedly, if the expected advisory is missing, or if the failure
+      # crate's code is never compiled or executed. This Ubuntu-only step is itself
+      # network-capable: it overrides the Cargo offline default and resolves the throwaway
+      # manifest's dependencies with `cargo generate-lockfile`, so it is neither product
+      # dependency acquisition nor offline. The step fails closed if the
+      # probe succeeds unexpectedly, if the expected advisory is missing, or if the failure
       # is unrelated to that advisory.
       # ---------------------------------------------------------------------------
       - name: Advisory negative probe — RUSTSEC-2026-0009 (Ubuntu only)
@@ -800,7 +816,7 @@ jobs:
             echo ""
             echo "Source-level adversarial evidence: a genuine forbidden domain→adapter import was injected into the disposable runner checkout and refused with exit 1 by the precompiled checker as \`undeclared-crate\` (solo-domain's manifest declares no adapter dependency, so the scanner cannot resolve the reference to a declared workspace root), then restored byte-for-byte. The declared-but-outward fixtures are separately required to refuse as \`layer-outward-reference\` and dynamic loading as \`dynamic-loading\`. Two independent clean release builds were compared on raw bytes."
             echo ""
-            echo "Network provenance: only three steps use the network — \`actions/checkout\` (v7.0.1, full-SHA pinned), \`rustup toolchain install\`, and the component security gate (pinned scanner archive download plus a current RustSec advisory-database fetch). \`cargo fetch --locked\` is the only network-enabled Cargo dependency acquisition; every other Cargo command ran with \`CARGO_NET_OFFLINE=true\` and \`--locked\`. The advisory refresh is never claimed to be offline."
+            echo "Network provenance: network-capable operations on this host are \`actions/checkout\` (v7.0.1, full-SHA pinned), \`rustup toolchain install\`, the single network-enabled locked product-dependency fetch (\`cargo fetch --locked\`), this component security gate (verified scanner-archive download plus current RustSec advisory-data refresh), and the Ubuntu-only disposable \`RUSTSEC-2026-0009\` fixture, which resolves a throwaway manifest with \`cargo generate-lockfile\`. Production dependency acquisition is limited to the locked fetch; the advisory refresh is the security data path; the fixture is test-only and its crate is never compiled. Ordinary product build, lint, test and check commands after the locked fetch ran with \`CARGO_NET_OFFLINE=true\` and \`--locked\` where applicable. Neither the advisory refresh nor the fixture is offline, and no Cargo environment variable is claimed to deny the network system-wide."
             echo ""
             echo "**Browser smoke: UNVERIFIED / NOT RUN — no authorized browser UI, served Page, HTTP adapter or Node/Playwright project exists at this stage**"
             echo ""
@@ -838,7 +854,7 @@ jobs:
             '',
             'Gates verified on this host: locked dependency fetch, four-crate workspace/package set, component security gate (`cargo-deny 0.20.2`: advisories, bans, licenses, sources), format, strict Clippy, all-target tests, real-tree architecture checker, 23-fixture refusal self-test, failure tripwire (normal pass plus required injected failure), release build, and byte-exact release CLI accepted/refused smoke.',
             '',
-            'Network provenance: only three steps use the network — `actions/checkout` (v7.0.1, full-SHA pinned), `rustup toolchain install`, and the component security gate (pinned scanner archive download plus a current RustSec advisory-database fetch). `cargo fetch --locked` is the only network-enabled Cargo dependency acquisition; every other Cargo command ran with `CARGO_NET_OFFLINE=true` and `--locked`. The advisory refresh is never claimed to be offline.',
+            'Network provenance: network-capable operations on this host are `actions/checkout` (v7.0.1, full-SHA pinned), `rustup toolchain install`, the single network-enabled locked product-dependency fetch (`cargo fetch --locked`) and this component security gate (verified scanner-archive download plus current RustSec advisory-data refresh). Production dependency acquisition is limited to the locked fetch; the advisory refresh is the security data path. The Ubuntu-only disposable RUSTSEC-2026-0009 fixture, which resolves a throwaway manifest with `cargo generate-lockfile`, does not run on this host. Ordinary product build, lint, test and check commands after the locked fetch ran with `CARGO_NET_OFFLINE=true` and `--locked` where applicable. The advisory refresh is not offline, and no Cargo environment variable is claimed to deny the network system-wide.',
             '',
             '**Browser smoke: UNVERIFIED / NOT RUN — no authorized browser UI, served Page, HTTP adapter or Node/Playwright project exists at this stage**',
             '',
