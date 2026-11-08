@@ -174,7 +174,13 @@ jobs:
           rm -rf "$WORK"
           mkdir -p "$WORK/archive" "$WORK/tool"
 
+          # Bounded retry for transient acquisition availability only. curl retries the
+          # transient HTTP statuses (including 504) at most four times, so five attempts
+          # inside a finite 120 s retry window. It bypasses no integrity or advisory gate,
+          # does not make the network offline, and cannot guarantee that the external CDN
+          # is available; an exhausted budget still fails this mandatory job.
           curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+            --connect-timeout 10 --max-time 30 --retry 4 --retry-max-time 120 --retry-connrefused \
             --output "$ARCHIVE" "$DENY_URL" || fail "cargo-deny archive download failed"
 
           ACTUAL_SHA256="$(sha256sum "$ARCHIVE" | cut -d' ' -f1)"
@@ -257,7 +263,12 @@ jobs:
           New-Item -ItemType Directory -Path (Join-Path $Work 'archive') -Force | Out-Null
           New-Item -ItemType Directory -Path (Join-Path $Work 'tool') -Force | Out-Null
 
+          # Same bounded retry policy as the Linux host: transient statuses including 504,
+          # at most four retries inside a finite 120 s window. No integrity or advisory gate
+          # is bypassed, the network is not made offline, and an exhausted budget still fails
+          # this mandatory job through the existing exit-status check below.
           curl.exe --fail --silent --show-error --location --proto '=https' --tlsv1.2 `
+            --connect-timeout 10 --max-time 30 --retry 4 --retry-max-time 120 --retry-connrefused `
             --output $Archive $DenyUrl
           if ($LASTEXITCODE -ne 0) { throw "cargo-deny archive download failed (exit $LASTEXITCODE)" }
 
