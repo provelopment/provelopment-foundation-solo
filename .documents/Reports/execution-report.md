@@ -1,213 +1,227 @@
 # Foundation Solo — Execution Report
 
-> **One canonical report.** Overwritten in place every run; Git history retains earlier revisions. It is not a WIP file, grants no authority, and its own commit SHA appears only in the chat handback.
+> **One canonical report.** Overwritten in place each run; Git history retains earlier revisions. It is neither a WIP file nor a source of authority, and its own commit SHA appears only in the chat handback.
 
 ## Run identity
 
 | Field | Value |
 | --- | --- |
-| Date (UTC) | 2026-11-08, from approximately 14:20 |
-| Work order | **`SOLO-WO-042 R01`** — Stage 01 Exit-Gate Evidence and Independent-Review Handback |
-| Owner handoff | Received — `SOLO-WO-042 R01` (matching handoff, §8 of the order) |
-| Installed ACTIVE | blob `17ed15cf38e373944e5025672252ffa0d1d3cd9c`, **24,760 bytes**, 106 lines, LF, no BOM — **remains installed at the end of this run** |
-| Starting HEAD / tree | `c62bcf7faef8e9e9c3866f4178c5a3a77c6836d9` / `b229d3deff9f29f3866e1557f6e44275c7345b93` |
-| R02 issuance commit / tree | `8333c2c418e3e2f884f66c2610e9546defc55b73` / `298e4dbb0abd0e23c911c4a0c9504a7b7730ccba` |
-| R02 issuance CI | run [`42490811420`](https://github.com/provelopment/provelopment-foundation-solo/actions/runs/42490811420) — [Ubuntu `128762554437`](https://github.com/provelopment/provelopment-foundation-solo/actions/runs/42490811420/job/128762554437) and [Windows `128762554768`](https://github.com/provelopment/provelopment-foundation-solo/actions/runs/42490811420/job/128762554768), both `success` |
-| Report publication HEAD | the commit carrying this file — named in chat, never here |
-| **Run status** | **`COMPLETE`** as an evidence package. **`Stage 01 remains OPEN`**; **Stage 02 is not promoted** |
+| Date (UTC) | 2026-11-08, from approximately 15:00 |
+| Work order | **`SOLO-WO-043 R01`** — Stage 01 Closure and Stage 02 Readiness Transition |
+| Matching handoff | Received — `SOLO-WO-043 R01` |
+| Installed ACTIVE | blob `bbf3dfb19381c1ab37682244a3017b16f065dfa3`, 17,649 bytes, 94 lines, LF, no BOM — **still installed at this evidence revision** |
+| Starting HEAD / tree | `9e5ecd624f2fe986317514a4afa003210f6a9c32` / `d09efe8c7048d076bdfc663d4bc2927de902b086` |
+| Issuance commit / tree | `87a197e91ef96411c68be8e3edff577bdf2f7bb6` / `e59220adbf1739a025c2e00cbd011d0add9d5910` |
+| Instrumented source revision / tree | `2d6a1174b639b98939c559da36e2c70deb9328d1` / `effe150de8b526b67d2e599c8dee70fc74a55e43` (workflow blob `1c0e450a…`) |
+| Instrumented CI | run [`42493698817`](https://github.com/provelopment/provelopment-foundation-solo/actions/runs/42493698817) — [Ubuntu `128771292695`](https://github.com/provelopment/provelopment-foundation-solo/actions/runs/42493698817/job/128771292695) and [Windows `128771292889`](https://github.com/provelopment/provelopment-foundation-solo/actions/runs/42493698817/job/128771292889), both `success`, attempt 1 |
+| **Phase reached** | **evidence phase complete**; Stage 01 **retained**; this report's own revision is named in chat |
+| **Run status** | **`COMPLETE`** for this evidence phase. **Stage 01 is NOT yet closed** — closure follows the independent Chief Architect `ACCEPT` required by §4.3 of the order |
 
-## Independence boundary
+## Corrections to the previous canonical report
 
-This report is a **factual evidence package assembled by the Implementation Agent**. It is **not** the Chief Architect's disposition, and nothing here is an `ACCEPT`. Every row below is either a first-hand observation of this run or an explicitly attributed earlier observation with its source and date. A green matrix is only a recommendation for independent Chief Architect consideration; Stage 01 closes only on a separate Architect `ACCEPT` plus separate Owner-authorised reconciliation — neither of which this order permits. No `R01.D` package was created, no ROADMAP text changed, and ACTIVE was deliberately left installed rather than neutralised.
+The prior `SOLO-WO-042 R01` report contained two bounded factual defects. Both are corrected here, openly, and no historical Git commit is rewritten.
+
+**Correction 1 — work-order revision mislabels (two rows).** The previous report's identity table labelled its issuance commit and its issuance CI run as **R02**. Both are **R01**. The correct values are: issuance commit `8333c2c418e3e2f884f66c2610e9546defc55b73` = the **`SOLO-WO-042 R01`** issuance, and run `42490811420` = the **`SOLO-WO-042 R01`** issuance CI run, with Ubuntu job `128762554437` and Windows job `128762554768`. That run's report-HEAD sibling, run `42491286323` at `9e5ecd62…`, is likewise **R01** evidence. No `R02` revision of `SOLO-WO-042` ever existed; the mislabel carried over the preceding task's numbering and changed no technical conclusion.
+
+**Correction 2 — the `rustup` claim.** The previous report's G4 table listed "Cargo / rustup — resolved by that pinned toolchain and asserted by the same per-host step", which wrongly implied that `rustup` is pinned by `rust-toolchain.toml` and that its version was asserted by the exact-`rustc`/`cargo` step. It is not and it was not:
+
+- `rust-toolchain.toml` pins the **toolchain channel** (`1.99.1`) and its `rustfmt`/`clippy` components. It cannot and does not pin `rustup`.
+- The per-host `Assert exact rustc/cargo versions` step measures **`rustc` and `cargo` only** — both verified as `1.99.1` in every run cited here.
+- `rustup` is an **independently versioned installer**. Its version was never measured before this run and was never asserted by CI.
+
+**Remediation executed this run.** The one permitted instrumentation line, `rustup --version`, was added directly after the existing `rustup toolchain install 1.99.1 …` command in the `Install and assert the pinned toolchain` step (revision `2d6a117`; `+1` insertion, `0` deletions, byte-identical otherwise). It records the real installer version on **both** hosts instead of letting it be inferred from `rustc`.
+
+**Measurement outcome, first-hand this run.** On both hosts the `Install and assert the pinned toolchain` step concluded `success` — Ubuntu `15:13:24Z`→`15:13:32Z`, Windows `15:13:29Z`→`15:13:40Z`. Because that run block now ends with `rustup --version`, a non-zero exit fails the step on both the bash and pwsh shells, so the command's execution and its zero exit status are proven. **The printed version string itself is `UNVERIFIED` at the Agent's vantage:** `GET /actions/jobs/{id}/logs` returns **HTTP 403** for both jobs and the check-run `output` payload is empty, so the log body cannot be read to quote the value.
+
+**Dated cross-check against the official source.** The officially published stable `rustup` release on 2026-11-08 is **1.29.3**, announced 2026-11-03 by the Rustup Team ([Rust Blog, 2026-11-03](https://blog.rust-lang.org/2026/11/03/Rustup-1.29.3/)), described as a patch release fixing an "Illegal instruction" error on certain x86_64 CPUs without SSE4.1 (pr#5162) and a `lock() not supported` error on Solaris (pr#5167), with **no** security advisory, deprecation or end-of-life statement. The two hosted images independently document the installer they preinstall — `Rustup 1.29.2` in both `images/ubuntu/Ubuntu2404-Readme.md` and `images/windows/Windows2025-Readme.md`, read 2026-11-08 — and the workflow installs the toolchain with `--no-self-update`, which deliberately prevents an implicit installer upgrade. The coherent reading is that both runners execute **`rustup 1.29.2`**.
+
+**Disposition: `UPDATE NEEDED`, low urgency, non-blocking.** The installed installer is one patch release behind current stable, so it is **not** reported as `current`. It is also **not** a STOP, with the reasoning stated rather than asserted: 1.29.3 carries no security advisory; 1.29.2 is a prior point release of a supported series, not a deprecated or end-of-life installer; and both 1.29.3 fixes target conditions that do not occur on these runners (they have SSE4.1 and are not Solaris). If the Owner or Architect judges `1.29.2` unsupported, the correct remedy is a **separate authorised order** — for example an explicit installer-update step — not a silent change in this closure run, and never a change to the pinned toolchain.
 
 ## Preflight
 
 | Check | Result |
 | --- | --- |
 | Accessible root | the intended Owner root, confirmed as the repository top level (not a parent workspace, symlink or junction) |
-| Branch / remote / remote head | `main`; sole `origin` = `https://github.com/provelopment/provelopment-foundation-solo.git`; remote `main` = `c62bcf7faef8e9e9c3866f4178c5a3a77c6836d9` = local HEAD |
-| Tree at start | `b229d3deff9f29f3866e1557f6e44275c7345b93` (matches the order's required tree) |
-| Worktrees / stash / secondary checkout | exactly 1 worktree, 0 stash entries, no second clone or nested repository |
-| Working tree | the **only** tracked difference was the Owner-installed full ACTIVE replacement; no untracked or foreign Owner material |
-| **Sixteen required baseline blobs** | **16 / 16 matched, zero drift** — ACTIVE `ea5f20b7…`, ROADMAP `145f9d7a…`, NEXT `92fa562b…`, OUTLOOK `cb9c7a61…`, report `fa27b702…`, `README.md` `ce2d1cf9…`, `AGENTS.md` `6eae1da8…`, `sop-architect.md` `1483c9be…`, `sop-implementation.md` `51bb3792…`, `ARCHITECTURE.md` `4b050f63…`, `Cargo.toml` `14505be4…`, `Cargo.lock` `05a02666…`, `deny.toml` `3063e864…`, `rust-toolchain.toml` `9ec55b3b…`, `rust-verify.yml` `5426c1f5…`, `dependabot.yml` `1874726f…` |
-| WIP inventory | exactly four files, **no** subdirectory |
-| Prior report | the `SOLO-WO-041 R02` report was read as **history** and is not reclassified as this run's evidence |
+| Branch / remote / remote head | `main`; sole `origin` = `https://github.com/provelopment/provelopment-foundation-solo.git`; remote `main` = `9e5ecd62…` = local HEAD at start |
+| Worktrees / stash | exactly 1 worktree, 0 stash entries, no second checkout, nested clone or shadow source tree |
+| Working tree at start | the **only** tracked difference was the Owner-installed replacement of ACTIVE; no unknown dirty, untracked or Owner-owned content |
+| **Fourteen baseline blobs** | **14 / 14 matched, zero drift** — ACTIVE `17ed15cf…`, report `99761df2…`, ROADMAP `145f9d7a…`, NEXT `92fa562b…`, OUTLOOK `cb9c7a61…`, `ARCHITECTURE.md` `4b050f63…`, `rust-verify.yml` `5426c1f5…`, `Cargo.lock` `05a02666…`, `deny.toml` `3063e864…`, `rust-toolchain.toml` `9ec55b3b…`, `sop-architect.md` `1483c9be…`, `sop-implementation.md` `51bb3792…`, `AGENTS.md` `6eae1da8…`, `README.md` `ce2d1cf9…` |
+| WIP inventory | exactly four files, no subdirectory |
+| Prior report | read as history for the correction above; not reclassified as this run's evidence |
 
-`README.md`, `AGENTS.md`, Architect SOP §§6–8 (§6B, §7A, §7B), Implementation SOP §§4–5C and 7–9, Architecture §§5, 5A and 6A, the full Stage 01 ROADMAP text, all four WIP files, the real source and tests, `Cargo.lock`, `deny.toml`, the workflow and Dependabot configuration were read before any writing.
+`README.md`, `AGENTS.md`, Architect SOP §§6–8, Implementation SOP §§4–5C and 7–9, Architecture §§5/5A/6A with the EFS identity and manifest contracts, Stage 01 and Stage 02 ROADMAP text, all four WIP slots, the canonical report and the relevant source, manifests, security configuration and workflow were read before any writing.
 
-## Stage 01 exit gate being assessed
+## Phase status — deliberately not closure
 
-Quoted from `.documents/WIP/plan-roadmap.md` (blob `145f9d7a…`, unchanged by this run): clean-room dependency installation and build; one genuine request-to-application-port or equivalent minimal vertical-slice proof; green static checks and a deliberately failing forbidden-import architecture probe; a fresh exact-version security/advisory assessment with no unresolved applicable critical/high or malicious-component finding and no hidden mandatory security-scan skip; no premature feature shell or provider dependency. Browser evidence stays `NOT RUN` because no authorised browser surface exists. The CLI `bootstrap-preflight` is an **engineering vertical slice**, not an EFS publication pipeline and not a website.
+The order places a **technical acceptance gate inside the work order**: §4.3 requires the Chief Architect's formal `ACCEPT / REVISE / STOP` against this exact corrected-report revision, and only then may §4.4–§4.6 run. Accordingly this run stops at the evidence phase, and the following remain **untouched and true**:
 
-## Stage 01 exit-gate and A1 matrix
+- Stage 01 is **still present** in ROADMAP — heading, prerequisite and full exit gate byte-identical at blob `145f9d7a…`, 13 stages and 13 exit gates intact; no completion history was written.
+- NEXT `92fa562b…` and OUTLOOK `cb9c7a61…` are unchanged; **R02.A has not been installed in NEXT**.
+- `ARCHITECTURE.md` blob `4b050f63…` is unchanged — the §5A/§6A status-parity repair has **not** been made.
+- ACTIVE still holds the complete installed order at `bbf3dfb1…`; **it has not been neutralised**, and Stage 02 has **not** been promoted.
+- No R02.A implementation, EFS product, HTTP surface, release or deployment exists or is claimed.
+
+This is the order's own instructed behaviour, not an incomplete run: `REVISE` or `STOP` must preserve the Stage and report the correction instead of pruning it.
+
+
+## Stage 01 exit-gate and A1 matrix — fresh evidence
+
+Evidence below is from this run at the instrumented source revision `2d6a117` (run `42493698817`) and, where noted, from the issuance revision `87a197e`.
 
 | Gate | Requirement | Verdict | Anchor evidence |
 | --- | --- | --- | --- |
-| **G1** | clean-room dependency installation and build; locked/reproducible acquisition | **PASS** (hosted clean room) · local build `NOT RUN` (see cause) | issuance run `42490811420`: locked fetch, format, strict lint, all-target tests, release build and two byte-identical clean builds on Ubuntu |
-| **G2** | one genuine request → application-port vertical slice | **PASS** | source trace from composition root to domain validation, plus `cli_smoke`/adapter/application/domain tests and the release-CLI smoke on **both** hosts |
-| **G3** | green static checks and a deliberately failing forbidden-import probe | **PASS** | format, `-D warnings` Clippy, all-target tests, real-tree checker, 23-fixture refusal self-test and the injected-import refusal with guaranteed restore |
-| **G4** | fresh exact-version security/advisory assessment; no critical/high or malicious finding; no hidden mandatory scan skip | **PASS** | `cargo-deny 0.20.2` all four categories on both hosts with a fresh RustSec fetch, plus an independent OSV query at `2026-11-08T14:40:53Z` |
-| **G5** | version currency, warning and provenance review | **PASS**, one non-blocking proposal | every executed component is at its latest stable release; one runner-image proposal recorded |
-| **G6** | limits, skipped checks and Stage-scope integrity | **PASS** with enumerated unknowns | per-host step inventory, exact 401/403 register, Stage 01 open and Stage 02 unpromoted |
-| **Browser / HTTP / rendered page** | — | **`NOT RUN` / `NOT APPLICABLE`** | no browser or HTTP surface exists at this stage |
+| **G1** | clean-room reproducibility: hosted fresh locked fetch, build, fmt, strict lint, all-target tests, release CLI smoke; Ubuntu two independently clean byte-equal release builds | **PASS** (hosted) · local Windows build `NOT RUN` | both hosts `success`, 0 failed steps: `Fetch locked packages`, `Format check`, `Strict lint (warnings are errors)`, `Test (workspace, all targets, locked)`, `Release build (workspace, locked)`, `Release CLI smoke on the built binary` per host, and `Two clean release builds compared byte-for-byte (Ubuntu)` |
+| **G2** | real composition root → adapter → application inbound port → domain, positive and refused outputs and exit statuses | **PASS** | source trace plus 15 `cli_smoke` tests, adapter/application/domain suites and the real release-binary smoke on both hosts |
+| **G3** | inward-only crate/import checks, 23 negative fixtures, deliberate forbidden-import failure and restore, tripwire, strict static checks, no provider/browser shell | **PASS** | `Architecture checker on the real checkout`, `Architecture refusal self-test` (pinned to exactly 23 refused), `Test-failure tripwire` per host, and `Forbidden import and bypass refusal with guaranteed restore (Ubuntu)` — annotation confirms `undeclared-crate` refusal and exit 1 |
+| **G4** | complete exact graph, re-counted; both-host RustSec; digest-verified `cargo-deny 0.20.2` four classes; disposable `RUSTSEC-2026-0009` refusal; dated independent advisory checks | **PASS** | **4 workspace + 11 registry** packages, **6 name-wide + 3 exact-release** bans, four categories `ok` on both hosts — details below |
+| **G5** | exact versions and dated authority for compiler, Cargo, **rustup**, every locked dependency, scanner, action and runners; raw-log and annotation warning inspection | **PASS with one `UPDATE NEEDED`** | version table below; the `rustup` mismatch is disclosed as `UPDATE NEEDED`, low urgency, and the raw-log limitation as `UNVERIFIED` |
+| **G6** | per-host PASS versus host-conditional `NOT APPLICABLE`, `NOT RUN`/`UNVERIFIED` never counted as success; alert inventory never asserted clean | **PASS** with enumerated unknowns | step inventory and access register below |
+| **Browser / HTTP / rendered / contact / release / deployment** | surfaces do not exist | **`NOT RUN` / `NOT APPLICABLE`** | no such code path exists in `crates/` |
 
-### G1 — clean room, locked graph and reproducible build
+### G1 — clean room and reproducibility
 
-**Independently inspected:** the tracked four-crate workspace (`crates/solo-domain` `431ee6a5…`, `crates/solo-application` `1f8bf66c…`, `crates/solo-adapters` `8d3be5e7…`, `crates/solo-cli` `1ca5e114…`), `rust-toolchain.toml` blob `9ec55b3b…` pinning `1.99.1` with `rustfmt` and `clippy`, the complete lockfile blob `05a02666…`, the workflow blob `5426c1f5…`, and the real job records at step granularity.
+The instrumented run `42493698817` at `2d6a117` has **31 step slots per job** and completed with **zero failures**: Ubuntu 22 `success` / 9 `skipped` / 0 failed; Windows 19 `success` / 12 `skipped` / 0 failed. Every skip is the mirrored host-conditional counterpart of a step that ran on the other host, plus the three Ubuntu-only steps (advisory probe, forbidden-import refusal, two clean builds) — enumerated in G6.
 
-**Lockfile recounted independently, not copied:** lockfile version 4, **15 packages = 4 first-party path crates + 11 registry crates**, every registry entry sourced from `registry+https://github.com/rust-lang/crates.io-index`: `itoa 1.0.18`, `memchr 2.8.3`, `proc-macro2 1.0.107`, `quote 1.0.47`, `serde 1.0.229`, `serde_core 1.0.229`, `serde_derive 1.0.229`, `serde_json 1.0.154`, `syn 3.0.9`, `unicode-ident 1.0.27`, `zmij 1.0.23`. No git, out-of-workspace path, floating or undeclared dependency edge exists.
+The Ubuntu job builds the release binary twice, each into its own initially empty target directory, and compares the two binaries on raw bytes; that is the reproducibility proof, and it is Ubuntu-only. Windows byte-equality is **not** claimed: CI's Windows host is the default `x86_64-pc-windows-msvc`, so the tracked `[target.x86_64-pc-windows-gnu]` timestamp link-arg is inert there.
 
-**Local isolated reproduction attempt (this run).** Because no Rust toolchain existed on the Owner's host, the **exact already-approved** toolchain was acquired into disposable, task-owned roots only — `RUSTUP_HOME`, `CARGO_HOME` and `CARGO_TARGET_DIR` all under `.temp/w042/`, with no user-profile or global installation and `--no-modify-path`:
+**Local reproduction remains `NOT RUN`, unchanged and not invented:** this Owner host has no MSVC Build Tools, no Visual Studio and no mingw/gcc/clang/ld, so `cargo build`, `cargo clippy … -D warnings` and `cargo test` cannot link (`error: linker 'link.exe' not found`). Acquiring a linker is a new external executable this order forbids. The previous run's first-hand local results stand as recorded: `cargo fetch --locked`, `cargo tree --locked --offline`, `cargo metadata --locked --offline` and `cargo fmt --all --check` each exited 0 in an isolated disposable root; the hosted two-host clean room satisfies this gate.
 
-| Local step | Result |
-| --- | --- |
-| bootstrap acquisition | `rustup-init.exe` from `static.rust-lang.org`, SHA-256 `38027d51d69a5d05493627a0634dbea52d6cd793c8f072d2373d3f4163eec7db` |
-| toolchain install | `1.99.1-x86_64-pc-windows-msvc`, `rustc 1.99.1 (58cf8f9c3 2026-10-13)`, profile minimal with `rustfmt` + `clippy` — exactly the tracked pin |
-| `cargo fetch --locked` | **exit 0** — the exact locked graph resolved and downloaded from the real index |
-| `cargo tree --locked --offline` | **exit 0** — offline-after-fetch resolution works from the disposable cache alone |
-| `cargo metadata --locked --offline` | **exit 0** — declared dependency edges read authoritatively for G3 |
-| `cargo fmt --all --check` | **exit 0** — formatting verified locally |
-| `cargo build --locked --release --offline` | **`NOT RUN` — blocked by host environment:** `error: linker 'link.exe' not found`; the host has no MSVC Build Tools, no Visual Studio and no mingw/gcc/clang/ld |
-| `cargo clippy … -- -D warnings`, `cargo test …` | **`NOT RUN`** for the same single cause: build scripts and test binaries must link, so clippy and tests cannot execute on this host |
+**Provenance:** the workflow's own statement, re-read this run, limits network-capable operations to checkout, `rustup toolchain install`, the single `cargo fetch --locked`, the scanner archive and advisory refresh, and the Ubuntu advisory fixture; ordinary build/lint/test/check commands then run with `CARGO_NET_OFFLINE=true` and `--locked`. That variable is a Cargo-scoped setting and is **not** claimed as a system-wide network denial.
 
-Acquiring a C++ linker or mingw would be a **new external executable and component selection**, which this order does not authorise, so the attempt stops there and nothing further is claimed as a local pass. The gate is therefore evidenced by the **hosted clean room**, the stronger artefact for this requirement: fresh `ubuntu-24.04` and `windows-2025` machines with empty target directories. At issuance revision `8333c2c` both hosts completed 31/31 steps with **zero failures** — `Fetch locked packages (only network-enabled Cargo acquisition)`, `Format check`, `Strict lint (warnings are errors)`, `Test (workspace, all targets, locked)`, `Release build (workspace, locked)` and, on Ubuntu, `Two clean release builds compared byte-for-byte (Ubuntu)`, which builds twice into two initially empty target directories and compares the release binaries on raw bytes. Windows PE determinism is supported by the tracked `[target.x86_64-pc-windows-gnu]` link-arg, but note precisely: CI's Windows host resolves to the default `x86_64-pc-windows-msvc` (the scanner asset and toolchain install are both MSVC), so that GNU section is inert there and **Windows byte-equality of two clean builds is not claimed** — the two-clean-build comparison runs on Ubuntu only, and the matrix says so.
-
-**No cached or prebuilt artefact is accepted:** the workflow's provenance statement, re-read this run, limits network-capable operations to checkout, `rustup toolchain install`, the single `cargo fetch --locked`, the security gate's archive and advisory refresh, and the Ubuntu-only advisory fixture; ordinary build, lint, test and check commands then run with `CARGO_NET_OFFLINE=true` and `--locked`. `CARGO_NET_OFFLINE` is a Cargo-scoped setting and is **not** claimed as a system-wide network denial.
 
 ### G2 — genuine minimal vertical slice
 
-The real call path was traced in source, not inferred:
-
 | Layer | Exact evidence |
 | --- | --- |
-| Composition root | `crates/solo-cli/src/main.rs` — `fn main()` calls `run(std::env::args_os(), &BootstrapPreflightService)` and `emit()` maps the typed outcome to `ExitCode`: `0` accepted, `2` refused, `1` internal. `main.rs` holds no validation rule |
-| Adapter boundary | `crates/solo-adapters/src/bootstrap_cli.rs` — `parse_request` produces `BootstrapInputV1`, and `pub fn run<I>(args: I, preflight: &dyn BootstrapPreflightV1)` consumes the **port trait**, not a concrete service |
-| Inbound port | `crates/solo-application/src/bootstrap_preflight.rs` — `pub trait BootstrapPreflightV1 { fn execute(&self, input: BootstrapInputV1) -> BootstrapOutcomeV1; }`, implemented by `BootstrapPreflightService`, with typed `BootstrapAcceptedV1` / `BootstrapRefusedV1` / `BootstrapRefusalCode` outcomes |
-| Domain validation | `crates/solo-domain` — `EntityIdV1`/`EntityIdError`/`ENTITY_ID_MAX_BYTES` plus the base-address candidate rules, `std` only |
+| Composition root | `crates/solo-cli/src/main.rs` — `fn main()` calls `run(std::env::args_os(), &BootstrapPreflightService)`; `emit()` maps the typed outcome to `ExitCode` 0 accepted / 2 refused / 1 internal, with no validation rule in `main.rs` |
+| Adapter boundary | `crates/solo-adapters/src/bootstrap_cli.rs` — `parse_request` builds `BootstrapInputV1`; `pub fn run<I>(args: I, preflight: &dyn BootstrapPreflightV1)` consumes the **port trait**, not a concrete service |
+| Inbound port | `crates/solo-application/src/bootstrap_preflight.rs` — `pub trait BootstrapPreflightV1 { fn execute(&self, input: BootstrapInputV1) -> BootstrapOutcomeV1; }`, implemented by `BootstrapPreflightService`, with typed accepted/refused outcomes |
+| Domain validation | `crates/solo-domain` — `EntityIdV1`, `EntityIdError`, `ENTITY_ID_MAX_BYTES` and the base-address candidate rules, `std` only |
 
-Real automated tests behind the accepted and refused behaviour: `crates/solo-cli/tests/cli_smoke.rs` (15 tests, including `required_success_case_canonicalizes_the_authored_base`, `required_refusal_case_reports_an_identity_code`, `entity_identity_survives_a_changed_base_address`, `refuses_unusable_argument_sets`), `crates/solo-adapters/tests/bootstrap_cli.rs` (312 lines), `crates/solo-application/tests/bootstrap_preflight.rs` and the domain suites. They execute in the `Test (workspace, all targets, locked)` step on **both** hosts, and `Release CLI smoke on the built binary` exercises the actual release binary's accepted and refused inputs with byte-exact expectations on both hosts. No application-free stub path exists: the port is a required argument of `run`, so the binary cannot run without the injected service.
+Real tests: `crates/solo-cli/tests/cli_smoke.rs` (15 tests, including `required_success_case_canonicalizes_the_authored_base` and `required_refusal_case_reports_an_identity_code`), `crates/solo-adapters/tests/bootstrap_cli.rs`, `crates/solo-application/tests/bootstrap_preflight.rs` and the domain suites — all exercised by the all-target test step on both hosts, with the release binary's accepted/refused behaviour additionally proven by `Release CLI smoke on the built binary` on both hosts. The port is a required argument of `run`, so no application-free stub path exists. This proves the minimal preflight slice **only** — not JSON/Markdown publication, multi-Entity support, routing, a website or a released Installation.
 
-**Scope discipline:** this proves the minimal `bootstrap-preflight` slice only. It is **not** JSON/Markdown publication, multi-Entity support, routing, a website, an EFS publication pipeline or a released Installation, and it is not presented as any of those.
-
-### G3 — static, boundary and refusal gates
+### G3 — architecture, refusal and static gates
 
 | Check | Evidence and result |
 | --- | --- |
-| `cargo fmt --all --check` | `Format check` step, both hosts `success`; independently re-run locally **exit 0** |
-| Strict Clippy | `Strict lint (warnings are errors)` runs `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`, both hosts `success`; local run impossible (linker, see G1) |
-| All-target tests | `Test (workspace, all targets, locked)` = `cargo test --workspace --all-targets --locked`, both hosts `success` |
-| Real-tree architecture checker | `Architecture checker on the real checkout` per host, `success`; it asserts inward-only source and graph boundaries on the actual checkout, not a mock |
-| Deliberately forbidden fixture must be refused | `pub const FIXTURES: [Fixture; 23] = …` in `crates/solo-cli/tests/architecture_checks/mod.rs`; `Architecture refusal self-test` per host, `success`, with the workflow asserting exactly **23** refused outcomes (`grep -c 'refused as ' … -eq 23` and `if ($refused -ne 23) { throw … }`) |
-| Deliberately forbidden outer import fails the real checker, then is fully restored | `Forbidden import and bypass refusal with guaranteed restore (Ubuntu)`, `success`; annotation: *"injected forbidden import refused with category `undeclared-crate` and exit 1"*; the step records the pre-injection digest, appends the import to `crates/solo-domain/src/lib.rs`, requires refusal, restores from backup, re-checks the digest and fails on any `git diff` or residue |
-| Test-failure tripwire | `Test-failure tripwire` per host, `success` — the unmodified target passes and a deliberately failing injection must fail the gate |
-| Boundary shape | Declared edges from `cargo metadata`: `solo-domain` **0 dependencies**; `solo-application` → `solo-domain`; `solo-adapters` → `solo-application`, `solo-domain`; `solo-cli` → `solo-adapters`, `solo-application`, with `serde_json =1.0.154` and `syn =3.0.9` as **dev-dependencies only**. Core stays transport-, provider- and storage-independent; adapters point inward; exactly one composition root |
-| No premature shell | No provider, browser, HTTP server, routing or advanced contact-form subsystem exists anywhere in `crates/`; the four crates total **8,157** lines across 20 `.rs` files and contain only the preflight slice |
+| Format | `Format check`, both hosts `success`; independently re-run locally earlier with exit 0 |
+| Strict Clippy | `Strict lint (warnings are errors)` runs `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`, both hosts `success` |
+| All-target tests | `Test (workspace, all targets, locked)`, both hosts `success` |
+| Real-tree boundary | `Architecture checker on the real checkout` per host, `success` — checks the actual checkout, not a mock |
+| 23 negative fixtures | `pub const FIXTURES: [Fixture; 23]` in `crates/solo-cli/tests/architecture_checks/mod.rs`; `Architecture refusal self-test` per host `success`, and the workflow hard-asserts exactly 23 refused outcomes (`grep -c 'refused as ' … -eq 23`, `if ($refused -ne 23) { throw … }`) |
+| Deliberate forbidden import | `Forbidden import and bypass refusal with guaranteed restore (Ubuntu)` `success`, annotation *"injected forbidden import refused with category `undeclared-crate` and exit 1"*; the step records the pre-injection digest, injects into `crates/solo-domain/src/lib.rs`, requires refusal, restores from backup, re-checks the digest and fails on any `git diff` or residue |
+| Failure tripwire | `Test-failure tripwire` per host `success` — the unmodified target passes and a deliberate injection must fail the gate |
+| Boundary shape | Declared edges from `cargo metadata`: `solo-domain` **0 dependencies**; `solo-application` → `solo-domain`; `solo-adapters` → `solo-application`, `solo-domain`; `solo-cli` → `solo-adapters`, `solo-application`, with `serde_json =1.0.154` and `syn =3.0.9` as **dev-dependencies only** |
+| No premature shell | No provider, browser, HTTP server, routing or advanced contact-form subsystem exists in `crates/` (8,157 lines across 20 `.rs` files); the release binary has **zero third-party normal-dependency crates** |
 
-Exit-code semantics make refusal observable rather than assumed: `EXIT_LEGAL = 0`, `EXIT_REFUSED = 1`, `EXIT_USAGE = 2` and `EXIT_HARNESS_FAILURE = 3` — the last of which exists precisely so that a checker that *accepts* a forbidden fixture can never be mistaken for a pass.
-
+Exit semantics make refusal observable rather than assumed: `EXIT_LEGAL = 0`, `EXIT_REFUSED = 1`, `EXIT_USAGE = 2`, and `EXIT_HARNESS_FAILURE = 3`, the last existing so a checker that *accepts* a forbidden fixture can never be mistaken for a pass.
 
 
 ### G4 — exact-version dependency and supply-chain security
 
-**Inventory, recounted from the real lockfile rather than inherited.** Fifteen locked packages: 4 first-party unpublished path crates and 11 registry crates — the same eleven the earlier report listed, now independently re-derived. The important structural fact: **every registry crate arrives on the `dev` path** (transitively from `serde_json` and `syn` in `solo-cli`), so the shipped release binary has **zero third-party normal-dependency crates**; its production graph is `std` plus the three workspace crates.
+**Independently recounted, not inherited:** the lockfile holds **15 packages = 4 first-party path crates + 11 registry crates**, every registry entry from `registry+https://github.com/rust-lang/crates.io-index`, and **every registry crate is dev-path only** — the shipped release binary has no third-party normal dependency. The ban inventory was re-parsed from `deny.toml`: **6 name-wide** (`proc-macro1`, `proc-macro-en`, `aovine`, `arone`, `aronenao`, `tinymember`) plus **3 exact-release** (`arrayref@0.3.10`, `internment@0.8.7`, `append-only-vec@0.1.9`) entries.
 
-| Component | Exact version / identity | Evidence |
-| --- | --- | --- |
-| Rust toolchain | `1.99.1` (`rustc 1.99.1 58cf8f9c3 2026-10-13`) | `rust-toolchain.toml` blob `9ec55b3b…`; `Install and assert the pinned toolchain`, `Assert exact rustc/cargo versions` per host |
-| Cargo / rustup | resolved by that pinned toolchain and asserted by the same per-host step | workflow blob `5426c1f5…` |
-| Scanner | `cargo-deny 0.20.2`; Linux archive SHA-256 `9f12ed4c49936e09b48bf862b595cde2fe64fcbd9d74dfacac6131ca824c8d5f`; Windows archive SHA-256 `975a22143262fd27476d19ee00c7af67978426e40e1dee94eed6bbade1cf87dc` | gate annotations at both hosts, re-read this run |
-| Advisory data | RustSec commit `309392b18f6b17022f82c701f300433126901068`, fetched **`2026-11-08T14:38:51Z`** (Ubuntu) and **`14:39:25Z`** (Windows) | `component security gate passed …` annotations |
-| Policy categories | `advisories`, `bans`, `licenses`, `sources` — **all four ok** on both hosts, all four `deny.toml` targets with `all-features = true` | same annotations; `deny.toml` blob `3063e864…` |
-| Forbidden components | **six name-wide** (`proc-macro1`, `proc-macro-en`, `aovine`, `arone`, `aronenao`, `tinymember`) plus **three release-specific** (`arrayref@0.3.10`, `internment@0.8.7`, `append-only-vec@0.1.9`) | re-parsed from `deny.toml` this run — not the previously corrected undercount |
-| Fail-closed posture | `ignore = []`, `yanked = "deny"`, `unmaintained = "all"`, `unsound = "all"`, `unused-ignored-advisory = "deny"`, `unknown-registry = "deny"`, `unknown-git = "deny"`; the single narrow option is `allow-wildcard-paths = true`, required because workspace members depend by path | `deny.toml` re-read this run |
-| CI checkout action | `actions/checkout` **v7.0.1**, full SHA `3d3c42e5aac5ba805825da76410c181273ba90b1`, node24, `persist-credentials: false` | workflow blob `5426c1f5…`; latest release confirmed v7.0.1 |
-| Hosted runners | `ubuntu-24.04`, `windows-2025` | per-host job records |
-| Build scripts | none authored by Solo; third-party build scripts exist only on the dev-dependency path | `Cargo.lock` plus `cargo metadata` |
-| Independent advisory query | OSV `querybatch` over the 11 registry crates at their exact locked versions, **`2026-11-08T14:40:53Z`**: **0** known vulnerabilities | direct OSV API call this run |
+| Item | Exact evidence, this run |
+| --- | --- |
+| Advisory data | RustSec commit `309392b18f6b17022f82c701f300433126901068`, freshly fetched **`2026-11-08T15:13:34Z`** (Ubuntu) and **`15:13:49Z`** (Windows) |
+| Scanner integrity | `cargo-deny 0.20.2`; Linux archive SHA-256 `9f12ed4c49936e09b48bf862b595cde2fe64fcbd9d74dfacac6131ca824c8d5f`; Windows archive SHA-256 `975a22143262fd27476d19ee00c7af67978426e40e1dee94eed6bbade1cf87dc` |
+| Four policy classes | `advisories`, `bans`, `licenses`, `sources` — **all ok** on both hosts, on the unchanged locked graph, with `all-features = true` and every `targets` entry |
+| Fail-closed posture | `ignore = []`, `yanked = "deny"`, `unmaintained = "all"`, `unsound = "all"`, `unused-ignored-advisory = "deny"`, `unknown-registry = "deny"`, `unknown-git = "deny"`; the one narrow option is `allow-wildcard-paths = true`, needed for path dependencies |
+| Negative probe | `Advisory negative probe — RUSTSEC-2026-0009 (Ubuntu only)` `success`, annotation *"refused time 0.3.46 with RUSTSEC-2026-0009 and exit 1, while the unchanged locked workspace graph passed all four checks"*; the fixture is a throwaway `$RUNNER_TEMP` manifest resolved with `cargo generate-lockfile`, never compiled into the product |
+| Independent advisory query | OSV `querybatch` over all 11 registry crates at their exact locked versions, **`2026-11-08T15:17:14Z`**: **0** known vulnerabilities |
+| Toolchain assertion | per-host step verifies `rustc 1.99.1` and `cargo 1.99.1`; `rustup` is measured separately by the new line — see G5, `UPDATE NEEDED` |
 
-**Negative probe, Ubuntu only:** `Advisory negative probe — RUSTSEC-2026-0009 (Ubuntu only)` completed `success` with the annotation *"advisory negative probe refused time 0.3.46 with RUSTSEC-2026-0009 and exit 1, while the unchanged locked workspace graph passed all four checks"* — the vulnerable disposable fixture is refused while the real graph stays clean. The fixture is a throwaway manifest in `$RUNNER_TEMP` resolved with `cargo generate-lockfile`, and its crate is never compiled into the product.
-
-**Finding: none.** No applicable critical or high severity advisory, no known-malicious component, no yanked or unsound use in the locked graph, no scanner failure, no suppression, `ignore` list, reduced severity or missing target, and no hidden mandatory security-scan skip. Risk was not accepted on the Owner's behalf and no advisory was added to `deny.toml`.
-
+**Finding: none blocking.** No applicable critical or high severity advisory, no known-malicious, yanked or unsound use in the locked graph, no scanner failure, no suppression, `ignore` entry, reduced severity or missing target, and no hidden mandatory security-scan skip. Risk was not accepted on the Owner's behalf and `deny.toml` was not touched.
 
 ### G5 — version currency, warnings and provenance
 
-| Component | In use | Latest supported / status | Dated source | Disposition |
+| Component | In use | Latest supported | Dated authority | Disposition |
 | --- | --- | --- | --- | --- |
-| Rust toolchain | `1.99.1` | `1.99.1` — newest release | `rust-lang/rust` latest release, published 2026-10-16 | **current**; Rust has **no separate LTS track**, so there is no LTS to prefer |
-| `itoa` | 1.0.18 | 1.0.18 | crates.io, updated 2026-03-20 | **current** |
-| `memchr` | 2.8.3 | 2.8.3 | crates.io, updated 2026-07-08 | **current** |
-| `proc-macro2` | 1.0.107 | 1.0.107 | crates.io, updated 2026-07-19 | **current** |
-| `quote` | 1.0.47 | 1.0.47 | crates.io, updated 2026-07-19 | **current** |
-| `serde` | 1.0.229 | 1.0.229 | crates.io, updated 2026-07-18 | **current** |
-| `serde_core` | 1.0.229 | 1.0.229 | crates.io, updated 2026-07-18 | **current** |
-| `serde_derive` | 1.0.229 | 1.0.229 | crates.io, updated 2026-07-18 | **current** |
-| `serde_json` | 1.0.154 | 1.0.154 | crates.io, updated 2026-10-11 | **current** |
-| `syn` | 3.0.9 | 3.0.9 | crates.io, updated 2026-10-12 | **current** |
-| `unicode-ident` | 1.0.27 | 1.0.27 | crates.io, updated 2026-10-12 | **current** |
-| `zmij` | 1.0.23 | 1.0.23 | crates.io, updated 2026-07-13 | **current** |
-| `cargo-deny` | 0.20.2 | 0.20.2 — newest release | `EmbarkStudios/cargo-deny` latest, published 2026-07-09 | **current** |
-| `actions/checkout` | v7.0.1 | v7.0.1 — newest release | `actions/checkout` latest, published 2026-07-20 | **current**; the older platform Node-20 runtime notice is retired by this pin |
-| Node runtime | node24 via the pinned action | node24, current for that action release | workflow plus action release | **current** |
-| `ubuntu-24.04` runner image | in use | `ubuntu-26.04` image now exists upstream (`images/ubuntu/Ubuntu2604-Readme.md`) | `actions/runner-images` repository listing, read this run | **update-proposed** — a migration is a **separate** Owner-authorised order with full two-host regression evidence; nothing was changed here |
-| `windows-2025` runner image | in use | `windows-2025` is the current GA Windows image (a `Windows2025-VS2026` variant also exists) | `actions/runner-images` repository listing | **current** |
+| Rust toolchain | `1.99.1` | `1.99.1` | `rust-lang/rust` latest release, published 2026-10-16 | **current**; Rust has **no separate LTS track**, so there is none to prefer |
+| Cargo | `1.99.1` (asserted per host) | ships with the toolchain | same release | **current** |
+| **`rustup`** | **`1.29.2`** per both image readmes; actual printed value `UNVERIFIED` (logs 403) | **`1.29.3`** | [Rust Blog 2026-11-03](https://blog.rust-lang.org/2026/11/03/Rustup-1.29.3/); image readmes read 2026-11-08 | **`UPDATE NEEDED`** — one patch behind, **low urgency**, no advisory or deprecation; not `current`, not a STOP |
+| `itoa` | 1.0.18 | 1.0.18 | crates.io, 2026-03-20 | **current** |
+| `memchr` | 2.8.3 | 2.8.3 | crates.io, 2026-07-08 | **current** |
+| `proc-macro2` | 1.0.107 | 1.0.107 | crates.io, 2026-07-19 | **current** |
+| `quote` | 1.0.47 | 1.0.47 | crates.io, 2026-07-19 | **current** |
+| `serde`, `serde_core`, `serde_derive` | 1.0.229 | 1.0.229 | crates.io, 2026-07-18 | **current** |
+| `serde_json` | 1.0.154 | 1.0.154 | crates.io, 2026-10-11 | **current** |
+| `syn` | 3.0.9 | 3.0.9 | crates.io, 2026-10-12 | **current** |
+| `unicode-ident` | 1.0.27 | 1.0.27 | crates.io, 2026-10-12 | **current** (notice obligation still open, see G6) |
+| `zmij` | 1.0.23 | 1.0.23 | crates.io, 2026-07-13 | **current** |
+| `cargo-deny` | 0.20.2 | 0.20.2 | `EmbarkStudios/cargo-deny` latest, 2026-07-09 | **current** |
+| `actions/checkout` | v7.0.1 (full SHA `3d3c42e5aac5ba805825da76410c181273ba90b1`) | v7.0.1 | action latest release, 2026-07-20 | **current**; retires the older Node-20 platform notice |
+| Node runtime | node24 via the pinned action | node24 | action release | **current** |
+| `ubuntu-24.04` runner | in use | `ubuntu-26.04` image exists upstream | `actions/runner-images` listing, read 2026-11-08 | **`update-proposed`** — supported image, not EOL; a migration is a separate authorised order and was **not** made here |
+| `windows-2025` runner | in use | `windows-2025` current GA (a `Windows2025-VS2026` variant exists) | same listing | **current** |
 
-Every dependency is at its latest stable release, so there is **no update proposal for any crate, the toolchain, the scanner or the action**. The only proposal is the optional runner-image migration, and `ubuntu-24.04` is a supported image rather than an end-of-life one — this is not a blocking A1 finding.
+Fresh re-verification this run: all **11** crates re-queried against crates.io — **0** not at latest stable; OSV re-queried — **0** vulnerabilities. Every crate, the toolchain, the scanner and the action are current; the only currency debt is the installer above.
 
-**Warnings:** the annotations on both issuance jobs contain only the expected gate, refusal and advisory-probe notices — three on Ubuntu, one on Windows. No dependency-update, deprecation, unsupported-runtime, end-of-life, unmaintained-component or incompatible-version warning appears, and none has been hidden, downgraded or triaged away.
+**Warnings — actual, not summarised.** Annotations at run `42493698817`: **three** on Ubuntu (forbidden-import refusal; advisory-probe refusal; component security gate passed) and **one** on Windows (component security gate passed). No dependency-update, deprecation, unsupported-runtime, end-of-life, unmaintained-component or incompatible-version warning appears, and none was hidden, downgraded or triaged away. The scanner, RustSec freshness, digests and policy outcomes are all corroborated above.
 
-**Documentary inconsistency (reported, not changed):** Architecture §6A's older "no code" phrasing is out of step with the verified engineering baseline that now exists. Under this order it is recorded only as a proposed future canonical-document parity correction; `ARCHITECTURE.md` blob `4b050f63…` is byte-identical to the starting HEAD.
-
-**Installed versus future components:** only the components listed above are installed and executed. Architecture §6A's conditionally selected future components are **not** installed, not evaluated as present and not claimed.
+**Reported, not changed:** Architecture §6A's older "no code" phrasing remains out of step with the verified baseline. Repairing it is authorised by this order but is **sequenced after** the technical acceptance gate, so `ARCHITECTURE.md` is byte-identical at blob `4b050f63…` in this revision.
 
 
-### G6 — limits, skipped checks and Stage-scope integrity
+### G6 — limits, host-conditional skips and scope integrity
 
-Each job has **31 step slots**. At issuance revision `8333c2c`: Ubuntu **22 success / 9 skipped / 0 failed**; Windows **19 success / 12 skipped / 0 failed**. Every skip is the mirrored host-conditional counterpart, enumerated rather than summarised:
+**Per-host step inventory, run `42493698817` (31 slots each):**
 
-| Host-conditional steps | Ubuntu | Windows |
+| Step group | Ubuntu | Windows |
 | --- | --- | --- |
-| `Record revision and runner identity`, `Assert exact rustc/cargo versions`, component security gate for its own platform, `Workspace package-set gate`, `Architecture checker on the real checkout`, `Architecture refusal self-test`, `Test-failure tripwire`, `Release CLI smoke`, `Job summary` | Linux variants **success**; Windows variants `skipped` — `NOT APPLICABLE` | Windows variants **success**; Linux variants `skipped` — `NOT APPLICABLE` |
-| `Advisory negative probe — RUSTSEC-2026-0009 (Ubuntu only)` | **success** | `skipped` — `NOT APPLICABLE` by design |
-| `Forbidden import and bypass refusal with guaranteed restore (Ubuntu)` | **success** | `skipped` — `NOT APPLICABLE` |
-| `Two clean release builds compared byte-for-byte (Ubuntu)` | **success** | `skipped` — `NOT APPLICABLE` |
+| `Set up job`, `Checkout (pinned full commit SHA, credentials not persisted)`, `Install and assert the pinned toolchain` (now also logging `rustup --version`), `Fetch locked packages`, `Format check`, `Strict lint`, `Test (workspace, all targets, locked)`, `Release build`, `Post Checkout`, `Complete job` | `success` | `success` |
+| `Record revision and runner identity`, `Assert exact rustc/cargo versions`, component security gate for own platform, `Workspace package-set gate`, `Architecture checker on the real checkout`, `Architecture refusal self-test`, `Test-failure tripwire`, `Release CLI smoke`, `Job summary` | own variant `success`; other host's variant `skipped` | own variant `success`; other host's variant `skipped` |
+| `Advisory negative probe — RUSTSEC-2026-0009 (Ubuntu only)` | `success` | `skipped` — `NOT APPLICABLE` |
+| `Forbidden import and bypass refusal with guaranteed restore (Ubuntu)` | `success` | `skipped` — `NOT APPLICABLE` |
+| `Two clean release builds compared byte-for-byte (Ubuntu)` | `success` | `skipped` — `NOT APPLICABLE` |
 
-Every mandatory gate therefore runs on at least one host, and the common gates run on both. There is no `continue-on-error`, masked exit, `|| true` or forced-true fallback anywhere in the workflow, so no mandatory gate can silently pass.
+Every mandatory gate therefore ran on at least one host and the common gates on both; no step uses `continue-on-error`, masks an exit, or is written `|| true`.
 
-**Access limitations, with exact endpoints and statuses — never reported as "no alerts":**
+**Access register — exact endpoints, never reported as "no alerts":**
 
 | Endpoint | Status | Classification |
 | --- | --- | --- |
 | `…/dependabot/alerts?state=open` | **HTTP 401** `Requires authentication` | `UNVERIFIED` |
 | `…/dependabot/alerts?state=dismissed` | **HTTP 401** `Requires authentication` | `UNVERIFIED` |
 | `…/code-scanning/alerts?state=open` | **HTTP 401** `Requires authentication` | `UNVERIFIED` |
-| `…/actions/runs/42490811420/logs` | **HTTP 403** | raw log body unreadable; step-level job records and annotations used instead |
-| `…/actions/jobs/128762554437/logs` | **HTTP 403** | same substitution |
+| `…/actions/jobs/{ubuntu,windows}/logs` | **HTTP 403** (both hosts, run `42493698817`) | log bodies unreadable — this is why the printed `rustup` value is `UNVERIFIED`; step records and annotations used as the substitute |
+| `…/check-runs/{job}` `output` | empty `title`/`summary` | no substitute value available |
 
-The scheduled Dependabot run is **`NOT OBSERVED`** — an unobserved schedule is not a current scan. Repository security settings were not read, changed or bypassed.
+The scheduled Dependabot run stays **`NOT OBSERVED`** — an unobserved schedule is not a current scan. No repository setting, security feature or permission was read, changed or bypassed.
 
-**`NOT RUN` / `NOT APPLICABLE` surfaces, because they do not exist at this stage:** browser and HTTP behaviour, rendered-page and visual checks, numerical accessibility conformance, contact-form delivery, provider conformance, sitemap and routing, release, distribution and deployment.
+**`NOT RUN` / `NOT APPLICABLE`:** browser and HTTP behaviour, rendered-page and visual checks, numerical accessibility conformance, contact-form delivery, provider conformance, sitemap/routing, release, distribution and deployment — all because those surfaces do not exist at this stage.
 
-**Stage-scope integrity:** the ROADMAP Stage 01 heading, `**Prerequisite:**` line and complete `**Exit gate:**` text are byte-identical (blob `145f9d7a…`); 13 stage headings with 13 exit gates remain; no `R01.D` package exists; Stage 02 is **not** promoted; NEXT `92fa562b…` and OUTLOOK `cb9c7a61…` are unchanged.
+**Stage-scope integrity:** ROADMAP blob `145f9d7a…` unchanged, 13 stage headings and 13 exit gates present, Stage 01 block intact, no `R01.D` and no completion history; NEXT `92fa562b…` and OUTLOOK `cb9c7a61…` unchanged; `ARCHITECTURE.md` `4b050f63…` unchanged; four WIP files and no subdirectory; Stage 02 not promoted and no Stage 02 order installed.
 
-**Remaining prerequisite, correctly scoped:** `unicode-ident` 1.0.27's Unicode-3.0 third-party attribution/NOTICE is an open **future release** prerequisite. It is neither waived nor misreported as Stage 01 product delivery, and it blocks no Stage 01 exit-gate item. No other unresolved Stage-01-relevant prerequisite was found.
+**Open prerequisites, correctly scoped:** `unicode-ident` 1.0.27's Unicode-3.0 third-party attribution/NOTICE remains a **release** prerequisite — neither waived nor counted as Stage 01 product delivery — plus the `rustup 1.29.2 → 1.29.3` installer update as a separately authorised, low-urgency item.
 
-## Changed-path ledger
+## Changed-path ledger for this evidence phase
 
 | Path | Operation | Blob |
 | --- | --- | --- |
-| `.documents/WIP/workorder-active.md` | issuance-history commit only, **byte-for-byte unchanged**; remains installed through the handback | `17ed15cf38e373944e5025672252ffa0d1d3cd9c` (24,760 B) |
-| `.documents/Reports/execution-report.md` | overwritten in place with this evidence package | previous `fa27b702e368dd8cc8945ab1f5af1170eb123c29` → this revision |
+| `.documents/WIP/workorder-active.md` | issuance-history commit only, **byte-for-byte unchanged**, still installed | `bbf3dfb19381c1ab37682244a3017b16f065dfa3` (17,649 B) |
+| `.github/workflows/rust-verify.yml` | one added line, `rustup --version` | `5426c1f5…` → `1c0e450c0a4a50b6f22f547d8a7c646dce8b79b1` |
+| `.documents/Reports/execution-report.md` | overwritten in place with this corrected evidence package | `99761df2…` → this revision |
 
-Verified byte-identical at the report HEAD, not inferred from a short `git status`: `README.md`, `AGENTS.md`, `plan-roadmap.md`, `plan-next.md`, `plan-outlook.md`, both SOPs, `ARCHITECTURE.md`, `Cargo.toml`, `Cargo.lock`, `deny.toml`, `rust-toolchain.toml`, `.cargo/config.toml`, `rust-verify.yml`, `dependabot.yml`, `.github/SECURITY.md`, all four crate manifests, all 20 `.rs` source and test files, `LICENSE` and every notice. No dependency, pin, runner, scanner, policy, schedule, threshold, repository setting, branch, PR, merge, release or deployment was created or changed.
+Verified byte-identical, not merely absent from a short `git status`: `README.md`, `AGENTS.md`, both SOPs, `ARCHITECTURE.md`, `plan-roadmap.md`, `plan-next.md`, `plan-outlook.md`, `Cargo.toml`, `Cargo.lock`, `deny.toml`, `rust-toolchain.toml`, `.cargo/config.toml`, `.github/dependabot.yml`, `.github/SECURITY.md`, every crate manifest and all 20 `.rs` files, `LICENSE` and all notices. No dependency, pin, runner, scanner, policy, setting, branch, PR, merge, release or deployment was created or changed.
+
+
+## Remaining authorised sequence — not executed by this phase
+
+In the order's own terms, pending the Architect's `ACCEPT` against this revision:
+
+1. **§4.4 Close Stage 01** — delete the complete Stage 01 block from ROADMAP, leaving the title and Stage 02–13 byte-identical; populate NEXT with the single `R02.A` candidate; repair only the narrowly identified §5A/§6A status contradictions in ARCHITECTURE; commit those three paths; verify the byte diff and two-host CI on the closure revision.
+2. **§4.5 Restore neutral ACTIVE** — replace the installed order with the exact 40-byte neutral heading (blob `ea5f20b7…`); commit that one file.
+3. **§4.6 Publish the final report** — overwrite this report with the actually executed sequence, the closure revisions, the final ledger and remaining warnings; it must not embed its own commit SHA, and final CI is reported in chat rather than pre-claimed.
+
+On `REVISE` or `STOP` this report is corrected instead, and Stage 01 stays exactly where it is.
 
 ## Temporary material and cleanup
 
-Disposable task material lived only in `.temp/w042/`: the isolated `rustup`, `cargo` and `target` roots, the downloaded `rustup-init.exe`, plus `metadata.json` and the two captured command logs. All of it is task-owned, none of it is tracked, and it is removed at the end of this run. Pre-existing material that this run did not create — `.temp/rt`, `.temp/w032`, `.temp/w033` and `.temp/architecture-fixtures` — was preserved untouched. Nothing was written to a user profile, a global toolchain location or an arbitrary OS temp path, no secret or credential was read, and no destructive Git operation was performed.
+Nothing was written outside the ledgered paths and ordinary disposable locations. Scratch from the prior run (`.temp/w042`) was already removed; this run created no build caches, no downloaded toolchain, no on-disk logs, and no OS-temp files beyond the two commit-message texts, both deleted after use. Pre-existing non-task material — `.temp/rt`, `.temp/w032`, `.temp/w033`, `.temp/architecture-fixtures` — was preserved untouched. No secret, credential or personal data was read or exposed, and no destructive Git operation was performed.
 
 ## Honest summary for the independent reviewer
 
-All six applicable gates carry a first-hand `PASS` at the issuance revision, with the single local limitation in G1 stated rather than papered over. The two soft spots are **not** gate failures but must not be read as green: the GitHub alert inventories are `UNVERIFIED` behind HTTP 401, and raw log bodies are `403`, so warning classification rests on check annotations and step records. `COMPLETE` here means **this evidence package is complete**, not that Stage 01 is accepted: **Stage 01 remains OPEN**, Stage 02 remains unpromoted, and closure needs the Architect's own `ACCEPT` plus separate Owner-authorised reconciliation.
+The Stage 01 engineering gate carries a first-hand `PASS` on hosted two-host evidence, and the two prior report defects are corrected rather than hidden. Two items are deliberately **not** clean: the `rustup` installer is `UPDATE NEEDED` (1.29.2 versus 1.29.3, low urgency, no advisory, exact printed value `UNVERIFIED` behind an HTTP 403 log restriction), and the GitHub alert inventories remain `UNVERIFIED` behind 401. Nothing in this phase closed Stage 01 — the ROADMAP Stage, NEXT, ARCHITECTURE and the installed ACTIVE are all untouched, pending the acceptance gate the order itself places here.
 
-**`agent report ready`** — status `COMPLETE` (evidence collected and published). No Agent `ACCEPT` is claimed, no `R01.D` package exists, ACTIVE stays installed and no Stage or ROADMAP change was made.
+**`agent report ready`** — status `COMPLETE` for the evidence phase. No Agent `ACCEPT` is claimed, Stage 01 is retained, Stage 02 is not promoted, and the closure sequence awaits the Chief Architect's decision against this exact revision.
 
