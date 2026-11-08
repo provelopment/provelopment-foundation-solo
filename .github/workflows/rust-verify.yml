@@ -427,8 +427,11 @@ jobs:
           injected=$?
           cat "$RUNNER_TEMP/injected-source.txt"
           if [ "$injected" -ne 1 ]; then echo "::error::injected forbidden import exited $injected, expected 1"; exit 1; fi
+          injected_category=$(sed -n 's/^error: \([a-z-]*\): .*/\1/p' "$RUNNER_TEMP/injected-source.txt" | head -n 1)
+          echo "injected_refusal_category=$injected_category"
+          echo "::notice::injected forbidden import refused with category '$injected_category'"
           grep -q 'layer-outward-reference' "$RUNNER_TEMP/injected-source.txt" \
-            || { echo "::error::injected source refused without the expected category"; exit 1; }
+            || { echo "::error::injected source refused without the expected category (saw '$injected_category')"; exit 1; }
 
           restore
           restored_sha=$(sha256sum "$target_file" | cut -d' ' -f1)
