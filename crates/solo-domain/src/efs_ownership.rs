@@ -339,11 +339,13 @@ impl LocaleKeyV1 {
 
         let mut saw_separator = false;
         let mut previous_hyphen = false;
-        for byte in candidate.bytes() {
+        for (index, byte) in candidate.bytes().enumerate() {
             match byte {
                 b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' => previous_hyphen = false,
                 b'-' => {
-                    if previous_hyphen {
+                    // A separating hyphen may never open the key, and two in a row
+                    // are refused rather than collapsed.
+                    if previous_hyphen || index == 0 {
                         return Err(LocaleKeyError::new(LocaleKeyErrorKind::Malformed));
                     }
                     saw_separator = true;

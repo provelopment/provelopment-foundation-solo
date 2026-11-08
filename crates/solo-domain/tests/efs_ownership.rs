@@ -333,7 +333,10 @@ fn accepts_the_same_token_at_different_levels() {
 }
 
 /// Every refusal the accepted identity grammar defines, asserted at one level.
-fn assert_node_refusals(level: EfsLevel) {
+///
+/// The parser is passed in so that each level is checked through its own public
+/// constructor without matching an enum arm that no longer exists.
+fn assert_node_refusals(level: EfsLevel, parse: fn(&str) -> Result<(), EfsNodeIdError>) {
     let too_long = "a".repeat(64);
     let cases: [(&str, EntityIdErrorKind); 8] = [
         ("", EntityIdErrorKind::Empty),
@@ -347,16 +350,7 @@ fn assert_node_refusals(level: EfsLevel) {
     ];
 
     for (candidate, expected) in cases {
-        let outcome: Result<(), EfsNodeIdError> = match level {
-            EfsLevel::Facet => FacetIdV1::parse(candidate).map(|_| ()),
-            EfsLevel::Site => SiteIdV1::parse(candidate).map(|_| ()),
-            EfsLevel::Page => PageIdV1::parse(candidate).map(|_| ()),
-            EfsLevel::Entity | EfsLevel::Representation => {
-                unreachable!("only Facet, Site and Page are checked here")
-            }
-        };
-
-        let error = outcome.expect_err("a candidate must be refused, never repaired");
+        let error = parse(candidate).expect_err("a candidate must be refused, never repaired");
         assert_eq!(error.kind(), expected, "wrong reason for {candidate:?}");
         assert_eq!(error.level(), level);
         assert_eq!(error.code(), "PREFLIGHT_EFS_NODE_ID_INVALID");
@@ -365,9 +359,15 @@ fn assert_node_refusals(level: EfsLevel) {
 
 #[test]
 fn validates_every_non_entity_identity_level() {
-    assert_node_refusals(EfsLevel::Facet);
-    assert_node_refusals(EfsLevel::Site);
-    assert_node_refusals(EfsLevel::Page);
+    assert_node_refusals(EfsLevel::Facet, |candidate| {
+        FacetIdV1::parse(candidate).map(|_| ())
+    });
+    assert_node_refusals(EfsLevel::Site, |candidate| {
+        SiteIdV1::parse(candidate).map(|_| ())
+    });
+    assert_node_refusals(EfsLevel::Page, |candidate| {
+        PageIdV1::parse(candidate).map(|_| ())
+    });
 }
 
 #[test]
