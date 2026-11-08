@@ -214,6 +214,7 @@ jobs:
             || fail "Cargo.lock changed during the security gate"
           [ -z "$(git status --porcelain)" ] \
             || fail "working tree is dirty after the security gate"
+          echo "::notice::component security gate passed: $REPORTED_VERSION archive sha256 $ACTUAL_SHA256; RustSec $DB_COMMIT fetched $DB_FETCHED_AT; advisories, bans, licenses and sources all ok on the unchanged locked graph"
 
           {
             echo "DENY_SCANNER_VERSION=$REPORTED_VERSION"
@@ -305,6 +306,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "git status failed after the security gate" }
           if ($Dirty) { throw "working tree is dirty after the security gate: $Dirty" }
 
+          Write-Output "::notice::component security gate passed: $ReportedVersion archive sha256 $ActualSha256; RustSec $DbCommit fetched $DbFetchedAt; advisories, bans, licenses and sources all ok on the unchanged locked graph"
+
           @(
             "DENY_SCANNER_VERSION=$ReportedVersion",
             "DENY_SCANNER_ASSET=$DenyAsset",
@@ -379,6 +382,8 @@ jobs:
             || fail "negative probe did not report the expected RUSTSEC-2026-0009 advisory"
           grep -Eq 'error\[(vulnerability|yanked|unmaintained|unsound|notice)\]' "$WORK/negative-probe.log" \
             || fail "negative probe failure is not an advisory-class diagnostic"
+
+          echo "::notice::advisory negative probe refused time 0.3.46 with RUSTSEC-2026-0009 and exit $PROBE_STATUS, while the unchanged locked workspace graph passed all four checks"
 
           rm -rf "$FIXTURE"
           [ -z "$(git status --porcelain)" ] || fail "working tree is dirty after the negative probe"
