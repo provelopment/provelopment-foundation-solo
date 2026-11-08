@@ -12,7 +12,8 @@
 | Installed ACTIVE | blob `c4b422de0d9c2a3ec516a7b3ce1dff40afc7cfb1`, **13,116 bytes**, 83 lines, LF, no BOM, preserved byte-for-byte in its issuance commit |
 | Starting HEAD / tree | `fcad9fb495e01bd05d67592f231479152c47f6bc` / `ec74f078b776656f705d70236a96fa182e691acc` |
 | R02 issuance commit / tree | `011179dda9bc3a69be6dd199ccc9cd6bc06743fc` / `0ca6de1125a286bea6c9485582a6e5ea43b78a37` |
-| R02 source revision | the commit carrying this corrected report — its exact identity is recorded in the final report-only revision and in the chat handback, never here |
+| R02 source revision | `4642aca0c0352ce93098df54d7e95b427eb8e278` / tree `e94513d8ce41db3e4d2913921def0017822922e6` — corrected report, ACTIVE still installed |
+| R02 neutralization commit | `90e3643a11ab1374c3b781c7eb297640ec33d3ce` — ACTIVE returned to the neutral blob `ea5f20b7…` |
 | **Status** | **`COMPLETE`** — the two report inaccuracies are corrected. This is not an Architect `ACCEPT`, and it changes no code, policy, gate or WIP authority |
 
 ## What this run corrects, and why it is stated openly
@@ -94,9 +95,17 @@ The ROADMAP reconciliation was checked independently from blobs rather than trus
 
 The two permitted permanent paths are the only ones touched in the whole run: `.documents/WIP/workorder-active.md` and `.documents/Reports/execution-report.md`. ROADMAP, NEXT, OUTLOOK, `README.md`, `AGENTS.md`, About/Architecture, both SOPs, `deny.toml`, `Cargo.lock`, `Cargo.toml`, `rust-toolchain.toml`, `.cargo/config.toml`, `dependabot.yml`, `rust-verify.yml`, `.github/SECURITY.md`, every crate manifest/source/test, licences and notices are byte-identical to the R02 starting HEAD. No dependency, action, runner, scanner, digest, policy, schedule, threshold, repository setting, branch, PR, merge, release or deployment was created or changed, and no ROADMAP or Stage closure was performed.
 
-## Source-revision CI
+## CI at both R02 revisions
 
-At the source revision carrying this corrected report, `rust-verify` must pass on **both** `ubuntu-24.04` and `windows-2025` with the pinned `cargo-deny 0.20.2`, a freshly fetched RustSec database, all four policy classes, locked dependency fetch, the exact toolchain, format, strict lint, all-target tests, architecture and refusal/tripwire evidence, release build and CLI smoke, the Ubuntu `RUSTSEC-2026-0009` negative probe and two byte-identical clean builds. This revision is published for exactly that check; the run identifiers, per-job step counts and the outcome are recorded in the final report-only revision and in the chat handback, because they exist only after publication. Linux-only steps on Windows and Windows-only steps on Ubuntu are `NOT APPLICABLE`, not missing gates, and no `continue-on-error`, masked exit or forced-true fallback exists anywhere in the workflow.
+| Purpose | Revision | Run / jobs | Result |
+| --- | --- | --- | --- |
+| R02 issuance (order recorded) | `011179dda9bc3a69be6dd199ccc9cd6bc06743fc` | [`42488004313`](https://github.com/provelopment/provelopment-foundation-solo/actions/runs/42488004313) · [Ubuntu `128754010506`](https://github.com/provelopment/provelopment-foundation-solo/actions/runs/42488004313/job/128754010506) · [Windows `128754010194`](https://github.com/provelopment/provelopment-foundation-solo/actions/runs/42488004313/job/128754010194) | both `success` |
+| **R02 source (corrected report)** | `4642aca0c0352ce93098df54d7e95b427eb8e278` | [`42488143962`](https://github.com/provelopment/provelopment-foundation-solo/actions/runs/42488143962) · [Ubuntu `128754434441`](https://github.com/provelopment/provelopment-foundation-solo/actions/runs/42488143962/job/128754434441) (22 ok / 9 skipped / **0 failed**) · [Windows `128754434290`](https://github.com/provelopment/provelopment-foundation-solo/actions/runs/42488143962/job/128754434290) (19 ok / 12 skipped / **0 failed**) | both `success` |
+| Final report-only HEAD | this commit | verified after publication; run/job identifiers and outcome in the chat handback | see handback |
+
+The source run exercised the pinned `cargo-deny 0.20.2` archive verified by digest on both hosts — Ubuntu `9f12ed4c49936e09b48bf862b595cde2fe64fcbd9d74dfacac6131ca824c8d5f`, Windows `975a22143262fd27476d19ee00c7af67978426e40e1dee94eed6bbade1cf87dc` — with RustSec commit `309392b18f6b17022f82c701f300433126901068` freshly fetched at **`2026-11-08T14:06:35Z`** and **`14:06:50Z`**, all four policy classes reported ok on the unchanged locked graph, plus locked dependency fetch, exact toolchain, format, strict lint, all-target tests, the architecture checker and its refusal self-test, the test-failure tripwire, release build, CLI smoke, the Ubuntu `RUSTSEC-2026-0009` refusal of `time 0.3.46` and two byte-identical clean release builds. The only skipped steps are each host's Linux-only or Windows-only counterparts — `NOT APPLICABLE` there, not missing gates. No step failed, and no `continue-on-error`, masked exit or forced-true fallback exists in the workflow.
+
+Annotations visible on those jobs are only the expected gate, refusal and advisory-probe notices. No new actionable version, deprecation, unsupported-runtime or end-of-life warning appeared, and no material warning is suppressed or triaged away.
 
 ## Remaining obligations and open items
 
