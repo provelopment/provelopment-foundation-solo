@@ -1,7 +1,7 @@
 # Foundation Solo — Implementation Agent Standard Operating Procedure
 
 **Document:** `.documents/SOP/sop-implementation.md`  
-**Edition:** 2026-11-04, revision 6 (four-file WIP execution discipline, reference-reuse and A1 cross-references)  
+**Edition:** 2026-11-04, revision 7 (four-file WIP execution discipline, reference-reuse, A1 cross-references and the operational version-currency and safe-upgrade procedure)  
 **Authority:** Owner-issued and adopted project procedure, binding on every implementation agent. Adoption is not an issued work order: work requires a complete `OWNER-ISSUED` order in `.documents/WIP/workorder-active.md` plus its matching Owner handoff.  
 **Scope:** Every implementation agent or code-modifying contributor to the independent Foundation Solo project.  
 **Companions:** [`sop-architect.md`](sop-architect.md), [`workorder-active.md`](../WIP/workorder-active.md), [`plan-next.md`](../WIP/plan-next.md), [`plan-roadmap.md`](../WIP/plan-roadmap.md), [`plan-outlook.md`](../WIP/plan-outlook.md).
@@ -145,7 +145,7 @@ When the task touches these subjects, verify positive and negative cases:
 
 A checked source file is not equivalent to a passing build. An agent-authored test is not independent acceptance. Real external delivery (e.g. a contact message) must not be claimed from a stub/offline result.
 
-Apply the permanent A1 evidence standard in [`sop-architect.md`](sop-architect.md) §7B; this section supplies the operational checks, while the acceptance policy and its `PASS`/`FAIL`/`UNVERIFIED` disposition belong to the Architect. Rows above apply only where the authorized task genuinely touches that subject: a capability a later stage schedules and that is not yet implemented is **`NOT APPLICABLE`** with a reason, never a failed check, and no unimplemented feature may be described as delivered. The agent reports facts and cannot certify its own acceptance.
+Apply the permanent A1 evidence standard in [`sop-architect.md`](sop-architect.md) §7B; this section supplies the operational checks, while the acceptance policy and its `PASS`/`FAIL`/`UNVERIFIED` disposition belong to the Architect. Version currency, warning status and upgrade safety are part of that same standard and are operationalized in §7B below — one rule, not a second policy. Rows above apply only where the authorized task genuinely touches that subject: a capability a later stage schedules and that is not yet implemented is **`NOT APPLICABLE`** with a reason, never a failed check, and no unimplemented feature may be described as delivered. The agent reports facts and cannot certify its own acceptance.
 
 ## 7A. Security obligations
 
@@ -157,6 +157,19 @@ Security evidence is required by **A1**, the permanent acceptance standard in [`
 - **Sensitive findings stay private.** A suspected vulnerability in Solo is reported through GitHub private vulnerability reporting per [`.github/SECURITY.md`](../../.github/SECURITY.md), never in a pull request, issue, commit message, chat log or any public file, and no exploit recipe or confidential detail is published in any artefact.
 
 §6B/§5B remains the sole version-control procedure.
+
+## 7B. Version currency and safe upgrade — operational procedure
+
+The acceptance rule is **A1 §7B(e2)** in [`sop-architect.md`](sop-architect.md). This section is only how an agent performs it: no parallel policy, no second register, and the ledger belongs in the canonical run report.
+
+- **Inventory.** Read the real manifests and locks — `Cargo.lock`, `rust-toolchain.toml`, workflow pins, and any future lockfile — and list every component actually used: first-party crates, every direct and transitive normal/build/dev dependency, the compiler/Cargo/rustup channel, external pinned binaries such as `cargo-deny` with their digests, each CI action with its runtime requirement, the runner labels, and any installed browser ecosystem. Mark each row `current`, `outdated`, `selected-but-not-installed` or `UNVERIFIED`; a lock row and an uninstalled architecture pin must never masquerade as one another.
+- **Research.** For each row query the authoritative source at a recorded date — the vendor registry or crates.io for crates, official release metadata for tools and actions, the Node release index and EOL feeds for LTS/support dates, the vendor documentation for runner labels — together with the advisory sources A1 §7B(e1) already requires. Record source, date, installed version, latest stable/supported version and disposition. An unreachable or ambiguous source is `UNVERIFIED` with a decision, never `current`.
+- **Warnings.** Read the actual Actions logs, check annotations and Dependabot/security alerts for the reviewed revision. Each warning is resolved, or recorded with source, affected version, support deadline, impact and a bounded remediation. Never silence one by disabling a check, ignoring a dependency, pinning a deprecated action or masking output, and never treat a green badge as a warning-free run.
+- **Proposal.** Report a needed update as a **proposal** for a separate Owner-authorized order, naming the exact target versions, the affected dependency graph, breaking-change and advisory review, runner compatibility and the intended evidence. Do not upgrade inside a documentation or monitoring order, and never edit manifests, locks, pins or toolchain files outside an authorizing order.
+- **Authorized update.** Inside that order only: change the manifest, lock, toolchain channel and immutable action or binary pins to the accepted exact versions, leave every other path untouched, re-verify support status, provenance, digests and compatibility instead of blindly bumping, and keep the previous verified commit, lock and artifact available for recovery.
+- **Exact-head verification.** Run the complete two-host evidence — locked fetch, security gate with a fresh advisory refresh, architecture and refusal checks, tests, byte-reproducibility and smoke — at the source revision and again at the final published HEAD, and compare it against the pre-update baseline. A Dependabot pull request is a proposal; its existence proves nothing was tested.
+- **Rollback.** A failed or regressive update returns to the previous verified commit and pins through a new Owner-authorized order carrying the same evidence. Never rewrite history, force-push or delete released artifacts, and fail closed on provenance or compatibility uncertainty.
+- **Cadence.** Review pending Dependabot proposals weekly together with the surfaces Dependabot cannot see — the toolchain channel, external scanner binaries, runner images, licence notices and future ecosystems — and triage critical or malicious advisories immediately through the existing security gate rather than waiting for the weekly cycle. Record deferred updates and the next review date in the canonical report.
 
 ## 8. Reporting — no report-file proliferation
 

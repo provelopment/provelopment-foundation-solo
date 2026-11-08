@@ -1,0 +1,46 @@
+# Foundation Solo — GitHub Dependabot version monitoring (schema `version: 2`).
+#
+# Proposal-only. Dependabot opens pull requests; it never approves, merges, releases or
+# deploys, and nothing here authorizes an automatic upgrade. Every proposal is triaged
+# under the permanent version-currency rule in Architect SOP §7B and may only be applied
+# inside its own Owner-authorized work order.
+#
+# Exactly two ecosystems, both rooted at "/" and both on the repository default branch
+# (`target-branch` is deliberately omitted), both weekly on a fixed UTC day and time, with
+# a small explicit bound on open version-update pull requests. There is no `ignore` list,
+# no grouping, no registry override, no credential and no versioning strategy override, so
+# every component keeps its own individual risk review.
+#
+# `cargo` covers the tracked root `Cargo.lock` and the four-crate workspace. `github-actions`
+# covers the workflow's action references, which are pinned by full commit SHA.
+#
+# Dependabot *security* update pull requests are a separate repository feature with their
+# own fixed limit of ten open pull requests; they are not configured or disabled here.
+# Disabling an ecosystem would require `open-pull-requests-limit: 0`, which is not used.
+#
+# NOT covered by this file, and therefore part of the Owner-visible manual weekly review:
+#   * the `rust-toolchain.toml` channel — Dependabot exposes a separate `rust-toolchain`
+#     ecosystem for it, which is intentionally not enabled by this order;
+#   * the external `cargo-deny` scanner release archive and its pinned digest;
+#   * GitHub-hosted runner image labels;
+#   * any future npm/Node ecosystem, which does not exist until a browser manifest and
+#     lockfile are actually installed.
+version: 2
+updates:
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "04:30"
+      timezone: "Etc/UTC"
+    open-pull-requests-limit: 3
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "04:45"
+      timezone: "Etc/UTC"
+    open-pull-requests-limit: 3
