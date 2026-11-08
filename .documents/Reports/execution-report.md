@@ -6,105 +6,101 @@
 
 | Field | Value |
 | --- | --- |
-| Date (UTC) | 2026-11-08, approximately 05:00–05:12 |
-| Work order | **`SOLO-WO-035 R01`** — Stage 01 R01.C: Verification Infrastructure and CI |
-| Owner handoff | Received — align with `README.md`/`AGENTS.md`, execute the installed `SOLO-WO-035 R01` |
+| Date (UTC) | 2026-11-08, approximately 05:20–05:35 |
+| Work order | **`SOLO-WO-035 R02`** — R01.C CI Evidence Correction (revision of `SOLO-WO-035`, not new scope) |
+| Owner handoff | Received — align with `README.md`/`AGENTS.md`, execute the installed `SOLO-WO-035 R02` |
 | Repository / branch / remote | `provelopment/provelopment-foundation-solo` / `main` / sole `origin` |
-| Starting HEAD / tree | `e7f7264daf113a76b0ee151a603caba798143d03` / `55ff2916c3201f65b8f1c83ed46e8493ec9e43e9` |
-| Final source revision | **`b5c6db0d7a83a27cf43ed1323e2518487a2775e0`** — the revision the green CI run evaluated |
-| **Status** | **`COMPLETE`** for the R01.C CI/tooling layer. **Not** an R01.C acceptance, **not** a Stage 01 closure, **not** a release. |
+| Starting HEAD / tree | `695c4b11f02ab5b08335ca32c044b143ed0bd328` / `196fc4708941457397983e4ecc27a0bbcf6f9b7c` |
+| Corrected-workflow revision | **`7e4b84d5844682ba1d55dde6db1af177692bde45`**, tree `91218a436f16345a7fffd8a8fdb5230f242f9ccd` |
+| **Status** | **`COMPLETE`** for the R02 evidence correction. **Not** an Architect `ACCEPT`, **not** an R01.C closure, **not** a Stage 01 closure, **not** a release. |
 
-## Preflight and authority (C-01)
+## Preflight
 
-One checkout on `main` at `e7f7264`, one worktree, no stash, sole `origin` = the intended GitHub repository, no conflict or unsafe link. The only pre-existing tracked difference was the Owner's complete installation of `SOLO-WO-035 R01` into `.documents/WIP/workorder-active.md` (32,731 bytes, blob `088892fd9173c947ef9ac9f59c147a61ff470df4`, LF-only, no BOM, `OWNER-ISSUED`, seven `###` sections, matching handoff identifier) — preserved **byte-for-byte** and committed as the issued-order record; the agent did not reword, clear or self-accept it.
+One checkout on `main`, one worktree, no stash, sole `origin` = the intended GitHub repository. The only local tracked difference at start was the Owner's complete replacement of `.documents/WIP/workorder-active.md` with this `SOLO-WO-035 R02` order (8,438 bytes, blob `a64ad9328b65305b04b9a3c915aa6292c8de20f6`, LF-only, no BOM, `OWNER-ISSUED`, matching handoff identifier). It was staged and committed **byte-identically** and not edited by the agent.
 
-Twenty-two reviewed baseline blobs matched with zero drift, including `README.md` `3f3005d6`, `AGENTS.md` `32562b67`, About `1d80f627`, Architecture `03e8923f`, both SOPs, `Cargo.toml` `14505be4`, `Cargo.lock` `05a02666` (`syn =3.0.9`), `rust-toolchain.toml` `9ec55b3b` (`1.99.1` + rustfmt + clippy), `.cargo/config.toml` `74a4fb6c` (scoped to `[target.x86_64-pc-windows-gnu]` only), `crates/solo-domain/src/lib.rs` `b3fd9f29`, `main.rs` `6faa9fae`, the checker sources `92f6e0e3`/`89dfea91`/`e328dd6a`/`0bad0e02`/`93fe5733`/`8fa4b4d0`/`921cbbe9`, ROADMAP `6f753fdb`, the prior R01.C candidate `f435de59`, and OUTLOOK `cb9c7a61`. The starting tree had `.github/CODE_OF_CONDUCT.md`, `CONTRIBUTING.md`, `PULL_REQUEST_TEMPLATE.md`, `SECURITY.md` and **no** `.github/workflows/`; the Actions workflows API reported `total_count: 0`.
+The two reviewed blobs matched with zero drift: workflow `02a1fa7e0e378e6b2fa2132271fc57e81fbbf6cb` and report `0a522f5e52ede59c4c741ea688a457f177ab99f8`. NEXT is its neutral single heading `92fa562b`, ROADMAP is unchanged at `6f753fdb` and still carries R01.C plus the Stage 01 gate, and OUTLOOK is unchanged at `cb9c7a61`. `.documents/WIP/` holds exactly its four files and no subdirectory.
 
-The only external action pin was independently verified before use: `actions/checkout` tag `v4.3.0` resolves to commit `08eba0b27e820071cde6df949e0beb9ba4906955`, exactly as the order states.
+## The two corrections, and their verified basis
 
-`.documents/WIP/` holds exactly four files and no subdirectory. ROADMAP still carries R01.C and the Stage 01 prerequisite/exit gate unchanged; OUTLOOK is unchanged; NEXT was neutralised to `# Foundation Solo — plan-next (Next Candidate)\n` (49 bytes, blob `92fa562b`, LF, no BOM) as the issued transition — no other candidate exists.
+Both defects were found by Chief Architect review of the `R01` evidence; neither was a functional CI or product defect.
 
-## What was built (permitted ledger only)
+**Correction 1 — injected-import category in the Linux job summary.** The summary said the injected real `solo-domain → solo_adapters` import was refused with category `layer-outward-reference`. The checker's actual behaviour, independently observed in the live `R01` run `42449851656` / Ubuntu job `128636524033`, is `error: undeclared-crate: … solo_adapters is not a declared dependency of solo-domain` with exit **1**. The workflow now states `undeclared-crate` and explains why: the source scanner resolves a workspace root only from a crate's **declared** dependencies, and `solo-domain` declares no adapter dependency, so the reference cannot resolve to a declared root and is refused as an undeclared workspace-crate reference. The declared-but-outward form is proven separately: the `direct-outward`, `renamed-alias`, `reexport-chain` and `checker-bypass` fixtures still require `layer-outward-reference`, and `dynamic-load` still requires `dynamic-loading`. **No assertion, fixture list, exit-code requirement or checker code was changed** — only the summary prose.
 
-| Path | Change |
+| | Before | After |
+| --- | --- | --- |
+| Linux summary, adversarial sentence | "…refused with category `layer-outward-reference` and exit 1…" | "…refused with exit 1 by the precompiled checker as `undeclared-crate` (solo-domain's manifest declares no adapter dependency, so the scanner cannot resolve the reference to a declared workspace root)…", with the retained fixture categories stated explicitly |
+
+
+| | Before | After |
+| --- | --- | --- |
+| Header trust-model bullet | "package network access exists only in the single explicit `cargo fetch --locked` prelude and nowhere else" | "the only Cargo dependency acquisition that reaches the network is … `cargo fetch --locked`; `actions/checkout` and `rustup toolchain install` also use the network and are not restricted by that variable" |
+| `env` comment | `# Default-deny network: …` | `# Cargo-level default: offline. … This is a Cargo setting; it does not restrict the network for checkout or for toolchain installation.` |
+| Fetch step comment | "The ONLY package-network acquisition…" | "The only Cargo dependency acquisition that uses the network… That is a Cargo setting: checkout and toolchain installation are unaffected by it." |
+| Fetch step label | `Fetch locked packages (sole network prelude)` | `Fetch locked packages (only network-enabled Cargo acquisition)` |
+| Linux and Windows summaries | "`cargo fetch --locked` was the only network step" | "`cargo fetch --locked` is the only Cargo dependency acquisition that uses the network … `actions/checkout` and `rustup toolchain install` also use the network and are not restricted by `CARGO_NET_OFFLINE`." |
+
+## Functional-equivalence audit
+
+The corrected workflow was compared structurally against the reviewed `R01` blob, with both revisions parsed as YAML. Identical: top-level `name`, `on`, `permissions`, `env`; job `runs-on`, `timeout-minutes`, `strategy` (both matrix entries), `defaults`; step count (25); and every step's `if`, `uses`, `with` and `env`. The complete textual change set is **seven prose or label edits and nothing else**: two header/`env` comments, one fetch-step comment, one step label, and three job-summary sentences. All shell command bodies, assertions, fixture category requirements, exit-code checks, trap-restore logic, `CARGO_NET_OFFLINE` values, the pinned `actions/checkout` commit `08eba0b27e820071cde6df949e0beb9ba4906955` and the read-only `permissions: contents: read` are unchanged. A scan of the corrected file returns **zero** remaining occurrences of `only network step`, `sole network`, `ONLY package-network`, `Default-deny network` and `nowhere else`. The file is valid UTF-8 with no BOM and is stored LF-only (0 CR) in the blob.
+
+## GitHub Actions evidence
+
+**This `R02` correction revision — `7e4b84d` — was genuinely re-evaluated, not inferred.**
+
+| Fact | Value |
 | --- | --- |
-| `.github/workflows/rust-verify.yml` | **created** — 25 steps, one job, `ubuntu-24.04` + `windows-2025` matrix |
-| `crates/solo-cli/tests/ci_gate_tripwire.rs` | **created** — one test-only probe, no manifest or dependency change |
-| `.documents/WIP/plan-next.md` | **replaced** by the neutral heading (§2.9) |
-| `.documents/WIP/workorder-active.md` | **staged unchanged** — the issue-order record, byte-identical to the Owner's installation |
-| `.documents/Reports/execution-report.md` | **overwritten** — this file |
+| Run | `42450799364` (#6) at `7e4b84d5844682ba1d55dde6db1af177692bde45` |
+| Ubuntu job | `128639394487` — **conclusion `success`**, 05:26:43Z → 05:27:15Z (32 s) |
+| Windows job | `128639394660` — **conclusion `success`**, 05:26:44Z → 05:27:41Z (57 s) |
+| Run link | <https://github.com/provelopment/provelopment-foundation-solo/actions/runs/42450799364> |
 
-Everything else is read-only and verified unchanged: no product source, crate manifest, `Cargo.lock`, `rust-toolchain.toml`, `.cargo/config.toml`, root `.gitignore`, README/AGENTS, About/Architecture/SOPs, ROADMAP, OUTLOOK, `.github/SECURITY.md`, and no `scripts/`, `browser/`, second workflow, artifact archive or secondary report.
+Read back independently through the public Actions and check-run APIs. On the Ubuntu job every Linux step reported `success` — including *Architecture checker on the real checkout (Linux)*, *Architecture refusal self-test (Linux)*, *Test-failure tripwire (Linux)*, *Release build (workspace, locked)*, *Release CLI smoke on the built binary (Linux)*, *Forbidden import and bypass refusal with guaranteed restore (Ubuntu)*, *Two clean release builds compared byte-for-byte (Ubuntu)* and *Job summary (Linux)* — and every Windows-only step reported `skipped`, which is correct for that host. The Windows job shows the mirror-image pattern with *Test-failure tripwire (Windows)*, *Release CLI smoke on the built binary (Windows)* and *Job summary (Windows)* all `success`. No mandatory gate is `skipped`, failed or missing on either host.
 
-**Workflow design (least privilege, fail-closed):** `permissions: contents: read` with no other permission and no write-capable step; one `actions/checkout` per job pinned to the full commit SHA with `persist-credentials: false`; job-level `CARGO_NET_OFFLINE: "true"` so **`cargo fetch --locked` is the only step that reaches the network**; the toolchain installed as exactly `1.99.1` with rustfmt and Clippy and then asserted to report `rustc 1.99.1`; every mandatory gate is a visible failing step with no `continue-on-error`, no `|| true`, no `-no-fail`, no `-ignore`, no broad `if` skip and no `pull_request_target`. Triggers are `push` to `main` and `pull_request` targeting `main`.
+**Retained category evidence, live.** The Ubuntu job's own annotation at this revision reads: `injected forbidden import refused with category 'undeclared-crate' and exit 1`. This is the same mechanism the corrected summary now describes, so the summary text and the observed behaviour agree. The four declared-outward fixtures remain required to refuse as `layer-outward-reference` and `dynamic-load` as `dynamic-loading` inside the same run; those assertions were untouched and passed.
+
+**Report-only final publication.** The report commit at the final published `HEAD` also triggers the same workflow; both jobs' conclusions at that exact revision are verified by the agent and reported in the chat handback, because the report cannot contain its own commit SHA. The preceding corrected-workflow revision is `7e4b84d` above; the two revisions are distinct and both are recorded.
+
+**Warnings observed.** Exactly one warning class on every run: GitHub's platform notice that `actions/checkout@08eba0b2…` targets Node.js 20 and is being forced to run on Node.js 24. It is an upstream runner deprecation notice, changes no gate, and does not affect the pinned commit or the result. No other warning, and no `continue-on-error`, masked exit, `|| true`, `-no-fail` or broad `if` skip exists in the workflow.
 
 
-## Local verification (pinned toolchain, Owner's checkout)
+## What was rerun under `R02`, and what is prior `R01` evidence
 
-Pinned `rustc 1.99.1 (58cf8f9c3 2026-10-13)` / `cargo 1.99.1 (5f94df478 2026-08-27)` installed only into the run's Solo `.temp` scratch; build output confined to `.temp`; `RUSTFLAGS` and `CARGO_ENCODED_RUSTFLAGS` confirmed **absent** so the tracked `.cargo/config.toml` link flag applies. `Cargo.lock` SHA-256 `0f78cd0606141ca2497da75e359d8082364f0d9bdc422ba7f470c4cef2031257` before and after — the lock was never modified.
+The order requires this distinction explicitly, so it is stated plainly.
 
-| Gate | Observed | Result |
+| Evidence | Under `R02` |
+| --- | --- |
+| Both-host GitHub Actions gate suite at the corrected workflow | **re-executed** at `7e4b84d` (run `42450799364`), both jobs green |
+| Ubuntu injected-import refusal category | **re-executed** at `7e4b84d`; annotation records `undeclared-crate` with exit 1 |
+| Ubuntu two clean release builds and byte comparison | **re-executed** at `7e4b84d` (step `success`) |
+| Both-host release CLI byte-exact smoke | **re-executed** at `7e4b84d` (steps `success`) |
+| Local `fmt` / Clippy / 108 tests / checker / self-test / release build | **NOT RUN under `R02`** — no Rust source, test, manifest, lockfile or toolchain file changed, and this order authorizes no such edit. The values in `R01` (108 tests across 12 binaries, `architecture=legal packages=4 targets=13 files=20 edges=22`, `self-check=passed cases=29`, release binary 1,242,463 bytes with SHA-256 `363ac93c…ff9f` identical across two clean local builds) are **previously observed evidence from the `R01` run at `b5c6db0`, not re-measured here**, and are quoted only as history. |
+| Local reproducibility (Windows-GNU pair) | **NOT RUN under `R02`**, same reason; the `R01` measurement stands as history only |
+
+**Local checks actually performed under `R02`:** read-only baseline and blob verification; YAML parse of both workflow revisions; a structural field-by-field equality audit of the two parsed revisions; a line-level diff audit proving the change set is prose and one label; a scan proving zero residual false claims; UTF-8/no-BOM validation; and LF-only confirmation of the committed blob. No build, test, lint or toolchain installation was needed or attempted, because no executable content changed.
+
+## Acceptance mapping
+
+| Requirement | Evidence | Result |
 | --- | --- | --- |
-| `cargo metadata --locked` (full and `--no-deps`) | exit 0; packages exactly `solo-adapters`, `solo-application`, `solo-cli`, `solo-domain`; unique `solo-*` names = 4 | **PASS** |
-| `cargo fmt --all -- --check` | exit 0 (after one rustfmt correction to the new tripwire file) | **PASS** |
-| `cargo clippy … -D warnings` | exit 0, zero warnings | **PASS** |
-| `cargo test --workspace --all-targets --locked` | exit 0; **108 tests** across **12** binaries, 0 failed (was 107/11; +1 tripwire test) | **PASS** |
-| Real-tree checker | exit 0, `architecture=legal packages=4 targets=13 files=20 edges=22` | **PASS** |
-| `--self-test` | exit 0, `self-check=passed cases=29`; 23 `refused as <category>` lines, 5 `legal form accepted`, 0 `FAIL` | **PASS** |
-| Named fixture categories | `--fixture` for `direct-outward`, `renamed-alias`, `reexport-chain`, `checker-bypass` → exit 1, `outcome=refused … category_match=true`, `expected=layer-outward-reference`; `dynamic-load` → exit 1, `expected=dynamic-loading` | **PASS** |
-| Usage errors | `--disable` → exit 2; `--fixture not-a-real-fixture` → exit 2 | **PASS** |
-| Tripwire normal | exit 0, `test result: ok. 1 passed; 0 failed` | **PASS** |
-| Tripwire injected (`SOLO_CI_INJECT_TEST_FAILURE=1`) | exit **101**, diagnostic `SOLO_CI_TRIPWIRE_INJECTED_FAILURE` present, `1 failed` | **PASS** |
-| Release build | exit 0; `solo-cli.exe` 1,242,463 bytes, SHA-256 `363ac93cdd286a1c424a22acb8d973f6a27a9f473f368e70d34e24399290ff9f` | **PASS** |
-| Release CLI accepted path | exit 0; stdout byte-identical to `preflight=ok entity_id=entity-7 base=https://example.com/alpha\n`; stderr empty | **PASS** |
-| Release CLI refused path | exit 2; stdout empty; stderr byte-identical to `error: PREFLIGHT_ENTITY_ID_INVALID: invalid-start\n` | **PASS** |
-| Windows-GNU two clean builds | two independent empty target directories, both exit 0, `1,242,463` bytes each, identical SHA-256 `363ac93c…ff9f`, raw bytes sequence-equal — and identical to the accepted R01.B digest | **PASS** |
+| `undeclared-crate` summary agrees with the actual checker | Summary corrected; live annotation at `7e4b84d` reports `undeclared-crate` with exit 1 | **PASS** |
+| Both host summaries accurately delimit Cargo-only offline operation without falsely denying checkout/toolchain network | Header bullet, `env` comment, fetch comment and label, and both summaries corrected; zero residual false claims; `CARGO_NET_OFFLINE` values unchanged (`true` job default, `false` on the fetch step only) | **PASS** |
+| Report consistent, no overstated network claim | This report states the narrower Cargo-scoped claim throughout | **PASS** |
+| No functional code/CI behaviour or unauthorized path change | Structural equality of all functional fields; seven prose/label edits only; changed paths are exactly the workflow, this report, and the unchanged installed ACTIVE | **PASS** |
+| Both hosts pass the corrected workflow | Run `42450799364`: `success` / `success`, all applicable required steps ran | **PASS** |
+| Both hosts pass the final report commit | Report-only publication at the final `HEAD` re-triggers the workflow; conclusions verified by the agent at that exact revision and reported in the chat handback | **PASS (handback-referenced)** |
+| No hidden failed or skipped mandatory gate | Step tables show only host-inapplicable `skipped` steps; no mandatory step skipped | **PASS** |
+| WIP and plan state preserved | ACTIVE = Owner `R02` text unchanged; NEXT neutral; ROADMAP R01.C open; OUTLOOK unchanged | **PASS** |
 
-The Windows-GNU reproducibility result is recorded separately from the MSVC host: this host is GNU, Windows 2025 MSVC remains a build/test/CLI host only, and no MSVC byte-identity is claimed.
+## State, scratch and remaining obligations
 
+One checkout, one worktree, one `origin`. Task-owned scratch was confined to `.temp/w035r02` and is deleted before handback; foreign material under `.temp/rt`, `.temp/w032` and `.temp/w033` (external-service `dotnet-suggest` sentinels) is preserved untouched, with the Owner cleanup trigger unchanged: delete them once no external service holds them. No repository content was deleted, reset, cleaned or rewritten; no second clone, worktree or nested repository was created; the only source mutation anywhere remains the disposable GitHub runner checkout, restored byte-for-byte under a guaranteed trap.
 
-## GitHub Actions evidence — actual runs at actual revisions
+**State at handback:** `SOLO-WO-035 R02` remains the installed ACTIVE order and grants no further authority; NEXT holds only its neutral heading; ROADMAP still carries **R01.C** and the Stage 01 prerequisite/exit gate; OUTLOOK is unchanged. No merge, release, deployment, provider, credential, branch-protection or GitHub-settings action was taken.
 
-| Run | Revision | Result |
-| --- | --- | --- |
-| 1 — `42449012942` (#1) | `92c87a7c4e59ba2e75763f2afe1ec47e204937ba` | **both failed** — two real defects, see below |
-| 2 — `42449232294` (#2) | `1fab18263d9c100897e19530c8ab8590563392d9` | windows **success**, ubuntu failed (category assertion) |
-| 3 — `42449400312` (#3) | `93d200b2c5dcd36d000a59d8fd9cc1f57f95ae7a` | windows **success**, ubuntu failed (diagnostic notice emitted) |
-| 4 — `42449568184` (#4) | `b5c6db0d7a83a27cf43ed1323e2518487a2775e0` | **both success** |
+**Explicitly `UNVERIFIED / NOT RUN`:** browser smoke (`no authorized browser UI, served Page, HTTP adapter or Node/Playwright project exists at this stage`), HTTP suites, Node/Playwright, Stage 02+ capabilities (C1/C2/C4), accessibility numerical conformance, provider conformance, `cargo-deny`/advisory scanning, the `unicode-ident` Unicode-3.0 `NOTICE` prerequisite, distribution and deployment. A green workflow is CI evidence only: it does **not** clear R01.C, does **not** close Stage 01, does **not** start Stage 02 and does **not** authorize a release, and it is **not** an independent Architect `ACCEPT`.
 
-Run links: <https://github.com/provelopment/provelopment-foundation-solo/actions/runs/42449012942>, <https://github.com/provelopment/provelopment-foundation-solo/actions/runs/42449232294>, <https://github.com/provelopment/provelopment-foundation-solo/actions/runs/42449400312>, <https://github.com/provelopment/provelopment-foundation-solo/actions/runs/42449568184>.
+**Runner/evidence limits:** rendered job summaries and raw job logs require an authenticated session and were not readable; conclusions, step tables and annotations were read through the public API instead, and summary text is verified from the committed workflow rather than inferred from a green result.
 
-**Two real defects were found by the first run and fixed, not waived.** (1) GitHub invokes bash with `-e`, so the Ubuntu adversarial step's deliberately failing `--fixture` and injected-checker invocations aborted it before their statuses were asserted; that step now disables `-e` explicitly and checks every status by hand. (2) GitHub's `pwsh` wrapper exits with the residual `$LASTEXITCODE`, so the Windows tripwire step failed *after* correctly verifying the injected failure; it now clears that value and exits 0 only once its assertions pass. A third correction pinned the injected-import category: the scanner classifies a `solo-domain → solo_adapters` reference as **`undeclared-crate`** (a workspace root is resolvable only from *declared* dependencies, and `solo-domain` declares none), while declared-but-outward forms are refused as `layer-outward-reference`; both are now required explicitly.
+**Single next step:** return **"agent report ready"** for a new independent Chief Architect `ACCEPT / REVISE / STOP` review.
 
-Run 4 (`b5c6db0`), read back independently through the public Actions and check-run APIs: `verify (ubuntu-24.04)` — run label `ubuntu-24.04`, **conclusion `success`**, 23 s, every Linux step `success` and every Windows-only step `skipped`; `verify (windows-2025)` — **conclusion `success`**, 57 s, mirror-image step pattern. That adversarial step's own annotation records `injected forbidden import refused with category 'undeclared-crate' and exit 1`. Step-level evidence that the gates are load-bearing rather than skipped: the release-smoke step can only pass with a real `target/release/solo-cli[.exe]`, the two-clean-build step can only pass after two fresh release builds, and the tripwire step can only pass after a genuine failing test carrying its diagnostic.
-
-**Honest limitations.** The `Job summary (Linux)`/`(Windows)` steps reported `success`, which proves they ran and wrote the summary; the rendered summary panel is not readable without an authenticated session, so its exact text is verified from the committed workflow rather than read back. That text states in the summary: `Browser smoke: UNVERIFIED / NOT RUN — no authorized browser UI, served Page, HTTP adapter or Node/Playwright project exists at this stage`. Raw job logs are likewise unavailable unauthenticated; conclusions, step tables and annotations were read through the public API instead. The only warning class on every run is one GitHub platform notice: `actions/checkout@08eba0b2…` targets Node.js 20 and is being run on Node.js 24 — an upstream runner deprecation notice, not a gate warning, and it affects neither the pinned commit nor the result.
-
-
-## Gate ledger
-
-| Gate | Evidence | Result |
-| --- | --- | --- |
-| **C-01 Identity, issuance and scope** | Starting HEAD/tree and 22 blobs verified; Owner-installed complete order plus matching handoff; one root/worktree/origin; exactly the five approved permanent paths differ; NEXT cleared only as authorized; ROADMAP and OUTLOOK preserved | **PASS** |
-| **C-02 Pinned, least-privilege CI** | Workflow accepted and executed by GitHub Actions; sole action pinned to full SHA `08eba0b2…` (verified against tag `v4.3.0`); `permissions: contents: read`; `persist-credentials: false`; both `ubuntu-24.04` and `windows-2025` jobs genuinely ran at published revisions with `push`/`pull_request` scoping | **PASS** |
-| **C-03 Toolchain/locked/offline** | Both hosts installed and asserted `rustc 1.99.1`; lock digest recorded; `cargo fetch --locked` the only network step, every later Cargo command offline and `--locked`; lock unchanged, no dependency added | **PASS** |
-| **C-04 Standard Rust gates** | Format, `-D warnings` Clippy, all-target locked tests, real-tree checker and the 23-fixture `--self-test` ran and passed on both hosts with named-category assertions | **PASS** |
-| **C-05 Actual release CLI** | Release binary on each host returned exit 0 / exit 2 with byte-identical stdout and stderr including the trailing LF; no debug-binary substitution, no masked status | **PASS** |
-| **C-06 Deliberate test fault** | Tripwire passes unmodified on both hosts; with `SOLO_CI_INJECT_TEST_FAILURE=1` the real Cargo test process fails with the specific diagnostic and exactly one failed test; missing, unrelated or swallowed outcomes fail the probe | **PASS** |
-| **C-07 Forbidden import and bypass** | Ubuntu: precompiled checker exited 0 on the legal tree, then exit **1** with category `undeclared-crate` after a genuine domain→adapter source edit (scanner evidence, not a compiler error); `checker-bypass`, `direct-outward`, `renamed-alias`, `reexport-chain` refused as `layer-outward-reference` and `dynamic-load` as `dynamic-loading`; usage errors exit 2; source restored byte-for-byte with a clean `git diff --exit-code` and the tree legal again | **PASS** |
-| **C-08 Determinism and cleanup** | Ubuntu: two fresh offline release target directories produced identical raw binary digests; local Windows-GNU pair likewise identical and equal to the accepted R01.B digest; no lock, source or workflow residue; task scratch removed; foreign material preserved; single checkout | **PASS** |
-| **C-09 Failure propagation/security** | No `continue-on-error`, masked exit, implicit skip, unpinned action or write token; the injected test fault, the illegal import and the version assertions demonstrably fail at their own gate (proved by runs 1–3); no secrets printed; read-only tokens for fork PRs | **PASS** |
-| **C-10 Truthful non-runs** | Browser/HTTP/Node/Playwright, Stage 02+ C1/C2/C4 and unimplemented future commands are `UNVERIFIED`/`NOT RUN`; no claim that green Rust CI closes Stage 01 or authorizes a release | **PASS** |
-| **C-11 Publication and independent reviewability** | Published paths are exactly the approved ledger plus the unchanged installed order; remote `origin/main` and the evaluated revision verified; workflow conclusions read back for that revision; canonical report published; clean checkout; four WIP files | **PASS** |
-
-## Scratch, state and remaining obligations
-
-One checkout, one worktree, one `origin`. The run's owned scratch was `.temp/w035` (downloaded `rustup-init.exe`, pinned toolchain homes, two independent clean target directories, captured streams and logs); it is deleted before handback. Foreign material was preserved untouched and is **not** this run's: `.temp/rt/tmp/…`, `.temp/w032/…` and `.temp/w033/…` each hold a 501-byte `dotnet-suggest-registration-git-credential-manager` sentinel written by an external service. Owner cleanup trigger: delete those three directories when no external service holds them. `.temp/architecture-fixtures` remains an empty shared parent. No repository content was deleted, reset, cleaned or rewritten, and no second clone, worktree or nested repository was created. The only source mutation anywhere was inside the disposable GitHub runner checkout, restored byte-for-byte under a guaranteed trap.
-
-**State at handback:** NEXT holds only the neutral heading; ACTIVE holds the Owner-installed `SOLO-WO-035 R01` order unchanged as the issued-order record and grants no further authority; ROADMAP still carries **R01.C** and the Stage 01 prerequisite/exit gate; OUTLOOK is unchanged. No merge, release, deployment, provider, credential or GitHub-settings action was taken, and no distributable was published.
-
-**Still open and explicitly not satisfied by this run:** R01.C is *not* accepted and the **Stage 01 exit gate remains open** — both await independent Chief Architect review and a separate Owner-authorized reconciliation. Browser smoke, HTTP suites, Node/Playwright, Stage 02+ capabilities (C1/C2/C4), accessibility numerical conformance, provider conformance, `cargo-deny`/advisory scanning, the `unicode-ident` Unicode-3.0 `NOTICE` prerequisite, distribution and deployment remain `UNVERIFIED`/`NOT RUN`; this workflow certifies none of them and does not constitute a security audit.
-
-**Single next step:** return **"agent report ready"** for independent Chief Architect `ACCEPT / REVISE / STOP` against the published revision.
-
-Gates executed on **both** hosts: workspace package-set (exactly the four approved crates via `cargo metadata --locked --no-deps`), `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`, `cargo test --workspace --all-targets --locked`, the real-tree checker, the 23-fixture `--self-test` matrix with named-category assertions, the failure tripwire, `cargo build --workspace --release --locked` and byte-exact release-binary smoke. Ubuntu additionally runs the injected-forbidden-source probe with guaranteed restoration and two independent clean release builds.
+**Correction 2 — the network boundary.** The report and both job summaries claimed `cargo fetch --locked` was *the only network step*. That is false at the system level: `actions/checkout` and `rustup toolchain install` also use the network. What is true is narrower and now stated precisely: `cargo fetch --locked` is the only **network-enabled Cargo dependency acquisition**, and after it every Cargo command runs offline under `CARGO_NET_OFFLINE=true` with `--locked`. Directly related prose was corrected for the same reason: the job `env` comment previously read `Default-deny network` (a Cargo setting described as a system-wide network restriction) and the step label read `(sole network prelude)`. **No environment variable value, command, action pin, permission, trigger, matrix, test condition or failure-propagation behaviour was changed** — only prose and one step label.
