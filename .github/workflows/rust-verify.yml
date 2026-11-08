@@ -294,6 +294,10 @@ jobs:
           if ($bad -notmatch 'SOLO_CI_TRIPWIRE_INJECTED_FAILURE') { throw "injected run failed without the expected diagnostic" }
           if ($bad -notmatch '1 failed') { throw "injected run did not report exactly one failed test" }
           Write-Output "tripwire=verified normal=pass injected_exit=$injected"
+          # The injected run intentionally left LASTEXITCODE nonzero; the probe has
+          # verified that expected failure, so clear it and end the step cleanly.
+          $global:LASTEXITCODE = 0
+          exit 0
 
 
       # ---------------------------------------------------------------------------
@@ -361,6 +365,8 @@ jobs:
             throw "refused stderr is not byte-identical: $([System.BitConverter]::ToString($refuse.Err))"
           }
           Write-Output "release_smoke=verified accepted_exit=0 refused_exit=2"
+          $global:LASTEXITCODE = 0
+          exit 0
 
 
       # ---------------------------------------------------------------------------
@@ -371,6 +377,10 @@ jobs:
       - name: Forbidden import and bypass refusal with guaranteed restore (Ubuntu)
         if: runner.os == 'Linux'
         run: |
+          # GitHub invokes bash with -e; these probes deliberately run commands that
+          # MUST exit nonzero, so -e is disabled here and every status is checked by
+          # hand. No gate is skipped: each nonzero outcome is asserted explicitly.
+          set +e
           set -uo pipefail
           target_file=crates/solo-domain/src/lib.rs
           backup="$RUNNER_TEMP/solo-domain-lib.rs"
@@ -441,9 +451,10 @@ jobs:
           for variant in a b; do
             dir="$RUNNER_TEMP/target-$variant"
             rm -rf "$dir"
-            CARGO_TARGET_DIR="$dir" cargo build --workspace --release --locked
-            status=$?
-            if [ "$status" -ne 0 ]; then echo "::error::clean release build $variant failed"; exit 1; fi
+            if ! CARGO_TARGET_DIR="$dir" cargo build --workspace --release --locked; then
+              echo "::error::clean release build $variant failed"
+              exit 1
+            fi
             test -f "$dir/release/solo-cli" || { echo "::error::missing binary in target-$variant"; exit 1; }
           done
           first=$(sha256sum "$RUNNER_TEMP/target-a/release/solo-cli" | cut -d' ' -f1)
