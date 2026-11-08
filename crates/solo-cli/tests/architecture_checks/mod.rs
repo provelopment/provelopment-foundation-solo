@@ -48,6 +48,7 @@ pub enum Category {
     ModuleSourceUnresolved,
     ModuleSourceAmbiguous,
     ModuleSourceEscape,
+    ConditionalModulePath,
     IncludeUnsupported,
     IncludeEscape,
     HiddenSource,
@@ -79,6 +80,7 @@ impl Category {
             Self::ModuleSourceUnresolved => "module-source-unresolved",
             Self::ModuleSourceAmbiguous => "module-source-ambiguous",
             Self::ModuleSourceEscape => "module-source-escape",
+            Self::ConditionalModulePath => "conditional-module-path",
             Self::IncludeUnsupported => "include-unsupported",
             Self::IncludeEscape => "include-escape",
             Self::HiddenSource => "hidden-source",
@@ -129,6 +131,69 @@ impl fmt::Display for Violation {
 pub fn sort_unique(violations: Vec<Violation>) -> Vec<Violation> {
     let set: BTreeSet<Violation> = violations.into_iter().collect();
     set.into_iter().collect()
+}
+
+// ---------------------------------------------------------------------------
+// Process contract for the test-only checker.
+//
+// A deliberately illegal fixture must be *observably* refused: "nonzero" alone cannot
+// distinguish a policy refusal from the harness failing to refuse it, so acceptance gets
+// its own status and its own outcome word.
+// ---------------------------------------------------------------------------
+
+/// The real tree is legal (default gate and `--self-test` success).
+pub const EXIT_LEGAL: u8 = 0;
+/// A forbidden fixture was correctly refused by the policy, or the real tree is illegal.
+pub const EXIT_REFUSED: u8 = 1;
+/// The command line was not understood; no flag can weaken the checker.
+pub const EXIT_USAGE: u8 = 2;
+/// A forbidden fixture was **accepted**: the checker failed, this is not evidence.
+pub const EXIT_HARNESS_FAILURE: u8 = 3;
+
+/// What actually happened when a fixture was evaluated.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FixtureOutcome {
+    /// The forbidden construct was refused, as required.
+    Refused,
+    /// The forbidden construct was accepted: a checker failure, never a pass.
+    Accepted,
+}
+
+pub fn classify_fixture_result(violations: &[Violation]) -> FixtureOutcome {
+    if violations.is_empty() {
+        FixtureOutcome::Accepted
+    } else {
+        FixtureOutcome::Refused
+    }
+}
+
+pub fn fixture_exit_code(outcome: FixtureOutcome) -> u8 {
+    match outcome {
+        FixtureOutcome::Refused => EXIT_REFUSED,
+        FixtureOutcome::Accepted => EXIT_HARNESS_FAILURE,
+    }
+}
+
+/// Stable, machine-checkable outcome text: the word `refused` (with the category that
+/// caught it) is never confusable with `accepted`.
+pub fn fixture_outcome_text(fixture: &Fixture, violations: &[Violation]) -> String {
+    let outcome = classify_fixture_result(violations);
+    let status = match outcome {
+        FixtureOutcome::Refused => "refused",
+        FixtureOutcome::Accepted => "accepted",
+    };
+    let matched = violations
+        .iter()
+        .any(|violation| violation.category == fixture.expected);
+    format!(
+        "fixture={} class=\"{}\" outcome={} expected={} findings={} category_match={}",
+        fixture.id,
+        fixture.class,
+        status,
+        fixture.expected.as_str(),
+        violations.len(),
+        matched
+    )
 }
 
 /// What the real-tree check actually inspected, for the report and for the process
@@ -184,7 +249,7 @@ pub struct Fixture {
 }
 
 /// Every required negative class from the work order §5, plus one positive twin each.
-pub const FIXTURES: [Fixture; 19] = [
+pub const FIXTURES: [Fixture; 23] = [
     Fixture {
         id: "direct-outward",
         class: "direct outward dependency",
@@ -279,6 +344,26 @@ pub const FIXTURES: [Fixture; 19] = [
         id: "checker-bypass",
         class: "checker bypass",
         expected: Category::LayerOutwardReference,
+    },
+    Fixture {
+        id: "cfg-attr-path",
+        class: "conditional module path with a valid default",
+        expected: Category::ConditionalModulePath,
+    },
+    Fixture {
+        id: "cfg-attr-nested",
+        class: "nested conditional module path",
+        expected: Category::ConditionalModulePath,
+    },
+    Fixture {
+        id: "path-duplicate",
+        class: "duplicate #[path] declarations",
+        expected: Category::ModuleSourceAmbiguous,
+    },
+    Fixture {
+        id: "path-nonliteral",
+        class: "non-literal #[path] value",
+        expected: Category::ModuleSourceUnresolved,
     },
 ];
 
@@ -479,6 +564,62 @@ fn remaining_fixture(id: &str) -> Option<Vec<Violation>> {
             );
             source::check_unit(&spec, &reader)
         }
+        // A conditional `#[path]` with a **real default** present: passing merely because
+        // the default resolves is the exact defect this correction removes.
+        "cfg-attr-path" => {
+            let world = source::FixtureWorld::standard();
+            let spec = world.spec("solo-application", TargetKind::Lib, "lib.rs", &[]);
+            let src = spec.package_root.join("src");
+            let reader = source::MapReader::new()
+                .with(
+                    spec.root_file.clone(),
+                    "#[cfg_attr(windows, path = \"alternate_windows.rs\")]\nmod alternate;\n",
+                )
+                .with(src.join("alternate.rs"), "pub fn from_default() {}\n")
+                .with(
+                    src.join("alternate_windows.rs"),
+                    "pub fn from_windows() {}\n",
+                );
+            source::check_unit(&spec, &reader)
+        }
+        "cfg-attr-nested" => {
+            let world = source::FixtureWorld::standard();
+            let spec = world.spec("solo-application", TargetKind::Lib, "lib.rs", &[]);
+            let src = spec.package_root.join("src");
+            let reader = source::MapReader::new()
+                .with(
+                    spec.root_file.clone(),
+                    "#[cfg_attr(all(windows, not(test)), cfg_attr(unix, path = \"nested.rs\"))]\nmod nested;\n",
+                )
+                .with(src.join("nested.rs"), "pub fn from_default() {}\n")
+                .with(src.join("nested_alt.rs"), "pub fn from_nested() {}\n");
+            source::check_unit(&spec, &reader)
+        }
+        "path-duplicate" => {
+            let world = source::FixtureWorld::standard();
+            let spec = world.spec("solo-application", TargetKind::Lib, "lib.rs", &[]);
+            let src = spec.package_root.join("src");
+            let reader = source::MapReader::new()
+                .with(
+                    spec.root_file.clone(),
+                    "#[path = \"first.rs\"]\n#[path = \"second.rs\"]\nmod dup;\n",
+                )
+                .with(src.join("first.rs"), "pub fn a() {}\n")
+                .with(src.join("second.rs"), "pub fn b() {}\n");
+            source::check_unit(&spec, &reader)
+        }
+        "path-nonliteral" => {
+            let world = source::FixtureWorld::standard();
+            let spec = world.spec("solo-application", TargetKind::Lib, "lib.rs", &[]);
+            let src = spec.package_root.join("src");
+            let reader = source::MapReader::new()
+                .with(
+                    spec.root_file.clone(),
+                    "#[path = concat!(\"non\", \"literal.rs\")]\nmod nonlit;\n",
+                )
+                .with(src.join("nonliteral.rs"), "pub fn c() {}\n");
+            source::check_unit(&spec, &reader)
+        }
         _ => return None,
     };
 
@@ -486,11 +627,12 @@ fn remaining_fixture(id: &str) -> Option<Vec<Violation>> {
 }
 
 /// Positive twins: the same checker must accept the legal forms the real tree uses.
-pub const POSITIVES: [&str; 4] = [
+pub const POSITIVES: [&str; 5] = [
     "legal-application",
     "legal-cli-test-dev-deps",
     "legal-macro-usage",
     "legal-inline-module",
+    "legal-cfg-attr-harmless",
 ];
 
 pub fn evaluate_positive(id: &str) -> Option<Vec<Violation>> {
@@ -526,6 +668,16 @@ pub fn evaluate_positive(id: &str) -> Option<Vec<Violation>> {
                 "solo-application",
                 TargetKind::Lib,
                 "mod inner {\n    use core::fmt;\n    pub fn f(_: fmt::Formatter<'_>) {}\n}\npub use inner::f;\n",
+            );
+            source::check_unit(&spec, &reader)
+        }
+        // A harmless `cfg_attr` that cannot select source must stay legal: the correction
+        // refuses conditional *paths*, not conditional compilation in general.
+        "legal-cfg-attr-harmless" => {
+            let (spec, reader) = source_case(
+                "solo-application",
+                TargetKind::Lib,
+                "#[cfg_attr(test, allow(dead_code))]\nmod inner {\n    pub fn helper() {}\n}\npub use inner::helper;\n",
             );
             source::check_unit(&spec, &reader)
         }

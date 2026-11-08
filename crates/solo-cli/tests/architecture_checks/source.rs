@@ -19,14 +19,67 @@ use syn::visit::Visit;
 use super::graph::{self, DepKind, PackageTargets, TargetKind};
 use super::{Category, Violation};
 
+/// Why a candidate source path could not be proven confined.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConfinementError {
+    /// The lexical or the effective path lies outside the package root.
+    Escape,
+    /// The path could not be inspected or canonicalised, so it cannot be proven safe.
+    Unresolvable,
+}
+
 /// Reads source text. The real tree uses [`FsReader`]; fixtures use an in-memory map,
 /// so a negative case never has to touch the working tree.
+///
+/// [`SourceReader::confine`] is the single confinement gate: every source the checker may
+/// open, parse or treat as reachable is proved safe through it first. It fails closed —
+/// an unprovable path is an error, never a silent skip.
 pub trait SourceReader {
     fn read(&self, path: &Path) -> Option<String>;
     fn is_file(&self, path: &Path) -> bool;
+    fn confine(&self, path: &Path, root: &Path) -> Result<PathBuf, ConfinementError>;
 }
 
-/// Read-only filesystem access.
+/// Whether a filesystem entry redirects elsewhere: a symlink, a Windows junction, or any
+/// other reparse point.
+fn is_redirect(metadata: &std::fs::Metadata) -> bool {
+    if metadata.file_type().is_symlink() {
+        return true;
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x0000_0400;
+        metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
+    }
+    #[cfg(not(windows))]
+    {
+        false
+    }
+}
+
+/// Proves that no component between `root` and `path` is a redirect.
+fn redirected_component(root: &Path, path: &Path) -> Result<(), ConfinementError> {
+    let Ok(relative) = path.strip_prefix(root) else {
+        return Err(ConfinementError::Escape);
+    };
+
+    let mut current = root.to_path_buf();
+    for component in relative.components() {
+        current.push(component.as_os_str());
+        match std::fs::symlink_metadata(&current) {
+            Ok(metadata) => {
+                if is_redirect(&metadata) {
+                    return Err(ConfinementError::Escape);
+                }
+            }
+            Err(_) => return Err(ConfinementError::Unresolvable),
+        }
+    }
+    Ok(())
+}
+
+/// Read-only filesystem access with real effective-path enforcement.
 pub struct FsReader;
 
 impl SourceReader for FsReader {
@@ -35,7 +88,35 @@ impl SourceReader for FsReader {
     }
 
     fn is_file(&self, path: &Path) -> bool {
-        path.is_file()
+        std::fs::metadata(path).is_ok_and(|metadata| metadata.is_file())
+    }
+
+    /// Lexical containment, then a redirect scan over the real directory entries, then
+    /// canonicalisation of both the target and the package root. Any failure refuses.
+    ///
+    /// This cannot eliminate a hostile time-of-check/time-of-use race; it proves the
+    /// path that is about to be read is confined at the moment it is checked.
+    fn confine(&self, path: &Path, root: &Path) -> Result<PathBuf, ConfinementError> {
+        let lexical = normalize_lexical(path);
+        let lexical_root = normalize_lexical(root);
+        if !is_inside(&lexical, &lexical_root) {
+            return Err(ConfinementError::Escape);
+        }
+
+        redirected_component(&lexical_root, &lexical)?;
+
+        let effective =
+            std::fs::canonicalize(&lexical).map_err(|_| ConfinementError::Unresolvable)?;
+        let effective_root =
+            std::fs::canonicalize(&lexical_root).map_err(|_| ConfinementError::Unresolvable)?;
+        if !is_inside(
+            &normalize_lexical(&effective),
+            &normalize_lexical(&effective_root),
+        ) {
+            return Err(ConfinementError::Escape);
+        }
+
+        Ok(effective)
     }
 }
 
@@ -63,6 +144,17 @@ impl SourceReader for MapReader {
 
     fn is_file(&self, path: &Path) -> bool {
         self.files.contains_key(path)
+    }
+
+    /// In-memory fixtures never consult the host filesystem: confinement is the lexical
+    /// package-root rule only, so a fixture can express an escape intent without needing
+    /// a real link.
+    fn confine(&self, path: &Path, root: &Path) -> Result<PathBuf, ConfinementError> {
+        let lexical = normalize_lexical(path);
+        if !is_inside(&lexical, &normalize_lexical(root)) {
+            return Err(ConfinementError::Escape);
+        }
+        Ok(lexical)
     }
 }
 
@@ -292,15 +384,17 @@ pub fn check_packages(packages: &[PackageTargets]) -> Result<SourceReport, Vec<V
     // Hidden source: every Rust file in a package must be reachable from a declared
     // target, otherwise an unchecked file could carry a forbidden edge.
     for package in packages {
-        for path in rust_files_under(&package.root) {
+        let label = label_root(&package.root);
+        let (discovered, mut walk_violations) = rust_files_under(&package.root, &label);
+        violations.append(&mut walk_violations);
+        for path in discovered {
             if files.contains(&path) {
                 continue;
             }
             violations.push(Violation::new(
                 Category::HiddenSource,
                 format!(
-                    "{}/{}",
-                    label_root(&package.root),
+                    "{label}/{}",
                     path.strip_prefix(&package.root)
                         .unwrap_or(&path)
                         .to_string_lossy()
@@ -368,6 +462,27 @@ impl Scanner<'_> {
         }
         let location = self.rel(&ctx.path);
 
+        // Nothing is opened before its effective destination is proven confined.
+        match self.reader.confine(&ctx.path, &self.spec.package_root) {
+            Ok(_effective) => {}
+            Err(ConfinementError::Escape) => {
+                self.violation(
+                    Category::ModuleSourceEscape,
+                    location,
+                    "source file is redirected outside its package root and is refused",
+                );
+                return;
+            }
+            Err(ConfinementError::Unresolvable) => {
+                self.violation(
+                    Category::UnreadableSource,
+                    location,
+                    "source file could not be proven confined (inspect or canonicalise failed)",
+                );
+                return;
+            }
+        }
+
         let Some(text) = self.reader.read(&ctx.path) else {
             self.violation(
                 Category::UnreadableSource,
@@ -422,14 +537,33 @@ impl Scanner<'_> {
         self.report_facts(&facts, &child);
 
         if let Some((_, inner)) = &module.content {
+            // `#[path]` on an inline module is meaningless: refuse rather than ignore it.
+            if !matches!(
+                module_path_selection(&module.attrs),
+                ModulePathSelection::Default
+            ) {
+                let location = self.rel(&child.path);
+                self.violation(
+                    Category::ConditionalModulePath,
+                    location,
+                    "inline module carries a path-selecting attribute that is refused",
+                );
+            }
             self.scan_items(inner, &mut child);
             return;
         }
 
         let name = module.ident.to_string();
-        let resolved = match path_attribute(&module.attrs) {
-            Some(literal) => self.resolve_declared_path(&child, &literal, &name),
-            None => self.resolve_default_module(&child, &name),
+        let resolved = match module_path_selection(&module.attrs) {
+            ModulePathSelection::Default => self.resolve_default_module(&child, &name),
+            ModulePathSelection::Literal(literal) => {
+                self.resolve_declared_path(&child, &literal, &name)
+            }
+            ModulePathSelection::Refused(category, detail) => {
+                let location = self.rel(&child.path);
+                self.violation(category, location, detail);
+                None
+            }
         };
         let Some(resolved) = resolved else {
             return;
@@ -455,7 +589,7 @@ impl Scanner<'_> {
         self.scan(next);
     }
 
-    /// `#[path = "..."]`: only a literal, in-root, existing file is accepted.
+    /// `#[path = "..."]`: only one literal, confined, existing file is accepted.
     fn resolve_declared_path(
         &mut self,
         ctx: &FileCtx,
@@ -463,34 +597,23 @@ impl Scanner<'_> {
         name: &str,
     ) -> Option<PathBuf> {
         if literal.trim().is_empty() || literal.contains('\0') {
+            let location = self.rel(&ctx.path);
             self.violation(
                 Category::ModuleSourceEscape,
-                self.rel(&ctx.path),
+                location,
                 format!("module `{name}` declares an empty or invalid #[path]"),
             );
             return None;
         }
 
         let candidate = normalize_lexical(&ctx.dir.join(literal));
-        let root = normalize_lexical(&self.spec.package_root);
-        if !is_inside(&candidate, &root) {
-            self.violation(
-                Category::ModuleSourceEscape,
-                self.rel(&ctx.path),
-                format!("module `{name}` resolves outside its package root via #[path]"),
-            );
-            return None;
-        }
-        if !self.reader.is_file(&candidate) {
-            self.violation(
-                Category::ModuleSourceUnresolved,
-                self.rel(&ctx.path),
-                format!("module `{name}` #[path] target does not exist"),
-            );
-            return None;
-        }
-        self.verify_no_escape(&candidate, ctx, name);
-        Some(candidate)
+        self.confined_source(
+            &candidate,
+            &ctx.path,
+            Category::ModuleSourceEscape,
+            Category::ModuleSourceUnresolved,
+            &format!("module `{name}` #[path]"),
+        )
     }
 
     /// Default `mod name;` resolution: exactly one of `name.rs` / `name/mod.rs` may
@@ -513,23 +636,27 @@ impl Scanner<'_> {
             .collect();
 
         match existing.len() {
-            1 => {
-                let resolved = existing[0].clone();
-                self.verify_no_escape(&resolved, ctx, name);
-                Some(resolved)
-            }
             0 => {
+                let location = self.rel(&ctx.path);
                 self.violation(
                     Category::ModuleSourceUnresolved,
-                    self.rel(&ctx.path),
+                    location,
                     format!("module `{name}` has no resolvable source file"),
                 );
                 None
             }
+            1 => self.confined_source(
+                &existing[0],
+                &ctx.path,
+                Category::ModuleSourceEscape,
+                Category::ModuleSourceUnresolved,
+                &format!("module `{name}`"),
+            ),
             _ => {
+                let location = self.rel(&ctx.path);
                 self.violation(
                     Category::ModuleSourceAmbiguous,
-                    self.rel(&ctx.path),
+                    location,
                     format!("module `{name}` resolves to two conflicting source files"),
                 );
                 None
@@ -537,23 +664,52 @@ impl Scanner<'_> {
         }
     }
 
-    /// On the real filesystem, a resolved path must not reach outside the package even
-    /// through a symlink, junction or other reparse point.
-    fn verify_no_escape(&mut self, resolved: &Path, ctx: &FileCtx, name: &str) {
-        let Ok(real) = std::fs::canonicalize(resolved) else {
-            return;
-        };
-        let Ok(root) = std::fs::canonicalize(&self.spec.package_root) else {
-            return;
-        };
-        let normalized = normalize_lexical(&real);
-        if !is_inside(&normalized, &normalize_lexical(&root)) {
-            self.violation(
-                Category::ModuleSourceEscape,
-                self.rel(&ctx.path),
-                format!("module `{name}` resolves outside its package root through a link"),
-            );
+    /// Proves a candidate source is confined, present and identifiable **before** it is
+    /// read, parsed, traversed or treated as reachable. Any unprovable path refuses; there
+    /// is no warning-and-continue path.
+    fn confined_source(
+        &mut self,
+        candidate: &Path,
+        at: &Path,
+        escape_category: Category,
+        missing_category: Category,
+        purpose: &str,
+    ) -> Option<PathBuf> {
+        let location = self.rel(at);
+        let lexical = normalize_lexical(candidate);
+
+        match self.reader.confine(&lexical, &self.spec.package_root) {
+            Ok(_effective) => {}
+            Err(ConfinementError::Escape) => {
+                self.violation(
+                    escape_category,
+                    location,
+                    format!("{purpose} leaves the package root (lexically or through a redirect)"),
+                );
+                return None;
+            }
+            Err(ConfinementError::Unresolvable) => {
+                self.violation(
+                    Category::UnreadableSource,
+                    location,
+                    format!(
+                        "{purpose} could not be proven confined (inspect or canonicalise failed)"
+                    ),
+                );
+                return None;
+            }
         }
+
+        if !self.reader.is_file(&lexical) {
+            self.violation(
+                missing_category,
+                location,
+                format!("{purpose} does not exist"),
+            );
+            return None;
+        }
+
+        Some(lexical)
     }
 
     fn scan_item(&mut self, item: &syn::Item, ctx: &mut FileCtx) {
@@ -726,17 +882,18 @@ impl Scanner<'_> {
         };
 
         let candidate = normalize_lexical(&ctx.dir.join(literal.value()));
-        let root = normalize_lexical(&self.spec.package_root);
-        if !is_inside(&candidate, &root) {
-            self.violation(
-                Category::IncludeEscape,
-                location,
-                "include! resolves outside the package root and is refused",
-            );
+        let Some(confined) = self.confined_source(
+            &candidate,
+            &ctx.path,
+            Category::IncludeEscape,
+            Category::IncludeUnsupported,
+            "include!",
+        ) else {
             return;
-        }
+        };
 
-        let Some(text) = self.reader.read(&candidate) else {
+        let Some(text) = self.reader.read(&confined) else {
+            let location = self.rel(&ctx.path);
             self.violation(
                 Category::IncludeUnsupported,
                 location,
@@ -746,20 +903,18 @@ impl Scanner<'_> {
         };
 
         let Ok(file) = syn::parse_file(&text) else {
+            let location = self.rel(&confined);
             self.violation(
                 Category::UnparsableSource,
-                self.rel(&candidate),
+                location,
                 "included source is not parsable Rust",
             );
             return;
         };
 
         let mut inner = ctx.clone();
-        inner.dir = candidate
-            .parent()
-            .map(Path::to_path_buf)
-            .unwrap_or_default();
-        inner.path = candidate;
+        inner.dir = confined.parent().map(Path::to_path_buf).unwrap_or_default();
+        inner.path = confined;
         self.scan_items(&file.items, &mut inner);
     }
 
@@ -1103,23 +1258,125 @@ fn cfg_is_test(attributes: &[syn::Attribute]) -> bool {
     })
 }
 
-/// Literal value of a `#[path = "..."]` attribute, if present.
-fn path_attribute(attributes: &[syn::Attribute]) -> Option<String> {
-    attributes.iter().find_map(|attribute| {
-        if !attribute.path().is_ident("path") {
-            return None;
+/// How the source file of an out-of-line module is selected.
+///
+/// The checker refuses any selection it cannot pin down: a conditional `#[path]` could
+/// choose a different file on another platform, and inspecting only the default while the
+/// compiler selects an alternative would be a silent miss.
+enum ModulePathSelection {
+    /// No `#[path]` attribute: resolve `name.rs` / `name/mod.rs`.
+    Default,
+    /// Exactly one literal `#[path = "..."]`.
+    Literal(String),
+    /// Conditional, malformed or duplicated selection: refuse, never guess.
+    Refused(Category, String),
+}
+
+fn module_path_selection(attributes: &[syn::Attribute]) -> ModulePathSelection {
+    let mut literal: Option<String> = None;
+    let mut duplicate = false;
+
+    for attribute in attributes {
+        if attribute.path().is_ident("path") {
+            let syn::Meta::NameValue(value) = &attribute.meta else {
+                return ModulePathSelection::Refused(
+                    Category::ModuleSourceUnresolved,
+                    "module `#[path]` is malformed and is refused".to_owned(),
+                );
+            };
+            let syn::Expr::Lit(lit) = &value.value else {
+                return ModulePathSelection::Refused(
+                    Category::ModuleSourceUnresolved,
+                    "module `#[path]` is not a literal string and is refused".to_owned(),
+                );
+            };
+            let syn::Lit::Str(text) = &lit.lit else {
+                return ModulePathSelection::Refused(
+                    Category::ModuleSourceUnresolved,
+                    "module `#[path]` is not a string literal and is refused".to_owned(),
+                );
+            };
+            if literal.replace(text.value()).is_some() {
+                duplicate = true;
+            }
+            continue;
         }
-        let syn::Meta::NameValue(value) = &attribute.meta else {
-            return None;
+
+        if attribute.path().is_ident("cfg_attr") {
+            match cfg_attr_may_select_path(attribute) {
+                Ok(false) => {}
+                Ok(true) => {
+                    return ModulePathSelection::Refused(
+                        Category::ConditionalModulePath,
+                        "module source may be selected by a conditional `#[cfg_attr(..., path = ...)]` \
+                         and is refused rather than inspected on this platform alone"
+                            .to_owned(),
+                    );
+                }
+                Err(reason) => {
+                    return ModulePathSelection::Refused(Category::ConditionalModulePath, reason);
+                }
+            }
+        }
+    }
+
+    if duplicate {
+        return ModulePathSelection::Refused(
+            Category::ModuleSourceAmbiguous,
+            "module declares more than one `#[path]` and is refused".to_owned(),
+        );
+    }
+
+    match literal {
+        Some(path) => ModulePathSelection::Literal(path),
+        None => ModulePathSelection::Default,
+    }
+}
+
+/// Whether a `#[cfg_attr(...)]` can select or obscure a `path`, including nested forms.
+fn cfg_attr_may_select_path(attribute: &syn::Attribute) -> Result<bool, String> {
+    let syn::Meta::List(list) = &attribute.meta else {
+        return Err("`#[cfg_attr]` could not be analysed and is refused".to_owned());
+    };
+    let metas = parse_meta_list(list).ok_or_else(|| {
+        "`#[cfg_attr]` arguments could not be analysed and are refused".to_owned()
+    })?;
+
+    for meta in metas.iter().skip(1) {
+        if meta_mentions_path(meta)? {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+fn meta_mentions_path(meta: &syn::Meta) -> Result<bool, String> {
+    if meta.path().is_ident("path") {
+        return Ok(true);
+    }
+    if meta.path().is_ident("cfg_attr") {
+        let syn::Meta::List(list) = meta else {
+            return Err("nested `cfg_attr` could not be analysed and is refused".to_owned());
         };
-        let syn::Expr::Lit(literal) = &value.value else {
-            return None;
-        };
-        let syn::Lit::Str(text) = &literal.lit else {
-            return None;
-        };
-        Some(text.value())
-    })
+        let metas = parse_meta_list(list).ok_or_else(|| {
+            "nested `cfg_attr` arguments could not be analysed and are refused".to_owned()
+        })?;
+        for item in metas.iter().skip(1) {
+            if meta_mentions_path(item)? {
+                return Ok(true);
+            }
+        }
+    }
+    Ok(false)
+}
+
+fn parse_meta_list(
+    list: &syn::MetaList,
+) -> Option<syn::punctuated::Punctuated<syn::Meta, syn::token::Comma>> {
+    use syn::parse::Parser;
+    syn::punctuated::Punctuated::<syn::Meta, syn::token::Comma>::parse_terminated
+        .parse2(list.tokens.clone())
+        .ok()
 }
 
 fn file_stem(path: &Path) -> String {
@@ -1161,17 +1418,55 @@ fn label_root(package_root: &Path) -> String {
 }
 
 /// Every Rust file under a package root, excluding build output and hidden directories.
-fn rust_files_under(root: &Path) -> Vec<PathBuf> {
+///
+/// Discovery fails closed: an unreadable directory or any redirect encountered while
+/// walking is reported, and a redirect is never descended into, so a junction cannot hide
+/// or substitute source. Files reached only through a redirect can therefore never be
+/// counted as inspected.
+fn rust_files_under(root: &Path, label: &str) -> (Vec<PathBuf>, Vec<Violation>) {
     let mut found: Vec<PathBuf> = Vec::new();
+    let mut violations: Vec<Violation> = Vec::new();
     let mut pending: Vec<PathBuf> = vec![normalize_lexical(root)];
 
     while let Some(directory) = pending.pop() {
-        let Ok(entries) = std::fs::read_dir(&directory) else {
-            continue;
+        let entries = match std::fs::read_dir(&directory) {
+            Ok(entries) => entries,
+            Err(_) => {
+                violations.push(Violation::new(
+                    Category::UnreadableSource,
+                    format!("{label}/{}", relative_label(root, &directory)),
+                    "package directory could not be listed and cannot be audited",
+                ));
+                continue;
+            }
         };
-        for entry in entries.flatten() {
+
+        for entry in entries {
+            let Ok(entry) = entry else {
+                violations.push(Violation::new(
+                    Category::UnreadableSource,
+                    format!("{label}/{}", relative_label(root, &directory)),
+                    "package directory entry could not be read",
+                ));
+                continue;
+            };
+
             let path = entry.path();
             let name = entry.file_name().to_string_lossy().into_owned();
+            let redirect = entry.metadata().is_ok_and(|metadata| {
+                std::fs::symlink_metadata(&path).is_ok_and(|own| is_redirect(&own))
+                    || metadata.file_type().is_symlink()
+            });
+
+            if redirect {
+                violations.push(Violation::new(
+                    Category::ModuleSourceEscape,
+                    format!("{label}/{}", relative_label(root, &path)),
+                    "package entry is a link or reparse point and is not audited",
+                ));
+                continue;
+            }
+
             if path.is_dir() {
                 if name == "target" || name.starts_with('.') {
                     continue;
@@ -1184,7 +1479,13 @@ fn rust_files_under(root: &Path) -> Vec<PathBuf> {
     }
 
     found.sort();
-    found
+    (found, violations)
+}
+
+fn relative_label(root: &Path, path: &Path) -> String {
+    path.strip_prefix(root)
+        .map(|tail| tail.to_string_lossy().replace('\\', "/"))
+        .unwrap_or_else(|_| "<outside>".to_owned())
 }
 
 /// Public root surface of each workspace library crate: the names another crate may
@@ -1208,6 +1509,24 @@ pub fn public_surfaces(
             continue;
         };
         let root = normalize_lexical(&target.src_path);
+        if let Err(error) = reader.confine(&root, &package.root) {
+            let (category, detail) = match error {
+                ConfinementError::Escape => (
+                    Category::ModuleSourceEscape,
+                    "library root is redirected outside its package and is refused",
+                ),
+                ConfinementError::Unresolvable => (
+                    Category::UnreadableSource,
+                    "library root could not be proven confined while computing the public surface",
+                ),
+            };
+            violations.push(Violation::new(
+                category,
+                format!("{}/src/<lib>", label_root(&package.root)),
+                detail,
+            ));
+            continue;
+        }
         let Some(text) = reader.read(&root) else {
             violations.push(Violation::new(
                 Category::UnreadableSource,
@@ -1230,6 +1549,7 @@ pub fn public_surfaces(
         collect_public(
             &file.items,
             &lib_dir,
+            reader,
             &mut surface,
             &mut violations,
             &package.root,
@@ -1269,6 +1589,7 @@ fn surface_violation(package_root: &Path, detail: &str) -> Violation {
 fn collect_public(
     items: &[syn::Item],
     lib_dir: &Path,
+    reader: &dyn SourceReader,
     surface: &mut PublicSurface,
     violations: &mut Vec<Violation>,
     package_root: &Path,
@@ -1281,6 +1602,7 @@ fn collect_public(
                 &node.tree,
                 &mut Vec::new(),
                 lib_dir,
+                reader,
                 surface,
                 violations,
                 package_root,
@@ -1297,6 +1619,7 @@ fn collect_public_use(
     tree: &syn::UseTree,
     prefix: &mut Vec<String>,
     lib_dir: &Path,
+    reader: &dyn SourceReader,
     surface: &mut PublicSurface,
     violations: &mut Vec<Violation>,
     package_root: &Path,
@@ -1308,6 +1631,7 @@ fn collect_public_use(
                 &segment.tree,
                 prefix,
                 lib_dir,
+                reader,
                 surface,
                 violations,
                 package_root,
@@ -1322,7 +1646,15 @@ fn collect_public_use(
         }
         syn::UseTree::Group(group) => {
             for item in &group.items {
-                collect_public_use(item, prefix, lib_dir, surface, violations, package_root);
+                collect_public_use(
+                    item,
+                    prefix,
+                    lib_dir,
+                    reader,
+                    surface,
+                    violations,
+                    package_root,
+                );
             }
         }
         syn::UseTree::Glob(_) => {
@@ -1335,7 +1667,16 @@ fn collect_public_use(
                 ));
                 return;
             };
-            let parsed = std::fs::read_to_string(&path).map(|text| syn::parse_file(&text));
+            let parsed = match reader.confine(&path, package_root) {
+                Ok(_) => std::fs::read_to_string(&path).map(|text| syn::parse_file(&text)),
+                Err(_) => {
+                    violations.push(surface_violation(
+                        package_root,
+                        "public glob re-export target is not confined and is refused",
+                    ));
+                    return;
+                }
+            };
             let Ok(Ok(file)) = parsed else {
                 violations.push(surface_violation(
                     package_root,

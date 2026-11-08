@@ -9,18 +9,25 @@
 //! * `--fixture <id>` — run one forbidden fixture through the same routines; the
 //!   expected outcome is a **nonzero** exit with a bounded diagnostic.
 //!
-//! Exit codes: `0` legal, `1` violation, `2` usage error. Any other argument (including
-//! any imagined `--disable`) is a usage error, never a bypass.
+//! Exit codes distinguish a correct policy refusal from the harness failing to refuse:
+//!
+//! * `0` — the real tree is legal (`--self-test` also exits `0` only when the whole
+//!   matrix is correct);
+//! * `1` — a deliberate violation was refused: the real tree is illegal, or a forbidden
+//!   fixture was correctly refused by the policy;
+//! * `2` — the command line was not understood; no flag can weaken the checker;
+//! * `3` — a forbidden fixture was **accepted**: a checker failure, never evidence of a
+//!   refusal.
 
 mod architecture_checks;
 
 use std::process::ExitCode;
 
-use architecture_checks::{check_real_tree, evaluate_fixture, fixture_by_id, self_test};
-
-const EXIT_LEGAL: u8 = 0;
-const EXIT_VIOLATION: u8 = 1;
-const EXIT_USAGE: u8 = 2;
+use architecture_checks::{
+    EXIT_HARNESS_FAILURE, EXIT_LEGAL, EXIT_REFUSED, EXIT_USAGE, check_real_tree,
+    classify_fixture_result, evaluate_fixture, fixture_by_id, fixture_exit_code,
+    fixture_outcome_text, self_test,
+};
 
 fn main() -> ExitCode {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
@@ -50,7 +57,7 @@ fn check_the_real_tree() -> ExitCode {
         }
         Err(violations) => {
             report_refusals(&violations);
-            ExitCode::from(EXIT_VIOLATION)
+            ExitCode::from(EXIT_REFUSED)
         }
     }
 }
@@ -72,7 +79,7 @@ fn run_self_test() -> ExitCode {
         ExitCode::from(EXIT_LEGAL)
     } else {
         println!("self-check=failed cases={} failed={failed}", cases.len());
-        ExitCode::from(EXIT_VIOLATION)
+        ExitCode::from(EXIT_REFUSED)
     }
 }
 
@@ -82,34 +89,26 @@ fn run_one_fixture(id: &str) -> ExitCode {
         return ExitCode::from(EXIT_USAGE);
     };
 
-    match evaluate_fixture(id) {
-        None => {
-            eprintln!("usage: fixture `{id}` is not registered");
-            ExitCode::from(EXIT_USAGE)
-        }
-        Some(violations) if violations.is_empty() => {
-            // A forbidden fixture that passes is a checker failure, reported as such.
-            println!(
-                "fixture={} class=\"{}\" outcome=accepted expected={}",
-                fixture.id,
-                fixture.class,
-                fixture.expected.as_str()
-            );
-            eprintln!("error: forbidden fixture `{id}` was accepted");
-            ExitCode::from(EXIT_VIOLATION)
-        }
-        Some(violations) => {
-            println!(
-                "fixture={} class=\"{}\" outcome=refused expected={} findings={}",
-                fixture.id,
-                fixture.class,
-                fixture.expected.as_str(),
-                violations.len()
-            );
+    let Some(violations) = evaluate_fixture(id) else {
+        eprintln!("usage: fixture `{id}` is not registered");
+        return ExitCode::from(EXIT_USAGE);
+    };
+
+    let outcome = classify_fixture_result(&violations);
+    println!("{}", fixture_outcome_text(fixture, &violations));
+
+    match outcome {
+        architecture_checks::FixtureOutcome::Refused => {
             report_refusals(&violations);
-            // Intentionally nonzero: the fixture is forbidden, so refusal is success for
-            // the check and a nonzero status for this deliberately illegal input.
-            ExitCode::from(EXIT_VIOLATION)
+            // Correctly refused: the fixture is deliberately illegal, so a policy refusal
+            // is success for the check and exit 1 for this input.
+            ExitCode::from(fixture_exit_code(outcome))
+        }
+        architecture_checks::FixtureOutcome::Accepted => {
+            eprintln!(
+                "error: forbidden fixture `{id}` was accepted; the checker is not load-bearing"
+            );
+            ExitCode::from(EXIT_HARNESS_FAILURE)
         }
     }
 }
