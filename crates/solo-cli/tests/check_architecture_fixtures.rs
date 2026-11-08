@@ -1127,3 +1127,345 @@ fn the_anchor_requires_a_workspace_manifest_a_git_root_and_crates_layout() {
         "an anchor that is not a Git working tree root must be refused"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Discovery-root pre-enumeration (SOLO-WO-033 R01).
+//
+// These call the production `source::rust_files_under` directly and instrument the
+// `DiscoveryFs` seam, so they prove the *ordering*: a redirected or uninspectable
+// directory is refused before even its first `list` call, not after its contents have
+// been enumerated.
+// ---------------------------------------------------------------------------
+
+/// Delegates every inspection to the real filesystem while recording each enumeration.
+struct RecordingDiscoveryFs {
+    real: RealDiscoveryFs,
+    lists: std::cell::RefCell<Vec<PathBuf>>,
+}
+
+impl RecordingDiscoveryFs {
+    fn new() -> Self {
+        Self {
+            real: RealDiscoveryFs,
+            lists: std::cell::RefCell::new(Vec::new()),
+        }
+    }
+
+    fn list_count(&self) -> usize {
+        self.lists.borrow().len()
+    }
+
+    fn listed(&self, directory: &Path) -> bool {
+        let directory = directory.to_path_buf();
+        self.lists.borrow().iter().any(|entry| entry == &directory)
+    }
+}
+
+impl DiscoveryFs for RecordingDiscoveryFs {
+    fn list(&self, directory: &Path) -> std::io::Result<Vec<std::ffi::OsString>> {
+        self.lists.borrow_mut().push(directory.to_path_buf());
+        self.real.list(directory)
+    }
+
+    fn kind(&self, path: &Path) -> std::io::Result<EntryKind> {
+        self.real.kind(path)
+    }
+
+    fn redirected(&self, path: &Path) -> std::io::Result<bool> {
+        self.real.redirected(path)
+    }
+}
+
+/// T-01 — a genuine redirect at the **initial package root** is refused before any `list`.
+#[test]
+fn a_redirected_discovery_root_is_refused_before_its_first_list() {
+    let mut scratch = OwnedScratch::create("discovery-root-pre-list");
+    fixture_checkout(&mut scratch);
+    scratch.write(
+        "checkout/real-target/src/lib.rs",
+        "use solo_adapters::CliOutcome;\npub fn leaked(_: CliOutcome) -> u8 { 7 }\n",
+    );
+    let anchor = scratch.path("checkout");
+    let target = anchor.join("real-target");
+    let package_root = anchor.join("crates").join("solo-application");
+
+    if !scratch.link_dir("checkout/crates/solo-application", &target) {
+        panic!(
+            "UNVERIFIED: this host could not create a genuine package-root redirect, so the \
+             pre-enumeration gate cannot be evidenced"
+        );
+    }
+
+    // The former false-positive condition: root and child canonicalise consistently.
+    let effective_root = std::fs::canonicalize(&package_root).expect("root must resolve");
+    let effective_child =
+        std::fs::canonicalize(package_root.join("src")).expect("child must resolve");
+    assert!(
+        effective_child.starts_with(&effective_root),
+        "the redirected root and its child must canonicalise consistently"
+    );
+    let entry = std::fs::symlink_metadata(&package_root).expect("entry");
+    assert!(
+        is_a_redirect(&entry),
+        "the unresolved package-root entry must be a genuine redirect"
+    );
+
+    let before = snapshot(&target);
+    let inspector = RecordingDiscoveryFs::new();
+    let (found, violations) =
+        source::rust_files_under(&package_root, "fixture", &anchor, &inspector);
+
+    assert!(
+        violations
+            .iter()
+            .any(|violation| violation.category == Category::ModuleSourceEscape),
+        "the redirected discovery root must be refused as module-source-escape, saw {:?}",
+        categories(&violations)
+    );
+    assert_eq!(
+        inspector.list_count(),
+        0,
+        "no directory may be enumerated once the root is refused: {:?}",
+        inspector.lists.borrow()
+    );
+    assert!(
+        found.is_empty(),
+        "no redirected `.rs` file may be inventoried: {found:?}"
+    );
+    assert_target_preserved(&before, &target);
+    assert!(
+        package_root.exists(),
+        "the package-root redirect must be preserved"
+    );
+}
+
+/// T-02 — a redirect on the `crates` **ancestor** is refused before enumeration, even
+/// though the package-root entry looks like an ordinary directory after resolution.
+#[test]
+fn a_redirected_discovery_ancestor_is_refused_before_its_first_list() {
+    let mut scratch = OwnedScratch::create("discovery-ancestor-pre-list");
+    fixture_checkout(&mut scratch);
+    scratch.write(
+        "checkout/real-crates/solo-application/src/lib.rs",
+        "use solo_adapters::CliOutcome;\npub fn leaked(_: CliOutcome) -> u8 { 8 }\n",
+    );
+    let anchor = scratch.path("checkout");
+    let target = anchor.join("real-crates");
+    let package_root = anchor.join("crates").join("solo-application");
+
+    if !scratch.link_dir("checkout/crates", &target) {
+        panic!(
+            "UNVERIFIED: this host could not create a genuine `crates` redirect, so the \
+             ancestor pre-enumeration gate cannot be evidenced"
+        );
+    }
+
+    let entry = std::fs::symlink_metadata(&package_root).expect("package entry");
+    assert!(
+        !is_a_redirect(&entry) && entry.is_dir(),
+        "after resolution the package root itself looks like an ordinary directory"
+    );
+
+    let before = snapshot(&target);
+    let inspector = RecordingDiscoveryFs::new();
+    let (found, violations) =
+        source::rust_files_under(&package_root, "fixture", &anchor, &inspector);
+
+    assert!(
+        violations
+            .iter()
+            .any(|violation| violation.category == Category::ModuleSourceEscape),
+        "a redirected ancestor must be refused as module-source-escape, saw {:?}",
+        categories(&violations)
+    );
+    assert!(
+        !inspector.listed(&package_root),
+        "the package directory must never be enumerated through a redirected ancestor"
+    );
+    assert_eq!(
+        inspector.list_count(),
+        0,
+        "no enumeration at all may occur behind a refused ancestor: {:?}",
+        inspector.lists.borrow()
+    );
+    assert!(
+        found.is_empty(),
+        "no file behind a redirected ancestor may be inventoried: {found:?}"
+    );
+    assert_target_preserved(&before, &target);
+}
+
+/// T-03 — every **queued** directory is validated before `list`, not only when it is
+/// appended to the queue.
+///
+/// The injected seam models the deterministic real-world condition "a queued directory
+/// becomes uninspectable after the initial classification" by failing the second
+/// inspection of one specific child. The failure travels the production pre-list code.
+struct FlakyDiscoveryFs {
+    real: RealDiscoveryFs,
+    target: PathBuf,
+    kind_calls: std::cell::Cell<usize>,
+    redirect_calls: std::cell::Cell<usize>,
+    lists: std::cell::RefCell<Vec<PathBuf>>,
+}
+
+impl FlakyDiscoveryFs {
+    fn new(target: PathBuf) -> Self {
+        Self {
+            real: RealDiscoveryFs,
+            target,
+            kind_calls: std::cell::Cell::new(0),
+            redirect_calls: std::cell::Cell::new(0),
+            lists: std::cell::RefCell::new(Vec::new()),
+        }
+    }
+
+    fn listed(&self, directory: &Path) -> bool {
+        let directory = directory.to_path_buf();
+        self.lists.borrow().iter().any(|entry| entry == &directory)
+    }
+}
+
+impl DiscoveryFs for FlakyDiscoveryFs {
+    fn list(&self, directory: &Path) -> std::io::Result<Vec<std::ffi::OsString>> {
+        self.lists.borrow_mut().push(directory.to_path_buf());
+        self.real.list(directory)
+    }
+
+    fn kind(&self, path: &Path) -> std::io::Result<EntryKind> {
+        if path == self.target {
+            let calls = self.kind_calls.get() + 1;
+            self.kind_calls.set(calls);
+            if calls >= 2 {
+                return Err(std::io::Error::other("injected queued-directory failure"));
+            }
+        }
+        self.real.kind(path)
+    }
+
+    fn redirected(&self, path: &Path) -> std::io::Result<bool> {
+        if path == self.target {
+            let calls = self.redirect_calls.get() + 1;
+            self.redirect_calls.set(calls);
+            if calls >= 2 {
+                return Err(std::io::Error::other("injected queued-directory failure"));
+            }
+        }
+        self.real.redirected(path)
+    }
+}
+
+#[test]
+fn a_queued_directory_is_validated_before_it_is_listed() {
+    let mut scratch = OwnedScratch::create("discovery-queued-pre-list");
+    fixture_checkout(&mut scratch);
+    scratch.write(
+        "checkout/crates/solo-application/src/lib.rs",
+        "pub fn ok() {}\n",
+    );
+    scratch.write(
+        "checkout/crates/solo-application/src/nested/hidden.rs",
+        "pub fn nested() {}\n",
+    );
+    let anchor = scratch.path("checkout");
+    let package_root = anchor.join("crates").join("solo-application");
+    let nested = package_root.join("src").join("nested");
+
+    let inspector = FlakyDiscoveryFs::new(nested.clone());
+    let (found, violations) =
+        source::rust_files_under(&package_root, "fixture", &anchor, &inspector);
+
+    assert!(
+        violations
+            .iter()
+            .any(|violation| violation.category == Category::UnreadableSource),
+        "a queued directory that cannot be inspected must be refused, saw {:?}",
+        categories(&violations)
+    );
+    assert!(
+        !inspector.listed(&nested),
+        "the failed pre-enumeration check must prevent listing that directory: {:?}",
+        inspector.lists.borrow()
+    );
+    assert!(
+        !found
+            .iter()
+            .any(|path| path.to_string_lossy().contains("hidden")),
+        "nothing from an unvalidated queued directory may be inventoried: {found:?}"
+    );
+    assert!(
+        found
+            .iter()
+            .any(|path| path.to_string_lossy().ends_with("lib.rs")),
+        "the validated root must still be inventoried: {found:?}"
+    );
+}
+
+/// T-05 — safety evidence: fixture roots are positively owned, no redirect ever becomes a
+/// cleanup root, and pre-existing foreign scratch is never read, changed or deleted.
+#[test]
+fn discovery_fixtures_are_owned_and_foreign_scratch_is_untouched() {
+    let foreign = OwnedScratch::checkout()
+        .join(".temp")
+        .join("rt")
+        .join("tmp")
+        .join("system-commandline-sentinel-files");
+    let foreign_before = snapshot(&foreign);
+
+    let mut scratch = OwnedScratch::create("discovery-safety");
+    fixture_checkout(&mut scratch);
+    scratch.write("checkout/real-target/src/lib.rs", "pub fn leaked() {}\n");
+    let anchor = scratch.path("checkout");
+    let target = anchor.join("real-target");
+    let package_root = anchor.join("crates").join("solo-application");
+
+    if !scratch.link_dir("checkout/crates/solo-application", &target) {
+        panic!(
+            "UNVERIFIED: this host could not create a genuine redirect, so the ownership \
+             evidence cannot be produced"
+        );
+    }
+
+    // The fixture root is a real directory this test created, never a redirect.
+    let root_entry = std::fs::symlink_metadata(&scratch.root).expect("owned root entry");
+    assert!(
+        root_entry.is_dir() && !is_a_redirect(&root_entry),
+        "the fixture root must be an exclusive real directory"
+    );
+    assert!(
+        scratch.root.starts_with(
+            OwnedScratch::checkout()
+                .join(".temp")
+                .join("architecture-fixtures")
+        ),
+        "the fixture root must live in the owned scratch hierarchy: {}",
+        scratch.root.display()
+    );
+
+    let before = snapshot(&target);
+    let inspector = RecordingDiscoveryFs::new();
+    let (_found, violations) =
+        source::rust_files_under(&package_root, "fixture", &anchor, &inspector);
+    assert!(
+        violations
+            .iter()
+            .any(|violation| violation.category == Category::ModuleSourceEscape),
+        "the redirect must still be refused, saw {:?}",
+        categories(&violations)
+    );
+
+    // The redirect is a link, not an owned cleanup root, and its target is unchanged.
+    let link_entry = std::fs::symlink_metadata(&package_root).expect("link entry");
+    assert!(
+        is_a_redirect(&link_entry),
+        "the link must still exist as a link after the refused walk"
+    );
+    assert_target_preserved(&before, &target);
+
+    // Foreign scratch is never touched by building, walking or cleaning owned fixtures.
+    assert_eq!(
+        foreign_before,
+        snapshot(&foreign),
+        "pre-existing foreign scratch must be byte-for-byte untouched"
+    );
+}

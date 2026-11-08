@@ -1600,6 +1600,56 @@ impl DiscoveryFs for RealDiscoveryFs {
         Ok(is_redirect(&std::fs::symlink_metadata(path)?))
     }
 }
+/// Proves a directory may be **enumerated** before `DiscoveryFs::list` is called on it.
+///
+/// Applied to every dequeued directory, including the initial package root. It re-uses the
+/// existing confinement policy: lexical containment of the directory in the package root
+/// and of that root in the verified checkout anchor, a completely nonredirected original
+/// entry chain through the anchor and `crates/<package>`, an inspectable **directory**
+/// entry rather than a file, redirect or unknown kind, and effective (canonical)
+/// containment. A self-canonicalising redirected root cannot satisfy it, because the
+/// unresolved entry is rejected before any canonical form is trusted.
+fn validate_discovery_directory(
+    directory: &Path,
+    root: &Path,
+    anchor: &Path,
+    fs: &dyn DiscoveryFs,
+) -> Result<(), ConfinementError> {
+    let lexical = normalize_lexical(directory);
+    let lexical_root = normalize_lexical(root);
+    let lexical_anchor = normalize_lexical(anchor);
+
+    if !is_inside(&lexical, &lexical_root) || !is_inside(&lexical_root, &lexical_anchor) {
+        return Err(ConfinementError::Escape);
+    }
+
+    inspect_original_chain(&lexical_anchor)?;
+    inspect_original_chain(&lexical_root)?;
+    inspect_original_chain(&lexical)?;
+
+    match fs.kind(&lexical) {
+        Ok(EntryKind::Dir) => {}
+        Ok(_) => return Err(ConfinementError::Escape),
+        Err(_) => return Err(ConfinementError::Unresolvable),
+    }
+    match fs.redirected(&lexical) {
+        Ok(false) => {}
+        Ok(true) => return Err(ConfinementError::Escape),
+        Err(_) => return Err(ConfinementError::Unresolvable),
+    }
+
+    let effective = std::fs::canonicalize(&lexical).map_err(|_| ConfinementError::Unresolvable)?;
+    let effective_root =
+        std::fs::canonicalize(&lexical_root).map_err(|_| ConfinementError::Unresolvable)?;
+    let effective_anchor =
+        std::fs::canonicalize(&lexical_anchor).map_err(|_| ConfinementError::Unresolvable)?;
+    if !is_inside(&effective, &effective_root) || !is_inside(&effective_root, &effective_anchor) {
+        return Err(ConfinementError::Escape);
+    }
+
+    Ok(())
+}
+
 /// Every Rust file under a package root, excluding build output and hidden directories.
 ///
 /// Discovery fails closed. For **every** visited entry — including one whose name is not
@@ -1619,6 +1669,29 @@ pub fn rust_files_under(
     let mut pending: Vec<PathBuf> = vec![normalize_lexical(root)];
 
     while let Some(directory) = pending.pop() {
+        // Pre-enumeration gate: prove this directory — including the initial package root
+        // — before it is listed. A redirected, uninspectable, missing, wrong-kind or
+        // out-of-boundary directory is refused here, so its contents are never even
+        // enumerated. Later refusals never make a prior traversal safe.
+        if let Err(error) = validate_discovery_directory(&directory, root, anchor, fs) {
+            let (category, detail) = match error {
+                ConfinementError::Escape => (
+                    Category::ModuleSourceEscape,
+                    "package directory is redirected, of the wrong kind, or outside its boundary and is refused before enumeration",
+                ),
+                ConfinementError::Unresolvable => (
+                    Category::UnreadableSource,
+                    "package directory could not be inspected and is refused before enumeration",
+                ),
+            };
+            violations.push(Violation::new(
+                category,
+                format!("{label}/{}", relative_label(root, &directory)),
+                detail,
+            ));
+            continue;
+        }
+
         let names = match fs.list(&directory) {
             Ok(names) => names,
             Err(_) => {
