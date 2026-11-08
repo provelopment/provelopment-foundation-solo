@@ -1,0 +1,517 @@
+# Foundation Solo — reproducible verification for the existing four-crate Rust slice.
+#
+# Scope: CI/tooling only. This workflow builds, lints, tests and smoke-tests the
+# accepted crate graph and the accepted fail-closed architecture checker. It adds no
+# product feature, no runtime, no HTTP surface, no browser target and no deployment.
+#
+# Trust model, deliberately narrow:
+#   * read-only token (`permissions: contents: read`), no secrets, no write-capable step;
+#   * the only external action is `actions/checkout` pinned to one full commit SHA with
+#     credentials not persisted;
+#   * `CARGO_NET_OFFLINE=true` is the job default, so package network access exists only
+#     in the single explicit `cargo fetch --locked` prelude and nowhere else;
+#   * every mandatory gate is a visible, failure-propagating step: no `continue-on-error`,
+#     no masked exit code, no `|| true`, no broad `if` skip.
+name: rust-verify
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  # Default-deny network: only the locked fetch step overrides this to "false".
+  CARGO_NET_OFFLINE: "true"
+  RUST_BACKTRACE: "1"
+
+jobs:
+  verify:
+    name: verify (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            shell: bash
+            cli_path: target/release/solo-cli
+          - os: windows-2025
+            shell: pwsh
+            cli_path: target/release/solo-cli.exe
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
+
+    steps:
+      - name: Checkout (pinned full commit SHA, credentials not persisted)
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955
+        with:
+          persist-credentials: false
+
+      # ---------------------------------------------------------------------------
+      # Identity of the code under verification. Runner OS/image and commit are
+      # recorded so the conclusion can be tied to an exact revision.
+      # ---------------------------------------------------------------------------
+      - name: Record revision and runner identity (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          echo "commit=$GITHUB_SHA"
+          echo "tree=$(git rev-parse HEAD^{tree})"
+          echo "lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+          echo "runner_os=${{ runner.os }} runner_arch=${{ runner.arch }}"
+          echo "image=${ImageOS:-unknown}-${ImageVersion:-unknown}"
+          uname -a
+
+      - name: Record revision and runner identity (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          git rev-parse HEAD
+          if ($LASTEXITCODE -ne 0) { throw "git rev-parse HEAD failed" }
+          Write-Output "commit=$env:GITHUB_SHA"
+          Write-Output "tree=$(git rev-parse 'HEAD^{tree}')"
+          Write-Output "lock_sha256=$((Get-FileHash 'Cargo.lock' -Algorithm SHA256).Hash.ToLower())"
+          Write-Output "runner_os=${{ runner.os }} runner_arch=${{ runner.arch }}"
+          Write-Output "image=$env:ImageOS-$env:ImageVersion"
+
+      # ---------------------------------------------------------------------------
+      # Toolchain: exactly the channel pinned by the tracked rust-toolchain.toml
+      # (1.99.1 + rustfmt + clippy). Never "stable"/"latest"; a mismatch fails here.
+      # ---------------------------------------------------------------------------
+      - name: Install and assert the pinned toolchain
+        run: |
+          rustup toolchain install 1.99.1 --profile minimal --component rustfmt --component clippy --no-self-update
+
+      - name: Assert exact rustc/cargo versions (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          rustc --version
+          cargo --version
+          rustc --version --verbose
+          rustc --version | grep -q '^rustc 1\.99\.1 ' || { echo "::error::rustc is not 1.99.1"; exit 1; }
+
+      - name: Assert exact rustc/cargo versions (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          rustc --version
+          if ($LASTEXITCODE -ne 0) { throw "rustc --version failed" }
+          cargo --version
+          if ($LASTEXITCODE -ne 0) { throw "cargo --version failed" }
+          rustc --version --verbose
+
+      # ---------------------------------------------------------------------------
+      # The ONLY package-network acquisition. Everything after this step runs with
+      # the job-level CARGO_NET_OFFLINE=true, so a needed-but-unfetched crate is a
+      # hard failure instead of a silent download.
+      # ---------------------------------------------------------------------------
+      - name: Fetch locked packages (sole network prelude)
+        env:
+          CARGO_NET_OFFLINE: "false"
+        run: cargo fetch --locked
+
+      # ---------------------------------------------------------------------------
+      # Workspace identity gate: the real workspace must still be exactly the four
+      # approved crates. Approved edges are enforced by the accepted checker below.
+      # ---------------------------------------------------------------------------
+      - name: Workspace package-set gate (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          cargo metadata --locked --format-version 1 --no-deps > "$RUNNER_TEMP/metadata-nodeps.json"
+          test -s "$RUNNER_TEMP/metadata-nodeps.json"
+          for name in solo-domain solo-application solo-adapters solo-cli; do
+            grep -q "\"name\":\"$name\"" "$RUNNER_TEMP/metadata-nodeps.json" \
+              || { echo "::error::missing approved workspace crate $name"; exit 1; }
+          done
+          unique=$(grep -o '"name":"solo-[a-z-]*"' "$RUNNER_TEMP/metadata-nodeps.json" | sort -u | wc -l)
+          test "$unique" -eq 4 \
+            || { echo "::error::workspace crate set is not the approved four (found $unique)"; exit 1; }
+          cargo metadata --locked --format-version 1 > "$RUNNER_TEMP/metadata-full.json"
+          test -s "$RUNNER_TEMP/metadata-full.json"
+          echo "metadata=ok workspace_members=4"
+
+      - name: Workspace package-set gate (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cargo metadata --locked --format-version 1 --no-deps > "$env:RUNNER_TEMP/metadata-nodeps.json"
+          if ($LASTEXITCODE -ne 0) { throw "cargo metadata --no-deps failed" }
+          if (-not (Test-Path "$env:RUNNER_TEMP/metadata-nodeps.json")) { throw "metadata output missing" }
+          $meta = Get-Content "$env:RUNNER_TEMP/metadata-nodeps.json" -Raw | ConvertFrom-Json
+          $names = @($meta.packages | ForEach-Object { $_.name } | Sort-Object)
+          $expected = @('solo-adapters', 'solo-application', 'solo-cli', 'solo-domain')
+          if ($names.Count -ne 4) { throw "workspace crate count $($names.Count) is not the approved four" }
+          if (Compare-Object -ReferenceObject $expected -DifferenceObject $names) {
+            throw "workspace crate set changed: $($names -join ',')"
+          }
+          cargo metadata --locked --format-version 1 > $null
+          if ($LASTEXITCODE -ne 0) { throw "cargo metadata failed" }
+          Write-Output "metadata=ok workspace_members=4"
+
+      # ---------------------------------------------------------------------------
+      # Mandatory standard gates. Each step is a single cargo command, so both
+      # shells propagate its real exit status to the workflow.
+      # ---------------------------------------------------------------------------
+      - name: Format check
+        run: cargo fmt --all -- --check
+
+      - name: Strict lint (warnings are errors)
+        run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+
+      - name: Test (workspace, all targets, locked)
+        run: cargo test --workspace --all-targets --locked
+
+
+      # ---------------------------------------------------------------------------
+      # Accepted fail-closed architecture checker, run as its own process so the
+      # policy exit status — not a test harness — decides. No weaken switch exists.
+      # ---------------------------------------------------------------------------
+      - name: Architecture checker on the real checkout (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          cargo test --locked -p solo-cli --test check-architecture > "$RUNNER_TEMP/arch-real.txt" 2>&1 \
+            || { cat "$RUNNER_TEMP/arch-real.txt"; echo "::error::real-tree architecture check refused"; exit 1; }
+          cat "$RUNNER_TEMP/arch-real.txt"
+          grep -q 'architecture=legal packages=4' "$RUNNER_TEMP/arch-real.txt" \
+            || { echo "::error::unexpected package set in real-tree report"; exit 1; }
+          grep -q 'edges=22' "$RUNNER_TEMP/arch-real.txt" \
+            || { echo "::error::approved edge count changed"; exit 1; }
+
+      - name: Architecture checker on the real checkout (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cargo test --locked -p solo-cli --test check-architecture > "$env:RUNNER_TEMP/arch-real.txt" 2>&1
+          $code = $LASTEXITCODE
+          Get-Content "$env:RUNNER_TEMP/arch-real.txt" | Write-Output
+          if ($code -ne 0) { throw "real-tree architecture check refused (exit $code)" }
+          $text = Get-Content "$env:RUNNER_TEMP/arch-real.txt" -Raw
+          if ($text -notmatch 'architecture=legal packages=4') { throw "unexpected package set in real-tree report" }
+          if ($text -notmatch 'edges=22') { throw "approved edge count changed" }
+
+      - name: Architecture refusal self-test (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          cargo test --locked -p solo-cli --test check-architecture -- --self-test > "$RUNNER_TEMP/arch-self.txt" 2>&1 \
+            || { cat "$RUNNER_TEMP/arch-self.txt"; echo "::error::self-test matrix failed"; exit 1; }
+          cat "$RUNNER_TEMP/arch-self.txt"
+          grep -q 'self-check=passed cases=29' "$RUNNER_TEMP/arch-self.txt" \
+            || { echo "::error::unexpected self-test case count or outcome"; exit 1; }
+          test "$(grep -c '^ok ' "$RUNNER_TEMP/arch-self.txt")" -eq 29 \
+            || { echo "::error::not every self-test case reported ok"; exit 1; }
+          test "$(grep -c '^FAIL' "$RUNNER_TEMP/arch-self.txt")" -eq 0 \
+            || { echo "::error::a self-test case reported FAIL"; exit 1; }
+          test "$(grep -c 'refused as ' "$RUNNER_TEMP/arch-self.txt")" -eq 23 \
+            || { echo "::error::not every forbidden fixture was refused"; exit 1; }
+          test "$(grep -c 'legal form accepted' "$RUNNER_TEMP/arch-self.txt")" -eq 5 \
+            || { echo "::error::not every legal twin was accepted"; exit 1; }
+          grep -qE '^ok +checker-bypass +refused as layer-outward-reference' "$RUNNER_TEMP/arch-self.txt" \
+            || { echo "::error::checker-bypass was not refused as layer-outward-reference"; exit 1; }
+          grep -qE '^ok +dynamic-load +refused as dynamic-loading' "$RUNNER_TEMP/arch-self.txt" \
+            || { echo "::error::dynamic-load was not refused as dynamic-loading"; exit 1; }
+
+      - name: Architecture refusal self-test (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cargo test --locked -p solo-cli --test check-architecture -- --self-test > "$env:RUNNER_TEMP/arch-self.txt" 2>&1
+          $code = $LASTEXITCODE
+          Get-Content "$env:RUNNER_TEMP/arch-self.txt" | Write-Output
+          if ($code -ne 0) { throw "self-test matrix failed (exit $code)" }
+          $text = Get-Content "$env:RUNNER_TEMP/arch-self.txt" -Raw
+          if ($text -notmatch 'self-check=passed cases=29') { throw "unexpected self-test case count or outcome" }
+          $failed = ([regex]::Matches($text, '(?m)^FAIL')).Count
+          $refused = ([regex]::Matches($text, 'refused as ')).Count
+          $legal = ([regex]::Matches($text, 'legal form accepted')).Count
+          if ($failed -ne 0) { throw "$failed self-test case(s) reported FAIL" }
+          if ($refused -ne 23) { throw "only $refused forbidden fixtures reported refused" }
+          if ($legal -ne 5) { throw "only $legal legal twins reported accepted" }
+          if ($text -notmatch '(?m)^ok +checker-bypass +refused as layer-outward-reference') {
+            throw "checker-bypass was not refused as layer-outward-reference"
+          }
+          if ($text -notmatch '(?m)^ok +dynamic-load +refused as dynamic-loading') {
+            throw "dynamic-load was not refused as dynamic-loading"
+          }
+
+
+      # ---------------------------------------------------------------------------
+      # Failure-sensitivity tripwire. The unmodified target must pass; the injected
+      # run must fail with the specific diagnostic and exactly one failed test. A
+      # missing invocation, unrelated panic or swallowed exit fails the probe.
+      # ---------------------------------------------------------------------------
+      - name: Test-failure tripwire (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          set -uo pipefail
+          cargo test --locked -p solo-cli --test ci_gate_tripwire > "$RUNNER_TEMP/tripwire-normal.txt" 2>&1
+          normal=$?
+          if [ "$normal" -ne 0 ]; then
+            cat "$RUNNER_TEMP/tripwire-normal.txt"
+            echo "::error::tripwire must pass in the unmodified environment"
+            exit 1
+          fi
+          grep -q 'test result: ok. 1 passed; 0 failed' "$RUNNER_TEMP/tripwire-normal.txt" \
+            || { cat "$RUNNER_TEMP/tripwire-normal.txt"; echo "::error::tripwire did not run exactly one passing test"; exit 1; }
+          set +e
+          SOLO_CI_INJECT_TEST_FAILURE=1 cargo test --locked -p solo-cli --test ci_gate_tripwire > "$RUNNER_TEMP/tripwire-injected.txt" 2>&1
+          injected=$?
+          set -e
+          cat "$RUNNER_TEMP/tripwire-injected.txt"
+          if [ "$injected" -eq 0 ]; then
+            echo "::error::an injected test fault still produced exit 0"
+            exit 1
+          fi
+          grep -q 'SOLO_CI_TRIPWIRE_INJECTED_FAILURE' "$RUNNER_TEMP/tripwire-injected.txt" \
+            || { echo "::error::injected run failed without the expected diagnostic"; exit 1; }
+          grep -q '1 failed' "$RUNNER_TEMP/tripwire-injected.txt" \
+            || { echo "::error::injected run did not report exactly one failed test"; exit 1; }
+          echo "tripwire=verified normal=pass injected_exit=$injected"
+
+      - name: Test-failure tripwire (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cargo test --locked -p solo-cli --test ci_gate_tripwire > "$env:RUNNER_TEMP/tripwire-normal.txt" 2>&1
+          $normal = $LASTEXITCODE
+          if ($normal -ne 0) {
+            Get-Content "$env:RUNNER_TEMP/tripwire-normal.txt" | Write-Output
+            throw "tripwire must pass in the unmodified environment (exit $normal)"
+          }
+          $ok = Get-Content "$env:RUNNER_TEMP/tripwire-normal.txt" -Raw
+          if ($ok -notmatch 'test result: ok\. 1 passed; 0 failed') { throw "tripwire did not run exactly one passing test" }
+          $env:SOLO_CI_INJECT_TEST_FAILURE = '1'
+          cargo test --locked -p solo-cli --test ci_gate_tripwire > "$env:RUNNER_TEMP/tripwire-injected.txt" 2>&1
+          $injected = $LASTEXITCODE
+          Remove-Item Env:SOLO_CI_INJECT_TEST_FAILURE
+          Get-Content "$env:RUNNER_TEMP/tripwire-injected.txt" | Write-Output
+          if ($injected -eq 0) { throw "an injected test fault still produced exit 0" }
+          $bad = Get-Content "$env:RUNNER_TEMP/tripwire-injected.txt" -Raw
+          if ($bad -notmatch 'SOLO_CI_TRIPWIRE_INJECTED_FAILURE') { throw "injected run failed without the expected diagnostic" }
+          if ($bad -notmatch '1 failed') { throw "injected run did not report exactly one failed test" }
+          Write-Output "tripwire=verified normal=pass injected_exit=$injected"
+
+
+      # ---------------------------------------------------------------------------
+      # Release artifact. The smoke tests below run THIS binary (never a debug build,
+      # never a downloaded artifact), and it is built after the tree was verified.
+      # ---------------------------------------------------------------------------
+      - name: Release build (workspace, locked)
+        run: cargo build --workspace --release --locked
+
+      - name: Release CLI smoke on the built binary (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          set -uo pipefail
+          exe="${{ matrix.cli_path }}"
+          test -x "$exe" || { echo "::error::release binary missing"; exit 1; }
+          sha256sum "$exe"
+          set +e
+          "$exe" bootstrap-preflight --entity-id entity-7 --base-url https://EXAMPLE.com:443/alpha > "$RUNNER_TEMP/ok.out" 2> "$RUNNER_TEMP/ok.err"
+          ok_status=$?
+          "$exe" bootstrap-preflight --entity-id Main --base-url https://example.com > "$RUNNER_TEMP/bad.out" 2> "$RUNNER_TEMP/bad.err"
+          bad_status=$?
+          set -e
+          printf 'preflight=ok entity_id=entity-7 base=https://example.com/alpha\n' > "$RUNNER_TEMP/ok.want"
+          printf 'error: PREFLIGHT_ENTITY_ID_INVALID: invalid-start\n' > "$RUNNER_TEMP/bad.want"
+          [ "$ok_status" -eq 0 ] || { echo "::error::accepted invocation exited $ok_status"; exit 1; }
+          [ "$bad_status" -eq 2 ] || { echo "::error::refused invocation exited $bad_status"; exit 1; }
+          cmp -s "$RUNNER_TEMP/ok.out" "$RUNNER_TEMP/ok.want" \
+            || { echo "::error::accepted stdout is not byte-identical"; od -c "$RUNNER_TEMP/ok.out"; exit 1; }
+          test ! -s "$RUNNER_TEMP/ok.err" || { echo "::error::accepted invocation wrote stderr"; exit 1; }
+          test ! -s "$RUNNER_TEMP/bad.out" || { echo "::error::refused invocation wrote stdout"; exit 1; }
+          cmp -s "$RUNNER_TEMP/bad.err" "$RUNNER_TEMP/bad.want" \
+            || { echo "::error::refused stderr is not byte-identical"; od -c "$RUNNER_TEMP/bad.err"; exit 1; }
+          echo "release_smoke=verified accepted_exit=$ok_status refused_exit=$bad_status"
+
+      - name: Release CLI smoke on the built binary (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          $exe = "${{ matrix.cli_path }}"
+          if (-not (Test-Path $exe)) { throw "release binary missing" }
+          Write-Output "release_exe_sha256=$((Get-FileHash $exe -Algorithm SHA256).Hash.ToLower())"
+          $enc = New-Object System.Text.UTF8Encoding($false)
+          function Invoke-Cli {
+            param([string[]]$CliArgs, [string]$Tag)
+            $outPath = Join-Path $env:RUNNER_TEMP "$Tag.out"
+            $errPath = Join-Path $env:RUNNER_TEMP "$Tag.err"
+            $proc = Start-Process -FilePath $exe -ArgumentList $CliArgs -RedirectStandardOutput $outPath -RedirectStandardError $errPath -NoNewWindow -Wait -PassThru
+            return [pscustomobject]@{
+              Exit = $proc.ExitCode
+              Out  = [System.IO.File]::ReadAllBytes($outPath)
+              Err  = [System.IO.File]::ReadAllBytes($errPath)
+            }
+          }
+          $accept = Invoke-Cli -CliArgs @('bootstrap-preflight', '--entity-id', 'entity-7', '--base-url', 'https://EXAMPLE.com:443/alpha') -Tag 'ok'
+          $refuse = Invoke-Cli -CliArgs @('bootstrap-preflight', '--entity-id', 'Main', '--base-url', 'https://example.com') -Tag 'bad'
+          $wantOk = $enc.GetBytes("preflight=ok entity_id=entity-7 base=https://example.com/alpha`n")
+          $wantBad = $enc.GetBytes("error: PREFLIGHT_ENTITY_ID_INVALID: invalid-start`n")
+          if ($accept.Exit -ne 0) { throw "accepted invocation exited $($accept.Exit)" }
+          if ($refuse.Exit -ne 2) { throw "refused invocation exited $($refuse.Exit)" }
+          if (-not [System.Linq.Enumerable]::SequenceEqual([byte[]]$accept.Out, [byte[]]$wantOk)) {
+            throw "accepted stdout is not byte-identical: $([System.BitConverter]::ToString($accept.Out))"
+          }
+          if ($accept.Err.Length -ne 0) { throw "accepted invocation wrote stderr" }
+          if ($refuse.Out.Length -ne 0) { throw "refused invocation wrote stdout" }
+          if (-not [System.Linq.Enumerable]::SequenceEqual([byte[]]$refuse.Err, [byte[]]$wantBad)) {
+            throw "refused stderr is not byte-identical: $([System.BitConverter]::ToString($refuse.Err))"
+          }
+          Write-Output "release_smoke=verified accepted_exit=0 refused_exit=2"
+
+
+      # ---------------------------------------------------------------------------
+      # Adversarial source evidence (Ubuntu). A real, forbidden domain→adapter import
+      # is injected into THIS disposable runner checkout only, scanned by the already
+      # built checker binary, and the original bytes are restored on every outcome.
+      # ===========================================================================
+      - name: Forbidden import and bypass refusal with guaranteed restore (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          set -uo pipefail
+          target_file=crates/solo-domain/src/lib.rs
+          backup="$RUNNER_TEMP/solo-domain-lib.rs"
+          restore() { if [ -f "$backup" ]; then cp "$backup" "$target_file"; fi; }
+          trap restore EXIT INT TERM
+
+          cargo test --locked -p solo-cli --test check-architecture --no-run --message-format=json > "$RUNNER_TEMP/checker-build.json" 2>&1
+          build_status=$?
+          if [ "$build_status" -ne 0 ]; then cat "$RUNNER_TEMP/checker-build.json"; echo "::error::checker build failed"; exit 1; fi
+          checker=$(grep -o '"executable":"[^"]*check_architecture[^"]*"' "$RUNNER_TEMP/checker-build.json" | tail -n 1 | sed 's/^"executable":"//; s/"$//')
+          if [ -z "$checker" ] || [ ! -x "$checker" ]; then echo "::error::checker executable not located"; exit 1; fi
+          echo "checker_binary=$checker"
+
+          "$checker"; legal=$?
+          if [ "$legal" -ne 0 ]; then echo "::error::legal tree refused before injection"; exit 1; fi
+          echo "pre_injection_real_tree=legal"
+
+          for pair in \
+            checker-bypass:layer-outward-reference \
+            direct-outward:layer-outward-reference \
+            renamed-alias:layer-outward-reference \
+            reexport-chain:layer-outward-reference \
+            dynamic-load:dynamic-loading; do
+            id=${pair%%:*}
+            want=${pair##*:}
+            "$checker" --fixture "$id" > "$RUNNER_TEMP/fixture-$id.txt" 2>&1
+            status=$?
+            cat "$RUNNER_TEMP/fixture-$id.txt"
+            [ "$status" -eq 1 ] || { echo "::error::fixture $id exited $status, expected 1 (refused)"; exit 1; }
+            grep -q 'outcome=refused' "$RUNNER_TEMP/fixture-$id.txt" || { echo "::error::fixture $id was not refused"; exit 1; }
+            grep -q 'category_match=true' "$RUNNER_TEMP/fixture-$id.txt" || { echo "::error::fixture $id refused for the wrong category"; exit 1; }
+            grep -q "expected=$want" "$RUNNER_TEMP/fixture-$id.txt" || { echo "::error::fixture $id did not report expected=$want"; exit 1; }
+          done
+
+          "$checker" --fixture not-a-real-fixture > /dev/null 2>&1; usage_one=$?
+          "$checker" --disable > /dev/null 2>&1; usage_two=$?
+          { [ "$usage_one" -eq 2 ] && [ "$usage_two" -eq 2 ]; } \
+            || { echo "::error::usage errors did not exit 2 (got $usage_one and $usage_two)"; exit 1; }
+
+          cp "$target_file" "$backup"
+          original_sha=$(sha256sum "$target_file" | cut -d' ' -f1)
+          printf '\nuse solo_adapters::CliOutcome;\n\n#[allow(dead_code)]\npub fn ci_forbidden_probe(_value: Option<CliOutcome>) {}\n' >> "$target_file"
+          "$checker" > "$RUNNER_TEMP/injected-source.txt" 2>&1
+          injected=$?
+          cat "$RUNNER_TEMP/injected-source.txt"
+          if [ "$injected" -ne 1 ]; then echo "::error::injected forbidden import exited $injected, expected 1"; exit 1; fi
+          grep -q 'layer-outward-reference' "$RUNNER_TEMP/injected-source.txt" \
+            || { echo "::error::injected source refused without the expected category"; exit 1; }
+
+          restore
+          restored_sha=$(sha256sum "$target_file" | cut -d' ' -f1)
+          [ "$restored_sha" = "$original_sha" ] || { echo "::error::source not restored byte-for-byte"; exit 1; }
+          git diff --exit-code -- "$target_file" || { echo "::error::tracked source differs after restore"; exit 1; }
+          test -z "$(git status --porcelain -- "$target_file")" || { echo "::error::residue after restore"; exit 1; }
+          "$checker"; after=$?
+          [ "$after" -eq 0 ] || { echo "::error::real tree no longer legal after restore"; exit 1; }
+          echo "forbidden_import_probe=verified injected_exit=$injected restored_sha256=$restored_sha"
+
+      # ---------------------------------------------------------------------------
+      # Reproducibility: two genuinely independent clean release builds on one host,
+      # each in its own initially empty target directory, compared on raw bytes.
+      # ===========================================================================
+      - name: Two clean release builds compared byte-for-byte (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          set -uo pipefail
+          echo "lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+          for variant in a b; do
+            dir="$RUNNER_TEMP/target-$variant"
+            rm -rf "$dir"
+            CARGO_TARGET_DIR="$dir" cargo build --workspace --release --locked
+            status=$?
+            if [ "$status" -ne 0 ]; then echo "::error::clean release build $variant failed"; exit 1; fi
+            test -f "$dir/release/solo-cli" || { echo "::error::missing binary in target-$variant"; exit 1; }
+          done
+          first=$(sha256sum "$RUNNER_TEMP/target-a/release/solo-cli" | cut -d' ' -f1)
+          second=$(sha256sum "$RUNNER_TEMP/target-b/release/solo-cli" | cut -d' ' -f1)
+          echo "clean_release_sha256_a=$first"
+          echo "clean_release_sha256_b=$second"
+          echo "clean_release_bytes=$(stat -c%s "$RUNNER_TEMP/target-a/release/solo-cli")"
+          [ "$first" = "$second" ] || { echo "::error::two clean release builds are not byte-identical"; exit 1; }
+          echo "reproducibility=verified"
+
+
+      # ---------------------------------------------------------------------------
+      # Operator evidence. Reached only when every mandatory gate above passed on
+      # this host; the summary states what was verified and what was NOT verified.
+      # ===========================================================================
+      - name: Job summary (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          {
+            echo "## rust-verify — ${{ matrix.os }}"
+            echo ""
+            echo "| fact | value |"
+            echo "| --- | --- |"
+            echo "| commit | \`$GITHUB_SHA\` |"
+            echo "| tree | \`$(git rev-parse 'HEAD^{tree}')\` |"
+            echo "| lock_sha256 | \`$(sha256sum Cargo.lock | cut -d' ' -f1)\` |"
+            echo "| rustc | \`$(rustc --version)\` |"
+            echo "| cargo | \`$(cargo --version)\` |"
+            echo "| runner | \`${{ runner.os }} ${{ runner.arch }} ${ImageOS:-unknown}-${ImageVersion:-unknown}\` |"
+            echo "| release_exe_sha256 | \`$(sha256sum '${{ matrix.cli_path }}' | cut -d' ' -f1)\` |"
+            echo ""
+            echo "Gates verified on this host: locked dependency fetch, four-crate workspace/package set, format, strict Clippy, all-target tests, real-tree architecture checker, 23-fixture refusal self-test, failure tripwire (normal pass plus required injected failure), release build, and byte-exact release CLI accepted/refused smoke."
+            echo ""
+            echo "Source-level adversarial evidence: a genuine forbidden domain→adapter import was injected into the disposable runner checkout, refused with category \`layer-outward-reference\` and exit 1 by the precompiled checker, then restored byte-for-byte. Two independent clean release builds were compared on raw bytes."
+            echo ""
+            echo "Dependency provenance: \`cargo fetch --locked\` was the only network step; every later Cargo command ran with \`CARGO_NET_OFFLINE=true\` and \`--locked\`."
+            echo ""
+            echo "**Browser smoke: UNVERIFIED / NOT RUN — no authorized browser UI, served Page, HTTP adapter or Node/Playwright project exists at this stage**"
+            echo ""
+            echo "**Also not covered here:** Stage 02+ capabilities (C1/C2/C4), full HTTP and browser suites, accessibility numerical conformance, provider conformance, security advisory scanning (\`cargo-deny\`), release/distribution and deployment. A green run is CI evidence only and does not close R01.C, Stage 01 or authorize a release."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Job summary (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          $lines = @(
+            '## rust-verify — ${{ matrix.os }}',
+            '',
+            '| fact | value |',
+            '| --- | --- |',
+            "| commit | ``$env:GITHUB_SHA`` |",
+            "| tree | ``$(git rev-parse 'HEAD^{tree}')`` |",
+            "| lock_sha256 | ``$((Get-FileHash 'Cargo.lock' -Algorithm SHA256).Hash.ToLower())`` |",
+            "| rustc | ``$(rustc --version)`` |",
+            "| cargo | ``$(cargo --version)`` |",
+            "| runner | ``${{ runner.os }} ${{ runner.arch }} $env:ImageOS-$env:ImageVersion`` |",
+            "| release_exe_sha256 | ``$((Get-FileHash '${{ matrix.cli_path }}' -Algorithm SHA256).Hash.ToLower())`` |",
+            '',
+            'Gates verified on this host: locked dependency fetch, four-crate workspace/package set, format, strict Clippy, all-target tests, real-tree architecture checker, 23-fixture refusal self-test, failure tripwire (normal pass plus required injected failure), release build, and byte-exact release CLI accepted/refused smoke.',
+            '',
+            'Dependency provenance: `cargo fetch --locked` was the only network step; every later Cargo command ran with `CARGO_NET_OFFLINE=true` and `--locked`.',
+            '',
+            '**Browser smoke: UNVERIFIED / NOT RUN — no authorized browser UI, served Page, HTTP adapter or Node/Playwright project exists at this stage**',
+            '',
+            '**Also not covered here:** Stage 02+ capabilities (C1/C2/C4), full HTTP and browser suites, accessibility numerical conformance, provider conformance, security advisory scanning (`cargo-deny`), release/distribution and deployment. A green run is CI evidence only and does not close R01.C, Stage 01 or authorize a release.'
+          )
+          Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Value ($lines -join "`n")
+          Write-Output "summary=written"
+
+          if (((rustc --version) -notmatch '^rustc 1\.99\.1 ')) { throw "rustc is not 1.99.1" }
