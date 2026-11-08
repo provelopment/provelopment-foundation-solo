@@ -6,7 +6,6 @@
 
 **Remaining packages**
 
-- **R02.A:** implement immutable, language-neutral ownership identities and cardinality; one Entity only, one or more Facets/Sites/Pages and at least one representation per published Page.
 - **R02.B:** implement the single validated authoring/publication manifest and provenance-safe source references; declaration alone does not imply successful publication, and filename presence never self-publishes.
 - **R02.C:** implement simple default installation seed and expanded synthetic fixtures for multiple Facets and Sites; preserve one Entity even with complex nesting.
 
