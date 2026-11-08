@@ -435,9 +435,8 @@ impl EfsGraphErrorKind {
         match self {
             Self::NoFacet | Self::TooManyNodes | Self::TooManyPages => EfsLevel::Entity,
             Self::FacetWithoutSite | Self::DuplicateFacetId => EfsLevel::Facet,
-            Self::DuplicateSiteId => EfsLevel::Site,
-            Self::SiteWithoutPage
-            | Self::PageWithoutRepresentation
+            Self::SiteWithoutPage | Self::DuplicateSiteId => EfsLevel::Site,
+            Self::PageWithoutRepresentation
             | Self::DuplicatePageId
             | Self::DuplicateLocaleKey
             | Self::TooManyRepresentations => EfsLevel::Page,
