@@ -37,7 +37,8 @@ pub enum ConfinementError {
 pub trait SourceReader {
     fn read(&self, path: &Path) -> Option<String>;
     fn is_file(&self, path: &Path) -> bool;
-    fn confine(&self, path: &Path, root: &Path) -> Result<PathBuf, ConfinementError>;
+    fn confine(&self, path: &Path, root: &Path, anchor: &Path)
+    -> Result<PathBuf, ConfinementError>;
 }
 
 /// Whether a filesystem entry redirects elsewhere: a symlink, a Windows junction, or any
@@ -58,25 +59,121 @@ fn is_redirect(metadata: &std::fs::Metadata) -> bool {
     }
 }
 
-/// Proves that no component between `root` and `path` is a redirect.
-fn redirected_component(root: &Path, path: &Path) -> Result<(), ConfinementError> {
-    let Ok(relative) = path.strip_prefix(root) else {
-        return Err(ConfinementError::Escape);
-    };
+/// Proves that no original filesystem entry from the volume root down to `target` is a
+/// redirect, and that every intermediate entry is a real directory.
+///
+/// This inspects the **unresolved** entries, so a redirected package root — even one whose
+/// target is another directory inside the same checkout — is refused before its contents
+/// are opened. Canonicalising a redirected root and its redirected child consistently is
+/// exactly the false positive this check exists to prevent.
+pub fn inspect_original_chain(target: &Path) -> Result<(), ConfinementError> {
+    let components: Vec<Component> = target.components().collect();
+    let mut current = PathBuf::new();
 
-    let mut current = root.to_path_buf();
-    for component in relative.components() {
+    for (index, component) in components.iter().enumerate() {
         current.push(component.as_os_str());
-        match std::fs::symlink_metadata(&current) {
-            Ok(metadata) => {
-                if is_redirect(&metadata) {
-                    return Err(ConfinementError::Escape);
-                }
+        if matches!(
+            component,
+            Component::Prefix(_) | Component::RootDir | Component::CurDir
+        ) {
+            continue;
+        }
+
+        let metadata =
+            std::fs::symlink_metadata(&current).map_err(|_| ConfinementError::Unresolvable)?;
+        if is_redirect(&metadata) {
+            return Err(ConfinementError::Escape);
+        }
+
+        let last = index + 1 == components.len();
+        if last {
+            if !(metadata.is_dir() || metadata.is_file()) {
+                return Err(ConfinementError::Unresolvable);
             }
-            Err(_) => return Err(ConfinementError::Unresolvable),
+        } else if !metadata.is_dir() {
+            return Err(ConfinementError::Escape);
         }
     }
+
     Ok(())
+}
+
+/// The verified checkout anchor every package root is anchored to.
+///
+/// It is derived from locked Cargo metadata plus the real Solo tree, never from a
+/// package's self-declared root, and it is validated before any source is used.
+pub struct CheckoutAnchor {
+    root: PathBuf,
+}
+
+impl CheckoutAnchor {
+    pub fn verify(
+        workspace_root: &Path,
+        packages: &[PackageTargets],
+    ) -> Result<Self, Vec<Violation>> {
+        let root = normalize_lexical(workspace_root);
+
+        match inspect_original_chain(&root) {
+            Ok(()) => {}
+            Err(ConfinementError::Escape) => {
+                return Err(vec![Violation::new(
+                    Category::ModuleSourceEscape,
+                    "workspace: checkout anchor",
+                    "the checkout anchor is reached through a link or reparse point",
+                )]);
+            }
+            Err(ConfinementError::Unresolvable) => {
+                return Err(vec![Violation::new(
+                    Category::UnreadableSource,
+                    "workspace: checkout anchor",
+                    "the checkout anchor could not be inspected",
+                )]);
+            }
+        }
+
+        let manifest = root.join("Cargo.toml");
+        let manifest_ok = std::fs::symlink_metadata(&manifest)
+            .is_ok_and(|metadata| metadata.is_file() && !is_redirect(&metadata));
+        let workspace_manifest = manifest_ok
+            && std::fs::read_to_string(&manifest).is_ok_and(|text| text.contains("[workspace]"));
+        if !workspace_manifest {
+            return Err(vec![Violation::new(
+                Category::UnreadableSource,
+                "workspace: checkout anchor",
+                "the checkout anchor has no inspectable workspace manifest",
+            )]);
+        }
+
+        if std::fs::symlink_metadata(root.join(".git")).is_err() {
+            return Err(vec![Violation::new(
+                Category::UnreadableSource,
+                "workspace: checkout anchor",
+                "the checkout anchor is not a Git working tree root",
+            )]);
+        }
+
+        let mut violations: Vec<Violation> = Vec::new();
+        for package in packages {
+            let expected = root.join("crates").join(&package.name);
+            if normalize_lexical(&package.root) != normalize_lexical(&expected) {
+                violations.push(Violation::new(
+                    Category::ModuleSourceEscape,
+                    format!("crates/{}", package.name),
+                    "package root is not its declared crates/<package> path under the anchor",
+                ));
+            }
+        }
+
+        if !violations.is_empty() {
+            return Err(violations);
+        }
+
+        Ok(Self { root })
+    }
+
+    pub fn root(&self) -> &Path {
+        &self.root
+    }
 }
 
 /// Read-only filesystem access with real effective-path enforcement.
@@ -91,19 +188,29 @@ impl SourceReader for FsReader {
         std::fs::metadata(path).is_ok_and(|metadata| metadata.is_file())
     }
 
-    /// Lexical containment, then a redirect scan over the real directory entries, then
-    /// canonicalisation of both the target and the package root. Any failure refuses.
+    /// Lexical containment, then the **original** entry chain from the volume root through
+    /// the checkout anchor and the package root down to the file, then canonicalisation of
+    /// both the file and the package root. Any failure refuses.
     ///
-    /// This cannot eliminate a hostile time-of-check/time-of-use race; it proves the
-    /// path that is about to be read is confined at the moment it is checked.
-    fn confine(&self, path: &Path, root: &Path) -> Result<PathBuf, ConfinementError> {
+    /// This cannot eliminate a hostile time-of-check/time-of-use race; it proves the entry
+    /// that is about to be read is owned at the moment it is checked.
+    fn confine(
+        &self,
+        path: &Path,
+        root: &Path,
+        anchor: &Path,
+    ) -> Result<PathBuf, ConfinementError> {
         let lexical = normalize_lexical(path);
         let lexical_root = normalize_lexical(root);
-        if !is_inside(&lexical, &lexical_root) {
+        let lexical_anchor = normalize_lexical(anchor);
+
+        if !is_inside(&lexical, &lexical_root) || !is_inside(&lexical_root, &lexical_anchor) {
             return Err(ConfinementError::Escape);
         }
 
-        redirected_component(&lexical_root, &lexical)?;
+        inspect_original_chain(&lexical_anchor)?;
+        inspect_original_chain(&lexical_root)?;
+        inspect_original_chain(&lexical)?;
 
         let effective =
             std::fs::canonicalize(&lexical).map_err(|_| ConfinementError::Unresolvable)?;
@@ -149,9 +256,16 @@ impl SourceReader for MapReader {
     /// In-memory fixtures never consult the host filesystem: confinement is the lexical
     /// package-root rule only, so a fixture can express an escape intent without needing
     /// a real link.
-    fn confine(&self, path: &Path, root: &Path) -> Result<PathBuf, ConfinementError> {
+    fn confine(
+        &self,
+        path: &Path,
+        root: &Path,
+        anchor: &Path,
+    ) -> Result<PathBuf, ConfinementError> {
         let lexical = normalize_lexical(path);
-        if !is_inside(&lexical, &normalize_lexical(root)) {
+        if !is_inside(&lexical, &normalize_lexical(root))
+            || !is_inside(&normalize_lexical(root), &normalize_lexical(anchor))
+        {
             return Err(ConfinementError::Escape);
         }
         Ok(lexical)
@@ -183,6 +297,8 @@ pub struct UnitSpec {
     pub root_file: PathBuf,
     /// Directory boundary: no resolved source may escape it.
     pub package_root: PathBuf,
+    /// Verified checkout anchor this package root must sit under (`crates/<package>`).
+    pub anchor: PathBuf,
     /// Declared workspace dependency roots: extern ident -> package name.
     pub workspace_roots: BTreeMap<String, String>,
     /// External crates usable in this context (normal deps plus dev deps in tests).
@@ -320,9 +436,14 @@ fn sort_unique_local(violations: Vec<Violation>) -> Vec<Violation> {
 }
 
 /// Scans every declared target of every workspace package.
-pub fn check_packages(packages: &[PackageTargets]) -> Result<SourceReport, Vec<Violation>> {
+pub fn check_packages(
+    packages: &[PackageTargets],
+    workspace_root: &Path,
+) -> Result<SourceReport, Vec<Violation>> {
     let reader = FsReader;
-    let (surfaces, mut violations) = public_surfaces(packages, &reader);
+    let anchor = CheckoutAnchor::verify(workspace_root, packages)?;
+
+    let (surfaces, mut violations) = public_surfaces(packages, &reader, anchor.root());
     let known_crates: BTreeSet<String> = packages
         .iter()
         .map(|package| package.name.replace('-', "_"))
@@ -367,6 +488,7 @@ pub fn check_packages(packages: &[PackageTargets]) -> Result<SourceReport, Vec<V
                 kind: target.kind,
                 root_file: target.src_path.clone(),
                 package_root: package.root.clone(),
+                anchor: anchor.root().to_path_buf(),
                 workspace_roots: workspace_roots.clone(),
                 allowed_external,
                 dev_roots: dev_roots.clone(),
@@ -385,7 +507,8 @@ pub fn check_packages(packages: &[PackageTargets]) -> Result<SourceReport, Vec<V
     // target, otherwise an unchecked file could carry a forbidden edge.
     for package in packages {
         let label = label_root(&package.root);
-        let (discovered, mut walk_violations) = rust_files_under(&package.root, &label);
+        let (discovered, mut walk_violations) =
+            rust_files_under(&package.root, &label, anchor.root(), &RealDiscoveryFs);
         violations.append(&mut walk_violations);
         for path in discovered {
             if files.contains(&path) {
@@ -463,7 +586,10 @@ impl Scanner<'_> {
         let location = self.rel(&ctx.path);
 
         // Nothing is opened before its effective destination is proven confined.
-        match self.reader.confine(&ctx.path, &self.spec.package_root) {
+        match self
+            .reader
+            .confine(&ctx.path, &self.spec.package_root, &self.spec.anchor)
+        {
             Ok(_effective) => {}
             Err(ConfinementError::Escape) => {
                 self.violation(
@@ -678,7 +804,10 @@ impl Scanner<'_> {
         let location = self.rel(at);
         let lexical = normalize_lexical(candidate);
 
-        match self.reader.confine(&lexical, &self.spec.package_root) {
+        match self
+            .reader
+            .confine(&lexical, &self.spec.package_root, &self.spec.anchor)
+        {
             Ok(_effective) => {}
             Err(ConfinementError::Escape) => {
                 self.violation(
@@ -1423,14 +1552,75 @@ fn label_root(package_root: &Path) -> String {
 /// walking is reported, and a redirect is never descended into, so a junction cannot hide
 /// or substitute source. Files reached only through a redirect can therefore never be
 /// counted as inspected.
-fn rust_files_under(root: &Path, label: &str) -> (Vec<PathBuf>, Vec<Violation>) {
+/// Unresolved type of one directory entry, obtained **without** following links.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EntryKind {
+    File,
+    Dir,
+    /// Neither a file nor a directory (socket, device, FIFO…): never silently ignored.
+    Other,
+}
+
+/// Filesystem inspection seam for package discovery.
+///
+/// It exists so a deterministic inspection failure can be exercised through the *same*
+/// error-handling code the real walker uses, rather than inferring behaviour from a mock.
+pub trait DiscoveryFs {
+    fn list(&self, directory: &Path) -> std::io::Result<Vec<std::ffi::OsString>>;
+    fn kind(&self, path: &Path) -> std::io::Result<EntryKind>;
+    fn redirected(&self, path: &Path) -> std::io::Result<bool>;
+}
+
+/// The real filesystem inspector: unresolved metadata only.
+pub struct RealDiscoveryFs;
+
+impl DiscoveryFs for RealDiscoveryFs {
+    fn list(&self, directory: &Path) -> std::io::Result<Vec<std::ffi::OsString>> {
+        let entries = std::fs::read_dir(directory)?;
+        let mut names = Vec::new();
+        for entry in entries {
+            names.push(entry?.file_name());
+        }
+        Ok(names)
+    }
+
+    fn kind(&self, path: &Path) -> std::io::Result<EntryKind> {
+        let metadata = std::fs::symlink_metadata(path)?;
+        let file_type = metadata.file_type();
+        Ok(if file_type.is_file() {
+            EntryKind::File
+        } else if file_type.is_dir() {
+            EntryKind::Dir
+        } else {
+            EntryKind::Other
+        })
+    }
+
+    fn redirected(&self, path: &Path) -> std::io::Result<bool> {
+        Ok(is_redirect(&std::fs::symlink_metadata(path)?))
+    }
+}
+/// Every Rust file under a package root, excluding build output and hidden directories.
+///
+/// Discovery fails closed. For **every** visited entry — including one whose name is not
+/// `.rs` — the unresolved type and the redirect status are established explicitly: an
+/// inspection error becomes a refusal, a redirect is reported and never descended into, and
+/// an entry that is neither a file nor a directory is refused rather than dropped. Ignored
+/// names (`target`, hidden directories) are skipped only *after* their identity has been
+/// inspected safely.
+pub fn rust_files_under(
+    root: &Path,
+    label: &str,
+    anchor: &Path,
+    fs: &dyn DiscoveryFs,
+) -> (Vec<PathBuf>, Vec<Violation>) {
     let mut found: Vec<PathBuf> = Vec::new();
     let mut violations: Vec<Violation> = Vec::new();
     let mut pending: Vec<PathBuf> = vec![normalize_lexical(root)];
 
     while let Some(directory) = pending.pop() {
-        let entries = match std::fs::read_dir(&directory) {
-            Ok(entries) => entries,
+        let names = match fs.list(&directory) {
+            Ok(names) => names,
             Err(_) => {
                 violations.push(Violation::new(
                     Category::UnreadableSource,
@@ -1441,39 +1631,84 @@ fn rust_files_under(root: &Path, label: &str) -> (Vec<PathBuf>, Vec<Violation>) 
             }
         };
 
-        for entry in entries {
-            let Ok(entry) = entry else {
-                violations.push(Violation::new(
-                    Category::UnreadableSource,
-                    format!("{label}/{}", relative_label(root, &directory)),
-                    "package directory entry could not be read",
-                ));
-                continue;
+        for name in names {
+            let path = directory.join(&name);
+            let display = format!("{label}/{}", relative_label(root, &path));
+            let name_text = name.to_string_lossy().into_owned();
+
+            let redirected = match fs.redirected(&path) {
+                Ok(redirected) => redirected,
+                Err(_) => {
+                    violations.push(Violation::new(
+                        Category::UnreadableSource,
+                        display.clone(),
+                        "package entry metadata could not be inspected",
+                    ));
+                    continue;
+                }
             };
-
-            let path = entry.path();
-            let name = entry.file_name().to_string_lossy().into_owned();
-            let redirect = entry.metadata().is_ok_and(|metadata| {
-                std::fs::symlink_metadata(&path).is_ok_and(|own| is_redirect(&own))
-                    || metadata.file_type().is_symlink()
-            });
-
-            if redirect {
+            if redirected {
                 violations.push(Violation::new(
                     Category::ModuleSourceEscape,
-                    format!("{label}/{}", relative_label(root, &path)),
+                    display.clone(),
                     "package entry is a link or reparse point and is not audited",
                 ));
                 continue;
             }
 
-            if path.is_dir() {
-                if name == "target" || name.starts_with('.') {
+            let kind = match fs.kind(&path) {
+                Ok(kind) => kind,
+                Err(_) => {
+                    violations.push(Violation::new(
+                        Category::UnreadableSource,
+                        display.clone(),
+                        "package entry type could not be established",
+                    ));
                     continue;
                 }
-                pending.push(path);
-            } else if name.ends_with(".rs") {
-                found.push(normalize_lexical(&path));
+            };
+
+            match kind {
+                EntryKind::Dir => {
+                    if name_text == "target" || name_text.starts_with('.') {
+                        continue;
+                    }
+                    if let Err(error) = inspect_original_chain(&path) {
+                        let (category, detail) = match error {
+                            ConfinementError::Escape => (
+                                Category::ModuleSourceEscape,
+                                "package directory is reached through a redirect and is refused",
+                            ),
+                            ConfinementError::Unresolvable => (
+                                Category::UnreadableSource,
+                                "package directory could not be inspected before descending",
+                            ),
+                        };
+                        violations.push(Violation::new(category, display.clone(), detail));
+                        continue;
+                    }
+                    if !is_inside(&normalize_lexical(&path), &normalize_lexical(anchor)) {
+                        violations.push(Violation::new(
+                            Category::ModuleSourceEscape,
+                            display.clone(),
+                            "package directory lies outside the checkout anchor",
+                        ));
+                        continue;
+                    }
+                    pending.push(path);
+                }
+                EntryKind::File => {
+                    if name_text.ends_with(".rs") {
+                        found.push(normalize_lexical(&path));
+                    }
+                }
+                EntryKind::Other => {
+                    violations.push(Violation::new(
+                        Category::UnreadableSource,
+                        display.clone(),
+                        "package entry is neither a file nor a directory and cannot be audited",
+                    ));
+                }
             }
         }
     }
@@ -1493,6 +1728,7 @@ fn relative_label(root: &Path, path: &Path) -> String {
 pub fn public_surfaces(
     packages: &[PackageTargets],
     reader: &dyn SourceReader,
+    anchor: &Path,
 ) -> (BTreeMap<String, PublicSurface>, Vec<Violation>) {
     let mut surfaces: BTreeMap<String, PublicSurface> = BTreeMap::new();
     let mut violations: Vec<Violation> = Vec::new();
@@ -1509,7 +1745,7 @@ pub fn public_surfaces(
             continue;
         };
         let root = normalize_lexical(&target.src_path);
-        if let Err(error) = reader.confine(&root, &package.root) {
+        if let Err(error) = reader.confine(&root, &package.root, anchor) {
             let (category, detail) = match error {
                 ConfinementError::Escape => (
                     Category::ModuleSourceEscape,
@@ -1544,16 +1780,22 @@ pub fn public_surfaces(
             continue;
         };
 
-        let mut surface = PublicSurface::default();
         let lib_dir = root.parent().map(Path::to_path_buf).unwrap_or_default();
-        collect_public(
-            &file.items,
-            &lib_dir,
+        let mut pass = SurfacePass {
+            lib_dir,
             reader,
-            &mut surface,
-            &mut violations,
-            &package.root,
-        );
+            package_root: package.root.clone(),
+            anchor: anchor.to_path_buf(),
+            surface: PublicSurface::default(),
+            violations: Vec::new(),
+        };
+        collect_public(&file.items, &mut pass);
+        let SurfacePass {
+            surface,
+            violations: found,
+            ..
+        } = pass;
+        violations.extend(found);
         // Keyed by package name, the identity the layer and privacy rules use.
         surfaces.insert(package.name.clone(), surface);
     }
@@ -1586,100 +1828,75 @@ fn surface_violation(package_root: &Path, detail: &str) -> Violation {
     )
 }
 
-fn collect_public(
-    items: &[syn::Item],
-    lib_dir: &Path,
-    reader: &dyn SourceReader,
-    surface: &mut PublicSurface,
-    violations: &mut Vec<Violation>,
-    package_root: &Path,
-) {
+/// Accumulated state of one package's public-surface walk.
+///
+/// Bundled so the recursive walkers stay well under the argument limit while still
+/// carrying the anchored confinement context.
+struct SurfacePass<'a> {
+    lib_dir: PathBuf,
+    reader: &'a dyn SourceReader,
+    package_root: PathBuf,
+    anchor: PathBuf,
+    surface: PublicSurface,
+    violations: Vec<Violation>,
+}
+
+fn collect_public(items: &[syn::Item], pass: &mut SurfacePass<'_>) {
     for item in items {
         if let syn::Item::Use(node) = item
             && matches!(node.vis, syn::Visibility::Public(_))
         {
-            collect_public_use(
-                &node.tree,
-                &mut Vec::new(),
-                lib_dir,
-                reader,
-                surface,
-                violations,
-                package_root,
-            );
+            collect_public_use(&node.tree, &mut Vec::new(), pass);
             continue;
         }
         if let Some(name) = public_item_name(item) {
-            surface.names.insert(name);
+            pass.surface.names.insert(name);
         }
     }
 }
 
-fn collect_public_use(
-    tree: &syn::UseTree,
-    prefix: &mut Vec<String>,
-    lib_dir: &Path,
-    reader: &dyn SourceReader,
-    surface: &mut PublicSurface,
-    violations: &mut Vec<Violation>,
-    package_root: &Path,
-) {
+fn collect_public_use(tree: &syn::UseTree, prefix: &mut Vec<String>, pass: &mut SurfacePass<'_>) {
     match tree {
         syn::UseTree::Path(segment) => {
             prefix.push(segment.ident.to_string());
-            collect_public_use(
-                &segment.tree,
-                prefix,
-                lib_dir,
-                reader,
-                surface,
-                violations,
-                package_root,
-            );
+            collect_public_use(&segment.tree, prefix, pass);
             prefix.pop();
         }
         syn::UseTree::Name(name) => {
-            surface.names.insert(name.ident.to_string());
+            pass.surface.names.insert(name.ident.to_string());
         }
         syn::UseTree::Rename(rename) => {
-            surface.names.insert(rename.rename.to_string());
+            pass.surface.names.insert(rename.rename.to_string());
         }
         syn::UseTree::Group(group) => {
             for item in &group.items {
-                collect_public_use(
-                    item,
-                    prefix,
-                    lib_dir,
-                    reader,
-                    surface,
-                    violations,
-                    package_root,
-                );
+                collect_public_use(item, prefix, pass);
             }
         }
         syn::UseTree::Glob(_) => {
             // A globbed surface is usable only when the module can be located and
-            // inspected; otherwise the re-export is refused rather than trusted.
-            let Some(path) = resolve_module_file(prefix, lib_dir) else {
-                violations.push(surface_violation(
-                    package_root,
+            // inspected **and** its file is confined; otherwise the re-export is refused.
+            let package_root = pass.package_root.clone();
+            let Some(path) = resolve_module_file(prefix, &pass.lib_dir) else {
+                pass.violations.push(surface_violation(
+                    &package_root,
                     "public glob re-export does not resolve to a module and is refused",
                 ));
                 return;
             };
-            let parsed = match reader.confine(&path, package_root) {
+            let parsed = match pass.reader.confine(&path, &package_root, &pass.anchor) {
                 Ok(_) => std::fs::read_to_string(&path).map(|text| syn::parse_file(&text)),
                 Err(_) => {
-                    violations.push(surface_violation(
-                        package_root,
+                    pass.violations.push(surface_violation(
+                        &package_root,
                         "public glob re-export target is not confined and is refused",
                     ));
                     return;
                 }
             };
             let Ok(Ok(file)) = parsed else {
-                violations.push(surface_violation(
-                    package_root,
+                pass.violations.push(surface_violation(
+                    &package_root,
                     "public glob re-export target is not parsable and is refused",
                 ));
                 return;
@@ -1688,14 +1905,14 @@ fn collect_public_use(
                 if let syn::Item::Use(node) = item
                     && matches!(node.vis, syn::Visibility::Public(_))
                 {
-                    violations.push(surface_violation(
-                        package_root,
+                    pass.violations.push(surface_violation(
+                        &package_root,
                         "nested glob re-export cannot be resolved and is refused",
                     ));
                     continue;
                 }
                 if let Some(name) = public_item_name(item) {
-                    surface.names.insert(name);
+                    pass.surface.names.insert(name);
                 }
             }
         }
@@ -1798,6 +2015,7 @@ impl FixtureWorld {
             kind,
             root_file: package_root.join("src").join(file),
             package_root,
+            anchor: PathBuf::from("fixture"),
             workspace_roots: self.workspace_roots.clone(),
             allowed_external,
             dev_roots: dev,

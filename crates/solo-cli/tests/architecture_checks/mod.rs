@@ -212,6 +212,17 @@ pub struct RealTreeReport {
 pub fn check_real_tree() -> Result<RealTreeReport, Vec<Violation>> {
     let metadata = graph::metadata().map_err(|violation| vec![violation])?;
     let packages = graph::packages(&metadata).map_err(|violation| vec![violation])?;
+    let workspace_root = metadata
+        .get("workspace_root")
+        .and_then(|value| value.as_str())
+        .map(std::path::PathBuf::from)
+        .ok_or_else(|| {
+            vec![Violation::new(
+                Category::UnreadableSource,
+                "workspace: checkout anchor",
+                "Cargo metadata reported no workspace root, so nothing can be anchored",
+            )]
+        })?;
 
     let real = graph::real_graph(&metadata);
     let mut violations: Vec<Violation> = Vec::new();
@@ -219,7 +230,7 @@ pub fn check_real_tree() -> Result<RealTreeReport, Vec<Violation>> {
         violations.extend(found);
     }
 
-    let source_report = match source::check_packages(&packages) {
+    let source_report = match source::check_packages(&packages, &workspace_root) {
         Ok(report) => Some(report),
         Err(found) => {
             violations.extend(found);
