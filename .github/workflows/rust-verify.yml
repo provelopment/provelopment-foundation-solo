@@ -115,6 +115,7 @@ jobs:
       - name: Install and assert the pinned toolchain
         run: |
           rustup toolchain install 1.99.1 --profile minimal --component rustfmt --component clippy --no-self-update
+          rustup --version
 
       - name: Assert exact rustc/cargo versions (Linux)
         if: runner.os == 'Linux'
