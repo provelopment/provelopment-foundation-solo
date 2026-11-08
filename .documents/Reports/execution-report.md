@@ -1,123 +1,141 @@
 # Foundation Solo — Execution Report
 
-> **One canonical report.** Overwritten in place every run; Git history retains earlier revisions. It is not a WIP file, grants no authority, and its own commit SHA appears only in the chat handback.
+> **One canonical report.** Overwritten in place every run; Git history retains earlier revisions, including the `SOLO-WO-040 R01` report this one supersedes without rewriting. It is not a WIP file, grants no authority, and its own commit SHA appears only in the chat handback.
 
 ## Run identity
 
 | Field | Value |
 | --- | --- |
-| Date (UTC) | 2026-11-08, approximately 11:55–12:25 |
-| Work order | **`SOLO-WO-040 R01`** — Permanent A1 Version Currency and Safe Upgrade Process |
-| Owner handoff | Received — align with `README.md`/`AGENTS.md`, execute the installed `SOLO-WO-040 R01` |
-| Installed ACTIVE blob | `dbbb2b4d88b3d8856c7f963c78f980db092a5ada` (18,311 bytes, 90 lines, LF, no BOM), retained **unchanged** |
-| Starting HEAD / tree | `828aafb1b9c2e741b60980b747b1048d9f892edc` / `4b10fedcb552f41c82f86acde8c376ba1ca77690` |
-| Issuance record commit | `5f51832df320c7b2aa8ad1e91d079265f6157381` |
-| **Source revision** | `5e7c513fbea46524769431ae81916e8c8fb42d76`, tree `16b53bbd0f6a21c76572035f454664a830f84a2e` |
-| `.github/dependabot.yml` blob | new — `1874726fc2406575605b3c7ac467f45402fb7f13` (2,163 bytes) |
-| **Status** | **`COMPLETE`.** Governance, monitoring configuration and truthful documentation only. Not a package upgrade, not a release, not an Architect `ACCEPT`. |
+| Date (UTC) | 2026-11-08, approximately 13:05–13:30 |
+| Work order | **`SOLO-WO-040 R02`** — A1 Version-Policy Evidence and Documentation Correction |
+| Matching Owner handoff | Received — align with `README.md`/`AGENTS.md`, execute the installed `SOLO-WO-040 R02` |
+| Installed ACTIVE | blob `c1654c5f58150f104c38acf1052f43745dd68778`, **15,360 bytes**, 94 lines, LF, no BOM, `OWNER-ISSUED`, retained **byte-for-byte unchanged** |
+| Starting HEAD / tree | `19f1e9191d7e75fe775dff12917b053843571aa1` / `a3de01b30a11d5f80b664b8fff9998f29bbc3025` |
+| Issuance record commit | `c839aaf01cad19bee124b6cbf6417e69f19265b7` |
+| **Source revision** | `ee844ad0bed49f945cce1836b84257e07e67bd0e`, tree `b8813a0e41700cc02cca6ec90128582b9a18b532`, `README.md` blob `ce2d1cf9aee4a1805772dc797f437d081bd00540` |
+| **Status** | **`COMPLETE`** — a bounded factual correction of the four defects the Chief Architect's `REVISE` identified. Not a product, dependency or CI change; not an Architect `ACCEPT`; `R01.C` and Stage 01 remain open. |
 
 ## Preflight
 
-Intended Solo root, branch `main`, one worktree, no stash, sole `origin` equal to remote `main`, index clean apart from the single Owner installation of ACTIVE. All **fourteen** stated baseline blobs matched with **zero drift**: `AGENTS.md` `32562b67…`, `README.md` `3f3005d6…`, `sop-architect.md` `54c9676e…`, `sop-implementation.md` `a5771160…`, `ARCHITECTURE.md` `03e8923f…`, workflow `5426c1f5…`, pre-install ACTIVE `fded5f6e…`, ROADMAP `e6ea66cf…`, NEXT `92fa562b…`, OUTLOOK `cb9c7a61…`, prior report `b4a2c8d3…`, `Cargo.lock` `05a02666…`, `deny.toml` `3063e864…`, `rust-toolchain.toml` `9ec55b3b…`. `.github/dependabot.yml` was **absent**, as stated. Exactly four WIP files, no WIP subdirectory. `README.md`, `AGENTS.md`, both SOPs, Architecture §6A.2 and §6C, all four WIP files, the prior report and the workflow were read before writing.
+Verified the single Owner checkout, `main`, sole `origin` equal to the remote head, one worktree, no stash, and a working tree whose **only** tracked difference was this Owner-installed ACTIVE replacement. All **fifteen** stated baseline blobs matched with **zero drift**: `README.md` `d17f19b8…`, report `d9e2a2fd…`, pre-install ACTIVE `dbbb2b4d…`, `sop-architect.md` `1483c9be…`, `sop-implementation.md` `51bb3792…`, `ARCHITECTURE.md` `4b050f63…`, `AGENTS.md` `6eae1da8…`, `dependabot.yml` `1874726f…`, workflow `5426c1f5…`, `Cargo.lock` `05a02666…`, `deny.toml` `3063e864…`, `rust-toolchain.toml` `9ec55b3b…`, ROADMAP `e6ea66cf…`, NEXT `92fa562b…`, OUTLOOK `cb9c7a61…`. Exactly four WIP files, no WIP subdirectory. `README.md`, `AGENTS.md`, both SOPs, Architecture §6A.2 (including the canonical `@axe-core/playwright =4.14.0` row), all four WIP files, the previous report, `dependabot.yml` and the `rust-verify` workflow were read before any write. No rebase, reset or guess was needed.
 
-## The authorized change — six paths
+## The authorized change — exactly three paths
 
-| Path | Change |
+| Path | Operation |
 | --- | --- |
-| `.documents/SOP/sop-architect.md` | §7B gains one permanent rule, **(e2)**, beside the existing (e1); edition → revision 7 |
-| `.documents/SOP/sop-implementation.md` | A1 cross-reference extended and a new **§7B** operational procedure; edition → revision 7 |
-| `.documents/Architecture/ARCHITECTURE.md` | one narrow paragraph inside §6A.2 |
-| `AGENTS.md` | A1 pointer extended to §7B(e2); stale current-state claim replaced |
-| `README.md` | two current-status passages aligned to the verified baseline |
-| `.github/dependabot.yml` | **new**, minimal proposal-only weekly monitoring |
+| `README.md` | one substitution inside the single stale passage of "Installation, authoring and lifecycle" (diff: 1 line removed, 1 line added) |
+| `.documents/WIP/workorder-active.md` | committed unchanged as issuance history |
+| `.documents/Reports/execution-report.md` | this document, overwritten |
 
-Nothing else changed: `Cargo.toml`, `Cargo.lock`, `deny.toml`, `rust-toolchain.toml`, `.cargo/config.toml`, the workflow, `.github/SECURITY.md`, `LICENSE`, all four crate manifests, ROADMAP, NEXT and OUTLOOK are byte-identical to the starting revision, and the workflow contains no reference to Dependabot.
+Nothing else changed. `AGENTS.md`, both SOPs, Architecture, `dependabot.yml`, the workflow, `Cargo.toml`, `Cargo.lock`, `deny.toml`, `rust-toolchain.toml`, `.cargo/config.toml`, `.github/SECURITY.md`, every crate manifest, source and test, ROADMAP, NEXT, OUTLOOK and the licence/notice files remain byte-identical to the starting HEAD, and no dependency, toolchain, scanner, action, runner or product-contract version was altered.
 
-## A1 policy adoption — one authority, no duplication
+## Correction A — the README contradiction
 
-- **Architect SOP is the single authority.** Its §7B contains exactly one A1 heading and exactly one **(e2) Version currency, LTS and safe upgrade — permanent** rule, placed inside §7B between (e1) and (f) — not as a competing section. It binds: freshness as a tested attribute; recording source, query date, installed/selected and candidate versions with a disposition; never presenting an architecture-selected but uninstalled pin as installed; latest verified stable or latest **suitable** LTS (Node) with no invented Rust LTS; zero unresolved actionable version/deprecation/unsupported-runtime/EOL notices with each genuine warning recorded; exact-version/SHA/digest locking with no floating `latest`; product contract versions kept distinct from dependency versions; the discover→propose→authorized-update→exact-head-verification→independent-acceptance→separate-merge lifecycle with a recovery path; and that a Dependabot proposal is an input, never an upgrade that already passed.
-- **Implementation SOP adds only operational steps** and states it is not a parallel policy: it defers to A1 §7B(e2), keeps §5B/§6B as the sole version-control procedure, and covers inventory, research, warnings, proposal, authorized update, exact-head verification, rollback and cadence. It adds no register — the ledger lives in this report.
-- **Architecture stays explanatory.** The single added paragraph in §6A.2 ties its conditional exact pins to that periodic review, states that a row binds only when its gate proves it on a real revision, that nothing in the paragraph reclassifies any listed `E01` component, and that product contract versions are not dependency versions. All fifteen pinned `E01` rows are unchanged, and §6C.3/§6C.7 product support and release policy are untouched.
-- **`AGENTS.md` points, it does not legislate:** "(Architect SOP §7B) with its permanent version-currency, LTS, warning and safe-upgrade rule (§7B(e2)), and the agent obligations that mirror and operationalize it (Implementation SOP §7A and §7B)".
+The passage claimed: *"There is no application code, installed toolchain, dependency manifest, test suite, CI job, release or deployment."* That sentence is now replaced by the actual distinction, and no stale global denial of the existing manifests, tests or CI remains in the modified passage:
 
-## Installed-versus-current ledger (queried 2026-11-08)
+- **The engineering baseline exists and is verified** — the four-crate inward-only workspace (`solo-domain`, `solo-application`, `solo-adapters`, `solo-cli`), recorded exact toolchain pin, tracked manifests and `Cargo.lock`, executable architecture and unit tests, and the mandatory Linux/Windows CI proving the security gate, architecture and refusal checks, strict build, lint and tests, byte-reproducible release build and CLI smoke evidence.
+- **The Solo EFS product does not exist** — its JSON/Markdown publication validators, real website/browser/HTTP surface, installation, release, deployment and the later §6A/§6C promises remain unimplemented and unverified.
+- **No local installation is implied** — pinning a toolchain in the repository and executing it in hosted CI does not install it on any user's machine.
 
-Sources: crates.io API per crate; `github.com/rust-lang/rust` tags; EmbarkStudios `cargo-deny` releases; `actions/checkout` release metadata and its `action.yml`; `nodejs.org/dist/index.json` and `endoflife.date/api/nodejs.json`; `actions/runner-images` README and issue #14748; OSV `/v1/querybatch`. A green security scan is **not** treated as freshness evidence anywhere below.
+Everything around the substitution is preserved verbatim: the conditional §6A selection and its still-owed conformance proof, the §6.2 schemas that are specified without a schema file, validator or command, the documentary §6C decisions, the accepted `§1.1–§1.4` identifier grammar and publication-declaration semantics, Apache-2.0, and the rule against borrowing historical Foundation commands. The corrected passage now agrees with the unchanged `AGENTS.md` §7 entry (`6eae1da8…`), which independently records the same four crates, the same lock, the same two hosts and the same denial of the product, browser surface, release and deployment.
 
-| Component | Installed / selected | Latest stable or supported (source, 2026-11-08) | Disposition |
-| --- | --- | --- | --- |
-| First-party crates | `solo-domain`, `solo-application`, `solo-adapters`, `solo-cli` all `0.1.0`, `publish = false` | not published — internal | **current** (internal, no upstream) |
-| `itoa` | 1.0.18 | 1.0.18 (crates.io, updated 2026-03-20) | **current** |
-| `memchr` | 2.8.3 | 2.8.3 (2026-07-08) | **current** |
-| `proc-macro2` | 1.0.107 | 1.0.107 (2026-07-19) | **current** |
-| `quote` | 1.0.47 | 1.0.47 (2026-07-19) | **current** |
-| `serde` | 1.0.229 | 1.0.229 (2026-07-18) | **current** |
-| `serde_core` | 1.0.229 | 1.0.229 (2026-07-18) | **current** |
-| `serde_derive` | 1.0.229 | 1.0.229 (2026-07-18) | **current** |
-| `serde_json` | 1.0.154 (direct, `=1.0.154`) | 1.0.154 (2026-10-11) | **current** |
-| `syn` | 3.0.9 (direct, dev/architecture tool) | 3.0.9 (2026-10-12) | **current** |
-| `unicode-ident` | 1.0.27 | 1.0.27 (2026-10-12) | **current** |
-| `zmij` | 1.0.23 | 1.0.23 (2026-07-13) | **current** |
-| Rust / Cargo channel | `1.99.1` (`rust-toolchain.toml`, `rustfmt` + `clippy`), MSRV `rust-version = "1.99"`, edition 2024 | `1.99.1` is the newest stable tag | **current** |
-| `cargo-deny` | `0.20.2`, verified archive digests `9f12ed4c…` / `975a2214…` | `0.20.2` released 2026-07-09 | **current** |
-| `actions/checkout` | `v7.0.1` pinned by full SHA `3d3c42e5…`, `runs.using: node24` | `v7.0.1` released 2026-07-20 | **current** |
-| Action Node runtime | `node24` (bundled in the action) | Node 24 LTS, EOL 2028-04-30 | **current**, supported |
-| `ubuntu-24.04` runner | Ubuntu 24.04.5 LTS image | `ubuntu-26.04` is GA; `ubuntu-latest` migrates to 26.04 across 2026-10-19 → 2026-11-19 (runner-images #14748) | **outdated but supported → proposal**, not changed here |
-| `windows-2025` runner | Windows Server 2025 image | `windows-2025` is the newest Windows Server x64 label; no `windows-2026` exists | **current** |
-| Node.js application toolchain | **not installed** — §6A.2 selects `26.13.0` LTS | `v26.13.0` is the newest LTS (Lithium, LTS since 2026-10-28, EOL 2029-04-30) | **selected-but-not-installed**; equalling the newest LTS is not an installation |
-| TypeScript `7.0.2`, Vite `8.3.6`, Playwright `1.64.1`, `@axe-core/playwright` `14.4.0`, `ts-rs` `12.0.1` | **not installed** (future browser stage) | not assessed — nothing installed to query | **selected-but-not-installed**, `UNVERIFIED` |
-| RustSec / OSV | gate DB commit `309392b1…`; OSV batch over the exact 11 crates | **0** advisories returned for the locked set | **clear** for this revision |
-| Dependabot security alerts | repository feature | API returned **401** to this agent | **`UNVERIFIED`** — no access, not claimed clear |
+## Correction B — the exact-version error (`@axe-core/playwright`)
 
-**No upgrade is required or proposed on version grounds**, because every installed component is already the latest stable or supported release. One **proposal** follows from runner currency, not from a defect: evaluate moving the Linux matrix entry from `ubuntu-24.04` to `ubuntu-26.04` in a separate Owner-authorized order, weighing the documented breaking differences (removed Java 8, systemd 259, kernel 7.0, newer system headers that break some cross-compiles) against this workflow's actual needs. It is **not** performed here, and the explicit `ubuntu-24.04` pin is deliberately preferred over `ubuntu-latest`, which is itself mid-migration.
+The `R01` report recorded the future browser test stack as `@axe-core/playwright` **`14.4.0`**. That was **wrong**, and this report corrects it instead of hiding it: the binding Architecture §6A.2 row selects **`@axe-core/playwright =4.14.0`** (with `@playwright/test =1.64.1`), read from the unchanged `ARCHITECTURE.md` blob `4b050f63…` at line 1254 and echoed by the §6A.13 future test stack.
+
+- **Value recorded:** `@axe-core/playwright =4.14.0`, `@playwright/test =1.64.1`, both **Architecture-selected and not installed**.
+- **Architecture pin:** not edited, not reclassified, not "corrected" — the report was the defect, not the contract.
+- **npm freshness: `UNVERIFIED`.** No npm registry release metadata was queried in this run and no package was installed, so nothing here claims that `4.14.0`, `1.64.1`, TypeScript `=7.0.2`, Vite `=8.3.6` or `ts-rs =12.0.1` is the current publishable version. Their standing is *selected-but-not-installed*, exactly as the canonical text says.
+- **Node.js `26.13.0`** remains a **selected future pin, not an installed Node application**; the November 8, 2026 observation in the `R01` ledger that it matched the then-current LTS is retained as a dated historical fact, not as a present-tense freshness claim.
+- No version number anywhere was adjusted to look newer.
+
+## Correction C — the pull-request inventory
+
+`R01` stated that the repository had "**0** pull requests in any state". That statement was **false**, and the mechanism matters: an *unauthenticated* REST call to `/repos/.../pulls?state=all` returned an empty array, and that artefact was reported as the repository's inventory. Freshly queried on 2026-11-08 for this report:
+
+| Query | Result |
+| --- | --- |
+| GitHub pull-request inventory for this repository (authenticated tooling) | **exactly one PR in total** |
+| `GET /repos/.../pulls?state=all&per_page=100` (unauthenticated) | `[]` — an empty body, which is the source of the earlier error |
+| `GET /repos/.../pulls/1` (unauthenticated) | `404 Not Found` |
+| `GET /repos/.../issues?state=all` (unauthenticated) | 1 entry, carrying `pull_request`, i.e. the same PR |
+
+**The one historical pull request:**
+
+| Field | Value |
+| --- | --- |
+| Number | **#1** |
+| Title | `docs(security): establish security register and codify security by design (SOLO-WO-019 R02)` |
+| Author | `provelopment` (Owner's own account — **not** Dependabot) |
+| State | **closed**, `merged: false` |
+| Created / closed | `2026-11-07T03:06:07Z` / `2026-11-07T04:11:07Z` |
+| Head → base | `docs/solo-wo-018-security-register` → `main` |
+| Relation to this work | predates it; it belongs to `SOLO-WO-019 R02`, not to the Dependabot configuration added on 2026-11-08 |
+
+**Corrected statement.** The repository has had exactly **one** pull request ever — a historical, closed, unmerged Owner-authored PR (#1). It has **zero open pull requests**, and **zero Dependabot-authored pull requests**: the initial configuration-triggered Dependabot update jobs produced none, consistent with the version ledger showing nothing outdated. "Zero open update PRs" is therefore not the same claim as "no PR ever existed", and this order created, closed, approved and merged no pull request.
+
+## Correction D — Dependabot warning attribution and classification
+
+`R01` attributed the `ubuntu-latest` migration notice to both Dependabot update jobs. Rechecked directly for this report, with the retrieval time recorded:
+
+- **Check-run annotations — observed by this agent.** `GET /check-runs/{id}/annotations` returned **HTTP 200** for both jobs (`128727737592`, the Cargo updater; `128727737337`, the GitHub Actions updater) at `2026-11-08T13:12:15Z` and `13:12:16Z`. Each carries **exactly one** annotation, level `notice`, `path=.github`: *"The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748"*. The `R01` attribution was therefore annotation-supported rather than invented — but an annotation is not the raw updater log, and the two are not interchangeable.
+- **Raw updater logs — not retrievable by this agent.** `GET /actions/jobs/{id}/logs` returned **HTTP 403** for both jobs. Everything below that comes from raw logs is attributed to the **independent Chief Architect's retrieval**, not to this agent; my own reproduction of those lines is `UNVERIFIED`.
+- **Raw-log messages the Architect's review identified, classified without suppression:**
+
+| Message | Source | Severity / classification | Affects Solo source, CI or toolchain? | Disposition |
+| --- | --- | --- | --- | --- |
+| `rehash: warning: skipping ca-certificates.crt,it does not contain exactly one certificate or CRL` | certificate-store rehash inside the Dependabot **updater container** | benign warning about a bundle file in the updater's own trust store; not a dependency, version or deprecation notice | **No** — Solo's runners, crates, toolchain and actions are unaffected | recorded here, no action; not suppressed, muted or ignored |
+| `Failed to parse GITHUB_REGISTRIES_PROXY environment variable` | Dependabot updater diagnostic, empty proxy environment value | benign configuration diagnostic; no registry proxy is configured for Solo | **No** — Solo uses crates.io and public actions only | recorded, no action; no setting changed |
+| *ubuntu-latest → Ubuntu 26 migration* | upstream runner-image announcement, `actions/runner-images` issue #14748, rollout 2026-10-19 → 2026-11-19 | upstream platform notice attached to the Dependabot job (annotation `path=.github`), concerning **GitHub's own** updater runner label | **No** — the `rust-verify` matrix explicitly pins `ubuntu-24.04` and `windows-2025`, which is why neither `verify` job shows it | discussed as a **separate upstream proposal** only; no runner migration is approved by R02 and no matrix label changed |
+
+**Net assessment.** Neither updater message proves an outdated installed Solo dependency, an EOL component or an actionable `rust-verify` warning. At this revision **no actionable version, deprecation, unsupported-runtime or end-of-life warning remains** for Solo: the only annotations on the two `verify` jobs are the four expected gate, architecture and advisory-probe notices. Two pre-existing parser notices in the Windows job-summary string remain unchanged from the baseline; they are documentation-string diagnostics, not runtime warnings, and that step succeeds. The `ubuntu-latest` item stays an upstream runner-image announcement and an open proposal — not a Solo defect and not a passed item.
 
 
-## Dependabot configuration — validated, and already live
 
-The file is schema `version: 2` with **exactly two** ecosystems rooted at `/`: `cargo` and `github-actions`. Each is `weekly` on Monday at 04:30 and 04:45 `Etc/UTC`, on the default branch (`target-branch` omitted), with `open-pull-requests-limit: 3`. There is no `ignore`, no `groups`, no `registries`, no `allow`, no `versioning-strategy`, no credential and no auto-merge key. Because `open-pull-requests-limit: 0` is what disables an ecosystem, a bound of 3 keeps both active while capping proposals. Dependabot **security** updates are a separate repository feature with their own fixed limit of ten open pull requests and are neither configured nor disabled here.
+## Change-scope evidence
 
-Checked against the official `dependabot.yml` options reference, the supported-ecosystems reference and the configure-version-updates how-to: **44 of 44** assertions passed, covering required keys, documented `schedule.interval` values, `hh:mm` time, IANA timezone, default branch, the per-ecosystem bound, and the absence of every forbidden key.
+| Path | At source revision | Note |
+| --- | --- | --- |
+| `README.md` | changed, blob `ce2d1cf9…` | one line replaced; 1 insertion, 1 deletion |
+| `.documents/WIP/workorder-active.md` | committed unchanged | blob `c1654c5f…`, equals the installed order |
+| `.documents/Reports/execution-report.md` | overwritten | this document |
 
-**Live evidence, not just schema validity.** Adding the file triggered GitHub's Dependabot update jobs, which both completed `success` on the source revision ([job `128727737592`](https://github.com/provelopment/provelopment-foundation-solo/actions/runs/42479369649/job/128727737592), [job `128727737337`](https://github.com/provelopment/provelopment-foundation-solo/actions/runs/42479369510/job/128727737337)) — the configuration was accepted and executed. It produced **no pull requests**: the repository has **0** pull requests in any state, consistent with the ledger above showing nothing outdated. No PR was manufactured, approved, merged or claimed.
-
-**What this file cannot see**, and therefore stays in the manual weekly review the new SOP requires: the `rust-toolchain.toml` channel (GitHub exposes a *separate* `rust-toolchain` ecosystem for it, deliberately **not** enabled by this order), the external `cargo-deny` release archive and digest, the hosted runner image labels, and any future npm ecosystem, which cannot be monitored before a browser manifest and lockfile actually exist.
-
-## Warning and risk inventory
-
-- **One genuine platform warning, recorded as required.** Both Dependabot jobs carried the notice `The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026` (source `actions/runner-images` issue #14748; rollout 2026-10-19 → 2026-11-19). It concerns GitHub's own `ubuntu-latest` runner used by the Dependabot job. **Impact on Solo: none of our jobs use `ubuntu-latest`** — the matrix pins `ubuntu-24.04` and `windows-2025` explicitly, which is why neither `verify` job emitted it. Bounded remediation: none required now; it becomes part of the open `ubuntu-26.04` proposal above.
-- **No version, deprecation, unsupported-runtime or EOL warning in our own jobs.** The `verify` annotations on the source revision are exactly the four expected notices — the two gate notices, the architecture refusal and the advisory refusal — and nothing else.
-- **Two pre-existing parser notices** in the Windows job-summary script (``Use `{` instead of { in variable names``) remain, unchanged by this order, byte-identical in count to the baseline; they are documentation-string diagnostics, not runtime warnings, and the step succeeds.
-- **Residual risk, stated plainly.** Dependabot may in future open proposals this order forbids anyone from auto-merging, and an open proposal is not evidence that an upgrade passed. The manual review surfaces (toolchain channel, external scanner binary, runner images, licences) are human processes that CI cannot enforce; only the SOP makes them mandatory. `ubuntu-24.04` will eventually be retired and today's currency is a point-in-time fact that decays.
-- **`NOT RUN` / `UNVERIFIED`.** Dependabot's *scheduled* weekly run (only the config-triggered update jobs were observed, not the Monday 04:30/04:45 schedule); Dependabot security alerts (401); TypeScript/Vite/Playwright currency (not installed); browser/HTTP smoke (**NOT RUN** — no authorized browser surface). No local Rust toolchain exists on this machine, so no local build, lint or test was run.
-- **Not claimed anywhere:** that this task upgraded a package, that the product is current in a product sense, or that a green scan proves freshness.
+Every other path — `AGENTS.md` `6eae1da8…`, `sop-architect.md` `1483c9be…`, `sop-implementation.md` `51bb3792…`, `ARCHITECTURE.md` `4b050f63…`, `dependabot.yml` `1874726f…`, `rust-verify.yml` `5426c1f5…`, `Cargo.lock` `05a02666…`, `deny.toml` `3063e864…`, `rust-toolchain.toml` `9ec55b3b…`, ROADMAP `e6ea66cf…`, NEXT `92fa562b…`, OUTLOOK `cb9c7a61…` and all first-party source — is byte-identical to the starting HEAD. No gate, threshold, scanner rule, suppression, setting or policy was touched, so nothing was bypassed to make this documentation order pass.
 
 ## CI evidence at the source revision — both hosts green
 
-Run [`42479361260`](https://github.com/provelopment/provelopment-foundation-solo/actions/runs/42479361260) at `5e7c513f…`, inspected by step and annotation rather than by badge:
+Run [`42483885541`](https://github.com/provelopment/provelopment-foundation-solo/actions/runs/42483885541) at `ee844ad0…`, inspected step by step with annotations read directly:
 
-- **`ubuntu-24.04` — [job `128727718624`](https://github.com/provelopment/provelopment-foundation-solo/actions/runs/42479361260/job/128727718624) — success, 29 s.** Gate notice: archive `sha256 9f12ed4c…`, RustSec `309392b1…` fetched `2026-11-08T12:15:32Z`, advisories/bans/licenses/sources all ok on the unchanged locked graph; plus the architecture refusal (`undeclared-crate`, exit 1) and the real `RUSTSEC-2026-0009` refusal of `time 0.3.46`.
-- **`windows-2025` — [job `128727718908`](https://github.com/provelopment/provelopment-foundation-solo/actions/runs/42479361260/job/128727718908) — success, 62 s.** Gate notice: archive `sha256 975a2214…`, RustSec `309392b1…` fetched `2026-11-08T12:15:52Z`, all four classes ok.
+- **`ubuntu-24.04` — [job `128741448810`](https://github.com/provelopment/provelopment-foundation-solo/actions/runs/42483885541/job/128741448810) — success, 30 s, 0 failed steps.** All Linux steps succeeded: pinned-SHA checkout without persisted credentials, pinned toolchain install and exact `rustc`/`cargo` assertion, locked fetch, `cargo-deny 0.20.2` gate from the verified archive (`sha256 9f12ed4c…`, RustSec `309392b1…` fetched `2026-11-08T13:13:13Z`, advisories/bans/licenses/sources all ok), package-set gate, format, strict lint, all-target tests, architecture checker on the real checkout, architecture refusal self-test, test-failure tripwire, release build, release CLI smoke, forbidden-import refusal with guaranteed restore, two byte-identical release builds, and the job summary. The advisory negative probe refused `time 0.3.46` with **`RUSTSEC-2026-0009`** and exit 1 while the unchanged locked graph passed.
+- **`windows-2025` — [job `128741448832`](https://github.com/provelopment/provelopment-foundation-solo/actions/runs/42483885541/job/128741448832) — success, 69 s, 0 failed steps** (19 succeeded, 12 Linux-only steps skipped by design): Windows identity, exact toolchain assertion, locked fetch, the Windows `cargo-deny` gate (`sha256 975a2214…`, RustSec `309392b1…` fetched `2026-11-08T13:13:31Z`), package-set gate, format, strict lint, all-target tests, Windows architecture checker and refusal self-test, tripwire, release build, Windows CLI smoke and summary.
 
-Both hosts therefore re-ran the complete accepted gate — including the fresh advisory refresh and the Ubuntu negative probe — on a revision that changes only documentation and monitoring configuration, so no regression was introduced.
+Advisory database state is therefore current at the source revision: RustSec commit `309392b1…` fetched twice on 2026-11-08, with both hosts confirming all four check classes on the unchanged graph.
+
+**Final report-only HEAD.** This document is part of that commit, so its own run cannot be described inside it. After publication the same `rust-verify` jobs were inspected on both hosts at the final HEAD and are reported in the chat handback together with the final commit SHA and tree. No report-only commit was repeated to manufacture a success.
 
 
-## Verification requirements and acceptance
+## Acceptance conditions
 
-| # | Requirement | Result | Evidence |
+| # | Condition | Result | Evidence |
 | --- | --- | --- | --- |
-| 1 | Policy parity: one authoritative A1 standard in Architect §7B, operational guidance in Implementation SOP, matching `AGENTS.md` pointer, one narrow §6A.2 clarification; no duplicated policy, false version claims or unapproved pin changes | **PASS** | 6/6 parity groups, 0 failures, including "§7B(e2) is the single authority", "no parallel policy", and all fifteen `E01` rows unchanged |
-| 2 | Concrete version assessment with sources, dates, major versions and blockers, distinguishing selected-but-not-installed | **PASS** | 23-row ledger; 11/11 crates current; Rust, scanner and action current; Node toolchain explicitly selected-but-not-installed; one evidenced runner proposal; one `UNVERIFIED` (alert API) |
-| 3 | Config test: full YAML/schema validation against authoritative docs; only Cargo and GitHub Actions; cadence, branch, PR limit and non-auto-merge shown; settings access recorded without changing settings; first scan behaviour honest | **PASS** | 44/44 assertions; live Dependabot update jobs succeeded; 0 pull requests; `rust-toolchain` ecosystem deliberately not enabled; settings untouched |
-| 4 | Regression: read-only blobs unchanged, source **and** final-HEAD CI green on both hosts including fresh `cargo-deny` and the Ubuntu advisory probe; warnings reviewed | **PASS at the source revision** | 15/15 read-only paths byte-identical; both `verify` jobs success with fresh advisory data; final HEAD in the handback |
-| 5 | Repository/WIP: only listed paths, ACTIVE exactly Owner-installed, NEXT/ROADMAP/OUTLOOK unchanged, R01.C and Stage 01 open, four WIP files, clean status, scratch removed | **PASS** | ACTIVE `dbbb2b4d…`; ROADMAP `e6ea66cf…`; NEXT `92fa562b…`; OUTLOOK `cb9c7a61…`; six changed paths; clean tree |
-| — | Canonical report accurate and complete | **PASS** | this document |
+| 1 | Factual correction: a minimal diff to the single README passage distinguishes the verified engineering foundation from the unimplemented EFS product and does not claim a locally installed toolchain; no stale global denial remains in it; `AGENTS.md` and the tree agree | **PASS** | one line replaced (1/1); all four stale denials absent; baseline, product and toolchain-caveat statements present; `AGENTS.md` `6eae1da8…` unchanged and consistent |
+| 2 | Evidence/report precision: `@axe-core/playwright =4.14.0` recorded as Architecture-selected and not installed; true PR inventory with a fresh query; the actual certificate-rehash and proxy diagnostics classified; `ubuntu-latest` treated as upstream unless personally observed; no false `PASS`, fabricated test or npm-freshness claim | **PASS** | corrections B, C and D above, each with query path, timestamp and evidence owner; npm freshness explicitly `UNVERIFIED` |
+| 3 | No change to gates or policy: A1 §7B(e2), both SOPs, Architecture pins, Dependabot config, `rust-verify`, action SHA, toolchain, locked graph and first-party source byte-identical; only three paths changed from the starting HEAD | **PASS** | change-scope table; 15/15 starting blobs matched before writing and all non-authorized paths still match at the source revision |
+| 4 | Exact CI evidence at the source and final HEAD on both hosts, with live verified `cargo-deny`, fresh RustSec, all four checks, strict build/lint/tests, architecture/refusal, smoke, the Ubuntu `RUSTSEC-2026-0009` probe and byte-identical release builds; logs and annotations read where available | **PASS at the source revision** | run `42483885541`: 0 failed steps on either host; annotations read directly; final HEAD reported in the handback |
+| 5 | Repository hygiene and WIP: only permitted paths pushed, clean local status, ROADMAP `R01.C` and Stage 01 still open, NEXT neutral, OUTLOOK unchanged, four WIP files, installed ACTIVE unmodified, scratch removed, no closure or reconciliation | **PASS** | see below; no closure performed |
 
-`R01.C` and Stage 01 remain **open**; this order did not consume them. `SOLO-WO-039 R01`'s verified scanner fallback is unchanged and passed again on both hosts, so it did not regress.
+## Unrun and unverified evidence
 
-## Repository state, cleanup and handback
+- **Browser/HTTP smoke: `NOT RUN`** — no authorized application or browser surface exists.
+- **Dependabot raw updater logs: `UNVERIFIED` for this agent (HTTP 403).** The two updater diagnostics are recorded from the Architect's independent retrieval and are not claimed as personally reproduced.
+- **npm registry freshness for the future browser stack: `UNVERIFIED`** — nothing was installed and no npm metadata was queried.
+- **Dependabot security alerts: `UNVERIFIED`** — the alerts API returned 401 to this agent in the previous run and no access changed.
+- **Dependabot's scheduled Monday run: not observed** — only the configuration-triggered update jobs exist so far.
+- **No local Rust build, lint or test was run** — this machine has no local Rust toolchain; all build evidence is hosted CI, and it is described as such.
 
-One checkout, one worktree, sole `origin`, no stash, clean working tree after publication, exactly four WIP files with no subdirectory, no second report or work-order file. Task scratch stayed in `.temp/w040` (inventory, research, schema validator, parity verifier, downloaded reference documents, commit messages) and was removed; foreign material under `.temp/rt`, `.temp/w032`, `.temp/w033` and `.temp/architecture-fixtures` was preserved untouched. No package, toolchain, manifest, lock, action or pin was installed or changed; no setting was altered; no branch, PR, merge, release or deployment was created by this agent; no credential, token or paid service was used; no destructive Git operation was performed.
+## Repository state and cleanup
 
-**A separate Owner-authorized update order is the only route** for the `ubuntu-26.04` runner proposal, for enabling the `rust-toolchain` ecosystem, and for any future Dependabot proposal. This run does not approve any of them, does not declare the implementation Agent's work accepted, and does not close any roadmap obligation. **"agent report ready"** — the final commit, tree and both-host final-HEAD verification are in the chat handback.
+One checkout, one worktree, no stash, sole `origin`, clean working tree after publication, exactly four WIP files with no subdirectory, no second report or work-order file, and the installed ACTIVE unmodified. Task scratch stayed under `.temp/w040r2` and was removed; foreign material under `.temp/rt`, `.temp/w032`, `.temp/w033` and `.temp/architecture-fixtures` was left untouched. No dependency was installed, no setting changed, no branch, pull request, merge, release or deployment was created, no secret was accessed and no destructive Git operation was performed. Git history retains the superseded `R01` report unchanged; nothing was rewritten or backdated.
 
-- Both SOP editions incremented from revision 6 to revision 7.
+`R01.C` and Stage 01 remain **open**; the `ubuntu-26.04` runner question, enabling the separate `rust-toolchain` ecosystem and any future Dependabot proposal each still require their own Owner-authorized order. This run does not declare `ACCEPT`, does not close a stage and does not approve the Agent's own work. **"agent report ready"** — the final commit, tree and both-host final-HEAD verification are in the chat handback.
+
