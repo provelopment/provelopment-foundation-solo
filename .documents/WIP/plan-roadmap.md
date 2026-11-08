@@ -1,11 +1,5 @@
 # Foundation Solo — Implementation Roadmap
 
-## Stage 01 — Reproducible engineering and hexagonal skeleton
-
-**Prerequisite:** Stage 00 architecture/toolchain choices needed for the skeleton accepted.
-
-**Exit gate:** clean-room dependency installation and build, one genuine request-to-application-port or equivalent minimal vertical-slice proof, green static checks and deliberately failing forbidden-import architecture probe, plus a fresh, exact-version security/advisory assessment with no unresolved applicable critical/high or malicious-component finding and no hidden mandatory security-scan skip. No premature feature shell or provider dependency. Browser evidence remains NOT RUN until a real authorized browser surface exists.
-
 ## Stage 02 — One-Entity EFS identity and publication authority
 
 **Prerequisite:** skeleton and accepted ID/manifest contracts.
