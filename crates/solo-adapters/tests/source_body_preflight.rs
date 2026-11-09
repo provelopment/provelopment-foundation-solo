@@ -217,15 +217,11 @@ fn the_closed_body_root_is_enforced() {
         BodyPreflightRefusalKind::MissingMember
     );
     assert_eq!(
-        json_refusal(
-            br#"{"title":"a","blocks":[{}],"draft":true}"#
-        ),
+        json_refusal(br#"{"title":"a","blocks":[{}],"draft":true}"#),
         BodyPreflightRefusalKind::UnknownMember
     );
     assert_eq!(
-        json_refusal(
-            br#"{"contentVersion":"2.0.0","title":"a","blocks":[1]}"#
-        ),
+        json_refusal(br#"{"contentVersion":"2.0.0","title":"a","blocks":[1]}"#),
         BodyPreflightRefusalKind::UnsupportedContentVersion
     );
     assert_eq!(

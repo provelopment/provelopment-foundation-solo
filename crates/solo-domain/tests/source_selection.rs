@@ -43,7 +43,9 @@ fn both(json_path: &str, markdown_path: &str) -> SourceCandidateSetV1 {
     let json = locator(json_path, SourceCandidateKind::Json);
     let markdown = locator(markdown_path, SourceCandidateKind::Markdown);
     draft.json(json).expect("declare the json member");
-    draft.markdown(markdown).expect("declare the markdown member");
+    draft
+        .markdown(markdown)
+        .expect("declare the markdown member");
     draft.build().expect("a declared member is a non-empty set")
 }
 
