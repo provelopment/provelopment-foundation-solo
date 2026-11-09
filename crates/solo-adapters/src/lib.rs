@@ -14,16 +14,30 @@
 //! immutable copy of it. It still opens no file, proves no filesystem state and authorizes
 //! nothing: the one documented in-memory pipeline is a trust boundary, not a publisher.
 //!
+//! The source-read half is the only code in the project that opens a file. It resolves a
+//! declared `pages/…` locator beneath an explicitly adopted content-root handle, refuses
+//! every symlink, reparse point, escape and identity collision, and returns owned bytes with
+//! the physical identity of the object they came from. It publishes nothing.
+//!
 //! Dependency direction is strictly inward: this crate may depend on
-//! `solo-application` and `solo-domain`, and neither of those may depend on it. The two
-//! reviewed external roots `serde` and `serde_json` are normal dependencies of this outer
-//! adapter alone, and are the only exceptions.
+//! `solo-application` and `solo-domain`, and neither of those may depend on it. The reviewed
+//! external roots are normal dependencies of this outer adapter alone: `serde` and
+//! `serde_json` for parsing, and the two target-gated native roots `rustix` (Linux only) and
+//! `windows-sys` (Windows only).
+//!
+//! **Unsafe isolation.** This crate denies `unsafe_code` rather than forbidding it, because
+//! one Windows-gated module must call the NT entry point directly. The single allowance below
+//! is scoped to that module and only on Windows; the architecture guard fails the build if any
+//! other file, module or attribute acquires an unsafe capability.
 
-#![forbid(unsafe_code)]
+#![deny(unsafe_code)]
 
 mod bootstrap_cli;
 mod publication_manifest;
 mod source_body_preflight;
+mod source_read;
+#[cfg_attr(windows, allow(unsafe_code))]
+mod source_read_native;
 
 pub use bootstrap_cli::{
     CliOutcome, CliRefusal, CliRefusalCode, EXIT_INTERNAL, EXIT_OK, EXIT_REFUSED, FLAG_BASE_URL,
@@ -43,3 +57,4 @@ pub use source_body_preflight::{
     InertBodyCandidateV1, MAX_BLOCKS, MAX_JSON_BODY_BYTES, MAX_MARKDOWN_BODY_BYTES,
     MAX_SUMMARY_SCALARS, MAX_TITLE_SCALARS, preflight_selected_body, run_in_memory_source_pipeline,
 };
+pub use source_read::ContentRootCapability;

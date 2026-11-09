@@ -30,29 +30,43 @@ pub const APPROVED_EXTERNAL_DEV: [&str; 2] = ["serde_json", "syn"];
 pub const APPROVED_DEV_OWNER: &str = "solo-cli";
 
 /// External crates approved as **normal** (shipped) dependencies of exactly one owner:
-/// the outer parsing adapter. The list is closed and named by root, so a root that is
-/// not written here is unapproved whatever version or feature selection it carries.
-pub const APPROVED_ADAPTER_EXTERNAL_NORMAL: [&str; 2] = ["serde", "serde_json"];
+/// the outer adapter. The list is closed and named by root, so a root that is not
+/// written here is unapproved whatever version or feature selection it carries.
+///
+/// `rustix` and `windows-sys` are the two target-gated native source-read roots approved
+/// by the Owner for `SOLO-WO-047 R02`. They are disjoint by target — `rustix` is declared
+/// only for `cfg(target_os = "linux")` and `windows-sys` only for `cfg(windows)` — so a
+/// single host never compiles both, and the locked graph therefore carries exactly one
+/// `windows-sys`, which is what keeps `multiple-versions = "deny"` satisfied.
+pub const APPROVED_ADAPTER_EXTERNAL_NORMAL: [&str; 4] =
+    ["rustix", "serde", "serde_json", "windows-sys"];
 
 /// The only package permitted to declare an approved external normal dependency.
 pub const APPROVED_ADAPTER_EXTERNAL_OWNER: &str = "solo-adapters";
 
-/// The exact audited locked dependency closure reachable from the two approved adapter
+/// The exact audited locked dependency closure reachable from the four approved adapter
 /// roots, taken from the one tracked `Cargo.lock`.
 ///
 /// It is enumerated rather than computed so that a new transitive component cannot
 /// appear silently: an unlisted node is an unapproved reachability and is refused.
-pub const APPROVED_ADAPTER_CLOSURE: [&str; 11] = [
+pub const APPROVED_ADAPTER_CLOSURE: [&str; 18] = [
+    "bitflags",
+    "errno",
     "itoa",
+    "libc",
+    "linux-raw-sys",
     "memchr",
     "proc-macro2",
     "quote",
+    "rustix",
     "serde",
     "serde_core",
     "serde_derive",
     "serde_json",
     "syn",
     "unicode-ident",
+    "windows-link",
+    "windows-sys",
     "zmij",
 ];
 
@@ -148,8 +162,8 @@ pub fn edge_allowed(edge: &Edge) -> bool {
         // The application layer may depend on the domain only.
         "solo-application" => edge.to == "solo-domain",
         // The adapter may depend on the application and the domain, and — as the outer
-        // parsing adapter — on the two reviewed external parser roots as *normal*
-        // dependencies. It may never depend outward on the composition root.
+        // adapter holding the only native boundary — on the approved external roots as
+        // *normal* dependencies. It may never depend outward on the composition root.
         "solo-adapters" => {
             edge.to == "solo-domain"
                 || edge.to == "solo-application"
