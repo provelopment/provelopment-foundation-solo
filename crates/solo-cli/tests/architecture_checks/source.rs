@@ -367,6 +367,10 @@ struct FileCtx {
     is_crate_root: bool,
     stem: String,
     test_context: bool,
+    /// True when this file's items sit inside a positive `#[cfg(windows)]` scope. This is
+    /// what makes the single approved `unsafe` exception reachable at all, so it travels
+    /// with the context instead of being re-derived from an item's own attributes.
+    windows_gated: bool,
     /// Imported name -> full used path, propagated into nested modules.
     aliases: BTreeMap<String, Vec<String>>,
 }
@@ -406,6 +410,7 @@ pub fn check_unit(spec: &UnitSpec, reader: &dyn SourceReader) -> Vec<Violation> 
         stem: file_stem(&root),
         is_crate_root: true,
         test_context: spec.kind.is_test_context(),
+        windows_gated: false,
         aliases: BTreeMap::new(),
         path: root.clone(),
     });
@@ -424,6 +429,7 @@ pub fn check_unit(spec: &UnitSpec, reader: &dyn SourceReader) -> Vec<Violation> 
         stem: file_stem(&root),
         is_crate_root: true,
         test_context: spec.kind.is_test_context(),
+        windows_gated: false,
         aliases: BTreeMap::new(),
         path: root,
     });
@@ -554,6 +560,7 @@ fn visited_files(spec: &UnitSpec, reader: &dyn SourceReader) -> BTreeSet<PathBuf
             stem: file_stem(&root),
             is_crate_root: true,
             test_context: spec.kind.is_test_context(),
+            windows_gated: false,
             aliases: BTreeMap::new(),
             path: root,
         });
@@ -657,6 +664,7 @@ impl Scanner<'_> {
             is_crate_root: ctx.is_crate_root,
             stem: ctx.stem.clone(),
             test_context: ctx.test_context || cfg_is_test(&module.attrs),
+            windows_gated: ctx.windows_gated || is_cfg_windows(&module.attrs),
             aliases: ctx.aliases.clone(),
         };
         child.aliases.extend(facts.aliases.clone());
@@ -709,6 +717,7 @@ impl Scanner<'_> {
             },
             is_crate_root: is_mod_file,
             test_context: child.test_context,
+            windows_gated: child.windows_gated,
             aliases: child.aliases.clone(),
             path: resolved,
         };
@@ -842,7 +851,12 @@ impl Scanner<'_> {
     }
 
     fn scan_item(&mut self, item: &syn::Item, ctx: &mut FileCtx) {
-        let mut facts = Facts::default();
+        // The gate is a property of the enclosing scope, and `scan_module` descends without
+        // visiting the module as an item, so it is seeded here from the context.
+        let mut facts = Facts {
+            windows_scope_depth: usize::from(ctx.windows_gated),
+            ..Facts::default()
+        };
         facts.visit_item(item);
         ctx.aliases.extend(facts.aliases.clone());
         self.report_facts(&facts, ctx);
