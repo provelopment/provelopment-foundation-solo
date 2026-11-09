@@ -32,7 +32,7 @@ I could not observe *why* formatting is rejected, so I am stopping rather than c
 | `dfd3f6d` | Style: recomputed import packing and file endings |
 | `57c905a` | Style: call arguments brought inside the rustfmt width limits |
 
-## CI ledger — four red runs, all at the same step
+## CI ledger — five red runs, all at the same step
 
 | Revision | Ubuntu job | Windows job | Failing step |
 | --- | --- | --- | --- |
@@ -40,8 +40,11 @@ I could not observe *why* formatting is rejected, so I am stopping rather than c
 | `c37c51b` | `128984463594` | `128984463409` | 14 Format check |
 | `dfd3f6d` | `128986426061` | `128986425951` | 14 Format check |
 | `57c905a` | `128988195189` | `128988194976` | 14 Format check |
+| `57dc490` (this report) | `128989735856` | `128989736036` | 14 Format check |
 
 On every attempt the gates **before** formatting passed on both hosts: locked fetch, pinned-toolchain assertion with exact `rustc`/`cargo` versions, `cargo-deny 0.20.2` advisories/bans/licenses/sources on the unchanged 15-package locked graph with a fresh RustSec database, the Ubuntu `RUSTSEC-2026-0009` known-vulnerable negative probe correctly **refused**, and the workspace package-set gate. Steps 15 onward — strict lint, tests, real-tree architecture checker, refusal self-test, tripwire, release build, CLI smoke, forbidden-import refusal and byte-reproducibility — are **skipped**, not passed.
+
+The last row is this report itself: a documentation-only revision fails at the **same** step, which confirms the rejection follows the four new Rust files and not the WIP or report edits. Consequently the order's requirement of two-host green CI **at the report HEAD** is **not met**, and a final documentation-only amendment after this one could not be verified either — that limitation is disclosed rather than papered over.
 
 ## Why this stopped
 
