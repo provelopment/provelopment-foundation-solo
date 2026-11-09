@@ -921,21 +921,59 @@ mod sys {
             }
         }
 
+        /// How many alternative names a fixture may try before failing closed.
+        const FIXTURE_ATTEMPTS: usize = 16;
+
+        /// The sentinel the collision case plants in a directory that must survive untouched.
+        const SENTINEL: &[u8] = b"operator material that must survive";
+
         /// A task-owned content tree with one declared JSON leaf, removed on drop.
+        ///
+        /// Ownership is established by an **exclusive** creation, never by a destructive
+        /// pre-clean: `create_dir` fails when the name is already taken, so a path this test did
+        /// not create is never removed, reset, adopted or written into. A taken name is skipped
+        /// and nothing else happens to it. The guard exists the instant the base exists, so a
+        /// later panic or a failed child write still removes exactly the tree created here.
         struct Fixture {
             base: PathBuf,
         }
 
         impl Fixture {
+            /// The `attempt`-th candidate name for `tag` in the runner's task-owned temp root.
+            fn candidate(tag: &str, attempt: usize) -> PathBuf {
+                std::env::temp_dir().join(format!(
+                    "solo-r04-mapped-{}-{tag}-{attempt}",
+                    std::process::id()
+                ))
+            }
+
+            /// Claims a fresh fixture tree, skipping — never reusing — an existing name.
             fn new(tag: &str) -> Self {
-                let base = std::env::temp_dir()
-                    .join(format!("solo-r04-mapped-{}-{tag}", std::process::id()));
-                let _ = fs::remove_dir_all(&base);
-                fs::create_dir_all(base.join("content").join("pages"))
-                    .expect("create the mapped-view fixture tree");
-                fs::write(Self::leaf_of(&base), vec![b'A'; BODY_LENGTH])
-                    .expect("write the fixture body");
-                Self { base }
+                for attempt in 0..FIXTURE_ATTEMPTS {
+                    let base = Self::candidate(tag, attempt);
+                    match fs::create_dir(&base) {
+                        Ok(()) => {
+                            let guard = Self { base };
+                            guard.layout();
+                            return guard;
+                        }
+                        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
+                        Err(error) => panic!("a fixture directory could not be created: {error}"),
+                    }
+                }
+                panic!(
+                    "{FIXTURE_ATTEMPTS} fixture names were already taken; \
+                     nothing was removed and nothing was reused"
+                )
+            }
+
+            /// Creates the child tree and the body beneath a base this value already owns.
+            fn layout(&self) {
+                fs::create_dir(self.base.join("content"))
+                    .expect("create the fixture content directory");
+                fs::create_dir(self.content().join("pages"))
+                    .expect("create the fixture pages directory");
+                fs::write(self.leaf(), vec![b'A'; BODY_LENGTH]).expect("write the fixture body");
             }
 
             fn leaf_of(base: &Path) -> PathBuf {
@@ -961,8 +999,78 @@ mod sys {
 
         impl Drop for Fixture {
             fn drop(&mut self) {
+                // Only ever removes a tree this value created exclusively: a name that was already
+                // taken is skipped by `new` and never reaches here.
                 let _ = fs::remove_dir_all(&self.base);
             }
+        }
+
+        /// A pre-existing directory holding sentinel content at the name a fixture tries first.
+        ///
+        /// This stands in for material the test did not create. It is claimed with the same
+        /// exclusive `create_dir`, so an already-present path is refused loudly instead of being
+        /// adopted, reset or deleted, and only a directory this guard created is ever removed.
+        struct PreExisting {
+            base: PathBuf,
+        }
+
+        impl PreExisting {
+            fn claim(tag: &str) -> Self {
+                let base = Fixture::candidate(tag, 0);
+                match fs::create_dir(&base) {
+                    Ok(()) => {}
+                    Err(error) => {
+                        panic!("the collision name was already present and is not adopted: {error}")
+                    }
+                }
+                let guard = Self { base };
+                fs::write(guard.sentinel(), SENTINEL).expect("write the sentinel content");
+                guard
+            }
+
+            fn sentinel(&self) -> PathBuf {
+                self.base.join("sentinel.txt")
+            }
+        }
+
+        impl Drop for PreExisting {
+            fn drop(&mut self) {
+                // Only the directory this guard claimed, never anything it found.
+                let _ = fs::remove_dir_all(&self.base);
+            }
+        }
+        #[test]
+        fn a_pre_existing_fixture_name_is_preserved_and_never_adopted() {
+            let pre_existing = PreExisting::claim("collision");
+            let sentinel = pre_existing.sentinel();
+            let sentinel_before = fs::read(&sentinel).expect("read the sentinel content");
+
+            // A fixture that meets a taken name must skip it: no removal, no reset, no adoption.
+            let fixture = Fixture::new("collision");
+
+            assert!(
+                pre_existing.base.is_dir(),
+                "the pre-existing directory must survive"
+            );
+            assert_eq!(
+                fs::read(&sentinel).expect("read the sentinel content again"),
+                sentinel_before,
+                "the sentinel content must be unchanged"
+            );
+            assert_ne!(
+                fixture.base, pre_existing.base,
+                "the fixture must not adopt the taken path"
+            );
+            assert!(
+                fixture.leaf().is_file(),
+                "the skipped name must still yield a usable fixture"
+            );
+            assert_eq!(
+                fs::read(fixture.leaf())
+                    .expect("read the fixture body")
+                    .len(),
+                BODY_LENGTH
+            );
         }
 
         /// The one JSON member every fixture declares.
