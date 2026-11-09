@@ -808,11 +808,13 @@ mod sys {
     // The module is nested inside the audited Windows-gated `sys` module, so its `unsafe`
     // inherits the one approved Windows scope and can never compile elsewhere.
     // -----------------------------------------------------------------------
-    #[cfg(test)]
+    #[cfg(all(test, windows))]
     mod mapped_view_proofs {
         use super::{NativeError, adopt_root, open_leaf, read_bounded, recheck};
         use crate::{ContentRootCapability, RootProvenanceV1};
-        use solo_application::{SourceReadOutcomeV1, read_declared_source_v1};
+        use solo_application::{
+            SourceReadOutcomeV1, SourceReadRefusalKind, read_declared_source_v1,
+        };
         use solo_domain::{
             SourceCandidateDraftV1, SourceCandidateKind, SourceCandidatePathV1,
             SourceCandidateSetV1,
@@ -1056,66 +1058,90 @@ mod sys {
         }
 
         #[test]
-        fn a_persistent_writable_view_cannot_change_the_bytes_the_pinned_reader_returns() {
-            let fixture = Fixture::new("pinned-read");
+        fn a_handed_off_writable_view_still_blocks_the_pinned_body_open() {
+            let fixture = Fixture::new("handed-off-open");
             let view = handed_off_view(&fixture);
+            // Every originating handle is closed, yet the view still maps the file's data.
+            assert_eq!(
+                view.byte(0),
+                b'A',
+                "the handed-off view must still map the file"
+            );
 
             let (root, _) = adopt_root(&fixture.content()).expect("adopt the fixture root");
-            // The body is opened and pinned while the writable view is already alive.
-            let (mut leaf, facts) = open_leaf(&root, &["pages", "p.en-001.json"])
-                .expect("the body must open beneath a live writable view");
-
-            // The rewrite happens strictly inside the reader's open-then-read window, and it is an
-            // equal-length rewrite, so no length check can reveal it.
-            view.fill(b'C');
-
-            let bound = u64::try_from(BODY_LENGTH).expect("the fixture bound fits a u64");
-            let received =
-                read_bounded(&root, &mut leaf, bound).expect("the bounded read succeeds");
-            let after = recheck(&leaf).expect("the read handle still reports facts");
-
-            // Three outcomes are distinguishable, and only the last two are security failures:
-            // the facts moved (so the adapter refuses the body as changed), the bytes are
-            // undisturbed, or the bytes changed while every compared fact stayed identical.
-            assert_eq!(
-                received.len(),
-                BODY_LENGTH,
-                "the bounded read must return the whole body"
-            );
-            if after != facts {
-                // The mutation is visible in the handle's own facts, so the adapter refuses the
-                // body as changed instead of returning it.
-            } else if received.iter().all(|byte| *byte == b'A') {
-                // The surviving view could not reach the pinned handle: the returned bytes are
-                // one instant of the file, which is the guarantee this module exists to test.
-            } else if received.iter().all(|byte| *byte == b'C') {
-                panic!("the reader returned the view's rewritten bytes with unchanged facts");
-            } else {
-                panic!("the reader returned a torn body with unchanged facts");
+            // The section keeps the file object open with write access, so the reader's
+            // share-read-only body open is refused even though no writer handle survives.
+            match open_leaf(&root, &["pages", "p.en-001.json"]) {
+                Err(NativeError::OtherIo) => {}
+                Err(NativeError::PermissionDenied) => {
+                    panic!("the blocked body open was classified as PermissionDenied")
+                }
+                Err(NativeError::Absent) => {
+                    panic!("the blocked body open was misclassified as absence")
+                }
+                Err(NativeError::Unsafe) => {
+                    panic!("the blocked body open was classified as Unsafe")
+                }
+                Err(NativeError::Changed) => {
+                    panic!("the blocked body open was classified as Changed")
+                }
+                Err(NativeError::Unsupported) => {
+                    panic!("the blocked body open was classified as Unsupported")
+                }
+                Ok(_) => panic!("the body opened while a handed-off writable view was alive"),
             }
+
+            drop(view);
+
+            // The contrast proves the refusal came from the mapping and not from the fixture: the
+            // same body opens and reads normally the moment the view is released.
+            let (mut leaf, facts) = open_leaf(&root, &["pages", "p.en-001.json"])
+                .expect("the body must open once the view is released");
+            let bound = u64::try_from(BODY_LENGTH).expect("the fixture bound fits a u64");
+            let bytes = read_bounded(&root, &mut leaf, bound).expect("the read after release");
+            assert_eq!(bytes.len(), BODY_LENGTH);
+            assert_eq!(
+                recheck(&leaf).expect("the read handle reports facts"),
+                facts,
+                "the read after release must see one unchanged object"
+            );
         }
 
         #[test]
-        fn the_product_reader_reads_the_current_content_of_a_body_a_view_rewrote_earlier() {
-            let fixture = Fixture::new("product");
+        fn the_product_reader_refuses_a_body_while_a_handed_off_writable_view_is_alive() {
+            let fixture = Fixture::new("product-refusal");
             let view = handed_off_view(&fixture);
-            // This rewrite happens before the call, so the file genuinely holds these bytes and
-            // reading them is correct. The case is a control, not an exclusion proof.
-            view.fill(b'C');
-
             let capability = fixture.capability();
             let candidates = declaration();
-            let choice = match read_declared_source_v1(&capability, &candidates) {
-                SourceReadOutcomeV1::Chosen(choice) => choice,
-                SourceReadOutcomeV1::Refused(refusal) => {
-                    panic!("the product reader refused with {}", refusal.code())
+
+            match read_declared_source_v1(&capability, &candidates) {
+                SourceReadOutcomeV1::Chosen(_) => {
+                    panic!("the product accepted a body a live writable view can change")
                 }
-            };
-            assert_eq!(choice.bytes().len(), BODY_LENGTH);
-            assert!(
-                choice.bytes().iter().all(|byte| *byte == b'C'),
-                "the chosen body must be the file's current content"
-            );
+                SourceReadOutcomeV1::Refused(refusal) => match refusal.kind() {
+                    SourceReadRefusalKind::OtherIo => {}
+                    SourceReadRefusalKind::PermissionDenied => {
+                        panic!("the product refused as PermissionDenied")
+                    }
+                    SourceReadRefusalKind::ChangedDuringRead => {
+                        panic!("the product refused as ChangedDuringRead")
+                    }
+                    SourceReadRefusalKind::NoneEffective => {
+                        panic!("the product reported a confirmed absence")
+                    }
+                    SourceReadRefusalKind::UnsafeLocation => {
+                        panic!("the product refused as UnsafeLocation")
+                    }
+                    SourceReadRefusalKind::IdentityCollision => {
+                        panic!("the product refused as IdentityCollision")
+                    }
+                    SourceReadRefusalKind::Unsupported => {
+                        panic!("the product refused as Unsupported")
+                    }
+                },
+            }
+
+            drop(view);
         }
 
         #[test]
