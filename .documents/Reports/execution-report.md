@@ -7,137 +7,157 @@
 | Field | Value |
 | --- | --- |
 | Date (UTC) | 2026-11-09 |
-| Work order | **`SOLO-WO-045 R02`** — R02.B first bounded slice |
-| Owner handoff | `SOLO-WO-045 R02` (matching; the order had been replaced by the Owner locally) |
-| Required starting HEAD / tree | `732203b7436603a705d169b368a7734ed72febbd` / `44b2abdef8d2b183be5eec7b8a5beee6b0d70bf5` — **matched exactly** |
-| R02 issuance commit / tree | `be367d34335d8d229611dae0a934fb2f81503998` / `b53d457f0198985bc1576af652a4214070d4df09` |
-| Implementation commit / tree | `cf15cd5377663145e349f5344dedd593146f6396` / `1ba765005219a0935d8b3d9804deb645af5ac0e6` |
-| CI run | `42553390272` — Ubuntu job `128953690724`, Windows job `128953691010` |
-| **Status** | **`STOP` at §5.2 verification** — the slice is implemented and every local and hosted gate but one passes; a **read-only CI constant** blocks green CI |
+| Work order | **`SOLO-WO-045 R03`** — CI edge-count reconciliation and independent acceptance |
+| Matching Owner handoff | `SOLO-WO-045 R03` |
+| Required starting HEAD / tree | `d6c0bc764de7e7bc0e954963a70621be2a2a3a40` / `7ad47ed2e7e801c0b2ac9c8fcbda20404deafed7` — **matched exactly** |
+| §2 baseline blob ledger | **22 of 22 blobs verified, zero drift** |
+| R03 issuance commit / tree | `80d16992482e13d0add122bb9067698d95fb0be9` / `31ba6c69c51414a96a7e2b431d18ecf272ab2b53` |
+| R03 workflow-fix commit / tree / workflow blob | `3a8af1bab7e511a722be8bf8045e5c20200c32aa` / `eccb693c1f4f8436869136becb94c5458e7de95b` / `c12e622bfe5a2c36be2d6c9dd99592dc86b74134` |
+| Frozen R02.B code under review | `cf15cd5377663145e349f5344dedd593146f6396` / `1ba765005219a0935d8b3d9804deb645af5ac0e6` |
+| Green two-host CI | run **`42557798689`** (push, `3a8af1b`) — Ubuntu job `128967312322`, Windows job `128967312395`, **both `success`** |
+| **Status** | **`COMPLETE — evidence phase only`** |
 
 ## Outcome
 
-I executed `SOLO-WO-045 R02` for real this time: §5.1 issuance, then the whole §5.2 bounded source change. **The R01 blocker is genuinely fixed** — `workspace_graph.rs` now carries the reviewed two-owner rule and passes against real Cargo metadata on both hosts.
+The stale expectation is repaired and the whole mandatory workflow is now green on both hosts, through **every** gate. The only change to shipped verification machinery was the two authorized literals; the R02.B source, dependency graph, security controls and refusal fixtures are byte-unchanged from the reviewed commit.
 
-The run then stopped on a **second, previously unlisted instance of the same defect class**: the mandatory workflow `.github/workflows/rust-verify.yml` hardcodes the real-tree architecture report to `edges=22`, and the authorized dependency promotion necessarily makes it `edges=24`. The workflow is read-only under §1 and §3E forbids editing it, so the run stops here rather than weakening a gate or editing a forbidden path.
+Both previous STOPs remain in Git history and are neither waived nor retroactively accepted:
 
-This is the same kind of defect R02 was issued to repair — R01 forgot `workspace_graph.rs`; R02 forgot that its sibling assertion lives in the workflow.
+| Phase | Head | CI | Meaning |
+| --- | --- | --- | --- |
+| R01 | `be367d3` issuance | — | STOP: order omitted `workspace_graph.rs` from its ledger |
+| R02 code | `cf15cd5` | run `42553390272` — FAILURE both hosts at `edges=22` | Implementation published; blocked by a read-only constant |
+| R02 report | `d6c0bc7` | run `42554037361` — FAILURE both hosts at `edges=22` | Truthful STOP report |
+| R03 issuance | `80d1699` | run `42557683069` — **expected FAILURE** both hosts at `edges=22` | Order issued under the still-stale workflow |
+| **R03 workflow fix** | **`3a8af1b`** | run **`42557798689`** — **SUCCESS both hosts** | **Fully green** |
 
-Everything else is verified, and the verification is unusually strong: on **both** hosts steps 1–16 passed, including the four-category `cargo-deny` gate, the advisory negative probe, format, strict Clippy and the entire all-target test suite. Only the architecture-checker step failed.
+I verified the R03 issuance failure was the *same* mechanism, not a new defect, before repairing it: the Ubuntu annotation reads `failure: approved edge count changed`, with steps 1–16 already green.
 
-## What was delivered and published
+## The workflow repair, exactly
 
-All work is confined to the §1 ledger. Exactly ten paths changed, with surgical diffs (no line-ending rewrites):
+`.github/workflows/rust-verify.yml`, blob `1c0e450c…` → `c12e622b…`, a two-line diff (2 insertions, 2 deletions), `git diff --check` clean, no line-ending change:
 
-| Path | Operation | Lines |
-| --- | --- | --- |
-| `crates/solo-domain/src/source_locator.rs` | create | +711 |
-| `crates/solo-domain/src/lib.rs` | narrow module, docs, re-exports | +11 |
-| `crates/solo-domain/tests/source_locator.rs` | create | +395 |
-| `crates/solo-adapters/Cargo.toml` | two normal dependencies | +3 |
-| `Cargo.lock` | two direct references in the adapter stanza | +2 |
-| `crates/solo-adapters/src/publication_manifest.rs` | create | +1766 |
-| `crates/solo-adapters/src/lib.rs` | narrow module, exports, docs | +22/−7 |
-| `crates/solo-adapters/tests/publication_manifest.rs` | create | +597 |
-| `crates/solo-cli/tests/architecture_checks/graph.rs` | shared rule + closure | +67/−4 |
-| `crates/solo-cli/tests/workspace_graph.rs` | invariant replacement + adversarial cases | +259/−24 |
-
-**`source_locator.rs`** is `std`-only. It validates one logical `sourceCandidates` locator against the exact §6.2C.1–§6.2C.2 grammar (namespace, byte/segment/depth ceilings, per-segment charset, trailing-dot and doubled-dot rules, reserved Windows stems, and precise refusals for root, drive, UNC, `.`/`..`, backslash, colon, tilde, query, fragment, percent and control characters), builds a non-empty one-or-two member declaration set, and reserves claims across representations so two declarations cannot hold one logical path **including an absent one**. It compares logical paths only and states, in code and in a testable constant, that filesystem alias/hardlink/case identity is **not proven**.
-
-**`publication_manifest.rs`** deserializes into an ordered-pair tree through `serde`'s `visit_map`, refusing a duplicate member **during map access** at every depth, before any map could let a second member win. It then enforces the closed five-key root, the nested one-Entity grammar, ids validated through the accepted `EntityIdV1`/`FacetIdV1`/`SiteIdV1`/`PageIdV1`, per-parent uniqueness, the 10,000/500/100 budgets, authored ordering, and closed syntactic sub-shapes for `base`, route, `sourceCandidates`, `entryPaths`, `missingTranslation`, `visibilityDefault` and inert bounded `properties`. Locales stay raw authored strings and are never passed to `LocaleKeyV1::from_already_canonical`. The output type is `ParsedManifestCandidateV1`, documents each deferred semantic as *not proven*, and exposes `is_publication_authorized() == false`.
-
-## The blocker, exactly
-
-The mandatory workflow asserts the real-tree architecture report's edge count on **both** hosts:
-
-| Host | Line | Assertion |
-| --- | --- | --- |
-| Ubuntu 24.04 | `.github/workflows/rust-verify.yml:568` | `grep -q 'edges=22'` → else `echo "::error::approved edge count changed"; exit 1` |
-| Windows 2025 | `.github/workflows/rust-verify.yml:580` | `if ($text -notmatch 'edges=22') { throw "approved edge count changed" }` |
-
-The checker now reports, and is correct to report:
-
-```
-architecture=legal packages=4 targets=16 files=26 edges=24
+```diff
+@@ -566,5 +566,5 @@
+           grep -q 'architecture=legal packages=4' "$RUNNER_TEMP/arch-real.txt" \
+             || { echo "::error::unexpected package set in real-tree report"; exit 1; }
+-          grep -q 'edges=22' "$RUNNER_TEMP/arch-real.txt" \
++          grep -q 'edges=24' "$RUNNER_TEMP/arch-real.txt" \
+             || { echo "::error::approved edge count changed"; exit 1; }
+@@ -578,5 +578,5 @@
+           if ($text -notmatch 'architecture=legal packages=4') { throw "unexpected package set in real-tree report" }
+-          if ($text -notmatch 'edges=22') { throw "approved edge count changed" }
++          if ($text -notmatch 'edges=24') { throw "approved edge count changed" }
 ```
 
-The two extra edges are exactly the two edges the order commands: `solo-adapters → serde` and `solo-adapters → serde_json`. Baseline was 22 because every `resolve` edge is counted, including third-party-internal ones. No order-compliant change can avoid this: declaring the dependencies is the point of §1, and the count is structural, not a policy knob.
+`edges=22` now appears **zero** times and `edges=24` exactly twice. Nothing else moved: step names, shell/`throw` behaviour, exit codes, the `architecture=legal packages=4` assertion, the real checker execution as its own process, the 23-refusal/5-legal matrix, the security gate, smoke tests and the Ubuntu byte-reproducibility comparison are all intact. `24` is a recorded expectation of the current approved graph, **not** a generic threshold: any future graph change still fails this gate until separately reviewed.
 
-§1 lists `.github/` as read-only *"including `rust-verify.yml`"*, and §3E states *"Changes to the CI workflow, architecture contract or whole-test policy are forbidden."* I therefore did not touch it, and I did not weaken, skip or re-point anything to manufacture a green badge.
+## Hosted evidence — every gate executed
 
-**Minimal Owner decision needed:** authorize a one-line update in the workflow, on both hosts, changing the expected real-tree edge count from `22` to `24`, justified by the two newly approved adapter edges. No other change is required: with that single constant updated the remaining gates can run, and three of them were already rehearsed locally with the pinned toolchain.
+Run `42557798689` at `3a8af1b`. **Ubuntu 24.04** (job `128967312322`, runner `GitHub Actions 1000002982`): 22 steps succeeded, 0 failed, 9 skipped as the genuine Windows-only counterparts. **Windows 2025** (job `128967312395`, runner `GitHub Actions 1000002983`): 19 succeeded, 0 failed, 12 skipped as the genuine Linux-only counterparts. No gate was skipped that should have run.
 
-## Verified evidence
-
-**Hosted CI (`run 42553390272`) — identical outcome on both hosts.** Steps 1–16 succeeded; step 17/18 failed:
-
-| Step | Ubuntu | Windows |
+| Gate | Ubuntu | Windows |
 | --- | --- | --- |
-| Install / assert pinned toolchain | success | success |
+| Checkout (pinned full commit SHA, no persisted credentials) | success | success |
+| Install and assert the pinned toolchain | success | success |
+| Assert exact `rustc`/`cargo` versions | success | success |
 | Fetch locked packages (only network Cargo acquisition) | success | success |
 | Component security gate — `cargo-deny 0.20.2` | success | success |
 | Advisory negative probe — RUSTSEC-2026-0009 | success | n/a (Linux-only) |
 | Workspace package-set gate | success | success |
 | Format check | success | success |
 | Strict lint (warnings are errors) | success | success |
-| **Test (workspace, all targets, locked)** | **success** | **success** |
-| **Architecture checker on the real checkout** | **failure — `approved edge count changed`** | **failure — exit 1** |
-| Architecture refusal self-test onward | skipped | skipped |
+| Test (workspace, all targets, locked) | success | success |
+| **Architecture checker on the real checkout** | **success** | **success** |
+| Architecture refusal self-test | success | success |
+| Test-failure tripwire | success | success |
+| Release build (workspace, locked) | success | success |
+| Release CLI smoke on the built binary | success | success |
+| Forbidden import and bypass refusal with guaranteed restore | success | n/a (Linux-only) |
+| **Two clean release builds compared byte-for-byte** | **success** | n/a (Linux-only) |
+| Job summary | success | success |
 
-Annotation on the Ubuntu job: `failure: approved edge count changed`, plus the notice that the negative probe refused `time 0.3.46` with `RUSTSEC-2026-0009` while the locked workspace graph passed all four checks.
+Annotations on the green run:
+
+- Ubuntu: `injected forbidden import refused with category 'undeclared-crate' and exit 1` — the load-bearing restore gate genuinely refused an injected violation and restored the tree.
+- Ubuntu: `advisory negative probe refused time 0.3.46 with RUSTSEC-2026-0009 and exit 1, while the unchanged locked workspace graph passed all four checks`.
+- Both: `component security gate passed: cargo-deny 0.20.2 … advisories, bans, licenses and sources all ok` — archive sha256 `9f12ed4c…` (Linux) / `975a2214…` (Windows), RustSec `7a40350e1b8ba5b656d909f88222a8059a83d88d` fetched `2026-11-09T03:42:01Z` (Linux) and `03:42:15Z` (Windows).
+
+### Why these step results are themselves the proof of the counts
+
+The workflow **encodes** the exact expectations as failing assertions, so a green step is not a claim I am making — it is the gate refusing to pass otherwise:
+
+- the architecture step fails unless the report matches `architecture=legal packages=4` **and** `edges=24`, which is why the two-host result proves the checker printed `edges=24` at `3a8af1b`;
+- the refusal self-test step fails unless `self-check=passed cases=29`, `^ok ` count is 29, `^FAIL` count is 0, `refused as ` count is **23** and `legal form accepted` count is **5**, plus the checker-bypass and dynamic-load probes — all of which therefore held;
+- the tripwire step fails unless the normal run passes *and* the deliberately injected failure is refused;
+- the reproducibility step fails unless two clean release builds are byte-identical.
+
+Raw job logs returned **HTTP 403** for this token, so I could not read log bodies first-hand. I am reporting that plainly rather than implying I read them: the evidence above is step-level conclusions plus the job annotations, and the per-count proof rests on the workflow's own failing assertions rather than on log text.
 
 
-**Local verification with the pinned `1.99.1` toolchain** (GNU host variant acquired into task-owned `.temp/` for verification only — no tracked path, no second checkout):
+## Security and dependency evidence
 
-| Command | Result |
+| Property | Value |
 | --- | --- |
-| `cargo fetch --locked` | pass — proves the hand-written lock stanza is consistent and adds no component |
-| `cargo fmt --all --check` | pass |
-| `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings` | pass, zero warnings |
-| `cargo test --workspace --all-targets --locked` | **pass — every target, 0 failures** |
-| Refusal self-test matrix | `self-check=passed cases=29`, `ok` 29, `FAIL` 0, `refused as` **23**, `legal form accepted` **5** — the mandatory fixtures are intact and unchanged |
-| Release build `--workspace --locked` | pass |
-| Release CLI smoke (replica of the CI step) | accepted exit 0 with byte-exact `preflight=ok entity_id=entity-7 base=https://example.com/alpha` and empty stderr; refused exit 2 with `error: PREFLIGHT_ENTITY_ID_INVALID: invalid-start` and empty stdout |
-| Test-failure tripwire | normal run passes; `SOLO_CI_INJECT_TEST_FAILURE=1` fails as designed |
+| Locked packages | **15** (4 workspace + 11 external) — unchanged names, versions, sources and checksums |
+| Lock version | 4 |
+| `Cargo.lock` blob at start and unchanged since | `36125ff1be3eec79b30c5370a7ac4e2642e5d10d` |
+| Adapter external **normal** roots | `serde =1.0.229`, `serde_json =1.0.154` |
+| Adapter enumerated reachable closure | `itoa`, `memchr`, `proc-macro2`, `quote`, `serde`, `serde_core`, `serde_derive`, `serde_json`, `syn`, `unicode-ident`, `zmij` |
+| `solo-cli` externals | `serde_json`, `syn` — **dev only**, unchanged |
+| `solo-domain`, `solo-application` externals | **none of any kind** |
 
-The architecture checker passing on the real tree is the load-bearing proof that the boundary work is genuine: `solo-domain` and `solo-application` still reach **no** external crate, the adapter may reach only `serde`, `serde_json` and their enumerated locked closure, and the adapter still cannot depend outward on `solo-cli`. The source checker needed **no** edit — it already derives a package's allowed normal roots from real metadata — so `source.rs`, `mod.rs` and `check_architecture_fixtures.rs` are byte-identical, and the 23 fixtures are untouched.
+**Runtime reachability changed and is not waved through.** `serde` and `serde_json` were previously reached only as development material of `solo-cli`; they are now **shipped** normal dependencies of `solo-adapters`, so the earlier "zero third-party normal dependencies" finding no longer holds and is not repeated here. What was re-measured first-hand at this commit is the consequence: a fresh two-host `cargo-deny 0.20.2` over the expanded shipped graph returned **advisories, bans, licenses and sources all ok**, and the disposable negative probe still refused the known-vulnerable fixture — i.e. the scanner is genuinely load-bearing, not merely quiet. No suppression, severity override, scanner substitution or vendor input was used, and no applicable critical/high or malicious component was left unresolved.
 
-## Dependency and security transition
+## The frozen R02.B first slice
 
-| Property | Before | After |
+Independently re-confirmed as published, byte-identical to the reviewed blobs, and **not edited** by this order:
+
+| Property | State |
+| --- | --- |
+| `crates/solo-domain/src/source_locator.rs` | `2b507a8a…` — `std`-only logical `pages/` locator, precise refusals, non-empty set, logical reservation incl. absent candidates |
+| `crates/solo-adapters/src/publication_manifest.rs` | `f883dd93…` — duplicate-member refusal during map access at every depth; closed five-key root; exact `1.0.0`; size/UTF-8/BOM refusals |
+| Public parser outcome | `ParsedManifestCandidateV1`, untrusted and non-publishable; `is_publication_authorized()` is constant `false` |
+| `graph.rs` / `workspace_graph.rs` | `774d49fb…` / `9d9d2157…` — one reviewed owner/kind rule, enumerated closure, unconditional real-metadata test, adversarial negatives |
+
+**Proven by this slice:** strict duplicate rejection before value materialisation (including nested arbitrary and `properties`-nested duplicates); one Entity with accepted ID grammar, cardinality, per-parent uniqueness and authored ordering; budgets; inert bounded `properties`; declared and validated `sourceCandidates` with extension matching, reserved-stem and traversal refusal, and duplicate logical reservation even for a path that does not exist; a syntactically accepted declaration is never publication-authorized.
+
+**Explicitly *not* proven and not claimed:** filesystem no-follow confinement, alias/hardlink/case collision beyond logical comparison, snapshot atomicity, absence-versus-error semantics, effective JSON-first selection, selected body validity, canonical BCP47/Unicode/NFC conformance, route/URL/property-registry/visibility semantics, and any routing, HTTP, browser, provider, publication, release or deployment behaviour. `R02.B` and `R02.C` remain **open**; `C1` and `C2–C4` are **not** claimed complete; Stage 02 is not closed.
+
+## Versions and environment
+
+`rust-toolchain.toml` remains pinned at `1.99.1` with `rustfmt` and `clippy` and is byte-unchanged (`9ec55b3b…`). The two "Assert exact rustc/cargo versions" steps succeeded on both hosts, so the measured compiler and Cargo matched the pin exactly. Runner labels were `ubuntu-24.04` and `windows-2025`. Action pins, Node runtime and `deny.toml` (`3063e864…`) are unchanged, and the security gate re-verified its own archive digest (`9f12ed4c…` Linux, `975a2214…` Windows) rather than trusting a download.
+
+
+## Warnings, unknowns and limitations
+
+- Raw job logs: **HTTP 403 — `UNVERIFIED`** for bodies; step conclusions and annotations only, as stated above.
+- GitHub Dependabot and code-scanning alert endpoints remain **`UNVERIFIED`** (401) — never "clear". A scheduled Dependabot run is **`NOT OBSERVED`**, which is not a scan.
+- Browser, HTTP, accessibility, provider, UI, release and deployment checks: **`NOT APPLICABLE`** to this parser/CI slice, never PASS.
+- Release-only `unicode-ident` Unicode-3.0 attribution/NOTICE remains an **open** release obligation and is not waived.
+- Ubuntu `rustup 1.29.2` versus Windows `1.29.3` is a tracked low-urgency parity proposal, **not** an authorized upgrade; no toolchain change was made.
+- No warnings were suppressed, no step relabelled, and no green status is asserted without the gate inspection above.
+
+## State ledger and cleanup
+
+`.documents/WIP/` holds exactly four files with no subdirectory:
+
+| File | Blob | State |
 | --- | --- | --- |
-| Locked packages | 15 | **15 — unchanged** |
-| Lock version | 4 | 4 |
-| Adapter external normal roots | none | `serde =1.0.229`, `serde_json =1.0.154` |
-| `solo-cli` externals | `serde_json`, `syn` (dev) | unchanged, still dev-only |
-| Adapter reachable closure | none | `itoa`, `memchr`, `proc-macro2`, `quote`, `serde`, `serde_core`, `serde_derive`, `serde_json`, `syn`, `unicode-ident`, `zmij` — enumerated in one reviewed constant |
+| `workorder-active.md` | `543cc7ae0d1466f40d4fb8649b2d1dc0ef76c088` | **R03 order installed** (not neutralized — §4.4 ACCEPT has not occurred) |
+| `plan-next.md` | `92fa562b1af0c54391851aa5c79deb1631127069` | **neutral, untouched** (population is gated on ACCEPT) |
+| `plan-roadmap.md` | `18975332c2820170a32558c4ee224176667b91ab` | **byte-identical**; `R02.B`/`R02.C` and Stages 02–13 intact |
+| `plan-outlook.md` | `cb9c7a610cf3c537557e060ca9656e44a053e69d` | byte-identical |
 
-The promotion moves `serde`/`serde_json` from development reachability to a **shipped** adapter dependency, so the prior "zero third-party normal dependencies" finding no longer holds and is not repeated. The 15-package set, versions, sources and checksums are identical to baseline, so no new component, version movement or checksum change entered the graph.
+I did **not** self-accept the slice, close `R02.B`, neutralize ACTIVE or populate NEXT: §4.4 requires the Chief Architect's independent disposition first. Three paths differ from the starting HEAD, exactly as §1 permits: ACTIVE (issuance), the workflow (repair) and this report. `plan-next.md` is deliberately left neutral.
 
-First-hand security evidence from the two hosted jobs: `cargo-deny 0.20.2` with a fresh RustSec database (`7a40350e1b8ba5b656d909f88222a8059a83d88d`, fetched 2026-11-09T02:53:57Z on Ubuntu and 2026-11-09T02:54:22Z on Windows) reported **advisories, bans, licenses and sources all ok** on the changed graph, and the Ubuntu disposable negative probe still refused `time 0.3.46` with `RUSTSEC-2026-0009`. No suppression, severity change, scanner change or unapproved vendor input was used.
+**Cleanup.** R03 produced no build or toolchain artifacts: no local toolchain was installed this run, no `target/` exists in the repository, and I created no scratch files. Task-owned material from the previous run had already been removed, and pre-existing `.temp/` entries belonging to other tasks were left untouched. No PR, merge, branch, extra worktree, stash, amend, rebase, force-push, reset, tag, release, manual workflow dispatch/rerun/cancel, settings change or other-repository write occurred.
 
-## What remains open in R02.B
+## Disposition requested
 
-Unchanged by this run and still required: official parser/Unicode/schema conformance; resolved-source no-follow confinement and snapshot atomicity; existing-invalid-JSON refusal without fallback; absence-versus-I/O-error semantics; effective JSON/Markdown selection and body validity; canonical full-region locale validation; route, base and property/registry semantics; and independent publication-authority acceptance. `R02.B` and `R02.C` remain open, Stage 02 remains open, and this slice's parse is never publication-authorized.
+The **evidence phase** of `SOLO-WO-045 R03` is complete: the full mandatory workflow is green on both hosts at the workflow-fix commit, with every gate — including refusal self-test, tripwire, release smoke and byte-reproducibility — executing rather than skipped.
 
-
-## State ledger and honest limitations
-
-**WIP is exactly four files and unchanged by this run:** `workorder-active.md` holds the complete R02 order at blob `1953f0fb39f37b4911e2855d6bcc566a37f5a775` (31,310 bytes, installed), `plan-next.md` stays neutral at `92fa562b1af0c54391851aa5c79deb1631127069` (49 bytes), `plan-roadmap.md` is byte-identical at `18975332c2820170a32558c4ee224176667b91ab` with `R02.B` and `R02.C` still open, and `plan-outlook.md` is byte-identical at `cb9c7a610cf3c537557e060ca9656e44a053e69d`. I did not clear ACTIVE, did not populate NEXT and did not touch ROADMAP, because §5.5–§5.6 are gated on independent ACCEPT and no ACCEPT exists.
-
-**Not proven, and not claimed.** The byte-reproducibility gate (two clean release builds compared byte-for-byte) was skipped by CI behind the failing step and was **not** run locally; it must be treated as `NOT RUN`. The same applies to the hosted refusal self-test, tripwire, release build and CLI smoke steps, which CI skipped — those four were rehearsed locally instead and are reported as local results, not as hosted passes. Dependabot and code-scanning alert endpoints returning 401 remain `UNVERIFIED`, never "clear". Browser, HTTP, accessibility, provider, UI, release and deployment remain `NOT APPLICABLE` to this parser slice. The `unicode-ident` Unicode-3.0 attribution/NOTICE obligation is still an open release-time requirement and is not waived. `rustup 1.29.3` was current in the verification environment; the tracked `rustup` patch note is unchanged.
-
-**No red run was manufactured.** The two-host failure at `42553390272` is entailed by authorized work meeting a stale read-only constant, not by a speculative push. Publishing the implementation was necessary to obtain per-step hosted evidence and to avoid discarding approved work; the alternative — reverting a complete, locally green slice — would have destroyed the delivery and left the blocker unproven.
-
-**Cleanup.** The task-owned toolchain, crate cache, build directory and scratch reports lived only in git-ignored `.temp/` and were removed at run end; nothing was added to version control there. No `target/` exists in the repository root, no WIP file or report copy was added, no fixture directory or archive was created, and no OS-temp scratch remains. No PR, merge, branch, stash, force-push, rebase, amend, tag, release, workflow dispatch/rerun/cancel, settings change, secret access or other-repository write occurred.
-
-## Conclusion
-
-**`SOLO-WO-045 R02` stops at §5.2 verification on a read-only CI constant, with the authorized slice fully implemented and every other gate green on both hosts.**
-
-The R01 defect is genuinely closed: the real-metadata two-owner rule is in place, `solo-domain` and `solo-application` still reach no external crate, and 23 refusal fixtures remain untouched. The new blocker is a single stale integer in `.github/workflows/rust-verify.yml` that the order forbids me to change.
-
-Resuming requires one Owner decision — authorize updating `edges=22` to `edges=24` in both the Linux and Windows steps, justified by the two approved adapter edges — after which the remaining gates can run unchanged. The Chief Architect's disposition on this revision is `ACCEPT` of the stop and its evidence, `REVISE` with the workflow constant authorized, or `STOP`.
+The Chief Architect should verify at exact GitHub HEAD — the two-line workflow diff, the unchanged R02.B code blobs, the real binary/test/refusal evidence, the shipped-dependency exposure and the run and job identifiers above — and return **`ACCEPT`**, **`REVISE`** or **`STOP`**. On `ACCEPT` of this bounded first slice only, §4.5–§4.6 remain: populate one remaining-R02.B NEXT candidate, verify its both-host CI, then neutralize ACTIVE to blob `ea5f20b736483c2e102456be1cea9104059fc81a` in its own commit and publish the final report. None of that has been started, and a separate order will be required before the next remaining-R02.B slice.
 
 **`agent report ready`**
 
