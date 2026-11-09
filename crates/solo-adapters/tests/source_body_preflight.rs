@@ -5,7 +5,7 @@
 //! file-opening capability at all, so "no fallback" is observable rather than asserted.
 
 use solo_adapters::{
-    BODY_CONTENT_VERSION, BodyPreflightRefusalKind, CONTENT_VALIDITY_PROVEN,
+    BODY_CONTENT_VERSION, BodyPreflightRefusal, BodyPreflightRefusalKind, CONTENT_VALIDITY_PROVEN,
     InMemorySourceRefusalV1, InMemorySourceRequestV1, InertBodyCandidateV1, MAX_JSON_BODY_BYTES,
     MAX_MARKDOWN_BODY_BYTES, preflight_selected_body, run_in_memory_source_pipeline,
 };
@@ -46,18 +46,31 @@ fn markdown_candidates() -> SourceCandidateSetV1 {
     draft.build().expect("a declared member is a non-empty set")
 }
 
+fn observations_json(observation: SourceObservationV1<'_>) -> SuppliedObservationsV1<'_> {
+    SuppliedObservationsV1::new().with_json(observation)
+}
+
+fn observations_markdown(observation: SourceObservationV1<'_>) -> SuppliedObservationsV1<'_> {
+    SuppliedObservationsV1::new().with_markdown(observation)
+}
+
+fn observations_both(
+    json: SourceObservationV1<'_>,
+    markdown: SourceObservationV1<'_>,
+) -> SuppliedObservationsV1<'_> {
+    let observations = SuppliedObservationsV1::new().with_json(json);
+    observations.with_markdown(markdown)
+}
+
 fn select<'a>(
     candidates: &'a SourceCandidateSetV1,
     kind: SourceCandidateKind,
     bytes: &'a [u8],
 ) -> ProvisionalSourceChoiceV1<'a> {
+    let present = SourceObservationV1::Present(bytes);
     let observations = match kind {
-        SourceCandidateKind::Json => {
-            SuppliedObservationsV1::new().with_json(SourceObservationV1::Present(bytes))
-        }
-        SourceCandidateKind::Markdown => {
-            SuppliedObservationsV1::new().with_markdown(SourceObservationV1::Present(bytes))
-        }
+        SourceCandidateKind::Json => observations_json(present),
+        SourceCandidateKind::Markdown => observations_markdown(present),
     };
     match select_provisional_source(candidates, observations) {
         Ok(choice) => choice,
@@ -65,15 +78,13 @@ fn select<'a>(
     }
 }
 
-fn preflight_json(bytes: &[u8]) -> Result<InertBodyCandidateV1, solo_adapters::BodyPreflightRefusal> {
+fn preflight_json(bytes: &[u8]) -> Result<InertBodyCandidateV1, BodyPreflightRefusal> {
     let candidates = json_candidates();
     let choice = select(&candidates, SourceCandidateKind::Json, bytes);
     preflight_selected_body(&choice)
 }
 
-fn preflight_markdown(
-    bytes: &[u8],
-) -> Result<InertBodyCandidateV1, solo_adapters::BodyPreflightRefusal> {
+fn preflight_markdown(bytes: &[u8]) -> Result<InertBodyCandidateV1, BodyPreflightRefusal> {
     let candidates = markdown_candidates();
     let choice = select(&candidates, SourceCandidateKind::Markdown, bytes);
     preflight_selected_body(&choice)
@@ -214,9 +225,7 @@ fn the_closed_body_root_is_enforced() {
         BodyPreflightRefusalKind::UnsupportedContentVersion
     );
     assert_eq!(
-        json_refusal(
-            br#"{"contentVersion":"1.0.0","title":"Home","blocks":{}}"#
-        ),
+        json_refusal(br#"{"contentVersion":"1.0.0","title":"Home","blocks":{}}"#),
         BodyPreflightRefusalKind::InvalidBlocks
     );
 }
@@ -432,22 +441,25 @@ fn manifest_with_both_candidates() -> Vec<u8> {
 
 fn pipeline_error(request: &InMemorySourceRequestV1<'_>) -> InMemorySourceRefusalV1 {
     match run_in_memory_source_pipeline(request) {
-        Ok(candidate) => panic!(
-            "the pipeline must refuse, accepted {} bytes as {}",
-            candidate.len(),
-            candidate.kind()
-        ),
+        Ok(candidate) => panic!("the pipeline must refuse, got {} bytes", candidate.len()),
         Err(error) => error,
     }
+}
+
+fn pipeline_request<'a>(
+    manifest: &'a [u8],
+    locale: &'a str,
+    observations: SuppliedObservationsV1<'a>,
+) -> InMemorySourceRequestV1<'a> {
+    InMemorySourceRequestV1::new(manifest, "main", "site", "home", locale, observations)
 }
 
 #[test]
 fn the_pipeline_selects_and_preflights_only_the_chosen_body() {
     let manifest = manifest_with_both_candidates();
-    let observations =
-        SuppliedObservationsV1::new().with_json(SourceObservationV1::Present(MINIMAL_JSON));
-    let request =
-        InMemorySourceRequestV1::new(&manifest, "main", "site", "home", "en-001", observations);
+    let present = SourceObservationV1::Present(MINIMAL_JSON);
+    let observations = observations_json(present);
+    let request = pipeline_request(&manifest, "en-001", observations);
 
     let candidate = match run_in_memory_source_pipeline(&request) {
         Ok(candidate) => candidate,
@@ -466,10 +478,9 @@ fn the_pipeline_refuses_invalid_present_json_without_ever_touching_markdown() {
     let _unused_valid_markdown_elsewhere: &[u8] = MINIMAL_MARKDOWN;
     let manifest = manifest_with_both_candidates();
     let invalid_json = br#"{"contentVersion":"1.0.0","title":"Home","blocks":["#;
-    let observations =
-        SuppliedObservationsV1::new().with_json(SourceObservationV1::Present(invalid_json));
-    let request =
-        InMemorySourceRequestV1::new(&manifest, "main", "site", "home", "en-001", observations);
+    let present = SourceObservationV1::Present(invalid_json);
+    let observations = observations_json(present);
+    let request = pipeline_request(&manifest, "en-001", observations);
 
     let error = pipeline_error(&request);
     assert!(
@@ -482,11 +493,10 @@ fn the_pipeline_refuses_invalid_present_json_without_ever_touching_markdown() {
 #[test]
 fn the_pipeline_chooses_markdown_only_after_a_reported_json_absence() {
     let manifest = manifest_with_both_candidates();
-    let observations = SuppliedObservationsV1::new()
-        .with_json(SourceObservationV1::Absent)
-        .with_markdown(SourceObservationV1::Present(MINIMAL_MARKDOWN));
-    let request =
-        InMemorySourceRequestV1::new(&manifest, "main", "site", "home", "en-001", observations);
+    let absent = SourceObservationV1::Absent;
+    let present = SourceObservationV1::Present(MINIMAL_MARKDOWN);
+    let observations = observations_both(absent, present);
+    let request = pipeline_request(&manifest, "en-001", observations);
 
     let candidate = match run_in_memory_source_pipeline(&request) {
         Ok(candidate) => candidate,
@@ -500,11 +510,10 @@ fn the_pipeline_chooses_markdown_only_after_a_reported_json_absence() {
 #[test]
 fn the_pipeline_refuses_a_redundant_markdown_observation() {
     let manifest = manifest_with_both_candidates();
-    let observations = SuppliedObservationsV1::new()
-        .with_json(SourceObservationV1::Present(MINIMAL_JSON))
-        .with_markdown(SourceObservationV1::Present(MINIMAL_MARKDOWN));
-    let request =
-        InMemorySourceRequestV1::new(&manifest, "main", "site", "home", "en-001", observations);
+    let present = SourceObservationV1::Present(MINIMAL_JSON);
+    let markdown = SourceObservationV1::Present(MINIMAL_MARKDOWN);
+    let observations = observations_both(present, markdown);
+    let request = pipeline_request(&manifest, "en-001", observations);
 
     let error = pipeline_error(&request);
     assert!(
@@ -517,14 +526,8 @@ fn the_pipeline_refuses_a_redundant_markdown_observation() {
 #[test]
 fn the_pipeline_refuses_a_missing_observation() {
     let manifest = manifest_with_both_candidates();
-    let request = InMemorySourceRequestV1::new(
-        &manifest,
-        "main",
-        "site",
-        "home",
-        "en-001",
-        SuppliedObservationsV1::new(),
-    );
+    let observations = SuppliedObservationsV1::new();
+    let request = pipeline_request(&manifest, "en-001", observations);
 
     let error = pipeline_error(&request);
     assert!(matches!(error, InMemorySourceRefusalV1::Selection(_)));
@@ -534,37 +537,20 @@ fn the_pipeline_refuses_a_missing_observation() {
 #[test]
 fn the_pipeline_refuses_an_unmatched_representation() {
     let manifest = manifest_with_both_candidates();
-    let request = InMemorySourceRequestV1::new(
-        &manifest,
-        "main",
-        "site",
-        "home",
-        "de-DE",
-        SuppliedObservationsV1::new(),
-    );
+    let observations = SuppliedObservationsV1::new();
+    let request = pipeline_request(&manifest, "de-DE", observations);
 
     let error = pipeline_error(&request);
-    assert!(matches!(
-        error,
-        InMemorySourceRefusalV1::UnknownRepresentation
-    ));
-    assert_eq!(
-        error.code(),
-        "PREFLIGHT_SOURCE_PIPELINE_UNKNOWN_REPRESENTATION"
-    );
+    assert!(matches!(error, InMemorySourceRefusalV1::UnknownRepresentation));
+    let code = error.code();
+    assert_eq!(code, "PREFLIGHT_SOURCE_PIPELINE_UNKNOWN_REPRESENTATION");
 }
 
 #[test]
 fn the_pipeline_refuses_a_manifest_the_parser_refuses() {
     let manifest = b"{}";
-    let request = InMemorySourceRequestV1::new(
-        manifest,
-        "main",
-        "site",
-        "home",
-        "en-001",
-        SuppliedObservationsV1::new(),
-    );
+    let observations = SuppliedObservationsV1::new();
+    let request = pipeline_request(manifest, "en-001", observations);
 
     let error = pipeline_error(&request);
     assert!(matches!(error, InMemorySourceRefusalV1::Manifest(_)));

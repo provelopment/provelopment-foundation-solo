@@ -225,9 +225,9 @@ pub enum SourceSelectionRefusalKind {
     /// A declared member's observation was not supplied at all.
     MissingObservation,
     /// An observation was supplied for a member that was never declared.
-    UndeclaredCandidateObservation,
+    Undeclared,
     /// Present JSON was supplied together with Markdown body bytes, which are unwanted.
-    RedundantMarkdownObservation,
+    RedundantMarkdown,
     /// Every declared member was safely reported absent.
     NeitherPresent,
     /// A declared member reported a named failure instead of bytes or absence.
@@ -240,11 +240,9 @@ impl SourceSelectionRefusalKind {
     pub const fn detail(self) -> &'static str {
         match self {
             Self::MissingObservation => "a declared candidate has no supplied observation",
-            Self::UndeclaredCandidateObservation => {
-                "an observation was supplied for an undeclared candidate"
-            }
-            Self::RedundantMarkdownObservation => {
-                "present JSON was supplied together with unwanted Markdown body bytes"
+            Self::Undeclared => "an observation was supplied for an undeclared candidate",
+            Self::RedundantMarkdown => {
+                "present JSON was supplied with unwanted Markdown body bytes"
             }
             Self::NeitherPresent => "every declared candidate was reported absent",
             Self::ObservationFailure => "a declared candidate reported a named failure",
@@ -270,6 +268,23 @@ impl SourceSelectionRefusal {
             member,
             failure: None,
         }
+    }
+
+    const fn missing(member: SourceCandidateKind) -> Self {
+        Self::new(SourceSelectionRefusalKind::MissingObservation, Some(member))
+    }
+
+    const fn undeclared(member: SourceCandidateKind) -> Self {
+        Self::new(SourceSelectionRefusalKind::Undeclared, Some(member))
+    }
+
+    const fn redundant_markdown() -> Self {
+        let member = Some(SourceCandidateKind::Markdown);
+        Self::new(SourceSelectionRefusalKind::RedundantMarkdown, member)
+    }
+
+    const fn neither_present() -> Self {
+        Self::new(SourceSelectionRefusalKind::NeitherPresent, None)
     }
 
     const fn failed(member: SourceCandidateKind, failure: SourceFailureKind) -> Self {
@@ -350,33 +365,22 @@ pub fn select_provisional_source<'a>(
     // An observation for a member that was never declared is a caller fault, refused
     // before any read order could make it look meaningful.
     if observations.json().is_some() && candidates.json().is_none() {
-        return Err(SourceSelectionRefusal::new(
-            SourceSelectionRefusalKind::UndeclaredCandidateObservation,
-            Some(Json),
-        ));
+        return Err(SourceSelectionRefusal::undeclared(Json));
     }
     if observations.markdown().is_some() && candidates.markdown().is_none() {
-        return Err(SourceSelectionRefusal::new(
-            SourceSelectionRefusalKind::UndeclaredCandidateObservation,
-            Some(Markdown),
-        ));
+        return Err(SourceSelectionRefusal::undeclared(Markdown));
     }
 
     if let Some(locator) = candidates.json() {
-        let observation = observations.json().ok_or(SourceSelectionRefusal::new(
-            SourceSelectionRefusalKind::MissingObservation,
-            Some(Json),
-        ))?;
+        let missing = SourceSelectionRefusal::missing(Json);
+        let observation = observations.json().ok_or(missing)?;
 
         match observation {
             SourceObservationV1::Present(bytes) => {
                 // Present JSON ends the read order. Markdown body bytes supplied anyway
                 // were never needed, so they are refused rather than ignored or parsed.
                 if observations.markdown().is_some() {
-                    return Err(SourceSelectionRefusal::new(
-                        SourceSelectionRefusalKind::RedundantMarkdownObservation,
-                        Some(Markdown),
-                    ));
+                    return Err(SourceSelectionRefusal::redundant_markdown());
                 }
                 return Ok(ProvisionalSourceChoiceV1 {
                     kind: Json,
@@ -394,10 +398,8 @@ pub fn select_provisional_source<'a>(
     // Reached only when no JSON was declared, or when the declared JSON was reported
     // absent. Only a reported absence may permit considering Markdown.
     if let Some(locator) = candidates.markdown() {
-        let observation = observations.markdown().ok_or(SourceSelectionRefusal::new(
-            SourceSelectionRefusalKind::MissingObservation,
-            Some(Markdown),
-        ))?;
+        let missing = SourceSelectionRefusal::missing(Markdown);
+        let observation = observations.markdown().ok_or(missing)?;
 
         match observation {
             SourceObservationV1::Present(bytes) => {
@@ -414,10 +416,7 @@ pub fn select_provisional_source<'a>(
         }
     }
 
-    Err(SourceSelectionRefusal::new(
-        SourceSelectionRefusalKind::NeitherPresent,
-        None,
-    ))
+    Err(SourceSelectionRefusal::neither_present())
 }
 
 

@@ -447,25 +447,22 @@ impl std::error::Error for InMemorySourceRefusalV1 {}
 
 fn find_representation<'m>(
     parsed: &'m ParsedManifestCandidateV1,
-    facet: &str,
-    site: &str,
-    page: &str,
-    locale: &str,
+    request: &InMemorySourceRequestV1<'_>,
 ) -> Option<&'m solo_domain::SourceCandidateSetV1> {
     for facet_node in parsed.entity().facets() {
-        if facet_node.id().as_str() != facet {
+        if facet_node.id().as_str() != request.facet {
             continue;
         }
         for site_node in facet_node.sites() {
-            if site_node.id().as_str() != site {
+            if site_node.id().as_str() != request.site {
                 continue;
             }
             for page_node in site_node.pages() {
-                if page_node.id().as_str() != page {
+                if page_node.id().as_str() != request.page {
                     continue;
                 }
                 for representation in page_node.representations() {
-                    if representation.locale() == locale {
+                    if representation.locale() == request.locale {
                         return Some(representation.source_candidates());
                     }
                 }
@@ -491,22 +488,18 @@ fn find_representation<'m>(
 pub fn run_in_memory_source_pipeline(
     request: &InMemorySourceRequestV1<'_>,
 ) -> Result<InertBodyCandidateV1, InMemorySourceRefusalV1> {
-    let parsed =
-        parse_manifest_bytes(request.manifest_bytes).map_err(InMemorySourceRefusalV1::Manifest)?;
+    let supplied = parse_manifest_bytes(request.manifest_bytes);
+    let parsed = supplied.map_err(InMemorySourceRefusalV1::Manifest)?;
 
-    let candidates = find_representation(
-        &parsed,
-        request.facet,
-        request.site,
-        request.page,
-        request.locale,
-    )
-    .ok_or(InMemorySourceRefusalV1::UnknownRepresentation)?;
+    let unknown = InMemorySourceRefusalV1::UnknownRepresentation;
+    let found = find_representation(&parsed, request);
+    let candidates = found.ok_or(unknown)?;
 
-    let choice = select_provisional_source(candidates, request.observations)
-        .map_err(InMemorySourceRefusalV1::Selection)?;
+    let selected = select_provisional_source(candidates, request.observations);
+    let choice = selected.map_err(InMemorySourceRefusalV1::Selection)?;
 
-    preflight_selected_body(&choice).map_err(InMemorySourceRefusalV1::Body)
+    let preflighted = preflight_selected_body(&choice);
+    preflighted.map_err(InMemorySourceRefusalV1::Body)
 }
 
 
