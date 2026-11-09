@@ -811,6 +811,8 @@ mod snapshot_proofs {
     use std::path::PathBuf;
 
     const SOURCE: &[u8] = b"{\"slug\":\"p\"}";
+    /// A rewrite of exactly the same length, differing only in content.
+    const SAME_SIZE: &[u8] = b"{\"slug\":\"q\"}";
     const REWRITTEN: &[u8] = b"{\"slug\":\"p-rewritten\"}";
 
     fn fixture(variable: &str, tag: &str) -> PathBuf {
@@ -852,9 +854,16 @@ mod snapshot_proofs {
         // The source is rewritten in place after the clone, with different bytes.
         fs::write(directory.join("body.json"), REWRITTEN).expect("rewrite the source");
         assert_eq!(read_from_start(&clone, length).as_slice(), SOURCE);
+
+        // An equal-length rewrite is equally invisible to the clone: the length and the byte
+        // count are unchanged, so nothing but the content differs.
+        assert_eq!(SAME_SIZE.len(), SOURCE.len());
+        fs::write(directory.join("body.json"), SAME_SIZE).expect("rewrite with the same length");
+        assert_eq!(read_from_start(&clone, length).as_slice(), SOURCE);
         assert_eq!(read_from_start(&clone, length).as_slice(), SOURCE);
 
         // A fresh snapshot does see the new bytes: the clone is one instant, not a cache.
+        fs::write(directory.join("body.json"), REWRITTEN).expect("rewrite the source again");
         let (second, second_length) = snapshot_leaf(&root, &leaf, 4096).expect("re-clone");
         assert_eq!(
             read_from_start(&second, second_length).as_slice(),
