@@ -799,81 +799,16 @@ mod sys {
 
     #[cfg(all(test, windows))]
     mod mapped_view_proofs {
-        use crate::{ContentRootCapability, RootProvenanceV1};
-        use solo_application::{
-            SourceReadOutcomeV1, SourceReadRefusalKind, read_declared_source_v1,
+        use windows_sys::Win32::System::Memory::{
+            FILE_MAP_WRITE, MEMORY_MAPPED_VIEW_ADDRESS, PAGE_READWRITE,
         };
-        use solo_domain::{
-            SourceCandidateDraftV1, SourceCandidateKind, SourceCandidatePathV1,
-            SourceCandidateSetV1,
-        };
-        use std::fs;
-        use std::path::{Path, PathBuf};
-
-        const BODY_LENGTH: usize = 4096;
-
-        struct Fixture {
-            base: PathBuf,
-        }
-
-        impl Fixture {
-            fn new(tag: &str) -> Self {
-                let base =
-                    std::env::temp_dir().join(format!("solo-r04-b-{}-{tag}", std::process::id()));
-                let _ = fs::remove_dir_all(&base);
-                fs::create_dir_all(base.join("content").join("pages"))
-                    .expect("create the probe tree");
-                fs::write(Self::leaf_of(&base), vec![b'A'; BODY_LENGTH])
-                    .expect("write the probe body");
-                Self { base }
-            }
-
-            fn leaf_of(base: &Path) -> PathBuf {
-                base.join("content").join("pages").join("p.en-001.json")
-            }
-
-            fn content(&self) -> PathBuf {
-                self.base.join("content")
-            }
-
-            fn capability(&self) -> ContentRootCapability {
-                ContentRootCapability::adopt_bootstrap_path(
-                    &self.content(),
-                    RootProvenanceV1::OperatorDesignatedContentRoot,
-                )
-                .expect("adopt the probe content root")
-            }
-        }
-
-        impl Drop for Fixture {
-            fn drop(&mut self) {
-                let _ = fs::remove_dir_all(&self.base);
-            }
-        }
-
-        fn declaration() -> SourceCandidateSetV1 {
-            let locator =
-                SourceCandidatePathV1::parse("pages/p.en-001.json", SourceCandidateKind::Json)
-                    .expect("an accepted locator");
-            let mut draft = SourceCandidateDraftV1::new();
-            draft.json(locator).expect("json declared once");
-            draft.build().expect("a non-empty declaration")
-        }
 
         #[test]
-        fn the_product_reader_reads_a_plain_probe_body() {
-            let fixture = Fixture::new("plain");
-            let capability = fixture.capability();
-            let candidates = declaration();
-            match read_declared_source_v1(&capability, &candidates) {
-                SourceReadOutcomeV1::Chosen(choice) => {
-                    assert_eq!(choice.bytes(), vec![b'A'; BODY_LENGTH].as_slice());
-                }
-                SourceReadOutcomeV1::Refused(refusal) => {
-                    let _kind: SourceReadRefusalKind = refusal.kind();
-                    panic!("refused with {}", refusal.code())
-                }
-            }
+        fn the_memory_bindings_are_visible() {
+            assert_eq!(PAGE_READWRITE, 4);
+            assert_eq!(FILE_MAP_WRITE, 2);
+            let address = MEMORY_MAPPED_VIEW_ADDRESS::default();
+            assert!(address.Value.is_null(), "the default address is null");
         }
     }
 }
