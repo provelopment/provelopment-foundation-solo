@@ -22,14 +22,16 @@
 //! **What this module does not prove.** Neither host provides an atomic,
 //! filesystem-wide snapshot. The *transfer* is atomic on Linux in the strong sense: the bytes
 //! come from an anonymous copy-on-write clone, so nothing a writer does afterwards can move
-//! them. On Windows the read handle denies write and delete sharing, so no *handle-holding*
-//! writer can modify the file while the read is in progress; a writable section that was mapped
-//! before the read and has outlived its own file handle is an adversary that sharing rules do not
-//! reach, and this order stopped before it could be executed, so nothing here claims it is
-//! excluded. Beyond the transfer, a writer can still change this file after its clone was taken,
-//! and the before/after resample reports exactly that as [`NativeError::Changed`] rather than
-//! returning a stale body. A change that leaves every observed fact identical is not detectable,
-//! and nothing here claims otherwise.
+//! them. On Windows the read handle denies write and delete sharing, and a writable section that
+//! outlived its own file handle is refused as well: the section keeps the file object open with
+//! write access, so the reader's `ShareAccess = FILE_SHARE_READ` body open fails with a sharing
+//! violation. Both facts were executed natively on Windows 2025 by `sys::mapped_view_proofs`,
+//! which creates a real `PAGE_READWRITE` section with the pinned generated bindings, maps it
+//! writable and closes both originating handles before the reader is involved. Beyond the
+//! transfer, a writer can still change this file after its clone was taken, and the before/after
+//! resample reports exactly that as [`NativeError::Changed`] rather than returning a stale body. A
+//! change that leaves every observed fact identical is not detectable, and nothing here claims
+//! otherwise.
 
 use std::path::Path;
 

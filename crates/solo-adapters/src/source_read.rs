@@ -9,13 +9,14 @@
 //! **What a successful read proves here.** On Linux the returned bytes are one instant of the
 //! file, not a mutable read a writer can tear, because they come from an anonymous copy-on-write
 //! clone. On Windows the read handle denies write and delete sharing, which excludes any writer
-//! that still holds a handle; it does not reach a writable section mapped earlier that has
-//! outlived its own file handle, and that adversary is untested (R03 STOP). The bytes also belong
-//! to the physical object whose identity is reported, because identity, length and link count are
-//! sampled on the handle before and after the transfer and any difference is refused. What it does
-//! not prove is a filesystem-wide or multi-file snapshot, or that the source will not change
-//! immediately afterwards. A read never authorizes publication, selects a route, decides
-//! visibility or parses a body.
+//! that still holds a handle, and a writable section that outlived its own file handle is refused
+//! at the body open as well, because the section keeps the file object open with write access;
+//! that adversary was executed natively on Windows 2025. The bytes also belong to the physical
+//! object whose identity is reported, because identity, length and link count are sampled on the
+//! handle before and after the transfer and any difference is refused. What it does not prove is a
+//! filesystem-wide or multi-file snapshot, or that the source will not change immediately
+//! afterwards. A read never authorizes publication, selects a route, decides visibility or parses
+//! a body.
 
 use std::path::Path;
 
