@@ -796,6 +796,358 @@ mod sys {
         let (facts, _) = handle_facts(leaf.handle.as_raw_handle())?;
         Ok(facts)
     }
+
+    // -----------------------------------------------------------------------
+    // R04 — the mandatory in-process Windows writable-file-mapping adversary.
+    //
+    // A writable section is created from the fixture body with the pinned generated Win32
+    // bindings, a `PAGE_READWRITE` view is mapped, and the originating file and section
+    // handles are then closed while the view stays alive. The tests establish, on this host,
+    // what that surviving view can do to the bytes `SourceRead` returns.
+    //
+    // The module is nested inside the audited Windows-gated `sys` module, so its `unsafe`
+    // inherits the one approved Windows scope and can never compile elsewhere.
+    // -----------------------------------------------------------------------
+    #[cfg(test)]
+    mod mapped_view_proofs {
+        use super::{NativeError, adopt_root, open_leaf, read_bounded, recheck};
+        use crate::{ContentRootCapability, RootProvenanceV1};
+        use solo_application::{SourceReadOutcomeV1, read_declared_source_v1};
+        use solo_domain::{
+            SourceCandidateDraftV1, SourceCandidateKind, SourceCandidatePathV1,
+            SourceCandidateSetV1,
+        };
+        use std::fs::{self, File, OpenOptions};
+        use std::os::windows::io::AsRawHandle;
+        use std::path::{Path, PathBuf};
+        use std::ptr;
+        use windows_sys::Win32::Foundation::{CloseHandle, HANDLE};
+        use windows_sys::Win32::System::Memory::{
+            CreateFileMappingW, FILE_MAP_WRITE, MEMORY_MAPPED_VIEW_ADDRESS, MapViewOfFile,
+            PAGE_READWRITE, UnmapViewOfFile,
+        };
+
+        /// The fixture body length, small enough to stay bounded and large enough to carry a
+        /// whole-view rewrite.
+        const BODY_LENGTH: usize = 4096;
+
+        /// An owned file-section handle, closed exactly once.
+        struct Section(HANDLE);
+
+        impl Section {
+            /// Creates an unnamed `PAGE_READWRITE` section over `file`'s current contents.
+            fn over(file: &File) -> Self {
+                // SAFETY: `file` is an open handle owned by the caller for this whole call, the
+                // security descriptor is default (null), `PAGE_READWRITE` is a valid protection
+                // for a file-backed section, a zero maximum size means "the file's current
+                // size", and a null name creates an unnamed section no other process can open.
+                // The returned handle is owned by `Section` and closed once in `Drop`.
+                let section = unsafe {
+                    CreateFileMappingW(
+                        file.as_raw_handle() as HANDLE,
+                        ptr::null(),
+                        PAGE_READWRITE,
+                        0,
+                        0,
+                        ptr::null(),
+                    )
+                };
+                assert!(
+                    !section.is_null(),
+                    "CreateFileMappingW must return a section handle"
+                );
+                Self(section)
+            }
+        }
+
+        impl Drop for Section {
+            fn drop(&mut self) {
+                // SAFETY: `self.0` is the live section handle this value owns and has not been
+                // closed. Closing it once here cannot invalidate a view mapped from it, because
+                // every view holds its own reference to the section object.
+                unsafe { CloseHandle(self.0) };
+            }
+        }
+
+        /// An owned writable view over the whole file, unmapped exactly once.
+        struct WritableView {
+            address: MEMORY_MAPPED_VIEW_ADDRESS,
+            length: usize,
+        }
+
+        impl WritableView {
+            fn over(section: &Section, length: usize) -> Self {
+                // SAFETY: `section` is a live handle created from the fixture file, the requested
+                // access `FILE_MAP_WRITE` is permitted by the `PAGE_READWRITE` section, the file
+                // offset is zero and a zero size maps the whole section. The returned address is
+                // owned by this value and unmapped exactly once in `Drop`.
+                let address = unsafe { MapViewOfFile(section.0, FILE_MAP_WRITE, 0, 0, 0) };
+                assert!(
+                    !address.Value.is_null(),
+                    "MapViewOfFile must return a mapped base address"
+                );
+                Self { address, length }
+            }
+
+            /// One byte read back through the view, proving the view still maps this file.
+            fn byte(&self, offset: usize) -> u8 {
+                assert!(
+                    offset < self.length,
+                    "the offset must stay inside the mapped extent"
+                );
+                // SAFETY: `offset` was proven smaller than the mapped length, the base address is
+                // a live view this value still owns, and only that single byte is read.
+                unsafe { *self.address.Value.cast::<u8>().add(offset) }
+            }
+
+            /// Overwrites every mapped byte in place, leaving the file length unchanged.
+            fn fill(&self, value: u8) {
+                // SAFETY: the view maps exactly `self.length` bytes, which is the whole fixture
+                // file, so `value` fills only that extent; the base address is live and not
+                // unmapped, and no other pointer aliases this range.
+                unsafe { ptr::write_bytes(self.address.Value.cast::<u8>(), value, self.length) };
+            }
+        }
+
+        impl Drop for WritableView {
+            fn drop(&mut self) {
+                // SAFETY: the address came from `MapViewOfFile` above, has not been unmapped, and
+                // is unmapped exactly once here; no dereference happens afterwards.
+                unsafe { UnmapViewOfFile(self.address) };
+            }
+        }
+
+        /// A task-owned content tree with one declared JSON leaf, removed on drop.
+        struct Fixture {
+            base: PathBuf,
+        }
+
+        impl Fixture {
+            fn new(tag: &str) -> Self {
+                let base = std::env::temp_dir()
+                    .join(format!("solo-r04-mapped-{}-{tag}", std::process::id()));
+                let _ = fs::remove_dir_all(&base);
+                fs::create_dir_all(base.join("content").join("pages"))
+                    .expect("create the mapped-view fixture tree");
+                fs::write(Self::leaf_of(&base), vec![b'A'; BODY_LENGTH])
+                    .expect("write the fixture body");
+                Self { base }
+            }
+
+            fn leaf_of(base: &Path) -> PathBuf {
+                base.join("content").join("pages").join("p.en-001.json")
+            }
+
+            fn content(&self) -> PathBuf {
+                self.base.join("content")
+            }
+
+            fn leaf(&self) -> PathBuf {
+                Self::leaf_of(&self.base)
+            }
+
+            fn capability(&self) -> ContentRootCapability {
+                ContentRootCapability::adopt_bootstrap_path(
+                    &self.content(),
+                    RootProvenanceV1::OperatorDesignatedContentRoot,
+                )
+                .expect("adopt the fixture content root")
+            }
+        }
+
+        impl Drop for Fixture {
+            fn drop(&mut self) {
+                let _ = fs::remove_dir_all(&self.base);
+            }
+        }
+
+        /// The one JSON member every fixture declares.
+        fn declaration() -> SourceCandidateSetV1 {
+            let locator =
+                SourceCandidatePathV1::parse("pages/p.en-001.json", SourceCandidateKind::Json)
+                    .expect("an accepted locator");
+            let mut draft = SourceCandidateDraftV1::new();
+            draft.json(locator).expect("json declared once");
+            draft.build().expect("a non-empty declaration")
+        }
+
+        /// Opens the fixture body writable with the default share mode.
+        ///
+        /// The default share mode permits the reader's requested access, which is what makes the
+        /// reader's own share mode — and not the adversary's — the thing under test.
+        fn open_writer(fixture: &Fixture) -> File {
+            OpenOptions::new()
+                .read(true)
+                .write(true)
+                .open(fixture.leaf())
+                .expect("the adversary opens the body writable")
+        }
+
+        /// A section over the body with a writable view, and no originating handle left open.
+        ///
+        /// The file handle and the section handle are both dropped here, which is the strongest
+        /// form of the adversary: only the mapped view survives.
+        fn handed_off_view(fixture: &Fixture) -> WritableView {
+            let writer = open_writer(fixture);
+            let section = Section::over(&writer);
+            let view = WritableView::over(&section, BODY_LENGTH);
+            drop(section);
+            drop(writer);
+            view
+        }
+
+        #[test]
+        fn a_live_writer_handle_over_a_writable_view_makes_the_body_open_refuse() {
+            let fixture = Fixture::new("live-handle");
+            let writer = open_writer(&fixture);
+            let section = Section::over(&writer);
+            let view = WritableView::over(&section, BODY_LENGTH);
+            // The mapping is real before the reader is involved: the view already sees the file.
+            assert_eq!(
+                view.byte(0),
+                b'A',
+                "the mapped view must expose the fixture body's bytes"
+            );
+            assert_eq!(view.byte(BODY_LENGTH - 1), b'A');
+
+            let (root, _) = adopt_root(&fixture.content()).expect("adopt the fixture root");
+            match open_leaf(&root, &["pages", "p.en-001.json"]) {
+                Err(NativeError::OtherIo) => {}
+                Err(NativeError::PermissionDenied) => {
+                    panic!("the sharing violation was classified as PermissionDenied")
+                }
+                Err(NativeError::Absent) => {
+                    panic!("the sharing violation was misclassified as absence")
+                }
+                Err(NativeError::Unsafe) => {
+                    panic!("the sharing violation was classified as Unsafe")
+                }
+                Err(NativeError::Changed) => {
+                    panic!("the sharing violation was classified as Changed")
+                }
+                Err(NativeError::Unsupported) => {
+                    panic!("the sharing violation was classified as Unsupported")
+                }
+                Ok(_) => panic!("a live writer handle must not leave the body readable"),
+            }
+
+            drop(view);
+            drop(section);
+            drop(writer);
+        }
+
+        #[test]
+        fn a_writable_view_keeps_writing_after_its_originating_handles_close() {
+            let fixture = Fixture::new("handoff");
+            let view = handed_off_view(&fixture);
+
+            // No file handle and no section handle remain: only the view does.
+            view.fill(b'C');
+            assert_eq!(
+                view.byte(0),
+                b'C',
+                "the surviving view must hold the rewritten first byte"
+            );
+            assert_eq!(
+                view.byte(BODY_LENGTH - 1),
+                b'C',
+                "the surviving view must hold the rewritten last byte"
+            );
+        }
+
+        #[test]
+        fn a_persistent_writable_view_cannot_change_the_bytes_the_pinned_reader_returns() {
+            let fixture = Fixture::new("pinned-read");
+            let view = handed_off_view(&fixture);
+
+            let (root, _) = adopt_root(&fixture.content()).expect("adopt the fixture root");
+            // The body is opened and pinned while the writable view is already alive.
+            let (mut leaf, facts) = open_leaf(&root, &["pages", "p.en-001.json"])
+                .expect("the body must open beneath a live writable view");
+
+            // The rewrite happens strictly inside the reader's open-then-read window, and it is an
+            // equal-length rewrite, so no length check can reveal it.
+            view.fill(b'C');
+
+            let bound = u64::try_from(BODY_LENGTH).expect("the fixture bound fits a u64");
+            let received =
+                read_bounded(&root, &mut leaf, bound).expect("the bounded read succeeds");
+            let after = recheck(&leaf).expect("the read handle still reports facts");
+
+            // Three outcomes are distinguishable, and only the last two are security failures:
+            // the facts moved (so the adapter refuses the body as changed), the bytes are
+            // undisturbed, or the bytes changed while every compared fact stayed identical.
+            assert_eq!(
+                received.len(),
+                BODY_LENGTH,
+                "the bounded read must return the whole body"
+            );
+            if after != facts {
+                // The mutation is visible in the handle's own facts, so the adapter refuses the
+                // body as changed instead of returning it.
+            } else if received.iter().all(|byte| *byte == b'A') {
+                // The surviving view could not reach the pinned handle: the returned bytes are
+                // one instant of the file, which is the guarantee this module exists to test.
+            } else if received.iter().all(|byte| *byte == b'C') {
+                panic!("the reader returned the view's rewritten bytes with unchanged facts");
+            } else {
+                panic!("the reader returned a torn body with unchanged facts");
+            }
+        }
+
+        #[test]
+        fn the_product_reader_reads_the_current_content_of_a_body_a_view_rewrote_earlier() {
+            let fixture = Fixture::new("product");
+            let view = handed_off_view(&fixture);
+            // This rewrite happens before the call, so the file genuinely holds these bytes and
+            // reading them is correct. The case is a control, not an exclusion proof.
+            view.fill(b'C');
+
+            let capability = fixture.capability();
+            let candidates = declaration();
+            let choice = match read_declared_source_v1(&capability, &candidates) {
+                SourceReadOutcomeV1::Chosen(choice) => choice,
+                SourceReadOutcomeV1::Refused(refusal) => {
+                    panic!("the product reader refused with {}", refusal.code())
+                }
+            };
+            assert_eq!(choice.bytes().len(), BODY_LENGTH);
+            assert!(
+                choice.bytes().iter().all(|byte| *byte == b'C'),
+                "the chosen body must be the file's current content"
+            );
+        }
+
+        #[test]
+        fn the_reader_succeeds_normally_once_the_mapping_is_released() {
+            let fixture = Fixture::new("released");
+            {
+                let view = handed_off_view(&fixture);
+                view.fill(b'C');
+            }
+
+            let capability = fixture.capability();
+            let candidates = declaration();
+            let choice = match read_declared_source_v1(&capability, &candidates) {
+                SourceReadOutcomeV1::Chosen(choice) => choice,
+                SourceReadOutcomeV1::Refused(refusal) => {
+                    panic!("the reader refused after release: {}", refusal.code())
+                }
+            };
+            assert!(
+                choice.bytes().iter().all(|byte| *byte == b'C'),
+                "the flushed write must be the file's real content"
+            );
+
+            fs::remove_file(fixture.leaf()).expect("remove the fixture body");
+            let pages = fixture.content().join("pages");
+            assert_eq!(
+                fs::read_dir(&pages).expect("list the fixture").count(),
+                0,
+                "no fixture content may be retained"
+            );
+        }
+    }
 }
 
 #[cfg(all(test, target_os = "linux"))]
