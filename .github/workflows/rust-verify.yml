@@ -554,38 +554,48 @@ jobs:
         if: runner.os == 'Linux'
         shell: bash
         run: |
-          set -euo pipefail
+          set -uo pipefail
           tag="solo-r03-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           img="$RUNNER_TEMP/$tag.img"
           mnt="$RUNNER_TEMP/$tag-btrfs"
           tmp="$RUNNER_TEMP/$tag-tmpfs"
+
+          # Every command is wrapped so a failure names itself in an annotation instead of
+          # leaving a bare exit status that cannot be reviewed.
+          step() {
+            local label="$1"
+            shift
+            local output
+            if ! output="$("$@" 2>&1)"; then
+              echo "::error::$label failed: ${output//$'\n'/ | }"
+              exit 1
+            fi
+            echo "$label: ${output//$'\n'/ | }"
+          }
+
           for p in "$img" "$mnt" "$tmp"; do
             if [ -e "$p" ]; then
               echo "::error::refusing to reuse pre-existing path $p"
               exit 1
             fi
           done
-          if ! command -v mkfs.btrfs > /dev/null; then
+          if ! command -v mkfs.btrfs > /dev/null 2>&1; then
             echo "::error::mkfs.btrfs is not preinstalled on this image; installing it would be an unapproved package, so the positive D2 proof cannot be constructed"
             exit 1
           fi
 
-          echo "host_kernel=$(uname -r)"
-          mkfs.btrfs --version
-          head -n 1 /etc/os-release
-
-          truncate -s 192M "$img"
-          mkfs.btrfs -q -f "$img"
-          mkdir -p "$mnt/content" "$tmp"
-          sudo mount -o loop "$img" "$mnt"
-          sudo mount -t tmpfs -o size=16m,mode=0755 tmpfs "$tmp"
-          sudo chown -R "$(id -u):$(id -g)" "$mnt/content" "$tmp"
-
-          echo "supported_fs=$(findmnt -no FSTYPE,SOURCE,TARGET "$mnt")"
-          echo "unsupported_fs=$(findmnt -no FSTYPE,SOURCE,TARGET "$tmp")"
-          stat -f -c 'supported_fstype=%T block_size=%s' "$mnt/content"
-          stat -f -c 'unsupported_fstype=%T block_size=%s' "$tmp"
-          losetup -j "$img" || true
+          step "host_kernel" uname -r
+          step "mkfs_version" mkfs.btrfs --version
+          step "image_create" truncate -s 192M "$img"
+          step "image_format" mkfs.btrfs -q -f "$img"
+          step "mountpoint_create" mkdir -p "$mnt/content" "$tmp"
+          step "btrfs_mount" sudo mount -o loop "$img" "$mnt"
+          step "tmpfs_mount" sudo mount -t tmpfs -o size=16m,mode=0755 tmpfs "$tmp"
+          step "fixture_ownership" sudo chown -R "$(id -u):$(id -g)" "$mnt/content" "$tmp"
+          step "supported_mount" findmnt -no FSTYPE,SOURCE,TARGET "$mnt"
+          step "unsupported_mount" findmnt -no FSTYPE,SOURCE,TARGET "$tmp"
+          step "supported_fstype" stat -f -c 'fstype=%T block=%s' "$mnt/content"
+          step "unsupported_fstype" stat -f -c 'fstype=%T block=%s' "$tmp"
 
           {
             echo "SOLO_TEST_SOURCE_FS_ROOT=$mnt/content"

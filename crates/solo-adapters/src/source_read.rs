@@ -196,7 +196,7 @@ impl SourceReadPort for ContentRootCapability {
             Err(error) => return CandidateBodyV1::Refused(map_native(error, refusal_member)),
         };
         let before = leaf.facts();
-        let bytes = match native::read_bounded(&mut leaf, bound_for(member)) {
+        let bytes = match native::read_bounded(&self.root, &mut leaf, bound_for(member)) {
             Ok(bytes) => bytes,
             Err(NativeError::Absent) => return CandidateBodyV1::ConfirmedAbsent,
             Err(error) => return CandidateBodyV1::Refused(map_native(error, refusal_member)),

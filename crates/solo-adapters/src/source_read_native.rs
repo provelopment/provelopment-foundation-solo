@@ -149,12 +149,18 @@ pub(crate) fn open_leaf(root: &RootHandle, components: &[&str]) -> Result<OpenLe
     Ok(OpenLeaf { raw, facts })
 }
 
-/// Reads at most `max_bytes` from an already-opened leaf, refusing any overrun.
+/// Takes an immutable snapshot of an already-opened leaf and reads that snapshot.
 ///
-/// One extra byte is read to detect an overrun, so a file that grew past the bound is
-/// refused instead of being silently truncated.
-pub(crate) fn read_bounded(leaf: &mut OpenLeaf, max_bytes: u64) -> Result<Vec<u8>, NativeError> {
-    sys::read_bounded(&mut leaf.raw, max_bytes)
+/// On Linux the bytes come from an anonymous copy-on-write clone of the source, so a
+/// concurrent writer cannot tear the transfer; on Windows the same effect comes from the
+/// read handle denying write and delete sharing. Either way the caller receives one instant
+/// of the file, or a typed refusal — never a partial mixture and never a silent copy.
+pub(crate) fn read_bounded(
+    root: &RootHandle,
+    leaf: &mut OpenLeaf,
+    max_bytes: u64,
+) -> Result<Vec<u8>, NativeError> {
+    sys::read_bounded(&root.raw, &mut leaf.raw, max_bytes)
 }
 
 /// Re-observes identity, length and link count on the open handle after the read.
@@ -171,7 +177,8 @@ mod sys {
     use std::path::Path;
 
     /// The mechanism string reported for this host.
-    pub(super) const MECHANISM: &str = "linux-openat2-beneath-no-symlinks-no-magiclinks-no-xdev";
+    pub(super) const MECHANISM: &str =
+        "linux-openat2-beneath-otmpfile-excl-ficlone-immutable-clone";
 
     #[derive(Debug)]
     pub(super) struct DirHandle {
@@ -289,27 +296,98 @@ mod sys {
         Ok((LeafHandle { fd }, facts))
     }
 
+    /// Maps a clone-mechanism failure onto the closed refusal set.
+    ///
+    /// Real non-support is `Unsupported`: a filesystem without reflink (`EOPNOTSUPP`), a kernel
+    /// without the call (`ENOSYS`), or a form the kernel declines (`EINVAL`, `EPERM`, `EROFS`,
+    /// `EBUSY`). A cross-device attempt is `Unsafe`, because the destination must live on the
+    /// source's own filesystem. None of these may become absence, and none may be retried with
+    /// a copying fallback.
+    fn map_snapshot_err(error: rustix::io::Errno) -> NativeError {
+        use rustix::io::Errno;
+        match error {
+            Errno::OPNOTSUPP
+            | Errno::NOSYS
+            | Errno::INVAL
+            | Errno::PERM
+            | Errno::ROFS
+            | Errno::BUSY => NativeError::Unsupported,
+            Errno::XDEV => NativeError::Unsafe,
+            Errno::ACCESS => NativeError::PermissionDenied,
+            Errno::NOENT | Errno::ISDIR | Errno::NOTDIR | Errno::LOOP | Errno::MLINK => {
+                NativeError::Unsafe
+            }
+            _ => NativeError::OtherIo,
+        }
+    }
+
+    /// Takes the immutable clone of the leaf and returns it with its verified length.
+    ///
+    /// The destination is an unnamed, unlinkable `O_TMPFILE | O_EXCL` inode created in the
+    /// trusted root, so it is on the source's own filesystem and can never appear in the
+    /// namespace; one `FICLONE` then makes it an immutable copy-on-write view of the source.
+    /// The source handle is never read, because its bytes are exactly what a concurrent writer
+    /// can still change. A filesystem that cannot clone this source is refused rather than
+    /// copied, and a clone whose device or length disagrees with the source is refused.
+    pub(super) fn snapshot_leaf(
+        root: &DirHandle,
+        leaf: &LeafHandle,
+        max_bytes: u64,
+    ) -> Result<(rustix::fd::OwnedFd, usize), NativeError> {
+        let source = rustix::fs::fstat(&leaf.fd).map_err(map_err)?;
+        let root_stat = rustix::fs::fstat(&root.fd).map_err(map_err)?;
+        if !is_regular(&leaf.fd)? {
+            return Err(NativeError::Unsafe);
+        }
+        // A destination created anywhere but the source's own filesystem would turn the
+        // snapshot into a copy across mounts, which is not a snapshot of this object.
+        if root_stat.st_dev != source.st_dev {
+            return Err(NativeError::Unsafe);
+        }
+        let length = u64::try_from(source.st_size).unwrap_or(u64::MAX);
+        if length > max_bytes {
+            // The body exceeds its documented bound: a refusal, never a truncation.
+            return Err(NativeError::Unsafe);
+        }
+
+        let destination = rustix::fs::openat(
+            &root.fd,
+            c".",
+            OFlags::TMPFILE | OFlags::EXCL | OFlags::RDWR | OFlags::CLOEXEC,
+            Mode::RUSR | Mode::WUSR,
+        )
+        .map_err(map_snapshot_err)?;
+        // One clone, no retry and no alternative: a filesystem that cannot clone must refuse.
+        rustix::fs::ioctl_ficlone(&destination, &leaf.fd).map_err(map_snapshot_err)?;
+
+        let cloned = rustix::fs::fstat(&destination).map_err(map_err)?;
+        if cloned.st_dev != source.st_dev || !is_regular(&destination)? {
+            return Err(NativeError::Unsafe);
+        }
+        if u64::try_from(cloned.st_size).unwrap_or(u64::MAX) != length {
+            return Err(NativeError::Changed);
+        }
+        let expected = usize::try_from(length).map_err(|_| NativeError::Unsupported)?;
+        Ok((destination, expected))
+    }
+
+    /// Reads exactly the cloned bytes, never the mutable source.
     pub(super) fn read_bounded(
+        root: &DirHandle,
         leaf: &mut LeafHandle,
         max_bytes: u64,
     ) -> Result<Vec<u8>, NativeError> {
-        let limit = usize::try_from(max_bytes).map_err(|_| NativeError::Unsupported)?;
-        let ceiling = limit.checked_add(1).ok_or(NativeError::Unsupported)?;
-        let mut buffer = vec![0_u8; ceiling];
+        let (destination, expected) = snapshot_leaf(root, leaf, max_bytes)?;
+        // Exact-length read of the clone. A short clone is a change, never a shorter body.
+        let mut buffer = vec![0_u8; expected];
         let mut filled = 0_usize;
-        while filled < ceiling {
-            let read = rustix::io::read(&leaf.fd, &mut buffer[filled..]).map_err(map_err)?;
+        while filled < expected {
+            let read = rustix::io::read(&destination, &mut buffer[filled..]).map_err(map_err)?;
             if read == 0 {
-                break;
+                return Err(NativeError::Changed);
             }
             filled += read;
         }
-        if filled > limit {
-            // The body exceeded its documented bound. This is a refusal, never a
-            // truncation of authored content.
-            return Err(NativeError::Unsafe);
-        }
-        buffer.truncate(filled);
         Ok(buffer)
     }
 
@@ -675,9 +753,12 @@ mod sys {
     }
 
     pub(super) fn read_bounded(
+        _root: &DirHandle,
         leaf: &mut LeafHandle,
         max_bytes: u64,
     ) -> Result<Vec<u8>, NativeError> {
+        // The read handle already denies write and delete sharing, so no other opener can
+        // modify the object under it; the transfer below is therefore one instant of the file.
         // A borrowed clone keeps the original handle owned by `LeafHandle` and lets the
         // standard library's safe `Read` implementation do the transfer.
         let cloned = leaf.handle.try_clone().map_err(|_| NativeError::OtherIo)?;
@@ -708,5 +789,118 @@ mod sys {
     pub(super) fn recheck(leaf: &LeafHandle) -> Result<LeafFacts, NativeError> {
         let (facts, _) = handle_facts(leaf.handle.as_raw_handle())?;
         Ok(facts)
+    }
+}
+
+#[cfg(all(test, target_os = "linux"))]
+mod snapshot_proofs {
+    //! Real-host proof of the D2 snapshot, taken through the audited module itself.
+    //!
+    //! These live here, not in an integration test, because this is the only file permitted to
+    //! name the native crate at all: the boundary guard refuses `rustix` everywhere else and
+    //! that rule is not relaxed for tests.
+
+    use super::NativeError;
+    use super::sys::{adopt_root, open_leaf, read_bounded, snapshot_leaf};
+    use rustix::fd::OwnedFd;
+    use rustix::fs::SeekFrom;
+    use std::fs;
+    use std::path::PathBuf;
+
+    const SOURCE: &[u8] = b"{\"slug\":\"p\"}";
+    const REWRITTEN: &[u8] = b"{\"slug\":\"p-rewritten\"}";
+
+    fn fixture(variable: &str, tag: &str) -> PathBuf {
+        let root = match std::env::var_os(variable) {
+            Some(value) if !value.is_empty() => PathBuf::from(value),
+            _ => panic!("{variable} must name an R03 snapshot fixture filesystem"),
+        };
+        let directory = root.join(format!("solo-r03-unit-{}-{tag}", std::process::id()));
+        let _ = fs::remove_dir_all(&directory);
+        fs::create_dir(&directory).expect("create the unit fixture directory");
+        directory
+    }
+
+    fn read_from_start(fd: &OwnedFd, length: usize) -> Vec<u8> {
+        rustix::fs::seek(fd, SeekFrom::Start(0)).expect("rewind the clone");
+        let mut buffer = vec![0_u8; length];
+        let mut filled = 0_usize;
+        while filled < length {
+            let read = rustix::io::read(fd, &mut buffer[filled..]).expect("read the clone");
+            if read == 0 {
+                break;
+            }
+            filled += read;
+        }
+        buffer.truncate(filled);
+        buffer
+    }
+
+    #[test]
+    fn an_anonymous_clone_keeps_its_bytes_while_the_source_is_rewritten_in_place() {
+        let directory = fixture("SOLO_TEST_SOURCE_FS_ROOT", "clone");
+        fs::write(directory.join("body.json"), SOURCE).expect("write the source");
+        let (root, _) = adopt_root(&directory).expect("adopt the fixture root");
+        let (leaf, _) = open_leaf(&root, &["body.json"]).expect("open the source");
+
+        let (clone, length) = snapshot_leaf(&root, &leaf, 4096).expect("clone the source");
+        assert_eq!(length, SOURCE.len());
+
+        // The source is rewritten in place after the clone, with different bytes.
+        fs::write(directory.join("body.json"), REWRITTEN).expect("rewrite the source");
+        assert_eq!(read_from_start(&clone, length).as_slice(), SOURCE);
+        assert_eq!(read_from_start(&clone, length).as_slice(), SOURCE);
+
+        // A fresh snapshot does see the new bytes: the clone is one instant, not a cache.
+        let (second, second_length) = snapshot_leaf(&root, &leaf, 4096).expect("re-clone");
+        assert_eq!(
+            read_from_start(&second, second_length).as_slice(),
+            REWRITTEN
+        );
+
+        // Neither destination was ever named.
+        assert_eq!(
+            fs::read_dir(&directory).expect("list the fixture").count(),
+            1
+        );
+    }
+
+    #[test]
+    fn a_filesystem_without_reflink_is_refused_instead_of_copied() {
+        let directory = fixture("SOLO_TEST_UNSUPPORTED_FS_ROOT", "unsupported");
+        fs::write(directory.join("body.json"), SOURCE).expect("write the source");
+        let (root, _) = adopt_root(&directory).expect("adopt the fixture root");
+        let (mut leaf, _) = open_leaf(&root, &["body.json"]).expect("open the source");
+
+        match read_bounded(&root, &mut leaf, 4096) {
+            Ok(bytes) => panic!(
+                "a filesystem without reflink must refuse rather than copy; it returned {} byte(s)",
+                bytes.len()
+            ),
+            Err(NativeError::Unsupported) => {}
+            Err(other) => panic!("expected Unsupported on a non-reflink filesystem, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn an_oversized_source_is_refused_before_anything_is_cloned() {
+        let directory = fixture("SOLO_TEST_SOURCE_FS_ROOT", "bound");
+        fs::write(directory.join("body.json"), SOURCE).expect("write the source");
+        let (root, _) = adopt_root(&directory).expect("adopt the fixture root");
+        let (mut leaf, _) = open_leaf(&root, &["body.json"]).expect("open the source");
+
+        let exact = u64::try_from(SOURCE.len()).expect("the fixture length fits a u64");
+        match read_bounded(&root, &mut leaf, exact - 1) {
+            Ok(_) => panic!("a body above its bound must be refused"),
+            Err(NativeError::Unsafe) => {}
+            Err(other) => panic!("expected Unsafe above the bound, got {other:?}"),
+        }
+        // Exactly at the bound is accepted, so the bound is inclusive and not off by one.
+        assert_eq!(
+            read_bounded(&root, &mut leaf, exact)
+                .expect("the bound is inclusive")
+                .as_slice(),
+            SOURCE
+        );
     }
 }

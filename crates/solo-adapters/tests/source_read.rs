@@ -29,10 +29,36 @@ struct Scratch {
     base: PathBuf,
 }
 
+/// The directory a scratch tree is created in.
+///
+/// On Linux every fixture is created on the R03 snapshot fixture filesystem, because the reader
+/// now takes an immutable clone and a filesystem without reflink could only produce a refusal.
+/// The variable is therefore required on that host: a missing value is a loud failure, never a
+/// quiet run on an unverified filesystem. Windows and other hosts keep the runner temp dir.
+fn scratch_parent() -> PathBuf {
+    #[cfg(target_os = "linux")]
+    {
+        match std::env::var_os("SOLO_TEST_SOURCE_FS_ROOT") {
+            Some(root) if !root.is_empty() => PathBuf::from(root),
+            _ => panic!(
+                "SOLO_TEST_SOURCE_FS_ROOT must name the R03 snapshot fixture filesystem; refusing to run the real-filesystem suite on a filesystem that was never verified to support an immutable clone"
+            ),
+        }
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        std::env::temp_dir()
+    }
+}
+
 impl Scratch {
     fn new(label: &str) -> Self {
-        let base =
-            std::env::temp_dir().join(format!("solo-source-read-{}-{label}", std::process::id()));
+        Self::on(scratch_parent(), label)
+    }
+
+    /// A scratch tree created inside an explicitly chosen directory.
+    fn on(parent: PathBuf, label: &str) -> Self {
+        let base = parent.join(format!("solo-source-read-{}-{label}", std::process::id()));
         let _ = fs::remove_dir_all(&base);
         fs::create_dir_all(base.join("content").join("pages"))
             .expect("create scratch content root");
@@ -613,158 +639,177 @@ fn an_unselected_hardlinked_markdown_is_refused_while_json_would_have_won() {
 }
 
 // ---------------------------------------------------------------------------
-// R03 stage II — the D2 primitives on the real fixture filesystems.
-//
-// These run before the product path is changed and prove the kernel contract it will rely
-// on: an anonymous `O_TMPFILE | O_EXCL` inode on a reflink-capable filesystem accepts one
-// `FICLONE` from a confined source and keeps its bytes after the source is overwritten, while
-// the same call on a filesystem without reflink returns a real unsupported error. Neither
-// case may be simulated: the fixture roots are supplied by the workflow and a missing root is
-// a loud failure, never a quiet fallback to the checkout filesystem.
+// R03 stage III — the product path itself, on the real fixture filesystems.
 // ---------------------------------------------------------------------------
 
 #[cfg(target_os = "linux")]
-mod d2_primitives {
-    use rustix::fd::OwnedFd;
-    use rustix::fs::{Mode, OFlags, SeekFrom};
-    use rustix::io::Errno;
-    use std::fs;
-    use std::path::{Path, PathBuf};
+mod d2_product {
+    use super::*;
 
-    const SOURCE: &[u8] = b"{\"slug\":\"p\",\"body\":\"original\"}";
-    const REWRITTEN: &[u8] = b"{\"slug\":\"p\",\"body\":\"rewritten\"}";
+    /// Every file descriptor this process holds on the scratch tree, by its real path.
+    fn descriptors_under(path: &Path) -> usize {
+        let root = fs::canonicalize(path).expect("canonicalise the scratch tree");
+        let entries = match fs::read_dir("/proc/self/fd") {
+            Ok(entries) => entries,
+            Err(error) => panic!("read /proc/self/fd: {error}"),
+        };
+        entries
+            .filter_map(Result::ok)
+            .filter_map(|entry| fs::read_link(entry.path()).ok())
+            .filter(|target| target.starts_with(&root))
+            .count()
+    }
 
-    /// The fixture root must be named explicitly: a D2 proof may never quietly run on a
-    /// filesystem that was never verified to support the mechanism.
-    fn fixture_root(variable: &str) -> PathBuf {
-        match std::env::var_os(variable) {
-            Some(value) if !value.is_empty() => PathBuf::from(value),
+    #[test]
+    fn a_filesystem_without_reflink_is_refused_instead_of_read_by_copying() {
+        // tmpfs reads perfectly well, so this can only fail if the reader really takes the
+        // snapshot instead of copying the bytes: it is the load-bearing proof that the product
+        // path uses the clone.
+        let parent = match std::env::var_os("SOLO_TEST_UNSUPPORTED_FS_ROOT") {
+            Some(root) if !root.is_empty() => PathBuf::from(root),
             _ => panic!(
-                "{variable} must name the R03 snapshot fixture filesystem; refusing to run a D2 proof on an unverified filesystem"
+                "SOLO_TEST_UNSUPPORTED_FS_ROOT must name a filesystem without reflink; the refusal path cannot be proven without it"
             ),
-        }
-    }
+        };
+        let scratch = Scratch::on(parent, "unsupported-product");
+        scratch.write("pages/p.en-001.json", JSON_BODY);
 
-    struct Probe {
-        root: PathBuf,
-    }
+        let capability = scratch.capability();
+        let candidates = declaration(Some("pages/p.en-001.json"), None);
+        let outcome = read_declared_source_v1(&capability, &candidates);
 
-    impl Probe {
-        fn new(variable: &str, tag: &str) -> Self {
-            let root =
-                fixture_root(variable).join(format!("solo-r03-probe-{}-{tag}", std::process::id()));
-            let _ = fs::remove_dir_all(&root);
-            fs::create_dir(&root).expect("create the probe directory on the fixture filesystem");
-            Self { root }
-        }
-    }
-
-    impl Drop for Probe {
-        fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.root);
-        }
-    }
-
-    fn open_directory(path: &Path) -> OwnedFd {
-        rustix::fs::open(
-            path,
-            OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC,
-            Mode::empty(),
-        )
-        .expect("open the probe directory")
-    }
-
-    fn open_regular(path: &Path) -> OwnedFd {
-        rustix::fs::open(
-            path,
-            OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::CLOEXEC,
-            Mode::empty(),
-        )
-        .expect("open the probe source")
-    }
-
-    /// The candidate destination: an unnamed, unlinkable inode on the directory's own
-    /// filesystem, cloned once from the source. No name is ever created.
-    fn clone_into_unnamed(directory: &OwnedFd, source: &OwnedFd) -> Result<OwnedFd, Errno> {
-        let destination = rustix::fs::openat(
-            directory,
-            c".",
-            OFlags::TMPFILE | OFlags::EXCL | OFlags::RDWR | OFlags::CLOEXEC,
-            Mode::RUSR | Mode::WUSR,
-        )?;
-        rustix::fs::ioctl_ficlone(&destination, source)?;
-        Ok(destination)
-    }
-
-    fn read_from_start(fd: &OwnedFd) -> Vec<u8> {
-        rustix::fs::seek(fd, SeekFrom::Start(0)).expect("rewind the clone");
-        let mut buffer = vec![0_u8; SOURCE.len() + 64];
-        let mut filled = 0_usize;
-        while filled < buffer.len() {
-            let read = rustix::io::read(fd, &mut buffer[filled..]).expect("read the clone");
-            if read == 0 {
-                break;
-            }
-            filled += read;
-        }
-        buffer.truncate(filled);
-        buffer
+        let (kind, code) = refused(outcome);
+        assert_eq!(kind, SourceReadRefusalKind::Unsupported);
+        assert_eq!(code, "SOURCE_UNSUPPORTED");
     }
 
     #[test]
-    fn an_anonymous_clone_on_the_supported_fixture_keeps_its_bytes_after_a_source_rewrite() {
-        let probe = Probe::new("SOLO_TEST_SOURCE_FS_ROOT", "supported");
-        let source_path = probe.root.join("body.json");
-        fs::write(&source_path, SOURCE).expect("write the probe source");
+    fn a_snapshot_leaves_no_named_destination_and_no_open_descriptor() {
+        let scratch = Scratch::new("snapshot-cleanup");
+        scratch.write("pages/p.en-001.json", JSON_BODY);
+        let pages = scratch.path("pages");
+        let capability = scratch.capability();
+        let candidates = declaration(Some("pages/p.en-001.json"), None);
 
-        let directory = open_directory(&probe.root);
-        let source = open_regular(&source_path);
+        let before = fs::read_dir(&pages)
+            .expect("list the pages directory")
+            .count();
+        assert_eq!(descriptors_under(&scratch.base), 0);
 
-        let clone = clone_into_unnamed(&directory, &source)
-            .expect("a reflink-capable fixture filesystem must clone an unnamed inode");
+        for _ in 0..24 {
+            let choice = chosen(read_declared_source_v1(&capability, &candidates));
+            assert_eq!(choice.bytes(), JSON_BODY);
+        }
 
-        // The clone is its own inode sharing extents with the source.
-        let source_stat = rustix::fs::fstat(&source).expect("stat the source");
-        let clone_stat = rustix::fs::fstat(&clone).expect("stat the clone");
-        assert_ne!(
-            source_stat.st_ino, clone_stat.st_ino,
-            "the clone must be its own inode"
-        );
-        assert_eq!(clone_stat.st_size, source_stat.st_size);
-
-        // The source is overwritten in place with bytes of a different length.
-        fs::write(&source_path, REWRITTEN).expect("overwrite the probe source in place");
-
-        // The already-cloned bytes do not move: they are one instant of the source.
-        assert_eq!(read_from_start(&clone), SOURCE);
-
-        // And no name was ever created for the destination.
+        // Nothing was named for the snapshot, and nothing was left open once it returned.
         assert_eq!(
-            fs::read_dir(&probe.root)
-                .expect("list the probe directory")
+            fs::read_dir(&pages)
+                .expect("list the pages directory")
                 .count(),
-            1,
-            "the snapshot destination must stay unnamed"
+            before,
+            "the snapshot must never create a named entry"
+        );
+        assert_eq!(
+            descriptors_under(&scratch.base),
+            0,
+            "every snapshot descriptor must be closed before the read returns"
         );
     }
 
     #[test]
-    fn a_filesystem_without_reflink_refuses_the_anonymous_clone() {
-        let probe = Probe::new("SOLO_TEST_UNSUPPORTED_FS_ROOT", "unsupported");
-        let source_path = probe.root.join("body.json");
-        fs::write(&source_path, SOURCE).expect("write the probe source");
+    fn a_body_at_the_exact_bound_is_snapshotted_and_one_byte_over_is_refused() {
+        let scratch = Scratch::new("snapshot-bound");
+        let capability = scratch.capability();
 
-        let directory = open_directory(&probe.root);
-        let source = open_regular(&source_path);
+        let bound = usize::try_from(solo_application::bound_for(SourceCandidateKind::Json))
+            .expect("the JSON bound fits a usize");
+        scratch.write("pages/p.en-001.json", &vec![b'{'; bound]);
+        let candidates = declaration(Some("pages/p.en-001.json"), None);
+        let choice = chosen(read_declared_source_v1(&capability, &candidates));
+        assert_eq!(choice.bytes().len(), bound);
 
-        match clone_into_unnamed(&directory, &source) {
-            Ok(_) => panic!(
-                "this fixture filesystem accepted a clone, so it cannot prove the unsupported-refusal path"
-            ),
-            Err(error) => assert!(
-                error == Errno::OPNOTSUPP || error == Errno::NOTSUP,
-                "expected a real unsupported-filesystem error, got {error:?}"
-            ),
-        }
+        scratch.write("pages/p.en-001.json", &vec![b'{'; bound + 1]);
+        let (kind, _) = refused(read_declared_source_v1(&capability, &candidates));
+        assert_eq!(kind, SourceReadRefusalKind::UnsafeLocation);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// R03 — Windows writer exclusion, proven natively rather than asserted.
+//
+// A fake port cannot prove a share mode. These cases drive the real Win32 sharing rules: an
+// existing writable handle blocks the reader's body open, and a handle opened exactly the way
+// the reader opens a body denies a competing writer and a delete for as long as it is pinned.
+// ---------------------------------------------------------------------------
+
+#[cfg(windows)]
+mod writer_exclusion {
+    use super::*;
+    use std::fs::OpenOptions;
+    use std::os::windows::fs::OpenOptionsExt;
+
+    /// `FILE_SHARE_READ` — the share mode the reader requests for a body handle.
+    const FILE_SHARE_READ: u32 = 0x0000_0001;
+
+    #[test]
+    fn a_preexisting_write_handle_prevents_the_body_read() {
+        let scratch = Scratch::new("writer-preexisting");
+        scratch.write("pages/p.en-001.json", JSON_BODY);
+
+        // A writer that got there first. The reader requests share-read only, so this existing
+        // write access makes the reader's own open fail: no body is returned.
+        let writer = OpenOptions::new()
+            .write(true)
+            .open(scratch.path("pages/p.en-001.json"))
+            .expect("a writer may hold the body before the reader arrives");
+
+        let capability = scratch.capability();
+        let candidates = declaration(Some("pages/p.en-001.json"), None);
+        let outcome = read_declared_source_v1(&capability, &candidates);
+
+        assert!(
+            !matches!(outcome, SourceReadOutcomeV1::Chosen(_)),
+            "a body that a writer already holds open must not be read: {outcome:?}"
+        );
+        drop(writer);
+    }
+
+    #[test]
+    fn the_reader_share_mode_denies_a_competing_writer_and_a_delete() {
+        let scratch = Scratch::new("writer-pinned");
+        scratch.write("pages/p.en-001.json", JSON_BODY);
+        let path = scratch.path("pages/p.en-001.json");
+
+        // Exactly the handle the reader takes for a body: read access, share-read only.
+        let pinned = OpenOptions::new()
+            .read(true)
+            .share_mode(FILE_SHARE_READ)
+            .open(&path)
+            .expect("open the body the way the reader does");
+
+        let write_attempt = OpenOptions::new().write(true).open(&path);
+        assert!(
+            write_attempt.is_err(),
+            "a writer must be denied while the body handle is pinned"
+        );
+        let delete_attempt = fs::remove_file(&path);
+        assert!(
+            delete_attempt.is_err(),
+            "a delete must be denied while the body handle is pinned"
+        );
+        // The bytes are still the pinned object's bytes.
+        assert_eq!(fs::read(&path).expect("read the body directly"), JSON_BODY);
+
+        drop(pinned);
+
+        // Once released, the same operations succeed: the denial came from the pin, not from
+        // a permanently locked file.
+        let writer = OpenOptions::new().write(true).open(&path);
+        assert!(
+            writer.is_ok(),
+            "a writer must succeed once the pin is released"
+        );
+        drop(writer);
+        assert!(fs::remove_file(&path).is_ok());
     }
 }

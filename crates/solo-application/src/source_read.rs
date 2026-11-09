@@ -687,7 +687,19 @@ pub fn check_physical_reservations_v1<P: SourceReadPort + ?Sized>(
                 continue;
             };
             match port.probe_candidate(member, locator) {
-                CandidateProbeV1::Located { identity, .. } => {
+                CandidateProbeV1::Located {
+                    identity, links, ..
+                } => {
+                    // A candidate that shares its physical object with another directory entry
+                    // is ambiguous on its own, so it is refused here, before any reservation is
+                    // recorded — even when it is the only thing declared, and even when it is not
+                    // the member a single-representation selection would go on to read.
+                    if links != 1 {
+                        return Err(SourceReadRefusalV1::new(
+                            SourceReadRefusalKind::IdentityCollision,
+                            Some(member),
+                        ));
+                    }
                     if reservations
                         .iter()
                         .any(|reserved| reserved.identity == identity)

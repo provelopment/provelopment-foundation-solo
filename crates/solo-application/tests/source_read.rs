@@ -622,3 +622,63 @@ fn an_injected_unsupported_answer_is_refused_and_never_becomes_absence() {
     // Neither a fallback nor an absence is inferred from it.
     assert_eq!(fake.calls(), vec!["probe:json", "probe:markdown"]);
 }
+
+// ---------------------------------------------------------------------------
+// R03 — the global physical reservation must refuse ambiguity on its own.
+//
+// Comparing identities against each other cannot see it: with a single declaration there is
+// nothing to collide with, so a candidate that a second directory entry also names used to be
+// accepted and reserved. The link count is refused per candidate, before any reservation is
+// recorded and before any body is read.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn a_sole_declaration_with_two_directory_entries_is_refused_before_any_reservation() {
+    let fake = FakePort::new().with(
+        SourceCandidateKind::Json,
+        (
+            located_hardlinked(1, JSON_BODY.len() as u64),
+            present(JSON_BODY, 1),
+        ),
+    );
+    let declarations = vec![declaration(Some("pages/p.en-001.json"), None)];
+
+    let outcome = check_physical_reservations_v1(&fake, &declarations);
+
+    let Err(refusal) = outcome else {
+        panic!("a sole candidate with a second directory entry must be refused");
+    };
+    assert_eq!(refusal.kind(), SourceReadRefusalKind::IdentityCollision);
+    assert_eq!(refusal.code(), "SOURCE_COLLISION");
+    // The decision needs no body at all.
+    assert_eq!(fake.calls(), vec!["probe:json"]);
+}
+
+#[test]
+fn an_unselected_multi_link_member_is_refused_by_the_global_reservation() {
+    let fake = FakePort::new()
+        .with(
+            SourceCandidateKind::Json,
+            (located(1, JSON_BODY.len() as u64), present(JSON_BODY, 1)),
+        )
+        .with(
+            SourceCandidateKind::Markdown,
+            (
+                located_hardlinked(2, MARKDOWN_BODY.len() as u64),
+                present(MARKDOWN_BODY, 2),
+            ),
+        );
+    let declarations = vec![declaration(
+        Some("pages/p.en-001.json"),
+        Some("pages/p.en-001.md"),
+    )];
+
+    let outcome = check_physical_reservations_v1(&fake, &declarations);
+
+    let Err(refusal) = outcome else {
+        panic!("an ambiguous unselected member must be refused globally");
+    };
+    assert_eq!(refusal.kind(), SourceReadRefusalKind::IdentityCollision);
+    assert_eq!(refusal.member(), Some(SourceCandidateKind::Markdown));
+    assert_eq!(fake.calls(), vec!["probe:json", "probe:markdown"]);
+}
