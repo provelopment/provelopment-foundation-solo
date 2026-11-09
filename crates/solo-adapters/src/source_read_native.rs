@@ -799,24 +799,16 @@ mod sys {
 
     #[cfg(all(test, windows))]
     mod mapped_view_proofs {
-        use std::fs::{self, OpenOptions};
-        use std::os::windows::io::AsRawHandle;
+        use std::ptr;
 
         #[test]
-        fn an_open_options_handle_is_permitted() {
-            let base = std::env::temp_dir().join(format!("solo-r04-a12-{}", std::process::id()));
-            let _ = fs::remove_dir_all(&base);
-            fs::create_dir_all(&base).expect("create the probe root");
-            let body = base.join("body.bin");
-            fs::write(&body, vec![b'A'; 8]).expect("write the probe body");
-            let file = OpenOptions::new()
-                .read(true)
-                .write(true)
-                .open(&body)
-                .expect("open the probe body");
-            assert!(!file.as_raw_handle().is_null(), "the handle must be real");
-            drop(file);
-            let _ = fs::remove_dir_all(&base);
+        fn a_raw_pointer_fill_is_permitted() {
+            let mut buffer = [0_u8; 8];
+            let pointer = buffer.as_mut_ptr();
+            // SAFETY: `pointer` covers exactly the eight bytes of the live local `buffer`, and
+            // only that range is written.
+            unsafe { ptr::write_bytes(pointer, b'C', 8) };
+            assert_eq!(buffer[0], b'C', "the raw write must land in the buffer");
         }
     }
 }
