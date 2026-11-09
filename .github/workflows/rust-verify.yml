@@ -590,7 +590,7 @@ jobs:
           grep -q 'architecture=legal packages=4' "$RUNNER_TEMP/arch-real.txt" \
             || { echo "::error::unexpected package set in real-tree report"; exit 1; }
           grep -q 'edges=34' "$RUNNER_TEMP/arch-real.txt" \
-            || { echo "::error::approved edge count changed"; exit 1; }
+            || { echo "::error::approved edge count changed: $(grep -o 'edges=[0-9]*' "$RUNNER_TEMP/arch-real.txt" | head -n 1)"; exit 1; }
 
       - name: Architecture checker on the real checkout (Windows)
         if: runner.os == 'Windows'
@@ -601,7 +601,10 @@ jobs:
           if ($code -ne 0) { throw "real-tree architecture check refused (exit $code)" }
           $text = Get-Content "$env:RUNNER_TEMP/arch-real.txt" -Raw
           if ($text -notmatch 'architecture=legal packages=4') { throw "unexpected package set in real-tree report" }
-          if ($text -notmatch 'edges=34') { throw "approved edge count changed" }
+          if ($text -notmatch 'edges=34') {
+            $measured = [regex]::Match($text, 'edges=[0-9]+').Value
+            throw "approved edge count changed: $measured"
+          }
 
       - name: Architecture refusal self-test (Linux)
         if: runner.os == 'Linux'

@@ -1469,3 +1469,89 @@ fn discovery_fixtures_are_owned_and_foreign_scratch_is_untouched() {
         "pre-existing foreign scratch must be byte-for-byte untouched"
     );
 }
+
+// ---------------------------------------------------------------------------
+// The checker's own unsafe-scope rule, proved negatively in place.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn the_checker_allows_unsafe_only_inside_the_windows_gated_approved_module() {
+    let gated = concat!(
+        "#[cfg(windows)]\n",
+        "mod sys {\n",
+        "    fn f() {\n",
+        "        let _ = unsafe { core::ptr::null::<u8>() };\n",
+        "    }\n",
+        "}\n",
+    );
+    assert!(
+        architecture_checks::source::classify_unsafe_scope(
+            architecture_checks::source::APPROVED_NATIVE_MODULE,
+            gated
+        )
+        .is_ok(),
+        "the approved module may use unsafe inside a Windows gate"
+    );
+    assert!(
+        architecture_checks::source::classify_unsafe_scope("crates/solo-domain/src/lib.rs", gated)
+            .is_err(),
+        "the same code outside the approved module must be refused"
+    );
+    assert!(
+        architecture_checks::source::classify_unsafe_scope(
+            "crates/solo-adapters/src/source_read.rs",
+            gated
+        )
+        .is_err(),
+        "the safe wrapper must never be allowed an unsafe block"
+    );
+}
+
+#[test]
+fn the_checker_refuses_unsafe_outside_a_positive_windows_gate() {
+    let unscoped = "fn f() { let _ = unsafe { core::ptr::null::<u8>() }; }\n";
+    let reason = architecture_checks::source::classify_unsafe_scope(
+        architecture_checks::source::APPROVED_NATIVE_MODULE,
+        unscoped,
+    )
+    .expect_err("unscoped unsafe must be refused even in the approved module");
+    assert!(
+        reason.contains("outside a `#[cfg(windows)]` scope"),
+        "{reason}"
+    );
+
+    let negated = concat!(
+        "#[cfg(not(windows))]\n",
+        "mod sys { fn f() { let _ = unsafe { core::ptr::null::<u8>() }; } }\n",
+    );
+    assert!(
+        architecture_checks::source::classify_unsafe_scope(
+            architecture_checks::source::APPROVED_NATIVE_MODULE,
+            negated
+        )
+        .is_err(),
+        "a negated gate is not a Windows gate"
+    );
+
+    let other_os = concat!(
+        "#[cfg(target_os = \"linux\")]\n",
+        "mod sys { fn f() { let _ = unsafe { core::ptr::null::<u8>() }; } }\n",
+    );
+    assert!(
+        architecture_checks::source::classify_unsafe_scope(
+            architecture_checks::source::APPROVED_NATIVE_MODULE,
+            other_os
+        )
+        .is_err(),
+        "a non-Windows gate is not a Windows gate"
+    );
+
+    assert!(
+        architecture_checks::source::classify_unsafe_scope(
+            architecture_checks::source::APPROVED_NATIVE_MODULE,
+            "pub unsafe fn f() {}"
+        )
+        .is_err(),
+        "an ungated unsafe fn must be refused even in the approved module"
+    );
+}
