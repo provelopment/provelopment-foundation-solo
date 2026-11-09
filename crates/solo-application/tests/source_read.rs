@@ -9,9 +9,11 @@ use std::cell::RefCell;
 
 use solo_application::{
     CandidateBodyV1, CandidateProbeV1, PhysicalIdentityV1, SourceReadOutcomeV1, SourceReadPort,
-    SourceReadRefusalKind, SourceReadRefusalV1, check_physical_reservations_v1, fingerprint_of,
+    SourceReadRefusalKind, SourceReadRefusalV1, SourceReadSetOutcomeV1,
+    check_physical_reservations_v1, fingerprint_of, read_declared_source_set_v1,
     read_declared_source_v1,
 };
+use solo_domain::SourceCandidateKind::{Json, Markdown};
 use solo_domain::{
     SourceCandidateDraftV1, SourceCandidateKind, SourceCandidatePathV1, SourceCandidateSetV1,
 };
@@ -681,4 +683,375 @@ fn an_unselected_multi_link_member_is_refused_by_the_global_reservation() {
     assert_eq!(refusal.kind(), SourceReadRefusalKind::IdentityCollision);
     assert_eq!(refusal.member(), Some(SourceCandidateKind::Markdown));
     assert_eq!(fake.calls(), vec!["probe:json", "probe:markdown"]);
+}
+
+/// A fake adapter keyed by member kind **and** logical locator.
+///
+/// The single-representation fake above answers by member only, which is enough when one
+/// declaration is in play. A whole-set attempt addresses several declarations that can declare
+/// the same member kind, so this fake keys on both and records both in every call it logs.
+#[derive(Default)]
+struct SetPort {
+    replies: Vec<(SourceCandidateKind, String, Reply)>,
+    calls: RefCell<Vec<String>>,
+}
+
+impl SetPort {
+    fn new() -> Self {
+        Self::default()
+    }
+
+    fn with(mut self, member: SourceCandidateKind, path: &str, reply: Reply) -> Self {
+        self.replies.push((member, path.to_owned(), reply));
+        self
+    }
+
+    fn calls(&self) -> Vec<String> {
+        self.calls.borrow().clone()
+    }
+
+    fn reply(
+        &self,
+        member: SourceCandidateKind,
+        locator: &SourceCandidatePathV1,
+    ) -> Option<&Reply> {
+        self.replies
+            .iter()
+            .find(|(candidate, path, _)| *candidate == member && path == locator.as_str())
+            .map(|(_, _, reply)| reply)
+    }
+}
+
+impl SourceReadPort for SetPort {
+    fn probe_candidate(
+        &self,
+        member: SourceCandidateKind,
+        locator: &SourceCandidatePathV1,
+    ) -> CandidateProbeV1 {
+        self.calls
+            .borrow_mut()
+            .push(format!("probe:{member}:{}", locator.as_str()));
+        self.reply(member, locator)
+            .map_or(CandidateProbeV1::ConfirmedAbsent, |reply| reply.0)
+    }
+
+    fn read_candidate(
+        &self,
+        member: SourceCandidateKind,
+        locator: &SourceCandidatePathV1,
+    ) -> CandidateBodyV1 {
+        self.calls
+            .borrow_mut()
+            .push(format!("read:{member}:{}", locator.as_str()));
+        self.reply(member, locator)
+            .map_or(CandidateBodyV1::ConfirmedAbsent, |reply| reply.1.clone())
+    }
+}
+
+fn complete(outcome: SourceReadSetOutcomeV1) -> solo_application::ReadSourceSetV1 {
+    match outcome {
+        SourceReadSetOutcomeV1::Complete(set) => set,
+        SourceReadSetOutcomeV1::Refused(refusal) => {
+            panic!("expected a complete set, got refusal {refusal}")
+        }
+    }
+}
+
+fn refused_set(
+    outcome: SourceReadSetOutcomeV1,
+) -> (SourceReadRefusalKind, &'static str, Option<usize>) {
+    match outcome {
+        SourceReadSetOutcomeV1::Refused(refusal) => {
+            (refusal.kind(), refusal.code(), refusal.declaration())
+        }
+        SourceReadSetOutcomeV1::Complete(set) => {
+            panic!("expected a refusal, got {} assembled bodies", set.len())
+        }
+    }
+}
+
+/// The probe and body a healthy JSON leaf answers with.
+fn json_reply(value: u64) -> Reply {
+    let length = u64::try_from(JSON_BODY.len()).expect("a short fixture body");
+    (located(value, length), present(JSON_BODY, value))
+}
+
+/// The probe and body a healthy Markdown leaf answers with.
+fn markdown_reply(value: u64) -> Reply {
+    let length = u64::try_from(MARKDOWN_BODY.len()).expect("a short fixture body");
+    (located(value, length), present(MARKDOWN_BODY, value))
+}
+
+#[test]
+fn every_declared_representation_is_read_in_declaration_order() {
+    let fake = SetPort::new()
+        .with(Json, "pages/a.en-001.json", json_reply(11))
+        .with(Json, "pages/b.de-de.json", json_reply(12))
+        .with(Json, "pages/c.id-id.json", json_reply(13));
+    let declarations = vec![
+        declaration(Some("pages/a.en-001.json"), None),
+        declaration(Some("pages/b.de-de.json"), None),
+        declaration(Some("pages/c.id-id.json"), None),
+    ];
+
+    let set = complete(read_declared_source_set_v1(&fake, &declarations));
+
+    assert_eq!(set.len(), 3);
+    assert!(!set.is_empty());
+    for (index, entry) in set.iter().enumerate() {
+        assert_eq!(entry.declaration(), index);
+        assert_eq!(entry.source().bytes(), JSON_BODY);
+        assert_eq!(entry.source().fingerprint(), fingerprint_of(JSON_BODY));
+        assert_eq!(
+            entry.source().identity(),
+            identity(u64::try_from(index).expect("a small index") + 11)
+        );
+        assert_eq!(set.get(index).map(|held| held.declaration()), Some(index));
+    }
+    assert!(set.get(3).is_none());
+
+    // One reservation probe for every declared candidate, then exactly one probe/read pair per
+    // declaration, in declared order.
+    assert_eq!(
+        fake.calls(),
+        vec![
+            "probe:json:pages/a.en-001.json",
+            "probe:json:pages/b.de-de.json",
+            "probe:json:pages/c.id-id.json",
+            "probe:json:pages/a.en-001.json",
+            "read:json:pages/a.en-001.json",
+            "probe:json:pages/b.de-de.json",
+            "read:json:pages/b.de-de.json",
+            "probe:json:pages/c.id-id.json",
+            "read:json:pages/c.id-id.json",
+        ]
+    );
+}
+
+#[test]
+fn an_empty_declaration_list_is_refused_rather_than_returned_empty() {
+    let fake = SetPort::new();
+
+    let (kind, code, declaration) = refused_set(read_declared_source_set_v1(&fake, &[]));
+
+    assert_eq!(kind, SourceReadRefusalKind::NoneEffective);
+    assert_eq!(code, "SOURCE_NONE_EFFECTIVE");
+    assert_eq!(declaration, None);
+    assert_eq!(fake.calls(), Vec::<String>::new());
+}
+
+#[test]
+fn one_refused_declaration_refuses_the_whole_set_and_the_next_one_is_never_read() {
+    let length = u64::try_from(JSON_BODY.len()).expect("a short fixture body");
+    let fake = SetPort::new()
+        .with(Json, "pages/a.en-001.json", json_reply(11))
+        .with(
+            Json,
+            "pages/b.de-de.json",
+            (
+                located(12, length),
+                CandidateBodyV1::Refused(SourceReadRefusalV1::new(
+                    SourceReadRefusalKind::PermissionDenied,
+                    Some(SourceCandidateKind::Json),
+                )),
+            ),
+        )
+        .with(Json, "pages/c.id-id.json", json_reply(13));
+    let declarations = vec![
+        declaration(Some("pages/a.en-001.json"), None),
+        declaration(Some("pages/b.de-de.json"), None),
+        declaration(Some("pages/c.id-id.json"), None),
+    ];
+
+    let (kind, code, declaration) = refused_set(read_declared_source_set_v1(&fake, &declarations));
+
+    assert_eq!(kind, SourceReadRefusalKind::PermissionDenied);
+    assert_eq!(code, "SOURCE_OBSERVATION_PERMISSION_DENIED");
+    assert_eq!(declaration, Some(1));
+    // The third declaration is never reached: a refused member ends the attempt, so no valid
+    // subset can be observed by a caller.
+    assert!(
+        !fake
+            .calls()
+            .iter()
+            .any(|call| call == "read:json:pages/c.id-id.json"),
+        "the declaration after the refused one must not be read"
+    );
+}
+
+#[test]
+fn a_cross_representation_identity_collision_is_refused_before_any_body_is_read() {
+    let fake = SetPort::new()
+        .with(Json, "pages/a.en-001.json", json_reply(21))
+        .with(Json, "pages/b.de-de.json", json_reply(21));
+    let declarations = vec![
+        declaration(Some("pages/a.en-001.json"), None),
+        declaration(Some("pages/b.de-de.json"), None),
+    ];
+
+    let (kind, code, declaration) = refused_set(read_declared_source_set_v1(&fake, &declarations));
+
+    assert_eq!(kind, SourceReadRefusalKind::IdentityCollision);
+    assert_eq!(code, "SOURCE_COLLISION");
+    assert_eq!(declaration, None);
+    assert!(
+        !fake.calls().iter().any(|call| call.starts_with("read:")),
+        "a reserved collision must be refused before any body is read"
+    );
+}
+
+#[test]
+fn a_present_json_body_is_chosen_and_its_declared_markdown_is_never_read() {
+    let fake = SetPort::new()
+        .with(Json, "pages/a.en-001.json", json_reply(31))
+        .with(Markdown, "pages/a.en-001.md", markdown_reply(32))
+        .with(Json, "pages/b.de-de.json", json_reply(33));
+    let declarations = vec![
+        declaration(Some("pages/a.en-001.json"), Some("pages/a.en-001.md")),
+        declaration(Some("pages/b.de-de.json"), None),
+    ];
+
+    let set = complete(read_declared_source_set_v1(&fake, &declarations));
+
+    assert_eq!(set.len(), 2);
+    assert_eq!(
+        set.get(0).map(|entry| entry.source().member()),
+        Some(SourceCandidateKind::Json)
+    );
+    assert_eq!(
+        set.get(0)
+            .map(|entry| entry.source().logical_path().to_owned()),
+        Some("pages/a.en-001.json".to_owned())
+    );
+    assert!(
+        !fake
+            .calls()
+            .iter()
+            .any(|call| call == "read:markdown:pages/a.en-001.md"),
+        "the unselected Markdown body must never be read while JSON is available"
+    );
+}
+
+#[test]
+fn a_confirmed_json_absence_selects_markdown_in_that_declaration_only() {
+    let fake = SetPort::new()
+        .with(Markdown, "pages/a.en-001.md", markdown_reply(41))
+        .with(Json, "pages/b.de-de.json", json_reply(42));
+    let declarations = vec![
+        declaration(Some("pages/a.en-001.json"), Some("pages/a.en-001.md")),
+        declaration(Some("pages/b.de-de.json"), None),
+    ];
+
+    let set = complete(read_declared_source_set_v1(&fake, &declarations));
+
+    assert_eq!(
+        set.get(0).map(|entry| entry.source().member()),
+        Some(SourceCandidateKind::Markdown)
+    );
+    assert_eq!(
+        set.get(0).map(|entry| entry.source().bytes()),
+        Some(MARKDOWN_BODY)
+    );
+    assert_eq!(
+        set.get(1).map(|entry| entry.source().member()),
+        Some(SourceCandidateKind::Json)
+    );
+}
+
+#[test]
+fn an_unselected_hardlinked_markdown_refuses_the_whole_set_before_any_body_is_read() {
+    let length = u64::try_from(MARKDOWN_BODY.len()).expect("a short fixture body");
+    let fake = SetPort::new()
+        .with(Json, "pages/a.en-001.json", json_reply(51))
+        .with(
+            Markdown,
+            "pages/a.en-001.md",
+            (
+                located_hardlinked(52, length),
+                present_hardlinked(MARKDOWN_BODY, 52, 2),
+            ),
+        );
+    let declarations = vec![declaration(
+        Some("pages/a.en-001.json"),
+        Some("pages/a.en-001.md"),
+    )];
+
+    let (kind, code, declaration) = refused_set(read_declared_source_set_v1(&fake, &declarations));
+
+    assert_eq!(kind, SourceReadRefusalKind::IdentityCollision);
+    assert_eq!(code, "SOURCE_COLLISION");
+    assert_eq!(declaration, None);
+    assert!(
+        !fake.calls().iter().any(|call| call.starts_with("read:")),
+        "an ambiguous declaration must be refused before either body is read"
+    );
+}
+
+#[test]
+fn a_change_observed_in_the_second_declaration_refuses_the_whole_set() {
+    let fake = SetPort::new()
+        .with(Json, "pages/a.en-001.json", json_reply(61))
+        .with(
+            Json,
+            "pages/b.de-de.json",
+            (
+                located(
+                    62,
+                    u64::try_from(JSON_BODY.len()).expect("a short fixture body"),
+                ),
+                present_stamped(JSON_BODY, 62, LATER),
+            ),
+        );
+    let declarations = vec![
+        declaration(Some("pages/a.en-001.json"), None),
+        declaration(Some("pages/b.de-de.json"), None),
+    ];
+
+    let (kind, code, declaration) = refused_set(read_declared_source_set_v1(&fake, &declarations));
+
+    assert_eq!(kind, SourceReadRefusalKind::ChangedDuringRead);
+    assert_eq!(code, "SNAPSHOT_CHANGED");
+    assert_eq!(declaration, Some(1));
+}
+
+#[test]
+fn no_complete_set_can_claim_publication_or_snapshot_authority() {
+    let fake = SetPort::new()
+        .with(Json, "pages/a.en-001.json", json_reply(71))
+        .with(Json, "pages/b.de-de.json", json_reply(72));
+    let declarations = vec![
+        declaration(Some("pages/a.en-001.json"), None),
+        declaration(Some("pages/b.de-de.json"), None),
+    ];
+
+    let set = complete(read_declared_source_set_v1(&fake, &declarations));
+
+    assert!(!set.is_publication_authorized());
+    assert!(!set.is_verified_filesystem_snapshot());
+    for entry in set.iter() {
+        assert!(!entry.source().is_publication_authorized());
+        assert!(!entry.source().is_verified_filesystem_snapshot());
+    }
+}
+
+#[test]
+fn a_set_refusal_diagnostic_names_only_a_declaration() {
+    let fake = SetPort::new().with(Json, "pages/a.en-001.json", json_reply(81));
+    let declarations = vec![
+        declaration(Some("pages/a.en-001.json"), None),
+        declaration(Some("pages/b.de-de.json"), None),
+    ];
+
+    let outcome = read_declared_source_set_v1(&fake, &declarations);
+    let SourceReadSetOutcomeV1::Refused(refusal) = outcome else {
+        panic!("an absent second declaration must be refused");
+    };
+
+    // The second declaration was never located, so it is `SOURCE_NONE_EFFECTIVE`, and the
+    // diagnostic names the declaration without naming any path.
+    assert_eq!(refusal.kind(), SourceReadRefusalKind::NoneEffective);
+    assert_eq!(refusal.declaration(), Some(1));
+    let rendered = format!("{refusal}");
+    assert!(rendered.contains("declaration 1"), "{rendered}");
+    assert!(!rendered.contains("pages/"), "{rendered}");
 }

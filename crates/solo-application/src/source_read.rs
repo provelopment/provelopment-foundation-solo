@@ -723,3 +723,233 @@ pub fn check_physical_reservations_v1<P: SourceReadPort + ?Sized>(
     }
     Ok(reservations)
 }
+
+/// One declared representation's chosen source, keyed by its declaration index.
+///
+/// The index is the representation's position in the caller's declared order, which is the
+/// validated manifest order and never a directory iteration.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SetSourceEntryV1 {
+    declaration: usize,
+    source: ReadSourceCandidateV1,
+}
+
+impl SetSourceEntryV1 {
+    /// Which declaration this entry belongs to.
+    #[must_use]
+    pub const fn declaration(&self) -> usize {
+        self.declaration
+    }
+
+    /// The chosen body, with the evidence that belongs to it.
+    #[must_use]
+    pub const fn source(&self) -> &ReadSourceCandidateV1 {
+        &self.source
+    }
+
+    /// Takes the chosen body and its evidence out of the entry.
+    ///
+    /// Consuming the entry is what lets a caller assemble its own owned result without copying
+    /// the body a second time.
+    #[must_use]
+    pub fn into_source(self) -> ReadSourceCandidateV1 {
+        self.source
+    }
+}
+
+/// A whole-set refusal: one typed reason, plus the declaration that produced it where one did.
+///
+/// A set-level condition — an empty declaration list, or a reservation refusal decided before
+/// any representation is read — carries no declaration. Every other refusal names the
+/// declaration whose read refused, so a failure can be located without exposing a physical
+/// path, a body byte or a native diagnostic.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SourceReadSetRefusalV1 {
+    declaration: Option<usize>,
+    refusal: SourceReadRefusalV1,
+}
+
+impl SourceReadSetRefusalV1 {
+    /// Builds a set refusal around an accepted per-representation refusal.
+    #[must_use]
+    pub const fn new(refusal: SourceReadRefusalV1, declaration: Option<usize>) -> Self {
+        Self {
+            declaration,
+            refusal,
+        }
+    }
+
+    /// The declaration the refusal concerns, where one did.
+    #[must_use]
+    pub const fn declaration(&self) -> Option<usize> {
+        self.declaration
+    }
+
+    /// The underlying per-representation refusal, unchanged.
+    #[must_use]
+    pub const fn refusal(&self) -> SourceReadRefusalV1 {
+        self.refusal
+    }
+
+    /// The refusal reason.
+    #[must_use]
+    pub const fn kind(&self) -> SourceReadRefusalKind {
+        self.refusal.kind()
+    }
+
+    /// Stable, safe diagnostic token for the reason.
+    #[must_use]
+    pub const fn code(&self) -> &'static str {
+        self.refusal.code()
+    }
+
+    /// Fixed, bounded description for the reason.
+    #[must_use]
+    pub const fn detail(&self) -> &'static str {
+        self.refusal.detail()
+    }
+}
+
+impl fmt::Display for SourceReadSetRefusalV1 {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{}: {}", self.code(), self.detail())?;
+        if let Some(declaration) = self.declaration {
+            write!(formatter, " (declaration {declaration})")?;
+        }
+        Ok(())
+    }
+}
+
+impl std::error::Error for SourceReadSetRefusalV1 {}
+
+/// The outcome of reading every declared representation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SourceReadSetOutcomeV1 {
+    /// Every declared representation was read, in declared order.
+    Complete(ReadSourceSetV1),
+    /// Nothing is returned, for the stated safe reason.
+    Refused(SourceReadSetRefusalV1),
+}
+///
+/// There is no constructor, accessor or conversion that builds one of these from a partial
+/// attempt, so a caller cannot mistake a returned subset for the declared set: a value of this
+/// type only exists once **every** declaration was read. Holding one still proves nothing about
+/// publication, and nothing about a filesystem-wide or multi-file snapshot; the two constants
+/// below state both limits in a form no caller can mistake.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReadSourceSetV1 {
+    entries: Vec<SetSourceEntryV1>,
+}
+
+impl ReadSourceSetV1 {
+    /// How many declared representations the set holds.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether the set holds no representation at all.
+    ///
+    /// A complete set never is empty: an empty declaration list is refused rather than
+    /// returned as a successful empty set.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// The entries, in declared order.
+    #[must_use]
+    pub fn entries(&self) -> &[SetSourceEntryV1] {
+        &self.entries
+    }
+
+    /// The entry for one declaration, when the set holds it.
+    #[must_use]
+    pub fn get(&self, declaration: usize) -> Option<&SetSourceEntryV1> {
+        self.entries.get(declaration)
+    }
+
+    /// The entries, in declared order.
+    pub fn iter(&self) -> impl Iterator<Item = &SetSourceEntryV1> {
+        self.entries.iter()
+    }
+
+    /// Whether this set may be published. It never may.
+    #[must_use]
+    pub const fn is_publication_authorized(&self) -> bool {
+        SOURCE_READ_GRANTS_PUBLICATION_AUTHORITY
+    }
+
+    /// Whether this set is a verified filesystem-wide snapshot. It never is.
+    #[must_use]
+    pub const fn is_verified_filesystem_snapshot(&self) -> bool {
+        SOURCE_READ_PROVES_GLOBAL_SNAPSHOT
+    }
+
+    /// Takes the entries out of the set, in declared order.
+    ///
+    /// Consuming the set is what lets a caller assemble its own owned result without copying the
+    /// bodies a second time.
+    #[must_use]
+    pub fn into_entries(self) -> Vec<SetSourceEntryV1> {
+        self.entries
+    }
+}
+
+/// Reads **every** declared representation as one all-or-refused set.
+///
+/// The order here is the point of doing this in the application layer rather than in a loop at
+/// the call site:
+///
+/// 1. an empty declaration list is refused — a declared set with nothing in it is not a
+///    successful empty candidate;
+/// 2. [`check_physical_reservations_v1`] settles physical ownership for **every** declared
+///    candidate of **every** representation, including a Markdown locator that will never be
+///    read, before a single body is opened;
+/// 3. each declaration is then read with [`read_declared_source_v1`], so the accepted
+///    JSON-first rule and every per-file guarantee apply unchanged to each representation;
+/// 4. the first refusal ends the attempt. Entries collected so far are dropped, so no partial
+///    candidate is ever observable and a valid subset can never be mistaken for the set.
+///
+/// What this does **not** establish is a simultaneous cross-file snapshot: every body is read
+/// under its own guarantee, and a writer may still change one source after its own read. It
+/// grants no publication authority either.
+#[must_use]
+pub fn read_declared_source_set_v1<P: SourceReadPort + ?Sized>(
+    port: &P,
+    declarations: &[SourceCandidateSetV1],
+) -> SourceReadSetOutcomeV1 {
+    if declarations.is_empty() {
+        return SourceReadSetOutcomeV1::Refused(SourceReadSetRefusalV1::new(
+            SourceReadRefusalV1::new(SourceReadRefusalKind::NoneEffective, None),
+            None,
+        ));
+    }
+
+    // Ownership is reserved for the whole declaration before any body exists in memory. A
+    // collision between two representations, or an alias inside one, refuses the entire set
+    // and nothing is read.
+    if let Err(refusal) = check_physical_reservations_v1(port, declarations) {
+        return SourceReadSetOutcomeV1::Refused(SourceReadSetRefusalV1::new(refusal, None));
+    }
+
+    let mut entries = Vec::with_capacity(declarations.len());
+    for (declaration, candidates) in declarations.iter().enumerate() {
+        match read_declared_source_v1(port, candidates) {
+            SourceReadOutcomeV1::Chosen(source) => {
+                entries.push(SetSourceEntryV1 {
+                    declaration,
+                    source,
+                });
+            }
+            SourceReadOutcomeV1::Refused(refusal) => {
+                return SourceReadSetOutcomeV1::Refused(SourceReadSetRefusalV1::new(
+                    refusal,
+                    Some(declaration),
+                ));
+            }
+        }
+    }
+
+    SourceReadSetOutcomeV1::Complete(ReadSourceSetV1 { entries })
+}

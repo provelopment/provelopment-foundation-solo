@@ -22,7 +22,9 @@ pub use bootstrap_preflight::{
 pub use source_read::{
     CandidateBodyV1, CandidateProbeV1, MAX_JSON_SOURCE_BYTES, MAX_MARKDOWN_SOURCE_BYTES,
     PhysicalIdentityV1, PhysicalReservationV1, ProbeFactsV1, ReadSourceCandidateV1,
-    SOURCE_READ_GRANTS_PUBLICATION_AUTHORITY, SOURCE_READ_PROVES_GLOBAL_SNAPSHOT,
-    SourceReadOutcomeV1, SourceReadPort, SourceReadRefusalKind, SourceReadRefusalV1, bound_for,
-    check_physical_reservations_v1, fingerprint_of, read_declared_source_v1,
+    ReadSourceSetV1, SOURCE_READ_GRANTS_PUBLICATION_AUTHORITY, SOURCE_READ_PROVES_GLOBAL_SNAPSHOT,
+    SetSourceEntryV1, SourceReadOutcomeV1, SourceReadPort, SourceReadRefusalKind,
+    SourceReadRefusalV1, SourceReadSetOutcomeV1, SourceReadSetRefusalV1, bound_for,
+    check_physical_reservations_v1, fingerprint_of, read_declared_source_set_v1,
+    read_declared_source_v1,
 };
