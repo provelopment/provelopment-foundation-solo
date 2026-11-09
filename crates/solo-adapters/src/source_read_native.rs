@@ -20,10 +20,13 @@
 //!   name that may since have changed.
 //!
 //! **What this module does not prove.** Neither host provides an atomic,
-//! filesystem-wide snapshot. A writer can still change a file after the final re-check;
-//! what is proven is that the returned bytes belong to the object whose identity is
-//! reported, and that an identity, length or change-time difference observed before and
-//! after the read is reported as [`NativeError::Changed`] rather than returned as a body.
+//! filesystem-wide snapshot. The *transfer* is atomic: on Linux the bytes come from an
+//! anonymous copy-on-write clone and on Windows from a handle that denies write sharing, so
+//! no writer can tear the bytes that are returned. What is not proven is any wider instant of
+//! the tree: a writer can still change this file after its clone was taken, and the
+//! before/after resample reports exactly that as [`NativeError::Changed`] rather than
+//! returning a stale body. A change that leaves every observed fact identical is not
+//! detectable, and nothing here claims otherwise.
 
 use std::path::Path;
 

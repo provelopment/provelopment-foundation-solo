@@ -6,12 +6,14 @@
 //! [`crate::source_read_native`] does that, and this module never replaces it with a string
 //! comparison, a pre-open `metadata` check or a `canonicalize`.
 //!
-//! **What a successful read proves here.** The bytes returned belong to the physical object
+//! **What a successful read proves here.** The returned bytes are one instant of the file,
+//! not a mutable read a writer can tear: they come from an anonymous copy-on-write clone on
+//! Linux and from a write-denying handle on Windows. They also belong to the physical object
 //! whose identity is reported, because identity, length and link count are sampled on the
-//! handle before and after the transfer and any difference is refused. What it does not
-//! prove is a filesystem-wide snapshot: a writer can still change the file after the final
-//! sample. A read never authorizes publication, selects a route, decides visibility or parses
-//! a body.
+//! handle before and after the transfer and any difference is refused. What it does not prove
+//! is a filesystem-wide or multi-file snapshot, or that the source will not change immediately
+//! afterwards. A read never authorizes publication, selects a route, decides visibility or
+//! parses a body.
 
 use std::path::Path;
 
