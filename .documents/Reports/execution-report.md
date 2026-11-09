@@ -12,7 +12,7 @@
 | Required starting HEAD / tree | `8f81078ac42d26a882277a5e4bb954bba0303a07` / `ae83cf9c8d737c97cdc6f820bfe76291a361782f` — **matched exactly** |
 | §2 baseline blob ledger | **24 of 24 blobs verified, zero drift**; all four required-absent paths confirmed absent |
 | Current HEAD / tree | `57c905a86c525fef521d86b00be1d7c23ac4f609` / `1ba06d1a199e885473436d1a3860dfefce9d8ea6` |
-| **Status** | **`STOP`** — blocked at the mandatory format gate; **no functional evidence exists** |
+| **Status** | **`STOP`** — Architect returned `REVISE` at `6a2b794`; the three rustfmt hunks were not received and cannot be retrieved here, so **no code change was made this turn** |
 
 ## Outcome
 
@@ -20,7 +20,45 @@ The order's preflight, issuance, scope and refusal design were completed exactly
 
 I could not observe *why* formatting is rejected, so I am stopping rather than continuing to publish unverifiable corrections. This report records that honestly and asks for the smallest Owner decision.
 
-## Commit ledger
+## Chief Architect disposition — `REVISE`, and what this turn could not obtain
+
+The Architect reviewed at `6a2b794be0486de6e48815c3115734fbd27887b5` and reported retrieving the raw Ubuntu and Windows logs for run **`42565562908`** (jobs `128991196631` Ubuntu, `128991196456` Windows, both `failure`), which establish **exactly three outstanding rustfmt differences**, stated to be reproduced in the review. **Those three differences did not reach this agent**, and I did not invent them.
+
+This turn changed no file. Every route to the formatter output was tried again and refused:
+
+| Route | Result |
+| --- | --- |
+| `GET /repos/…/actions/runs/42565562908` | 200 — confirms `head_sha = 6a2b794…`, `conclusion = failure` |
+| `GET /repos/…/actions/runs/42565562908/jobs` | 200 — both job ids and names only |
+| `GET /repos/…/actions/jobs/{id}/logs` | **403**, no `Location` |
+| `GET /repos/…/actions/runs/{id}/logs` | **403** |
+| Same, without the JSON `Accept` header | **403** |
+| `GET /repos/…/check-runs/{id}/annotations` | only "Process completed with exit code 1" |
+| `GET /commits/{sha}/check-runs` → `output.summary` / `output.text` | **empty** |
+
+The format step itself is confirmed to be exactly `cargo fmt --all -- --check` with no configuration file and no extra flags, so nothing about the workflow narrows the answer.
+
+### I must also retract an overstatement in the previous revision of this report
+
+That revision said "every mechanical check I can perform locally is clean", offered as if it validated the formatting. **It does not, and I withdraw it.** Calibrating the same checks against the 26 Rust files in this repository that are already rustfmt-clean and CI-green:
+
+* they report **19 lines longer than 100 columns** in clean files, and
+* they report **50 "joinable" multi-line calls** in clean files that rustfmt deliberately left broken.
+
+A concrete demonstration of the gap, in `solo-domain/src/source_locator.rs`:
+
+```rust
+            return Err(SourceLocatorError::at(SourceLocatorErrorKind::Empty, None));   // line 260: 82 columns, ONE line
+            return Err(SourceLocatorError::at(                                           // line 265: 86 columns, BROKEN
+                SourceLocatorErrorKind::TooLong,
+                None,
+            ));
+```
+
+Across the corpus, 35 such nested `return Err(…)` statements are single-line and 69 are broken, and I cannot derive the rule that separates them. My local heuristics therefore cannot certify rustfmt output, and — because the real diff is unobservable here — **I will not apply three guessed edits and label them as the Architect's.** The order requires preserving actual evidence and forbids guessing or bypassing the gate; producing plausible-looking but unverified changes would be worse than the present STOP, since it would manufacture the appearance of compliance.
+
+**What is needed to finish in one pass:** the three rustfmt hunks verbatim (file, range, before/after), or log read access for `42565562908`, or the pinned `rustfmt 1.99.1` in this environment. With any one of those I can apply exactly the intended edits and then drive every mandatory gate to a real result.
+
 
 | Commit | Content |
 | --- | --- |
@@ -106,12 +144,13 @@ Exactly eight paths differ from the baseline, all within §1: the two WIP files 
 
 ## The smallest decision I need
 
-`main` is currently **red** at `57c905a`: the format gate rejects revisions of four new files whose behaviour I cannot verify. I will not self-authorise a fix, a revert or a workaround. One of these is needed:
+`main` remains **red** at the implementation revision: the format gate rejects changes to the four new Rust files whose exact deviation I cannot observe, and my local model of rustfmt is now proven unsound. I will not self-authorise a fix, a revert, or a workaround. One of these is needed:
 
-1. **Give the gate's actual output** — enable read access to the workflow logs (or paste the `cargo fmt` diff for this revision). One diff would let me correct every remaining line precisely, after which the full gate can finally run and produce real compile/lint/test/architecture evidence.
-2. **Provide the pinned toolchain** (`rustc`/`cargo`/`rustfmt` `1.99.1`) in this environment, so the exact formatter can be run before pushing.
-3. **Authorise a revert** of the seven commits to restore the last green baseline (`8f81078`), and re-issue the slice when either (1) or (2) is available.
+1. **Send the three rustfmt hunks verbatim** — file, line range, and before/after for each. This is the smallest possible input and is sufficient: I can apply exactly those edits and then run every gate to a real result.
+2. **Enable read access to the workflow log body** for run `42565562908`, so the formatter output is directly observable rather than inferred.
+3. **Provide the pinned toolchain** (`rustc`/`cargo`/`rustfmt` `1.99.1`) in this environment, so the exact formatter can be run before pushing.
+4. **Authorise a revert** of the seven commits to restore the last green baseline (`8f81078`), and re-issue the slice when (1), (2) or (3) is available.
 
-Until then the slice is **unproven, not accepted, and not rejected on its merits** — the failure is confined to formatting, and no functional judgement of the policy or the preflight has been made by anyone.
+Until one of these arrives, the slice is **unproven and unjudged on its merits** — the failure is confined to formatting, no functional judgement of the policy or the preflight has been made by anyone, and `R02.B`, `R02.C` and Stage 02 remain open.
 
 **`agent report ready`**
