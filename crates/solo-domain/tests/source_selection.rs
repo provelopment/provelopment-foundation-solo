@@ -57,10 +57,10 @@ fn observations_markdown(observation: SourceObservationV1<'_>) -> SuppliedObserv
     SuppliedObservationsV1::new().with_markdown(observation)
 }
 
-fn observations_both(
-    json: SourceObservationV1<'_>,
-    markdown: SourceObservationV1<'_>,
-) -> SuppliedObservationsV1<'_> {
+fn observations_both<'a>(
+    json: SourceObservationV1<'a>,
+    markdown: SourceObservationV1<'a>,
+) -> SuppliedObservationsV1<'a> {
     let observations = SuppliedObservationsV1::new().with_json(json);
     observations.with_markdown(markdown)
 }
