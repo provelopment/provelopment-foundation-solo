@@ -539,6 +539,60 @@ jobs:
           Write-Output "metadata=ok workspace_members=4"
 
       # ---------------------------------------------------------------------------
+      # R03 D2 snapshot proof — disposable test filesystems (Ubuntu only).
+      #
+      # The hosted Ubuntu root filesystem is ext4, which does not implement reflink, so a
+      # positive FICLONE proof cannot be staged on the checkout. This step builds exactly one
+      # loop-backed Btrfs image of 192 MiB (below the 256 MiB ceiling) under $RUNNER_TEMP and
+      # mounts only that image, plus one 16 MiB tmpfs mount that genuinely lacks reflink so the
+      # fail-closed refusal can be proven natively rather than simulated. Every path is
+      # task-owned and uniquely named from the run id; nothing outside $RUNNER_TEMP is written,
+      # no host mount is touched and no package is installed. The guaranteed cleanup step at the
+      # end of the job unmounts and removes exactly these paths.
+      # ---------------------------------------------------------------------------
+      - name: R03 snapshot-test filesystems (Ubuntu only, disposable)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="solo-r03-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          img="$RUNNER_TEMP/$tag.img"
+          mnt="$RUNNER_TEMP/$tag-btrfs"
+          tmp="$RUNNER_TEMP/$tag-tmpfs"
+          for p in "$img" "$mnt" "$tmp"; do
+            if [ -e "$p" ]; then
+              echo "::error::refusing to reuse pre-existing path $p"
+              exit 1
+            fi
+          done
+          if ! command -v mkfs.btrfs > /dev/null; then
+            echo "::error::mkfs.btrfs is not preinstalled on this image; installing it would be an unapproved package, so the positive D2 proof cannot be constructed"
+            exit 1
+          fi
+
+          echo "host_kernel=$(uname -r)"
+          mkfs.btrfs --version
+          head -n 1 /etc/os-release
+
+          truncate -s 192M "$img"
+          mkfs.btrfs -q -f "$img"
+          mkdir -p "$mnt/content" "$tmp"
+          sudo mount -o loop "$img" "$mnt"
+          sudo mount -t tmpfs -o size=16m,mode=0755 tmpfs "$tmp"
+          sudo chown -R "$(id -u):$(id -g)" "$mnt/content" "$tmp"
+
+          echo "supported_fs=$(findmnt -no FSTYPE,SOURCE,TARGET "$mnt")"
+          echo "unsupported_fs=$(findmnt -no FSTYPE,SOURCE,TARGET "$tmp")"
+          stat -f -c 'supported_fstype=%T block_size=%s' "$mnt/content"
+          stat -f -c 'unsupported_fstype=%T block_size=%s' "$tmp"
+          losetup -j "$img" || true
+
+          {
+            echo "SOLO_TEST_SOURCE_FS_ROOT=$mnt/content"
+            echo "SOLO_TEST_UNSUPPORTED_FS_ROOT=$tmp"
+          } >> "$GITHUB_ENV"
+
+      # ---------------------------------------------------------------------------
       # Mandatory standard gates. Each step is a single cargo command, so both
       # shells propagate its real exit status to the workflow.
       # ---------------------------------------------------------------------------
@@ -978,3 +1032,69 @@ jobs:
           Write-Output "summary=written"
 
           if (((rustc --version) -notmatch '^rustc 1\.99\.1 ')) { throw "rustc is not 1.99.1" }
+
+      # ---------------------------------------------------------------------------
+      # R03 D2 fixture cleanup — guaranteed, fail-closed, Ubuntu only.
+      #
+      # Runs even when an earlier step failed. It unmounts only the exact task-owned mount
+      # points created above, detaches only the loop device that still references this job's
+      # own image, and deletes the owned image and mount points only after every unmount has
+      # succeeded. A failed unmount is reported and left visible rather than deleted behind.
+      # ---------------------------------------------------------------------------
+      - name: R03 snapshot-test filesystem cleanup (Ubuntu only, guaranteed)
+        if: always() && runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -uo pipefail
+          tag="solo-r03-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          img="$RUNNER_TEMP/$tag.img"
+          mnt="$RUNNER_TEMP/$tag-btrfs"
+          tmp="$RUNNER_TEMP/$tag-tmpfs"
+          failed=0
+
+          for d in "$mnt" "$tmp"; do
+            [ -d "$d" ] || continue
+            if mountpoint -q "$d"; then
+              if sudo umount "$d"; then
+                echo "unmounted=$d"
+              else
+                echo "::error::unmount failed for $d; leaving it in place rather than deleting behind a live mount"
+                failed=1
+              fi
+            fi
+          done
+
+          if [ "$failed" -ne 0 ]; then
+            findmnt -no FSTYPE,SOURCE,TARGET "$mnt" "$tmp" || true
+            exit 1
+          fi
+
+          loop_devices="$(losetup -j "$img" 2>/dev/null | cut -d: -f1)"
+          for dev in $loop_devices; do
+            if sudo losetup -d "$dev"; then
+              echo "detached_loop=$dev"
+            else
+              echo "::error::could not detach $dev owned by this job"
+              exit 1
+            fi
+          done
+
+          if [ -e "$img" ]; then
+            rm -f -- "$img"
+            echo "removed_image=$img"
+          fi
+          for d in "$mnt" "$tmp"; do
+            if [ -e "$d" ]; then
+              rm -rf -- "$d"
+              echo "removed_mountpoint=$d"
+            fi
+          done
+
+          for p in "$img" "$mnt" "$tmp"; do
+            if [ -e "$p" ]; then
+              echo "::error::cleanup left $p behind"
+              exit 1
+            fi
+          done
+          echo "r03_fixture_cleanup=complete"
+

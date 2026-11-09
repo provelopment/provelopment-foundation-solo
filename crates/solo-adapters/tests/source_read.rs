@@ -611,3 +611,160 @@ fn an_unselected_hardlinked_markdown_is_refused_while_json_would_have_won() {
     assert_eq!(kind, SourceReadRefusalKind::IdentityCollision);
     assert_eq!(code, "SOURCE_COLLISION");
 }
+
+// ---------------------------------------------------------------------------
+// R03 stage II — the D2 primitives on the real fixture filesystems.
+//
+// These run before the product path is changed and prove the kernel contract it will rely
+// on: an anonymous `O_TMPFILE | O_EXCL` inode on a reflink-capable filesystem accepts one
+// `FICLONE` from a confined source and keeps its bytes after the source is overwritten, while
+// the same call on a filesystem without reflink returns a real unsupported error. Neither
+// case may be simulated: the fixture roots are supplied by the workflow and a missing root is
+// a loud failure, never a quiet fallback to the checkout filesystem.
+// ---------------------------------------------------------------------------
+
+#[cfg(target_os = "linux")]
+mod d2_primitives {
+    use rustix::fd::OwnedFd;
+    use rustix::fs::{Mode, OFlags, SeekFrom};
+    use rustix::io::Errno;
+    use std::fs;
+    use std::path::{Path, PathBuf};
+
+    const SOURCE: &[u8] = b"{\"slug\":\"p\",\"body\":\"original\"}";
+    const REWRITTEN: &[u8] = b"{\"slug\":\"p\",\"body\":\"rewritten\"}";
+
+    /// The fixture root must be named explicitly: a D2 proof may never quietly run on a
+    /// filesystem that was never verified to support the mechanism.
+    fn fixture_root(variable: &str) -> PathBuf {
+        match std::env::var_os(variable) {
+            Some(value) if !value.is_empty() => PathBuf::from(value),
+            _ => panic!(
+                "{variable} must name the R03 snapshot fixture filesystem; refusing to run a D2 proof on an unverified filesystem"
+            ),
+        }
+    }
+
+    struct Probe {
+        root: PathBuf,
+    }
+
+    impl Probe {
+        fn new(variable: &str, tag: &str) -> Self {
+            let root =
+                fixture_root(variable).join(format!("solo-r03-probe-{}-{tag}", std::process::id()));
+            let _ = fs::remove_dir_all(&root);
+            fs::create_dir(&root).expect("create the probe directory on the fixture filesystem");
+            Self { root }
+        }
+    }
+
+    impl Drop for Probe {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.root);
+        }
+    }
+
+    fn open_directory(path: &Path) -> OwnedFd {
+        rustix::fs::open(
+            path,
+            OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC,
+            Mode::empty(),
+        )
+        .expect("open the probe directory")
+    }
+
+    fn open_regular(path: &Path) -> OwnedFd {
+        rustix::fs::open(
+            path,
+            OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::CLOEXEC,
+            Mode::empty(),
+        )
+        .expect("open the probe source")
+    }
+
+    /// The candidate destination: an unnamed, unlinkable inode on the directory's own
+    /// filesystem, cloned once from the source. No name is ever created.
+    fn clone_into_unnamed(directory: &OwnedFd, source: &OwnedFd) -> Result<OwnedFd, Errno> {
+        let destination = rustix::fs::openat(
+            directory,
+            c".",
+            OFlags::TMPFILE | OFlags::EXCL | OFlags::RDWR | OFlags::CLOEXEC,
+            Mode::RUSR | Mode::WUSR,
+        )?;
+        rustix::fs::ioctl_ficlone(&destination, source)?;
+        Ok(destination)
+    }
+
+    fn read_from_start(fd: &OwnedFd) -> Vec<u8> {
+        rustix::fs::seek(fd, SeekFrom::Start(0)).expect("rewind the clone");
+        let mut buffer = vec![0_u8; SOURCE.len() + 64];
+        let mut filled = 0_usize;
+        while filled < buffer.len() {
+            let read = rustix::io::read(fd, &mut buffer[filled..]).expect("read the clone");
+            if read == 0 {
+                break;
+            }
+            filled += read;
+        }
+        buffer.truncate(filled);
+        buffer
+    }
+
+    #[test]
+    fn an_anonymous_clone_on_the_supported_fixture_keeps_its_bytes_after_a_source_rewrite() {
+        let probe = Probe::new("SOLO_TEST_SOURCE_FS_ROOT", "supported");
+        let source_path = probe.root.join("body.json");
+        fs::write(&source_path, SOURCE).expect("write the probe source");
+
+        let directory = open_directory(&probe.root);
+        let source = open_regular(&source_path);
+
+        let clone = clone_into_unnamed(&directory, &source)
+            .expect("a reflink-capable fixture filesystem must clone an unnamed inode");
+
+        // The clone is its own inode sharing extents with the source.
+        let source_stat = rustix::fs::fstat(&source).expect("stat the source");
+        let clone_stat = rustix::fs::fstat(&clone).expect("stat the clone");
+        assert_ne!(
+            source_stat.st_ino, clone_stat.st_ino,
+            "the clone must be its own inode"
+        );
+        assert_eq!(clone_stat.st_size, source_stat.st_size);
+
+        // The source is overwritten in place with bytes of a different length.
+        fs::write(&source_path, REWRITTEN).expect("overwrite the probe source in place");
+
+        // The already-cloned bytes do not move: they are one instant of the source.
+        assert_eq!(read_from_start(&clone), SOURCE);
+
+        // And no name was ever created for the destination.
+        assert_eq!(
+            fs::read_dir(&probe.root)
+                .expect("list the probe directory")
+                .count(),
+            1,
+            "the snapshot destination must stay unnamed"
+        );
+    }
+
+    #[test]
+    fn a_filesystem_without_reflink_refuses_the_anonymous_clone() {
+        let probe = Probe::new("SOLO_TEST_UNSUPPORTED_FS_ROOT", "unsupported");
+        let source_path = probe.root.join("body.json");
+        fs::write(&source_path, SOURCE).expect("write the probe source");
+
+        let directory = open_directory(&probe.root);
+        let source = open_regular(&source_path);
+
+        match clone_into_unnamed(&directory, &source) {
+            Ok(_) => panic!(
+                "this fixture filesystem accepted a clone, so it cannot prove the unsupported-refusal path"
+            ),
+            Err(error) => assert!(
+                error == Errno::OPNOTSUPP || error == Errno::NOTSUP,
+                "expected a real unsupported-filesystem error, got {error:?}"
+            ),
+        }
+    }
+}
