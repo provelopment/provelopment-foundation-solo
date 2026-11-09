@@ -7,82 +7,82 @@
 | Field | Value |
 | --- | --- |
 | Date (UTC) | 2026-11-08 |
-| Work order | **`SOLO-WO-045 R01`** — R02.B first bounded slice (strict manifest declarations, source-locator rules) |
-| Owner handoff | Received, verbatim `SOLO-WO-045 R01` — matched the order's §7 text exactly |
-| Required starting HEAD / tree | `47b9b0796c2266a6b429822b7e8ebdeefc7f9450` / `1b9b21c8713ca58318584f13dbba18864b9ffc4f` — **both matched exactly** |
-| §5.1 issuance revision | `211378a4a9f78c074c8099076f0055bff6b80515` / tree `9b1733bc31bad6868583d7089023a8d50504ca9e` |
-| §5.1 NEXT revision | `5184cd90578796e4a8809ee0c40a49394f64bae8` / tree `ea210988c1e555010f2fbe0ade1c7406561d0dbb` |
+| Work order | **`SOLO-WO-045 R01`** — R02.B first bounded slice |
+| Owner handoff | Received, verbatim `SOLO-WO-045 R01` — **second,** identical handoff against an **unchanged** order |
+| Starting HEAD / tree | `5fdbb9c855361aa0ec4bb4447e65852d6d7bd256` / `0d0f8d4dcd8910706fbdd15f794265e258e3033f` (clean, remote-equal) |
+| Issuance (previous run, stands) | `211378a4a9f78c074c8099076f0055bff6b80515` / tree `9b1733bc31bad6868583d7089023a8d50504ca9e` |
+| NEXT neutralisation (previous run, stands) | `5184cd90578796e4a8809ee0c40a49394f64bae8` |
 | Final revision of this run | given in the chat handback after publication, never embedded here |
-| **Status** | **`STOP`** — §5.1 complete and green; §5.2 **not started**; a hard scope contradiction blocks the approved slice |
+| **Status** | **`STOP` unchanged** — authorization is byte-identical to the run that stopped; no scope amendment was issued |
 
-## Outcome first
+## Outcome
 
-**I stopped before writing any implementation code, and I am not claiming any part of R02.B.** The approved slice cannot reach a green mandatory gate without editing a file that the same order declares read-only. Under §6 of this order that is a mandatory STOP — *"needed path outside §1"* and *"mandatory CI/red checker"* — and under §3E, *"If this cannot be proved under the exact locked graph, STOP instead of loosening the checker."*
+**I did not implement anything, again, and the reason is not a lack of effort or a tooling limit: the authorization is materially unchanged.** `workorder-active.md` is byte-identical to the order I stopped against — blob `a75e3e350685bfb54d2215d0e0fdf98c3f64ee88`, 26,472 bytes, `OWNER-ISSUED`, same `SOLO-WO-045 R01`, same frozen §1 ledger, same §3E wording. A repeated handoff against an unchanged order restates the same authority; it does not add, widen or waive a permission, and it does not convert an impossible scope into a possible one.
 
-To be unambiguous about what this run did **not** do: no `source_locator.rs` was created, no `publication_manifest.rs` was created, `crates/solo-adapters/Cargo.toml` and `Cargo.lock` are **byte-identical** to the baseline, no architecture-checker file was touched, no test was weakened, no fixture was removed, and **no red CI run was created**. The tree was left in the state the order prescribes for a non-accepted outcome: full ACTIVE installed, NEXT neutral, ROADMAP untouched.
+So this run did the only useful thing available: it re-verified that the blocker is still exactly true at this exact revision, and it did the deeper work of **closing every remaining escape hatch** that could have let §1 be satisfied while the mandatory gate stayed green. That analysis is the substance of this report — it is what makes the decision below final rather than provisional.
 
-## The blocker, with first-hand evidence
+No source file was created or modified. `crates/solo-adapters/Cargo.toml` still declares exactly `solo-application` and `solo-domain`; `Cargo.lock`, `Cargo.toml`, every architecture-checker file, the 23 fixtures and `rust-verify.yml` are byte-identical. **No red CI run was created.** ACTIVE remains fully installed, NEXT remains neutral, ROADMAP remains byte-identical with `R02.B` and `R02.C` open.
 
-§1 and §3E require promoting `serde = "=1.0.229"` and `serde_json = "=1.0.154"` from the locked graph into **normal** dependencies of `solo-adapters`. One existing test forbids exactly that, unconditionally, over the **real** metadata, and its file is not in the §1 ledger.
+## The blocker, restated exactly
 
-`crates/solo-cli/tests/workspace_graph.rs`, function `only_the_approved_external_dependencies_are_declared`, iterates the real `cargo metadata` for every workspace package and asserts, for **every** non-workspace dependency:
+§1 and §3E require `serde = "=1.0.229"` and `serde_json = "=1.0.154"` as **normal** dependencies of `solo-adapters`. `crates/solo-cli/tests/workspace_graph.rs` (blob `8fa4b4d0bde840782abb0c9e24c84bac8f06c947`, unmodified) contains `only_the_approved_external_dependencies_are_declared`, an unconditional `#[test]` — no `cfg`, no `#[ignore]`, no feature gate — which walks the **real** `cargo metadata` and, for every non-workspace dependency of every workspace package, asserts:
 
-| Line | Assertion | Effect of the required promotion |
+| Line | Assertion | Status if §1 is implemented |
 | --- | --- | --- |
-| 311–314 | `assert_eq!(name, APPROVED_DEV_OWNER, "only {APPROVED_DEV_OWNER} may declare an external dependency, found {name} -> {target}")` | **Fails.** `APPROVED_DEV_OWNER` is the literal `"solo-cli"`; the new edge is declared by `solo-adapters` |
-| 315–319 | `assert_eq!(dependency["kind"].as_str(), Some("dev"), "{name} -> {target} must be a development dependency, never shipped")` | **Fails.** A `[dependencies]` entry reports `kind: null`, never `"dev"` |
-| 320–323 | `assert!(APPROVED_EXTERNAL_DEV.contains(&target))` | `APPROVED_EXTERNAL_DEV` is `["serde_json", "syn"]`, so `serde_json` would pass and `serde` would fail |
-| 324–327 | `assert!(dependency["rename"].is_null())` | Satisfied — no alias is declared |
+| 311–314 | `assert_eq!(name, APPROVED_DEV_OWNER, "only {APPROVED_DEV_OWNER} may declare an external dependency…")` — `APPROVED_DEV_OWNER` is the literal `"solo-cli"` | **Fails**: the edge is declared by `solo-adapters` |
+| 315–319 | `assert_eq!(dependency["kind"].as_str(), Some("dev"), "…must be a development dependency, never shipped")` | **Fails**: a `[dependencies]` entry reports `kind: null` |
+| 320–323 | `assert!(APPROVED_EXTERNAL_DEV.contains(&target))` — the list is `["serde_json", "syn"]` | `serde_json` passes, `serde` **fails** |
+| 324–327 | `assert!(dependency["rename"].is_null())` | Satisfied — no alias declared |
 
-The test is unconditional (`#[test]` with no `cfg`, no `#[ignore]`, no feature gate) and runs inside the mandatory step `cargo test --workspace --all-targets --locked` (`.github/workflows/rust-verify.yml` line 552), on both `ubuntu-24.04` and `windows-2025`. It is the **only** test in the repository asserting this invariant, so there is no second place the rule could be satisfied instead.
+It runs inside the mandatory `cargo test --workspace --all-targets --locked` (`.github/workflows/rust-verify.yml` line 552) on both hosts, and it is the only place this invariant exists. Its file is absent from the §1 ledger, and §1 states *"**Everything else is read-only**… all other Rust source/tests/manifests"*.
 
-**Why no compliant workaround exists.** Declaring the parsers as `dev`-dependencies contradicts §1 ("as normal dependencies of the outer adapter") and §3A/§3E, which need `serde`'s visitor and `serde_json`'s value model in shipped adapter code. Hosting the parser in `solo-cli` contradicts the fixed path `crates/solo-adapters/src/publication_manifest.rs`. Hand-writing a duplicate-key-aware JSON parser instead of `serde` contradicts §3A's explicit *"Use `serde`'s visitor/map-access path so duplicate keys are refused **before** a `serde_json::Value`…"*. Editing the test is the only remaining route, and `crates/solo-cli/tests/workspace_graph.rs` — blob `8fa4b4d0bde840782abb0c9e24c84bac8f06c947`, unmodified (`git status` clean for that path) — is covered twice by the prohibition: it is absent from the §1 ledger, and §1 states *"**Everything else is read-only**… all other Rust source/tests/manifests"*.
+## Every escape hatch, closed
 
-I did not create a demonstration red run to prove this. The order forbids a gated failure being produced to force a green badge, and the assertion above is decidable from the committed source at the exact revision; an intentional failing push would have added red CI evidence without adding information.
+Because the same instruction arrived twice, the decisive question is not "did you try?" but "is there any conforming way?" Each candidate mechanism was tested against the actual assertion semantics above. None survives.
 
-## What §5.1 completed, verified on both hosts
+| Candidate mechanism | Why it cannot satisfy §1 while the gate stays green |
+| --- | --- |
+| Declare the dependency as `optional = true` and enable it by feature | Cargo lists optional dependencies in `packages[].dependencies` (`optional: true`, `kind: null`), so 311–314 and 315–319 both still fail. The parser would also be absent from the default build. |
+| Declare it only under `[target.'cfg(…)'.dependencies]` | Target-specific entries are still listed, with a `target` field and `kind: null`. Same two failures. |
+| Declare the version once in root `[workspace.dependencies]` and inherit it | Inheritance supplies a version constraint only. The member still declares a real, normal dependency edge, which is exactly what the assertion inspects. |
+| Vendor `serde` locally or pin it by `path`/`[patch]` | The dependency is still a non-workspace package named `serde`, so the assertion still applies and still fails; it would additionally introduce a non-registry component that §1 and §4 forbid outright. |
+| Rename or alias the dependency | `packages[].dependencies[].name` carries the **real** package name, and 324–327 independently refuse a rename. |
+| Declare it as a normal dependency of `solo-cli` instead | 315–319 requires `solo-cli`'s externals to be `dev`-kind, so that fails too — and `solo-adapters` could not use `solo-cli` (an outward edge the checker already refuses). |
+| Declare it as an adapter **dev**-dependency | Not available to the shipped library target, and §1 says "normal dependencies of the outer adapter". §3A/§3E need `serde`'s visitor and `serde_json`'s value model in shipped code. |
+| Relax only `architecture_checks/graph.rs`, as §3E permits | **Insufficient by construction.** The failing assertions hardcode `name == APPROVED_DEV_OWNER` and `kind == "dev"`; they never consult the checker's policy. No constant, allowlist or helper added to `graph.rs` can change their verdict. The decisive consequence: §3E's single permitted edit cannot resolve the conflict. |
+| Host the parser in `solo-cli` instead of the adapter | Contradicts the fixed path `crates/solo-adapters/src/publication_manifest.rs` in §1. |
+| Hand-write a duplicate-key-aware parser with no `serde` | Contradicts §3A's explicit requirement to *"Use `serde`'s visitor/map-access path so duplicate keys are refused **before** a `serde_json::Value`…"*. |
+| Skip, ignore, delete or rewrite the test | The file is read-only under §1, and weakening a refusal gate is forbidden by §6 in the strongest terms. |
 
-The issuance work that the order permits independently of the blocker was completed first, exactly as §5.1 specifies, and both revisions are green.
+The conclusion is therefore forced, not chosen: **satisfying §1 inevitably fails a test in an unlisted, read-only file, and no order-compliant adjustment to the permitted paths can prevent it.** That is the order's own STOP condition — *"needed path outside §1"* and *"mandatory CI/red checker"* — reinforced by §3E's *"STOP instead of loosening the checker"*.
 
-| Commit | Content | Role | CI (Ubuntu / Windows) |
-| --- | --- | --- | --- |
-| `211378a` | `workorder-active.md` recorded byte-for-byte as handed off, blob `a75e3e350685bfb54d2215d0e0fdf98c3f64ee88`; nothing else staged | issuance history | [run `42503168016`](https://github.com/provelopment/provelopment-foundation-solo/actions/runs/42503168016) · jobs [`128800082733`](https://github.com/provelopment/provelopment-foundation-solo/actions/runs/42503168016/job/128800082733) / [`128800082847`](https://github.com/provelopment/provelopment-foundation-solo/actions/runs/42503168016/job/128800082847) — 22 ok / 9 skipped / 0 failed and 19 ok / 12 skipped / 0 failed |
-| `5184cd9` | `plan-next.md` cleared to its retained one-line title plus LF, blob `92fa562b1af0c54391851aa5c79deb1631127069` (49 bytes), verified byte-exact before commit | NEXT neutral while its candidate is issued | [run `42503190317`](https://github.com/provelopment/provelopment-foundation-solo/actions/runs/42503190317) · jobs [`128800146540`](https://github.com/provelopment/provelopment-foundation-solo/actions/runs/42503190317/job/128800146540) / [`128800146583`](https://github.com/provelopment/provelopment-foundation-solo/actions/runs/42503190317/job/128800146583) — same counts, **success** on both hosts |
+## The decision, with ready-to-approve wording
 
-`plan-roadmap.md` remains byte-identical at `18975332c2820170a32558c4ee224176667b91ab` — the `R02.B` and `R02.C` bullets, the Stage 02 heading and exit gate and all twelve remaining stages are untouched. **Stage 02 and R02.B remain open.**
+Two bounded routes exist. I have drafted both; I have installed **neither**, because choosing between them is Owner authority and self-installing an amendment would be self-authorization.
 
-## Preflight evidence for this order
+**Route 1 — amend the §1 ledger.** Add one row to the §1 table:
 
-All nineteen §2 baseline blobs matched at the starting HEAD, so no drift existed before I acted: `plan-next.md`, `plan-roadmap.md`, `plan-outlook.md`, `execution-report.md`, `ARCHITECTURE.md`, `solo-domain/src/lib.rs`, `solo-domain/src/efs_ownership.rs`, `solo-adapters/Cargo.toml`, `solo-adapters/src/lib.rs`, `architecture_checks/graph.rs`, `architecture_checks/source.rs`, `architecture_checks/mod.rs`, root `Cargo.toml`, `Cargo.lock`, `deny.toml`, `rust-toolchain.toml`, `rust-verify.yml`, `sop-architect.md`, `sop-implementation.md` — `mismatches=0`. All four required absences held (`source_locator.rs` source and test, `publication_manifest.rs` source and test). `workorder-active.md` was the sole working-tree change, at its neutral baseline blob `ea5f20b7…`, i.e. exactly the permitted Owner installation. Root, branch `main`, single `origin` at `provelopment/provelopment-foundation-solo`, one worktree, zero stash, no second checkout.
+> **`crates/solo-cli/tests/workspace_graph.rs`** — **Narrow invariant replacement only.** Replace the blanket *"only `solo-cli` may declare an external dependency"* assertion with a reviewed two-owner table: `solo-cli` may declare only `dev`-kind externals from `APPROVED_EXTERNAL_DEV`, and `solo-adapters` may declare only `normal`-kind externals from a new `APPROVED_ADAPTER_EXTERNAL` = `["serde", "serde_json"]`. Retain the no-rename assertion for both owners. Add negative cases proving `solo-domain` and `solo-application` may declare neither kind, an unlisted adapter external is refused, a `dev`-kind adapter external is refused, and a renamed declaration is refused. Preserve the 23 mandatory refusal fixtures and the workflow's `if ($refused -ne 23)` check unchanged.
 
-## Verification boundary — what is and is not proven
+Paired with the corresponding closed allowlist in `architecture_checks/graph.rs` (already permitted by §1), this keeps a single source of truth and makes both the direct-edge rule and the transitive-closure rule explicit rather than implicit.
 
-**Proven first-hand this run:** the file/remote/worktree/stash state; every baseline blob; the required absences; the byte-exact content of both issuance commits; the `workspace_graph.rs` code, its line numbers, its baseline blob and its clean working-tree status; the absence of any `cfg`, `#[ignore]` or feature gate on that test; the workflow line that runs it; and both-host CI on the two §5.1 revisions.
+**Route 2 — split the order.** Deliver the dependency-free half first: `crates/solo-domain/src/source_locator.rs` plus `crates/solo-domain/tests/source_locator.rs`, needing no external crate at all, therefore touching nothing this blocker covers. Defer `publication_manifest.rs` and the `serde`/`serde_json` promotion to a new order issued after Route 1 is settled.
 
-**Not proven, and not claimed:** no Rust toolchain is installed on the Owner host in this run (the previous run's disposable `.temp` tree was removed and no new one was acquired, because the blocker was established before any build was warranted), so no local `cargo` command was executed and **no local test result is claimed**. There is therefore no local `cargo test` pass, no local architecture-checker run and no local lock-graph inspection in this report. The blocker argument is a source-level proof over the committed blobs, not an executed experiment; the Chief Architect can confirm it at the exact revision by reading the four assertions, and would see the same failure in the first hosted run of any promotion commit.
-
-**Unchanged, therefore not re-audited:** the 15-package locked graph, the four-category `cargo-deny` gate, the RustSec digest, OSV/crates.io currency data and the disposable advisory probe. Because `Cargo.toml` and `Cargo.lock` are byte-identical to the baseline, the previously accepted dependency and security posture carries forward **unchanged by this run** — it was not re-measured here and must not be read as freshly verified. The `unicode-ident` Unicode-3.0 attribution work remains an open future-release obligation and is not waived. GitHub alert endpoints returning 401 remain `UNVERIFIED`; no new alert state was observed.
-
-## Run history and cleanup
-
-This is the second consecutive run in which the Owner host held no linker, and the first in which a scope contradiction — not a tooling limit — stopped the work. The prior accepted run's record (three red revisions, the temporary diagnostic commit, the two malformed commit subjects and their disclosure) remains in Git history and in the previous revision of this report.
-
-Cleanup: the temporary commit-message files written under the OS temp area for this run were deleted; no `.temp/` toolchain or scratch directory was created; no `target/` directory exists in the worktree; no new WIP file, report copy, fixture directory or archive was added. No secrets, credentials or personal data were read or written. No PR, merge, branch, stash, force-push, rebase, amend, tag, release, workflow dispatch or settings change occurred, and no other repository was touched.
+Either route needs a further Owner-issued amendment or a new order plus a matching handoff before implementation resumes. Nothing in this report authorizes either.
 
 
-## The smallest Owner decision this needs
+## State ledger and honest limitations
 
-The scope as written cannot be executed green. Two bounded resolutions exist, and choosing between them is an Owner decision, not mine:
+**This run changed exactly one file:** `.documents/Reports/execution-report.md`. Verified unchanged against the starting revision: `workorder-active.md` (`a75e3e35…`, order still installed), `plan-next.md` (`92fa562b…`, neutral, 49 bytes), `plan-roadmap.md` (`18975332…`, `R02.B` and `R02.C` intact), `plan-outlook.md` (`cb9c7a61…`), `crates/solo-adapters/Cargo.toml`, `Cargo.lock`, root `Cargo.toml`, `workspace_graph.rs` (`8fa4b4d0…`), `architecture_checks/graph.rs`, `source.rs`, `mod.rs`, `solo-domain/src/lib.rs`, `rust-verify.yml` and `ARCHITECTURE.md`. Repository: one worktree, zero stash, sole `origin` at `provelopment/provelopment-foundation-solo`, clean tree, local `main` equal to `origin/main`.
 
-1. **Amend the §1 ledger to include `crates/solo-cli/tests/workspace_graph.rs`** with an exactly specified change: replace the blanket *"only `solo-cli` may declare an external dependency"* invariant with the reviewed adapter allowlist (`serde`, `serde_json` as normal adapter roots, with the existing `solo-cli` dev-only assertions retained verbatim), and add negative cases proving `solo-domain` and `solo-application` still cannot declare or reach any external package, that an unlisted adapter external is still refused, and that an aliased or renamed declaration is still refused. The 23 mandatory refusal fixtures and the workflow's `if ($refused -ne 23)` check must stay exactly as they are.
-2. **Split the order**: deliver the dependency-free addition first (the pure lexical `source_locator.rs` in `solo-domain` with its tests — it needs no external crate at all), and defer the manifest parser with its `serde`/`serde_json` promotion to a later order issued after decision 1 is settled.
+**Not proven, and not claimed:** no Rust toolchain is installed on the Owner host in this run, so no `cargo` command was executed and **no local test, clippy, format or checker result is claimed**. The blocker argument is a source-level proof over committed blobs plus documented `cargo metadata` semantics, not an executed experiment. Because `Cargo.toml` and `Cargo.lock` are untouched, the previously accepted dependency and security posture — the 15-package locked graph, the four-category `cargo-deny` gate, the RustSec digest, OSV/crates.io currency data and the disposable advisory probe — carries forward **unchanged by this run** and was not re-measured; it must not be read as freshly verified. GitHub alert endpoints previously returning 401 remain `UNVERIFIED`. The `unicode-ident` Unicode-3.0 attribution obligation remains open and is not waived.
 
-Either way, a further order amendment or a new order is required before implementation resumes. Issuance §5.1 stands complete on both hosts and needs no repetition.
+**Cleanup:** no `.temp/` toolchain or scratch directory was created or removed; no `target/` directory exists; no WIP file, report copy, fixture directory or archive was added; no OS-temp scratch remains from this run. No PR, merge, branch, stash, force-push, rebase, amend, tag, release, workflow dispatch, secret access or settings change occurred, and no other repository was touched.
 
 ## Conclusion
 
-**`SOLO-WO-045 R01` is stopped at §5.2, before implementation, for a scope contradiction that cannot be resolved inside the permitted write set.** ACTIVE remains fully installed, NEXT is neutral, ROADMAP is byte-identical with `R02.B` and `R02.C` still open, and Stage 02 remains open. No implementation of the approved slice exists, and none is implied by this report.
+**`SOLO-WO-045 R01` remains stopped at §5.2, before implementation, for a scope contradiction that cannot be resolved inside the permitted write set.** The repeated handoff restated the same authority and changed nothing; the blocker was re-verified and every escape hatch is now closed in writing. Stage 02 and `R02.B`/`R02.C` remain open, ACTIVE remains installed, NEXT remains neutral, and no implementation of the approved slice exists.
 
-The order instructs, on a STOP, to *"preserve ROADMAP R02.B, the issued ACTIVE and a factual report; do not erase failure evidence or self-authorize a revision."* That is exactly the state recorded here. Resuming requires the Owner decision above plus a matching handoff; the Chief Architect's disposition on this revision is `ACCEPT` of the stop and its evidence, `REVISE` with amended scope, or `STOP`.
+The order instructs, on a STOP, to *"preserve ROADMAP R02.B, the issued ACTIVE and a factual report; do not erase failure evidence or self-authorize a revision."* That is precisely the recorded state. Resuming requires Route 1 or Route 2 above, authorized by the Owner with a matching handoff. The Chief Architect's disposition on this revision is `ACCEPT` of the stop and its evidence, `REVISE` with amended scope, or `STOP`.
 
 **`agent report ready`**
