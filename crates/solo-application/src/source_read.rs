@@ -236,11 +236,51 @@ pub enum CandidateProbeV1 {
         byte_length: u64,
         /// How many directory entries reference the object.
         links: u64,
+        /// Modification and change timestamps the handle reported.
+        changed_nanos: (i64, i64),
     },
     /// The candidate positively does not exist.
     ConfirmedAbsent,
     /// The candidate could not be reported at all.
     Refused(SourceReadRefusalV1),
+}
+
+impl CandidateProbeV1 {
+    /// The evidence a located probe recorded, if it located anything.
+    #[must_use]
+    pub const fn located(&self) -> Option<ProbeFactsV1> {
+        match self {
+            Self::Located {
+                identity,
+                byte_length,
+                links,
+                changed_nanos,
+            } => Some(ProbeFactsV1 {
+                identity: *identity,
+                byte_length: *byte_length,
+                links: *links,
+                changed_nanos: *changed_nanos,
+            }),
+            Self::ConfirmedAbsent | Self::Refused(_) => None,
+        }
+    }
+}
+
+/// The identity evidence a probe recorded for one candidate.
+///
+/// This is what a later read has to agree with. Comparing a read only against its own
+/// before/after samples would answer "did this handle stay the same", which is not the same
+/// question as "is this still the object the caller was told about".
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ProbeFactsV1 {
+    /// Physical identity the probe recorded.
+    pub identity: PhysicalIdentityV1,
+    /// Byte length the probe recorded.
+    pub byte_length: u64,
+    /// Link count the probe recorded.
+    pub links: u64,
+    /// Modification and change timestamps the probe recorded.
+    pub changed_nanos: (i64, i64),
 }
 
 /// The body of one declared candidate, or a typed refusal.
@@ -254,6 +294,8 @@ pub enum CandidateBodyV1 {
         identity: PhysicalIdentityV1,
         /// How many directory entries reference the object.
         links: u64,
+        /// Modification and change timestamps the handle reported.
+        changed_nanos: (i64, i64),
         /// Non-cryptographic fingerprint of exactly these bytes, for later linkage.
         fingerprint: u64,
     },
@@ -411,25 +453,43 @@ fn read_and_choose<P: SourceReadPort + ?Sized>(
     candidates: &SourceCandidateSetV1,
     member: SourceCandidateKind,
     locator: &SourceCandidatePathV1,
+    probe: ProbeFactsV1,
     json_confirmed_absent: bool,
 ) -> SourceReadOutcomeV1 {
-    let (bytes, identity, links, fingerprint) = match port.read_candidate(member, locator) {
-        CandidateBodyV1::Present {
-            bytes,
-            identity,
-            links,
-            fingerprint,
-        } => (bytes, identity, links, fingerprint),
-        // The entry existed at probe time and does not now. That is a change, never an
-        // absence, and it must not silently promote the other member.
-        CandidateBodyV1::ConfirmedAbsent => {
-            return SourceReadOutcomeV1::Refused(SourceReadRefusalV1::new(
-                SourceReadRefusalKind::ChangedDuringRead,
-                Some(member),
-            ));
-        }
-        CandidateBodyV1::Refused(refusal) => return SourceReadOutcomeV1::Refused(refusal),
-    };
+    let (bytes, identity, links, changed_nanos, fingerprint) =
+        match port.read_candidate(member, locator) {
+            CandidateBodyV1::Present {
+                bytes,
+                identity,
+                links,
+                changed_nanos,
+                fingerprint,
+            } => (bytes, identity, links, changed_nanos, fingerprint),
+            // The entry existed at probe time and does not now. That is a change, never an
+            // absence, and it must not silently promote the other member.
+            CandidateBodyV1::ConfirmedAbsent => {
+                return SourceReadOutcomeV1::Refused(SourceReadRefusalV1::new(
+                    SourceReadRefusalKind::ChangedDuringRead,
+                    Some(member),
+                ));
+            }
+            CandidateBodyV1::Refused(refusal) => return SourceReadOutcomeV1::Refused(refusal),
+        };
+
+    // The read must agree with the evidence the probe recorded, not merely with its own
+    // before/after samples. A same-size replacement, or a rewrite that keeps the inode,
+    // therefore shows up here instead of being returned as a trustworthy body.
+    let transferred = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
+    let agrees = identity == probe.identity
+        && links == probe.links
+        && changed_nanos == probe.changed_nanos
+        && transferred == probe.byte_length;
+    if !agrees {
+        return SourceReadOutcomeV1::Refused(SourceReadRefusalV1::new(
+            SourceReadRefusalKind::ChangedDuringRead,
+            Some(member),
+        ));
+    }
 
     // A second name for the same physical object is refused rather than shared: exactly one
     // directory entry must own this object for it to count as this candidate's source.
@@ -532,12 +592,23 @@ pub fn read_declared_source_v1<P: SourceReadPort + ?Sized>(
         ));
     }
 
-    if let Some((locator, CandidateProbeV1::Located { .. })) = json_probe {
-        return read_and_choose(port, candidates, Json, locator, false);
+    if let Some((locator, probe)) = &json_probe
+        && let Some(evidence) = probe.located()
+    {
+        return read_and_choose(port, candidates, Json, locator, evidence, false);
     }
-    if let Some((locator, CandidateProbeV1::Located { .. })) = markdown_probe {
+    if let Some((locator, probe)) = &markdown_probe
+        && let Some(evidence) = probe.located()
+    {
         let json_confirmed_absent = candidates.json().is_some();
-        return read_and_choose(port, candidates, Markdown, locator, json_confirmed_absent);
+        return read_and_choose(
+            port,
+            candidates,
+            Markdown,
+            locator,
+            evidence,
+            json_confirmed_absent,
+        );
     }
 
     // Every declared member was positively absent, so the accepted policy decides, and its
@@ -556,4 +627,68 @@ pub fn read_declared_source_v1<P: SourceReadPort + ?Sized>(
         )),
         Err(refusal) => SourceReadOutcomeV1::Refused(policy_refusal(&refusal)),
     }
+}
+
+/// One physical identity reserved by one declared candidate of one representation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PhysicalReservationV1 {
+    /// Index of the declaration in the submitted list that owns this reservation.
+    pub declaration: usize,
+    /// Which member of that declaration the identity came from.
+    pub member: SourceCandidateKind,
+    /// The locator that was probed.
+    pub locator: SourceCandidatePathV1,
+    /// The physical identity that locator resolves to.
+    pub identity: PhysicalIdentityV1,
+}
+
+/// Reserves the physical identities of every declared candidate across all representations.
+///
+/// Comparing one representation's two members with each other is not sufficient: two
+/// *different* representations can declare locators that resolve to one physical object, and
+/// that would let a single authored body serve two published Pages. Every declared candidate
+/// is probed once, and every identity that is found must be distinct from the others.
+///
+/// # Errors
+///
+/// Returns the first probe refusal unchanged, or `IdentityCollision` when two distinct
+/// candidates resolve to the same physical object.
+pub fn check_physical_reservations_v1<P: SourceReadPort + ?Sized>(
+    port: &P,
+    declarations: &[SourceCandidateSetV1],
+) -> Result<Vec<PhysicalReservationV1>, SourceReadRefusalV1> {
+    let mut reservations: Vec<PhysicalReservationV1> = Vec::new();
+    for (index, candidates) in declarations.iter().enumerate() {
+        for member in [SourceCandidateKind::Json, SourceCandidateKind::Markdown] {
+            let locator = match member {
+                SourceCandidateKind::Json => candidates.json(),
+                SourceCandidateKind::Markdown => candidates.markdown(),
+            };
+            let Some(locator) = locator else {
+                continue;
+            };
+            match port.probe_candidate(member, locator) {
+                CandidateProbeV1::Located { identity, .. } => {
+                    if reservations
+                        .iter()
+                        .any(|reserved| reserved.identity == identity)
+                    {
+                        return Err(SourceReadRefusalV1::new(
+                            SourceReadRefusalKind::IdentityCollision,
+                            Some(member),
+                        ));
+                    }
+                    reservations.push(PhysicalReservationV1 {
+                        declaration: index,
+                        member,
+                        locator: locator.clone(),
+                        identity,
+                    });
+                }
+                CandidateProbeV1::ConfirmedAbsent => {}
+                CandidateProbeV1::Refused(refusal) => return Err(refusal),
+            }
+        }
+    }
+    Ok(reservations)
 }

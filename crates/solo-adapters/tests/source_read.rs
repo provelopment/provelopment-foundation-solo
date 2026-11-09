@@ -12,11 +12,17 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use solo_adapters::ContentRootCapability;
-use solo_application::{SourceReadOutcomeV1, SourceReadRefusalKind, read_declared_source_v1};
+use solo_adapters::{ContentRootCapability, RootProvenanceV1};
+use solo_application::{
+    CandidateBodyV1, CandidateProbeV1, SourceReadOutcomeV1, SourceReadPort, SourceReadRefusalKind,
+    read_declared_source_v1,
+};
 use solo_domain::{
     SourceCandidateDraftV1, SourceCandidateKind, SourceCandidatePathV1, SourceCandidateSetV1,
 };
+
+/// The trust assertion every fixture makes: the operator designated this directory.
+const TRUSTED: RootProvenanceV1 = RootProvenanceV1::OperatorDesignatedContentRoot;
 
 /// A task-owned scratch tree with a `content/pages` root, removed on drop.
 struct Scratch {
@@ -49,7 +55,11 @@ impl Scratch {
     }
 
     fn capability(&self) -> ContentRootCapability {
-        ContentRootCapability::adopt(&self.content()).expect("adopt the scratch content root")
+        let capability = ContentRootCapability::adopt(&self.content(), TRUSTED)
+            .expect("adopt the scratch content root");
+        // The trust input is explicit and recorded, never inferred from the path.
+        assert_eq!(capability.provenance(), TRUSTED);
+        capability
     }
 }
 
@@ -256,7 +266,7 @@ fn a_root_that_is_a_link_is_refused() {
     let linked_root = scratch.base.join("content-link");
     create_directory_link(&scratch.content(), &linked_root);
 
-    let adopted = ContentRootCapability::adopt(&linked_root);
+    let adopted = ContentRootCapability::adopt(&linked_root, TRUSTED);
 
     match adopted {
         Ok(_) => panic!("a root that is a link must not be adopted"),
@@ -269,7 +279,7 @@ fn an_absent_root_is_refused() {
     let scratch = Scratch::new("absent-root");
     let missing = scratch.base.join("does-not-exist");
 
-    match ContentRootCapability::adopt(&missing) {
+    match ContentRootCapability::adopt(&missing, TRUSTED) {
         Ok(_) => panic!("a missing root must not be adopted"),
         Err(refusal) => assert_ne!(refusal.kind(), SourceReadRefusalKind::NoneEffective),
     }
@@ -298,6 +308,66 @@ fn a_missing_intermediate_directory_is_a_confirmed_absence() {
     // A path that does not exist is absence, not a failure: nothing was declared to exist.
     assert_eq!(kind, SourceReadRefusalKind::NoneEffective);
     assert_eq!(code, "SOURCE_NONE_EFFECTIVE");
+}
+
+#[test]
+fn a_same_size_rewrite_between_probe_and_read_is_refused() {
+    let scratch = Scratch::new("same-size");
+    scratch.write("pages/p.en-001.json", JSON_BODY);
+    let capability = scratch.capability();
+    let leaf = locator("pages/p.en-001.json", SourceCandidateKind::Json);
+
+    // The probe records the identity, the length and the timestamps.
+    let probe = capability.probe_candidate(SourceCandidateKind::Json, &leaf);
+    assert!(
+        matches!(probe, CandidateProbeV1::Located { .. }),
+        "the fixture must be located before it is rewritten: {probe:?}"
+    );
+
+    // Same length, different bytes, same inode: only the timestamps can distinguish this
+    // from the object the probe reported, which is exactly why the read is compared with the
+    // probe and not only with its own before/after samples.
+    let mut rewritten = JSON_BODY.to_vec();
+    rewritten[0] = b'[';
+    assert_eq!(rewritten.len(), JSON_BODY.len());
+    scratch.write("pages/p.en-001.json", &rewritten);
+
+    match capability.read_candidate(SourceCandidateKind::Json, &leaf) {
+        CandidateBodyV1::Refused(refusal) => {
+            assert_eq!(refusal.kind(), SourceReadRefusalKind::ChangedDuringRead);
+        }
+        other => panic!("a same-size rewrite must be refused as a change, got {other:?}"),
+    }
+}
+
+#[test]
+fn a_leaf_replaced_by_another_object_between_probe_and_read_is_refused() {
+    let scratch = Scratch::new("replaced-leaf");
+    scratch.write("pages/p.en-001.json", JSON_BODY);
+    let capability = scratch.capability();
+    let leaf = locator("pages/p.en-001.json", SourceCandidateKind::Json);
+    let probe = capability.probe_candidate(SourceCandidateKind::Json, &leaf);
+    assert!(
+        matches!(probe, CandidateProbeV1::Located { .. }),
+        "the fixture must be located before it is replaced: {probe:?}"
+    );
+
+    // A different object, same size, same name: renamed over the declared leaf.
+    let mut replacement = JSON_BODY.to_vec();
+    replacement[1] = b'X';
+    scratch.write("pages/replacement.tmp", &replacement);
+    fs::rename(
+        scratch.path("pages/replacement.tmp"),
+        scratch.path("pages/p.en-001.json"),
+    )
+    .expect("replace the declared leaf with a different object");
+
+    match capability.read_candidate(SourceCandidateKind::Json, &leaf) {
+        CandidateBodyV1::Refused(refusal) => {
+            assert_eq!(refusal.kind(), SourceReadRefusalKind::ChangedDuringRead);
+        }
+        other => panic!("a replaced object must be refused as a change, got {other:?}"),
+    }
 }
 
 #[test]
@@ -342,11 +412,31 @@ fn create_file_link(target: &Path, link: &Path) {
 #[cfg(windows)]
 fn create_directory_link(target: &Path, link: &Path) {
     // A junction is a reparse point that needs no privilege, so the intermediate and root
-    // cases exercise this host's reparse refusal without elevation.
-    let command = format!("mklink /J \"{}\" \"{}\"", link.display(), target.display());
-    let status = std::process::Command::new("cmd")
-        .args(["/C", command.as_str()])
+    // cases exercise this host's reparse refusal without elevation. The two paths travel as
+    // environment variables rather than being interpolated into a command line, so a path
+    // containing spaces, quotes or parentheses can neither restructure the command nor turn
+    // into a differently-named fixture.
+    let status = std::process::Command::new("powershell")
+        .args([
+            "-NoProfile",
+            "-NonInteractive",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            "New-Item -ItemType Junction -Path $env:SOLO_JUNCTION_LINK \
+             -Target $env:SOLO_JUNCTION_TARGET -ErrorAction Stop | Out-Null",
+        ])
+        .env("SOLO_JUNCTION_LINK", link)
+        .env("SOLO_JUNCTION_TARGET", target)
         .status()
-        .expect("run cmd for a junction fixture");
+        .expect("run PowerShell to create a junction fixture");
     assert!(status.success(), "junction fixture creation failed");
+
+    // Prove the fixture really is a reparse point *before* any refusal is claimed from it: an
+    // ordinary directory here would make the following assertion meaningless.
+    let metadata = fs::symlink_metadata(link).expect("the junction fixture exists");
+    assert!(
+        metadata.file_type().is_symlink(),
+        "the fixture must be a reparse point, not an ordinary directory"
+    );
 }

@@ -26,6 +26,28 @@ use crate::source_read_native::{self as native, NativeError};
 /// The one namespace a source locator may address inside the content root.
 const PAGES_NAMESPACE: &str = "pages";
 
+/// Why the caller asserts that a directory is the installation content root.
+///
+/// The reader cannot attest provenance; it can only refuse to *assume* it. Requiring this
+/// value makes the trust input explicit at every call site, and the recorded value travels
+/// with the capability, so a capability can never be mistaken for something the reader
+/// discovered by itself.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RootProvenanceV1 {
+    /// The operator designated this directory as the installation content root.
+    OperatorDesignatedContentRoot,
+}
+
+impl RootProvenanceV1 {
+    /// A stable code for the execution report.
+    #[must_use]
+    pub const fn code(self) -> &'static str {
+        match self {
+            Self::OperatorDesignatedContentRoot => "operator-designated-content-root",
+        }
+    }
+}
+
 /// An explicitly trusted, already-opened content-root capability.
 ///
 /// The caller supplies the root *once*. Everything afterwards is relative to this handle, so
@@ -33,22 +55,32 @@ const PAGES_NAMESPACE: &str = "pages";
 #[derive(Debug)]
 pub struct ContentRootCapability {
     root: native::RootHandle,
+    provenance: RootProvenanceV1,
 }
 
 impl ContentRootCapability {
-    /// Adopts `path` as the trusted content root.
+    /// Adopts `path` as the trusted content root, on the caller's explicit assertion.
     ///
-    /// This is the single trust decision in the reader: the caller states which directory is
-    /// the content root, and this call opens it once and records what was actually opened.
+    /// This is the single trust decision in the reader. Trust is not derivable from a path,
+    /// so it is not derived: `provenance` is a required argument naming *why* the caller
+    /// asserts this directory is the installation content root, it is recorded on the
+    /// capability, and no bare path text can become a root capability without it. The call
+    /// opens the directory once and records the physical identity of what was actually opened.
     ///
     /// # Errors
     ///
     /// Returns a refusal when the root cannot be opened, is not a directory, or is itself a
     /// symlink or reparse point.
-    pub fn adopt(path: &Path) -> Result<Self, SourceReadRefusalV1> {
+    pub fn adopt(path: &Path, provenance: RootProvenanceV1) -> Result<Self, SourceReadRefusalV1> {
         native::RootHandle::adopt(path)
-            .map(|root| Self { root })
+            .map(|root| Self { root, provenance })
             .map_err(|error| map_native(error, None))
+    }
+
+    /// The trust assertion the caller made when adopting this capability.
+    #[must_use]
+    pub const fn provenance(&self) -> RootProvenanceV1 {
+        self.provenance
     }
 
     /// The physical identity recorded when the capability was adopted.
@@ -108,6 +140,7 @@ impl SourceReadPort for ContentRootCapability {
                     identity: facts.identity,
                     byte_length: facts.length,
                     links: facts.links,
+                    changed_nanos: facts.changed_nanos,
                 }
             }
             Err(NativeError::Absent) => CandidateProbeV1::ConfirmedAbsent,
@@ -154,6 +187,7 @@ impl SourceReadPort for ContentRootCapability {
             bytes,
             identity: before.identity,
             links: before.links,
+            changed_nanos: before.changed_nanos,
         }
     }
 }

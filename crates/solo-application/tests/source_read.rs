@@ -9,7 +9,8 @@ use std::cell::RefCell;
 
 use solo_application::{
     CandidateBodyV1, CandidateProbeV1, PhysicalIdentityV1, SourceReadOutcomeV1, SourceReadPort,
-    SourceReadRefusalKind, SourceReadRefusalV1, fingerprint_of, read_declared_source_v1,
+    SourceReadRefusalKind, SourceReadRefusalV1, check_physical_reservations_v1, fingerprint_of,
+    read_declared_source_v1,
 };
 use solo_domain::{
     SourceCandidateDraftV1, SourceCandidateKind, SourceCandidatePathV1, SourceCandidateSetV1,
@@ -94,22 +95,40 @@ fn identity(value: u64) -> PhysicalIdentityV1 {
     PhysicalIdentityV1::new(7, value, 0)
 }
 
+/// The timestamps every ordinary fixture reports, so probe and read agree by default.
+const STAMP: (i64, i64) = (1_700_000_000_000_000_000, 1_700_000_000_000_000_001);
+
+/// The timestamps after a deterministic same-size rewrite: only the stamps move.
+const LATER: (i64, i64) = (1_700_000_000_000_000_500, 1_700_000_000_000_000_501);
+
 /// A located, singly-linked probe for one identity and length.
 fn located(value: u64, length: u64) -> CandidateProbeV1 {
+    located_stamped(value, length, STAMP)
+}
+
+/// A located probe reporting the given timestamps.
+fn located_stamped(value: u64, length: u64, stamp: (i64, i64)) -> CandidateProbeV1 {
     CandidateProbeV1::Located {
         identity: identity(value),
         byte_length: length,
         links: 1,
+        changed_nanos: stamp,
     }
 }
 
 /// A present body for one identity.
 fn present(bytes: &[u8], value: u64) -> CandidateBodyV1 {
+    present_stamped(bytes, value, STAMP)
+}
+
+/// A present body reporting the given timestamps.
+fn present_stamped(bytes: &[u8], value: u64, stamp: (i64, i64)) -> CandidateBodyV1 {
     CandidateBodyV1::Present {
         fingerprint: fingerprint_of(bytes),
         bytes: bytes.to_vec(),
         identity: identity(value),
         links: 1,
+        changed_nanos: stamp,
     }
 }
 
@@ -120,6 +139,7 @@ fn present_hardlinked(bytes: &[u8], value: u64, links: u64) -> CandidateBodyV1 {
         bytes: bytes.to_vec(),
         identity: identity(value),
         links,
+        changed_nanos: STAMP,
     }
 }
 
@@ -290,6 +310,118 @@ fn two_members_resolving_to_one_object_are_a_collision() {
     assert_eq!(refusal.code(), "SOURCE_COLLISION");
     // Detected from the probes alone, so neither body was read.
     assert_eq!(fake.calls(), vec!["probe:json", "probe:markdown"]);
+}
+
+#[test]
+fn a_probe_to_read_replacement_that_keeps_identity_and_length_is_refused() {
+    // The deterministic hostile replacement: the object keeps its identity and its length and
+    // only its recorded change timestamps move. A read compared only against its own
+    // before/after samples cannot see this; the comparison against the probe can.
+    let fake = FakePort::new().with(
+        SourceCandidateKind::Json,
+        (
+            located_stamped(1, JSON_BODY.len() as u64, STAMP),
+            present_stamped(JSON_BODY, 1, LATER),
+        ),
+    );
+    let candidates = declaration(Some("pages/p.en-001.json"), None);
+
+    let outcome = read_declared_source_v1(&fake, &candidates);
+
+    let SourceReadOutcomeV1::Refused(refusal) = outcome else {
+        panic!("a body disagreeing with its probe must be refused, got {outcome:?}");
+    };
+    assert_eq!(refusal.kind(), SourceReadRefusalKind::ChangedDuringRead);
+    assert_eq!(refusal.code(), "SOURCE_CHANGED_DURING_READ");
+}
+
+#[test]
+fn a_read_of_a_different_object_than_the_probe_located_is_refused() {
+    let fake = FakePort::new().with(
+        SourceCandidateKind::Json,
+        (located(1, JSON_BODY.len() as u64), present(JSON_BODY, 2)),
+    );
+    let candidates = declaration(Some("pages/p.en-001.json"), None);
+
+    let outcome = read_declared_source_v1(&fake, &candidates);
+
+    let SourceReadOutcomeV1::Refused(refusal) = outcome else {
+        panic!("a substituted object must be refused, got {outcome:?}");
+    };
+    assert_eq!(refusal.kind(), SourceReadRefusalKind::ChangedDuringRead);
+}
+
+#[test]
+fn a_read_whose_length_disagrees_with_the_probe_is_refused() {
+    let fake = FakePort::new().with(
+        SourceCandidateKind::Json,
+        (
+            located(1, u64::try_from(JSON_BODY.len()).expect("small") + 1),
+            present(JSON_BODY, 1),
+        ),
+    );
+    let candidates = declaration(Some("pages/p.en-001.json"), None);
+
+    let outcome = read_declared_source_v1(&fake, &candidates);
+
+    let SourceReadOutcomeV1::Refused(refusal) = outcome else {
+        panic!("a length that disagrees with the probe must be refused, got {outcome:?}");
+    };
+    assert_eq!(refusal.kind(), SourceReadRefusalKind::ChangedDuringRead);
+}
+
+#[test]
+fn two_representations_resolving_to_one_physical_object_are_refused() {
+    // Both declarations probe to the same object. Checking one representation's two members
+    // against each other would never see this, and one authored body would then answer for
+    // two distinct representations.
+    let fake = FakePort::new()
+        .with(
+            SourceCandidateKind::Json,
+            (located(9, JSON_BODY.len() as u64), present(JSON_BODY, 9)),
+        )
+        .with(
+            SourceCandidateKind::Markdown,
+            (
+                located(9, MARKDOWN_BODY.len() as u64),
+                present(MARKDOWN_BODY, 9),
+            ),
+        );
+    let first = declaration(Some("pages/a.en-001.json"), None);
+    let second = declaration(Some("pages/b.en-001.json"), None);
+
+    let error = check_physical_reservations_v1(&fake, &[first, second])
+        .expect_err("one physical object cannot back two representations");
+
+    assert_eq!(error.kind(), SourceReadRefusalKind::IdentityCollision);
+    assert_eq!(error.code(), "SOURCE_COLLISION");
+}
+
+#[test]
+fn distinct_representations_reserve_their_own_identities() {
+    let fake = FakePort::new()
+        .with(
+            SourceCandidateKind::Json,
+            (located(1, 11), present(JSON_BODY, 1)),
+        )
+        .with(
+            SourceCandidateKind::Markdown,
+            (located(2, 12), present(MARKDOWN_BODY, 2)),
+        );
+    let first = declaration(Some("pages/a.en-001.json"), None);
+    let second = declaration(None, Some("pages/b.en-001.md"));
+
+    let reservations =
+        check_physical_reservations_v1(&fake, &[first, second]).expect("distinct identities");
+
+    assert_eq!(reservations.len(), 2);
+    assert_eq!(reservations[0].declaration, 0);
+    assert_eq!(reservations[0].member, SourceCandidateKind::Json);
+    assert_eq!(reservations[0].locator.as_str(), "pages/a.en-001.json");
+    assert_eq!(reservations[1].declaration, 1);
+    assert_eq!(reservations[1].member, SourceCandidateKind::Markdown);
+    assert_eq!(reservations[1].locator.as_str(), "pages/b.en-001.md");
+    assert_ne!(reservations[0].identity, reservations[1].identity);
 }
 
 #[test]

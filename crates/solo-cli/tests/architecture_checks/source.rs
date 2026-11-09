@@ -855,12 +855,12 @@ impl Scanner<'_> {
 
         let location = self.rel(&ctx.path);
 
-        if facts.unsafe_found {
-            self.violation(
-                Category::UnsafeCode,
-                location.clone(),
-                "unsafe code is forbidden in this workspace",
-            );
+        if let Err(reason) = unsafe_scope_verdict(
+            &location,
+            facts.unsafe_unscoped,
+            facts.unsafe_windows_scoped,
+        ) {
+            self.violation(Category::UnsafeCode, location.clone(), reason);
         }
         if facts.foreign_found {
             self.violation(
@@ -1246,9 +1246,58 @@ struct Facts {
     /// re-exported type keeps its owning crate.
     aliases: BTreeMap<String, Vec<String>>,
     macros: Vec<syn::Macro>,
-    unsafe_found: bool,
+    /// Unsafe occurrences that sit inside a `#[cfg(windows)]`-gated scope.
+    unsafe_windows_scoped: usize,
+    /// Unsafe occurrences that sit outside any `#[cfg(windows)]`-gated scope.
+    unsafe_unscoped: usize,
+    /// Nesting depth of the `#[cfg(windows)]`-gated items currently being visited.
+    windows_scope_depth: usize,
     foreign_found: bool,
     verbatim_found: bool,
+}
+
+/// The one repository-relative path permitted to contain `unsafe`.
+///
+/// The Owner approved a single Windows-gated native boundary for `SOLO-WO-047 R02`. The
+/// exception below is deliberately narrow: it needs both this exact module *and* AST
+/// evidence that the occurrence sits inside a `#[cfg(windows)]` scope, so Linux code, test
+/// code, inner crates and every other first-party file keep the unconditional refusal.
+pub const APPROVED_NATIVE_MODULE: &str = "crates/solo-adapters/src/source_read_native.rs";
+
+/// Whether an attribute list carries a positive `#[cfg(windows)]` gate.
+fn is_cfg_windows(attributes: &[syn::Attribute]) -> bool {
+    attributes.iter().any(|attribute| {
+        if !attribute.path().is_ident("cfg") {
+            return false;
+        }
+        let syn::Meta::List(list) = &attribute.meta else {
+            return false;
+        };
+        let text = list.tokens.to_string();
+        let words: Vec<&str> = text
+            .split(|character: char| !(character.is_alphanumeric() || character == '_'))
+            .filter(|word| !word.is_empty())
+            .collect();
+        words.contains(&"windows") && !words.contains(&"not")
+    })
+}
+
+/// The attributes of an item, for the kinds that can carry a `cfg` gate.
+fn item_attributes(item: &syn::Item) -> &[syn::Attribute] {
+    match item {
+        syn::Item::Mod(item) => &item.attrs,
+        syn::Item::Fn(item) => &item.attrs,
+        syn::Item::Impl(item) => &item.attrs,
+        syn::Item::Trait(item) => &item.attrs,
+        syn::Item::Struct(item) => &item.attrs,
+        syn::Item::Enum(item) => &item.attrs,
+        syn::Item::Union(item) => &item.attrs,
+        syn::Item::Type(item) => &item.attrs,
+        syn::Item::Const(item) => &item.attrs,
+        syn::Item::Static(item) => &item.attrs,
+        syn::Item::Use(item) => &item.attrs,
+        _ => &[],
+    }
 }
 
 impl Facts {
@@ -1292,6 +1341,63 @@ impl Facts {
         }
         self.use_paths.push(segments.to_vec());
     }
+
+    /// Records one unsafe occurrence together with the scope it sits in.
+    ///
+    /// The scope is the whole decision: an occurrence inside a `#[cfg(windows)]` item is
+    /// eligible for the single approved exception, and one outside it never is.
+    fn record_unsafe(&mut self) {
+        if self.windows_scope_depth > 0 {
+            self.unsafe_windows_scoped += 1;
+        } else {
+            self.unsafe_unscoped += 1;
+        }
+    }
+}
+
+/// The single unsafe-scope rule, applied identically to real files and to negative fixtures.
+///
+/// It is one function on purpose: the checker, and the tests that prove the checker refuses,
+/// cannot drift into two different policies.
+///
+/// # Errors
+///
+/// Returns the fixed refusal reason when the occurrence set is not permitted.
+pub fn unsafe_scope_verdict(
+    location: &str,
+    unsafe_unscoped: usize,
+    unsafe_windows_scoped: usize,
+) -> Result<(), String> {
+    let normalised = location.replace('\\', "/");
+    let approved = normalised == APPROVED_NATIVE_MODULE;
+    if unsafe_unscoped > 0 {
+        return Err(
+            "unsafe code outside a `#[cfg(windows)]` scope is forbidden in this workspace"
+                .to_owned(),
+        );
+    }
+    if unsafe_windows_scoped > 0 && !approved {
+        return Err(format!(
+            "unsafe code is forbidden outside the approved Windows-gated native module \
+             `{APPROVED_NATIVE_MODULE}`"
+        ));
+    }
+    Ok(())
+}
+
+/// Parses one source string and returns the unsafe-scope verdict for it.
+///
+/// # Errors
+///
+/// Returns the parse failure, or the refusal reason from [`unsafe_scope_verdict`].
+pub fn classify_unsafe_scope(location: &str, source: &str) -> Result<(), String> {
+    let file: syn::File =
+        syn::parse_file(source).map_err(|error| format!("source could not be parsed: {error}"))?;
+    let mut facts = Facts::default();
+    for item in &file.items {
+        facts.visit_item(item);
+    }
+    unsafe_scope_verdict(location, facts.unsafe_unscoped, facts.unsafe_windows_scoped)
 }
 
 impl<'ast> Visit<'ast> for Facts {
@@ -1322,7 +1428,7 @@ impl<'ast> Visit<'ast> for Facts {
     }
 
     fn visit_expr_unsafe(&mut self, node: &'ast syn::ExprUnsafe) {
-        self.unsafe_found = true;
+        self.record_unsafe();
         syn::visit::visit_expr_unsafe(self, node);
     }
 
@@ -1335,20 +1441,27 @@ impl<'ast> Visit<'ast> for Facts {
         if matches!(node, syn::Item::Verbatim(_)) {
             self.verbatim_found = true;
         }
+        let gated = is_cfg_windows(item_attributes(node));
+        if gated {
+            self.windows_scope_depth += 1;
+        }
         match node {
             syn::Item::Fn(item) if matches!(item.sig.safety, syn::Safety::Unsafe(_)) => {
-                self.unsafe_found = true;
+                self.record_unsafe();
             }
-            syn::Item::Impl(item) if item.unsafety.is_some() => self.unsafe_found = true,
-            syn::Item::Trait(item) if item.unsafety.is_some() => self.unsafe_found = true,
+            syn::Item::Impl(item) if item.unsafety.is_some() => self.record_unsafe(),
+            syn::Item::Trait(item) if item.unsafety.is_some() => self.record_unsafe(),
             _ => {}
         }
         syn::visit::visit_item(self, node);
+        if gated {
+            self.windows_scope_depth -= 1;
+        }
     }
 
     fn visit_impl_item_fn(&mut self, node: &'ast syn::ImplItemFn) {
         if matches!(node.sig.safety, syn::Safety::Unsafe(_)) {
-            self.unsafe_found = true;
+            self.record_unsafe();
         }
         syn::visit::visit_impl_item_fn(self, node);
     }

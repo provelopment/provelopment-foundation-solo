@@ -18,6 +18,11 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+#[path = "architecture_checks/mod.rs"]
+mod architecture_checks;
+
+use architecture_checks::source::{APPROVED_NATIVE_MODULE, classify_unsafe_scope};
+
 /// The single file permitted to contain `unsafe` and to import the native crates.
 const NATIVE_MODULE: &str = "crates/solo-adapters/src/source_read_native.rs";
 
@@ -348,4 +353,91 @@ fn the_guard_ignores_mentions_in_comments_strings_and_lifetimes() {
         "a mention must never be mistaken for a use: {}",
         code_only(prose)
     );
+}
+
+/// The architecture checker's own rule must permit exactly what this guard permits.
+///
+/// These cases are the negative proof for the Owner-approved exception: the rule needs both
+/// the exact approved module and a real `#[cfg(windows)]` scope, and refuses every
+/// near-miss that would otherwise be a hole.
+#[test]
+fn the_checker_allows_unsafe_only_inside_the_windows_gated_approved_module() {
+    let gated = concat!(
+        "#[cfg(windows)]\n",
+        "mod sys {\n",
+        "    fn f() {\n",
+        "        let _ = unsafe { core::ptr::null::<u8>() };\n",
+        "    }\n",
+        "}\n",
+    );
+    assert!(
+        classify_unsafe_scope(APPROVED_NATIVE_MODULE, gated).is_ok(),
+        "the approved module may use unsafe inside a Windows gate"
+    );
+    assert!(
+        classify_unsafe_scope("crates/solo-domain/src/lib.rs", gated).is_err(),
+        "the same code outside the approved module must be refused"
+    );
+    assert!(
+        classify_unsafe_scope("crates/solo-adapters/src/source_read.rs", gated).is_err(),
+        "the safe wrapper must never be allowed an unsafe block"
+    );
+}
+
+#[test]
+fn the_checker_refuses_unsafe_outside_a_positive_windows_gate() {
+    let unscoped = "fn f() { let _ = unsafe { core::ptr::null::<u8>() }; }\n";
+    let reason = classify_unsafe_scope(APPROVED_NATIVE_MODULE, unscoped)
+        .expect_err("unscoped unsafe must be refused even in the approved module");
+    assert!(
+        reason.contains("outside a `#[cfg(windows)]` scope"),
+        "{reason}"
+    );
+
+    let negated = concat!(
+        "#[cfg(not(windows))]\n",
+        "mod sys { fn f() { let _ = unsafe { core::ptr::null::<u8>() }; } }\n",
+    );
+    assert!(
+        classify_unsafe_scope(APPROVED_NATIVE_MODULE, negated).is_err(),
+        "a negated gate is not a Windows gate"
+    );
+
+    let other_os = concat!(
+        "#[cfg(target_os = \"linux\")]\n",
+        "mod sys { fn f() { let _ = unsafe { core::ptr::null::<u8>() }; } }\n",
+    );
+    assert!(
+        classify_unsafe_scope(APPROVED_NATIVE_MODULE, other_os).is_err(),
+        "a non-Windows gate is not a Windows gate"
+    );
+
+    assert!(
+        classify_unsafe_scope(APPROVED_NATIVE_MODULE, "pub unsafe fn f() {}").is_err(),
+        "an ungated unsafe fn must be refused even in the approved module"
+    );
+}
+
+#[test]
+fn the_approved_module_passes_the_checker_rule_and_no_other_file_does() {
+    let root = repository_root();
+
+    let native = fs::read_to_string(root.join(APPROVED_NATIVE_MODULE))
+        .expect("the approved native module exists");
+    assert!(
+        classify_unsafe_scope(APPROVED_NATIVE_MODULE, &native).is_ok(),
+        "the real native module must satisfy the checker's rule"
+    );
+
+    for path in first_party_sources(&root) {
+        let name = relative(&root, &path);
+        if name == APPROVED_NATIVE_MODULE {
+            continue;
+        }
+        let source = fs::read_to_string(&path).expect("first-party source is readable");
+        assert!(
+            classify_unsafe_scope(&name, &source).is_ok(),
+            "{name} must contain no unsafe the checker would refuse"
+        );
+    }
 }
