@@ -588,9 +588,13 @@ jobs:
           step "mkfs_version" mkfs.btrfs --version
           step "image_create" truncate -s 192M "$img"
           step "image_format" mkfs.btrfs -q -f "$img"
-          step "mountpoint_create" mkdir -p "$mnt/content" "$tmp"
+          # The mount points are created first; the test directory is created *inside* the
+          # mounted filesystems afterwards, because a directory made before a mount would be
+          # shadowed by it.
+          step "mountpoint_create" mkdir -p "$mnt" "$tmp"
           step "btrfs_mount" sudo mount -o loop "$img" "$mnt"
           step "tmpfs_mount" sudo mount -t tmpfs -o size=16m,mode=0755 tmpfs "$tmp"
+          step "content_create" mkdir -p "$mnt/content"
           step "fixture_ownership" sudo chown -R "$(id -u):$(id -g)" "$mnt/content" "$tmp"
           step "supported_mount" findmnt -no FSTYPE,SOURCE,TARGET "$mnt"
           step "unsupported_mount" findmnt -no FSTYPE,SOURCE,TARGET "$tmp"
