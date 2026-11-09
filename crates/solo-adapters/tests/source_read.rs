@@ -735,6 +735,28 @@ mod d2_product {
         let (kind, _) = refused(read_declared_source_v1(&capability, &candidates));
         assert_eq!(kind, SourceReadRefusalKind::UnsafeLocation);
     }
+
+    #[test]
+    fn an_unlinked_source_is_a_confirmed_absence_and_a_replacement_is_a_new_object() {
+        let scratch = Scratch::new("snapshot-unlink");
+        let original = br#"{"contentVersion":"1.0.0"}"#;
+        let replacement = br#"{"contentVersion":"2.0.0"}"#;
+        scratch.write("pages/p.en-001.json", original);
+        let capability = scratch.capability();
+        let candidates = declaration(Some("pages/p.en-001.json"), None);
+
+        // Removing the only name for the declared member is absence, not an error and not a body.
+        fs::remove_file(scratch.path("pages/p.en-001.json")).expect("unlink the declared leaf");
+        let (kind, code) = refused(read_declared_source_v1(&capability, &candidates));
+        assert_eq!(kind, SourceReadRefusalKind::NoneEffective);
+        assert_eq!(code, "SOURCE_NONE_EFFECTIVE");
+
+        // A file created again at the same name is a different object, and is read as itself.
+        scratch.write("pages/p.en-001.json", replacement);
+        let choice = chosen(read_declared_source_v1(&capability, &candidates));
+        assert_eq!(choice.bytes(), replacement);
+        assert_ne!(choice.bytes(), original);
+    }
 }
 
 // ---------------------------------------------------------------------------

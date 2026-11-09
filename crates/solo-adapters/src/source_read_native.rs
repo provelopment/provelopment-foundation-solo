@@ -915,4 +915,297 @@ mod snapshot_proofs {
             SOURCE
         );
     }
+
+    #[test]
+    fn an_unlinked_source_does_not_move_an_existing_clone() {
+        let directory = fixture("SOLO_TEST_SOURCE_FS_ROOT", "unlink");
+        let source_path = directory.join("body.json");
+        fs::write(&source_path, SOURCE).expect("write the source");
+        let (root, _) = adopt_root(&directory).expect("adopt the fixture root");
+        let (leaf, _) = open_leaf(&root, &["body.json"]).expect("open the source");
+        let (clone, length) = snapshot_leaf(&root, &leaf, 4096).expect("clone the source");
+
+        fs::remove_file(&source_path).expect("unlink the source");
+
+        // The clone holds the data, not the name: removing the last link cannot move it.
+        assert_eq!(read_from_start(&clone, length).as_slice(), SOURCE);
+        assert_eq!(read_from_start(&clone, length).as_slice(), SOURCE);
+
+        // A fresh lookup is a confirmed absence, never a body and never an error refusal.
+        assert!(matches!(
+            open_leaf(&root, &["body.json"]),
+            Err(NativeError::Absent)
+        ));
+
+        // The still-open descriptor keeps the inode alive, so it still clones its bytes.
+        let (second, second_length) =
+            snapshot_leaf(&root, &leaf, 4096).expect("clone from the still-open handle");
+        assert_eq!(read_from_start(&second, second_length).as_slice(), SOURCE);
+        assert_eq!(
+            fs::read_dir(&directory).expect("list the fixture").count(),
+            0
+        );
+    }
+
+    #[test]
+    fn a_replaced_source_is_a_new_object_while_the_clone_keeps_the_old_bytes() {
+        let directory = fixture("SOLO_TEST_SOURCE_FS_ROOT", "replace");
+        let source_path = directory.join("body.json");
+        fs::write(&source_path, SOURCE).expect("write the source");
+        let (root, _) = adopt_root(&directory).expect("adopt the fixture root");
+        let (leaf, original_facts) = open_leaf(&root, &["body.json"]).expect("open the source");
+        let (clone, length) = snapshot_leaf(&root, &leaf, 4096).expect("clone the source");
+
+        // The name now refers to a different physical object.
+        fs::remove_file(&source_path).expect("unlink the source");
+        fs::write(&source_path, REWRITTEN).expect("write a replacement at the same name");
+
+        assert_eq!(read_from_start(&clone, length).as_slice(), SOURCE);
+
+        let (replacement, replacement_facts) =
+            open_leaf(&root, &["body.json"]).expect("open the replacement");
+        assert_ne!(
+            replacement_facts.identity, original_facts.identity,
+            "a replacement is a different physical object"
+        );
+        assert_eq!(replacement_facts.links, 1);
+
+        let (replacement_clone, replacement_length) =
+            snapshot_leaf(&root, &replacement, 4096).expect("clone the replacement");
+        assert_eq!(
+            read_from_start(&replacement_clone, replacement_length).as_slice(),
+            REWRITTEN
+        );
+    }
+}
+
+#[cfg(all(test, windows))]
+mod mapping_proofs {
+    //! The mandatory pre-existing writable-mapping adversary, executed natively.
+    //!
+    //! Two situations are distinguished, because they behave differently and only one of them
+    //! is an exclusion: a writer whose **file handle is still open** holds access that the
+    //! reader's `FILE_SHARE_READ` open will not tolerate, so the reader is refused; a writer
+    //! whose file handle has been **closed while its writable section stays alive** holds no
+    //! handle at all, so Windows sharing checks have nothing to compare against and the reader's
+    //! open is accepted.
+    //!
+    //! The `kernel32` entry points are declared here rather than imported because this is the one
+    //! file permitted to name a native surface, and this order forbids widening the pinned
+    //! `windows-sys` feature set (the section APIs live behind `Win32_System_Memory`, which is not
+    //! enabled). Each `unsafe` block below carries its own `// SAFETY:` note.
+
+    use crate::{ContentRootCapability, RootProvenanceV1};
+    use solo_application::{SourceReadOutcomeV1, read_declared_source_v1};
+    use solo_domain::{
+        SourceCandidateDraftV1, SourceCandidateKind, SourceCandidatePathV1, SourceCandidateSetV1,
+    };
+    use std::ffi::c_void;
+    use std::fs::{self, File, OpenOptions};
+    use std::os::windows::io::AsRawHandle;
+    use std::path::PathBuf;
+    use std::ptr;
+    use windows_sys::Win32::Foundation::HANDLE;
+
+    /// `PAGE_READWRITE` from `Win32::System::Memory`.
+    const PAGE_READWRITE: u32 = 0x0000_0004;
+    /// `FILE_MAP_WRITE` from `Win32::System::Memory`.
+    const FILE_MAP_WRITE: u32 = 0x0000_0002;
+
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        fn CreateFileMappingW(
+            file: HANDLE,
+            attributes: *const c_void,
+            protect: u32,
+            maximum_high: u32,
+            maximum_low: u32,
+            name: *const u16,
+        ) -> HANDLE;
+        fn MapViewOfFile(
+            mapping: HANDLE,
+            access: u32,
+            offset_high: u32,
+            offset_low: u32,
+            bytes: usize,
+        ) -> *mut c_void;
+        fn UnmapViewOfFile(base: *const c_void) -> i32;
+        fn CloseHandle(object: HANDLE) -> i32;
+    }
+
+    /// A writable section over an open file, mapped over the whole file.
+    ///
+    /// The section holds its own reference to the file, which is precisely why it can outlive the
+    /// file handle it was created from.
+    struct WritableMapping {
+        view: *mut c_void,
+        section: HANDLE,
+    }
+
+    impl WritableMapping {
+        fn over(file: &File) -> Self {
+            // SAFETY: `file` is a live handle owned by the caller, the security attributes are
+            // null (default descriptor), the maximum size is taken from the file itself, and the
+            // handle returned here is closed exactly once in `Drop`.
+            let section = unsafe {
+                CreateFileMappingW(
+                    file.as_raw_handle() as HANDLE,
+                    ptr::null(),
+                    PAGE_READWRITE,
+                    0,
+                    0,
+                    ptr::null(),
+                )
+            };
+            assert!(!section.is_null(), "CreateFileMappingW must succeed");
+            // SAFETY: `section` is the live section handle created immediately above; a zero
+            // offset and a zero byte count map the whole file, and the view is released exactly
+            // once in `Drop`.
+            let view = unsafe { MapViewOfFile(section, FILE_MAP_WRITE, 0, 0, 0) };
+            assert!(!view.is_null(), "MapViewOfFile must succeed");
+            Self { view, section }
+        }
+
+        /// Writes `fill` over the first `len` bytes of the mapped file.
+        fn fill(&self, fill: u8, len: usize) {
+            // SAFETY: the view maps at least `len` bytes of the fixture file, which the caller
+            // sized to the body length, and only that mapped range is written.
+            unsafe { ptr::write_bytes(self.view.cast::<u8>(), fill, len) };
+        }
+    }
+
+    impl Drop for WritableMapping {
+        fn drop(&mut self) {
+            // SAFETY: both values were produced by the calls above and are released here exactly
+            // once; the file itself is neither closed nor removed here.
+            unsafe {
+                UnmapViewOfFile(self.view);
+                CloseHandle(self.section);
+            }
+        }
+    }
+
+    /// A task-owned content tree with one declared JSON leaf.
+    struct Fixture {
+        root: PathBuf,
+    }
+
+    impl Fixture {
+        fn new(tag: &str) -> Self {
+            let root =
+                std::env::temp_dir().join(format!("solo-r03-map-{}-{tag}", std::process::id()));
+            let _ = fs::remove_dir_all(&root);
+            fs::create_dir_all(root.join("content").join("pages"))
+                .expect("create the fixture tree");
+            Self { root }
+        }
+
+        fn content(&self) -> PathBuf {
+            self.root.join("content")
+        }
+
+        fn body_path(&self) -> PathBuf {
+            self.content().join("pages").join("p.en-001.json")
+        }
+
+        fn write(&self, bytes: &[u8]) {
+            fs::write(self.body_path(), bytes).expect("write the fixture body");
+        }
+
+        fn capability(&self) -> ContentRootCapability {
+            ContentRootCapability::adopt_bootstrap_path(
+                &self.content(),
+                RootProvenanceV1::OperatorDesignatedContentRoot,
+            )
+            .expect("adopt the fixture content root")
+        }
+    }
+
+    impl Drop for Fixture {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.root);
+        }
+    }
+
+    fn declaration() -> SourceCandidateSetV1 {
+        let locator =
+            SourceCandidatePathV1::parse("pages/p.en-001.json", SourceCandidateKind::Json)
+                .expect("an accepted locator");
+        let mut draft = SourceCandidateDraftV1::new();
+        draft.json(locator).expect("json declared once");
+        draft.build().expect("a non-empty declaration")
+    }
+
+    fn chosen_body(outcome: SourceReadOutcomeV1) -> Vec<u8> {
+        match outcome {
+            SourceReadOutcomeV1::Chosen(choice) => choice.bytes().to_vec(),
+            SourceReadOutcomeV1::Refused(refusal) => {
+                panic!("expected a chosen body, got refusal {}", refusal.code())
+            }
+        }
+    }
+
+    #[test]
+    fn a_writable_mapping_behind_a_live_writer_handle_makes_the_reader_refuse() {
+        let fixture = Fixture::new("live-handle");
+        fixture.write(&vec![b'A'; 4096]);
+        let capability = fixture.capability();
+        let candidates = declaration();
+
+        // The writer opens the body and maps it writable, keeping its own handle open.
+        let writer = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(fixture.body_path())
+            .expect("the writer opens the body");
+        let mapping = WritableMapping::over(&writer);
+
+        // The reader requests share-read only, so the writer's access cannot be tolerated: the
+        // open inside the read is refused and no body is returned.
+        let outcome = read_declared_source_v1(&capability, &candidates);
+        assert!(
+            !matches!(outcome, SourceReadOutcomeV1::Chosen(_)),
+            "a live writer handle over a writable mapping must block the read"
+        );
+
+        drop(mapping);
+        drop(writer);
+    }
+
+    #[test]
+    fn a_writable_mapping_that_outlives_its_file_handle_is_accepted_and_controls_the_bytes() {
+        let original = vec![b'A'; 4096];
+        let rewritten = vec![b'C'; original.len()];
+        let fixture = Fixture::new("orphan-mapping");
+        fixture.write(&original);
+        let capability = fixture.capability();
+        let candidates = declaration();
+
+        let writer = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(fixture.body_path())
+            .expect("the writer opens the body");
+        let mapping = WritableMapping::over(&writer);
+        // Only the section survives: there is no open file handle left to compare against.
+        drop(writer);
+
+        let first = chosen_body(read_declared_source_v1(&capability, &candidates));
+        assert_eq!(
+            first.as_slice(),
+            original.as_slice(),
+            "the reader accepts the body while a writable section over it is alive"
+        );
+
+        // A mapped write is neither excluded nor detected: the next read serves the new bytes.
+        mapping.fill(b'C', rewritten.len());
+        let second = chosen_body(read_declared_source_v1(&capability, &candidates));
+        assert_eq!(
+            second.as_slice(),
+            rewritten.as_slice(),
+            "a writable mapping that outlived its file handle changed the bytes SourceRead served, with no refusal and no detection"
+        );
+
+        drop(mapping);
+    }
 }
