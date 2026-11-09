@@ -70,7 +70,20 @@ Nothing here is publication authority. `OBSERVATION_IS_FILESYSTEM_PROOF`, `PROVI
 * Four WIP files, no subdirectory, clean tree, local `main` equal to `origin/main`.
 * The `R01` and `R02` STOPs and the `R03` ACCEPT stand unwaived in history.
 
-## 8. Request
+## 8. Transient acquisition failure on the first run at this revision
+
+The first workflow run at this report revision, run `42570194179`, showed Windows green across all 31 steps and the Ubuntu leg failing at step 9 with these two annotations, preserved verbatim:
+
+```
+Process completed with exit code 1.
+cargo-deny release-asset API fallback download failed (http 403)
+```
+
+This is a pinned-tool **acquisition** failure in the runner, not a repository, dependency or advisory finding. The identical gate, with the identical locked graph, had passed on both hosts six minutes earlier at `4fa9b51` (RustSec fetched `2026-11-09T05:51:48Z`, advisories, bans, licenses and sources all ok), and the failing step failed before `cargo-deny` ever ran, so no gate downstream of step 9 was evaluated on the Ubuntu leg of this revision. The Windows leg evaluated all of them and passed.
+
+Re-running the failed job requires repository write access, which this agent does not hold: `POST /actions/runs/42570194179/rerun-failed-jobs` returns `401 Requires authentication`. A re-run of the failed job is the single remaining action, and it is safe to do because nothing in the repository changed between the fully green `4fa9b51` and this docs-only revision.
+
+## 9. Request
 
 Independent technical review of `4fa9b51` for `ACCEPT`. Reconciliation of `ACTIVE`, and any `ROADMAP` movement, is left to the Owner and Architect after that judgement. `R02.C` and Stage 02 remain open.
 
