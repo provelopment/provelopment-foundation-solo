@@ -7,143 +7,78 @@
 | Field | Value |
 | --- | --- |
 | Date (UTC) | 2026-11-09 |
-| Work order | **`SOLO-WO-045 R03`** — CI edge-count reconciliation and independent acceptance |
-| Matching Owner handoff | `SOLO-WO-045 R03` |
-| Required starting HEAD / tree | `d6c0bc764de7e7bc0e954963a70621be2a2a3a40` / `7ad47ed2e7e801c0b2ac9c8fcbda20404deafed7` — **matched exactly** |
-| §2 baseline blob ledger | **22 of 22 blobs verified, zero drift** |
-| R03 issuance commit / tree | `80d16992482e13d0add122bb9067698d95fb0be9` / `31ba6c69c51414a96a7e2b431d18ecf272ab2b53` |
-| R03 workflow-fix commit / tree / workflow blob | `3a8af1bab7e511a722be8bf8045e5c20200c32aa` / `eccb693c1f4f8436869136becb94c5458e7de95b` / `c12e622bfe5a2c36be2d6c9dd99592dc86b74134` |
-| Frozen R02.B code under review | `cf15cd5377663145e349f5344dedd593146f6396` / `1ba765005219a0935d8b3d9804deb645af5ac0e6` |
-| Green two-host CI | run **`42557798689`** (push, `3a8af1b`) — Ubuntu job `128967312322`, Windows job `128967312395`, **both `success`** |
-| Independent disposition | **`ACCEPT`** by the Chief Architect against HEAD `ea9f9fe55868a60338b7e04327279cd5c11d437b` / tree `c4edd26ab017412325631232815ae27c16427f6d` — R03 evidence phase **and** the bounded R02.B first slice |
-| §4.5 NEXT reconciliation | `b8505d6840b804c1735149d9937664369bf890be` / tree `42fa4891f93da9f9ed70e916ac1acc3a3cb871ed` / NEXT blob `316ffc2fcf1600ec9f15547d8bc4c3c6027bb6bc` — run `42559879125`, both hosts `success` |
-| §4.6 ACTIVE neutralisation | `4cd3b3ea0830700ec2557233261548e5161485ff` / tree `14ec0acbe5e6de3ef88d1f0eed068d78f0814269` / ACTIVE blob `ea5f20b736483c2e102456be1cea9104059fc81a` (exactly 40 bytes) |
-| **Status** | **`COMPLETE`** — R03 closed, first slice accepted, next slice **not** started |
+| Work order | **`SOLO-WO-046 R01`** — R02.B second bounded slice: provisional source selection and inert body-byte preflight |
+| Matching Owner handoff | delivered verbatim in chat |
+| Required starting HEAD / tree | `8f81078ac42d26a882277a5e4bb954bba0303a07` / `ae83cf9c8d737c97cdc6f820bfe76291a361782f` — **matched exactly** |
+| §2 baseline blob ledger | **24 of 24 blobs verified, zero drift**; all four required-absent paths confirmed absent |
+| Current HEAD / tree | `57c905a86c525fef521d86b00be1d7c23ac4f609` / `1ba06d1a199e885473436d1a3860dfefce9d8ea6` |
+| **Status** | **`STOP`** — blocked at the mandatory format gate; **no functional evidence exists** |
 
 ## Outcome
 
-The stale expectation is repaired, the whole mandatory workflow is green on both hosts through **every** gate, the bounded R02.B first slice is independently accepted, and the order is closed in the prescribed sequence. The only change to shipped verification machinery across the whole order was the two authorized literals; the R02.B source, dependency graph, security controls and refusal fixtures remain byte-unchanged from the reviewed commit.
+The order's preflight, issuance, scope and refusal design were completed exactly as specified, and the bounded code was written to the §1 ledger and published in seven reviewable commits. **It has never been compiled.** The mandatory two-host workflow has failed four times on **step 14, "Format check"** — the first gate after the security and package-set gates, and before every compile, lint, test, architecture, release and reproducibility gate. Those gates therefore **did not run at all** on any revision this run.
 
-Both previous STOPs remain in Git history and are neither waived nor retroactively accepted:
+I could not observe *why* formatting is rejected, so I am stopping rather than continuing to publish unverifiable corrections. This report records that honestly and asks for the smallest Owner decision.
 
-| Phase | Head | CI | Meaning |
+## Commit ledger
+
+| Commit | Content |
+| --- | --- |
+| `0eac119` | ACTIVE recorded byte-identically (issuance history), blob `f7eb973e` |
+| `e401ff6` | NEXT cleared to the exact neutral 49-byte heading, blob `92fa562b` |
+| `824a437` | Domain: pure provisional JSON-first selection policy + tests + `lib.rs` wiring |
+| `8b56f47` | Adapters: inert body preflight, closed body root, in-memory pipeline + tests + `lib.rs` wiring |
+| `c37c51b` | Style: first rustfmt-clean restructure (short refusal/observation helpers, one statement per line) |
+| `dfd3f6d` | Style: recomputed import packing and file endings |
+| `57c905a` | Style: call arguments brought inside the rustfmt width limits |
+
+## CI ledger — four red runs, all at the same step
+
+| Revision | Ubuntu job | Windows job | Failing step |
 | --- | --- | --- | --- |
-| R01 | `be367d3` issuance | — | STOP: order omitted `workspace_graph.rs` from its ledger |
-| R02 code | `cf15cd5` | run `42553390272` — FAILURE both hosts at `edges=22` | Implementation published; blocked by a read-only constant |
-| R02 report | `d6c0bc7` | run `42554037361` — FAILURE both hosts at `edges=22` | Truthful STOP report |
-| R03 issuance | `80d1699` | run `42557683069` — **expected FAILURE** both hosts at `edges=22` | Order issued under the still-stale workflow |
-| **R03 workflow fix** | **`3a8af1b`** | run **`42557798689`** — **SUCCESS both hosts** | **Fully green** |
-| R03 evidence report | `ea9f9fe` | run `42558461713` — **SUCCESS both hosts** | Report HEAD green; **ACCEPT** returned here |
-| §4.5 NEXT | `b8505d6` | run `42559879125` — **SUCCESS both hosts** | Candidate recorded, ACTIVE still issued |
-| §4.6 ACTIVE neutral | `4cd3b3e` | — (verified at the final HEAD) | Order closed; no work authorized |
+| `8b56f47` | `128981825840` | `128981826036` | 14 Format check |
+| `c37c51b` | `128984463594` | `128984463409` | 14 Format check |
+| `dfd3f6d` | `128986426061` | `128986425951` | 14 Format check |
+| `57c905a` | `128988195189` | `128988194976` | 14 Format check |
 
-I verified the R03 issuance failure was the *same* mechanism, not a new defect, before repairing it: the Ubuntu annotation reads `failure: approved edge count changed`, with steps 1–16 already green.
+On every attempt the gates **before** formatting passed on both hosts: locked fetch, pinned-toolchain assertion with exact `rustc`/`cargo` versions, `cargo-deny 0.20.2` advisories/bans/licenses/sources on the unchanged 15-package locked graph with a fresh RustSec database, the Ubuntu `RUSTSEC-2026-0009` known-vulnerable negative probe correctly **refused**, and the workspace package-set gate. Steps 15 onward — strict lint, tests, real-tree architecture checker, refusal self-test, tripwire, release build, CLI smoke, forbidden-import refusal and byte-reproducibility — are **skipped**, not passed.
 
+## Why this stopped
 
-## The workflow repair, exactly
+* **No Rust toolchain exists in this environment.** `cargo`, `rustc` and `rustup` are all absent from `PATH`, and `~/.cargo`, `~/.rustup`, `C:\Program Files\Rust`, `C:\Rust` and `%LOCALAPPDATA%\Programs\Rust` do not exist. I therefore cannot run `cargo fmt`, or compile, or test, locally.
+* **The workflow log body is not readable.** `GET /actions/jobs/{id}/logs` returns **HTTP 403 with no redirect**, so the token cannot reach the archive; the check-run annotations expose only "Process completed with exit code 1" for that step. The `cargo fmt` diff — the one artifact that would name the offending lines — is unobservable.
+* **Installing a toolchain is not permitted here** (`no global installer`, `unapproved network/component`), and the workflow is read-only for this order, so there is no sanctioned way to surface the diff.
 
-`.github/workflows/rust-verify.yml`, blob `1c0e450c…` → `c12e622b…`, a two-line diff (2 insertions, 2 deletions), `git diff --check` clean, no line-ending change:
+I attempted four corrections, each modelling a different rustfmt rule, and validated my model by reproducing untouched, rustfmt-clean blocks in this same repository byte-for-byte:
 
-```diff
-@@ -566,5 +566,5 @@
-           grep -q 'architecture=legal packages=4' "$RUNNER_TEMP/arch-real.txt" \
-             || { echo "::error::unexpected package set in real-tree report"; exit 1; }
--          grep -q 'edges=22' "$RUNNER_TEMP/arch-real.txt" \
-+          grep -q 'edges=24' "$RUNNER_TEMP/arch-real.txt" \
-             || { echo "::error::approved edge count changed"; exit 1; }
-@@ -578,5 +578,5 @@
-           if ($text -notmatch 'architecture=legal packages=4') { throw "unexpected package set in real-tree report" }
--          if ($text -notmatch 'edges=22') { throw "approved edge count changed" }
-+          if ($text -notmatch 'edges=24') { throw "approved edge count changed" }
-```
+1. `c37c51b` — replaced discretionary layouts with short helpers and one statement per line.
+2. `dfd3f6d` — recomputed wrapped import blocks with the fill rule rustfmt actually uses (validated against `publication_manifest.rs` and `source_locator.rs`, which it reproduces exactly), and removed stray trailing blank lines.
+3. `57c905a` — shortened fixtures and hoisted long `format!` bodies so no single-line argument list exceeds the 60-character call budget.
 
-`edges=22` now appears **zero** times and `edges=24` exactly twice. Nothing else moved: step names, shell/`throw` behaviour, exit codes, the `architecture=legal packages=4` assertion, the real checker execution as its own process, the 23-refusal/5-legal matrix, the security gate, smoke tests and the Ubuntu byte-reproducibility comparison are all intact. `24` is a recorded expectation of the current approved graph, **not** a generic threshold: any future graph change still fails this gate until separately reviewed.
+After each attempt every mechanical check I can perform locally is clean: no line exceeds 100 columns, no wrapped call or macro could fit on one line, no single-line call exceeds the 60-character argument budget except one `fn` signature where that rule does not apply, no macro block carries a trailing comma, no trailing whitespace, exactly one final newline, LF endings, and balanced delimiters. The gate still fails, so at least one rustfmt behaviour I cannot observe differs from my model. Further blind guessing would only add unverifiable churn to `main`.
 
-## Hosted evidence — every gate executed
+**No workaround was attempted outside §1:** I did not edit the workflow, the checker, a manifest, the lockfile, or any unlisted file, and I installed nothing.
 
-Run `42557798689` at `3a8af1b`. **Ubuntu 24.04** (job `128967312322`, runner `GitHub Actions 1000002982`): 22 steps succeeded, 0 failed, 9 skipped as the genuine Windows-only counterparts. **Windows 2025** (job `128967312395`, runner `GitHub Actions 1000002983`): 19 succeeded, 0 failed, 12 skipped as the genuine Linux-only counterparts. No gate was skipped that should have run.
+## What was written, and its exact boundaries
 
-| Gate | Ubuntu | Windows |
-| --- | --- | --- |
-| Checkout (pinned full commit SHA, no persisted credentials) | success | success |
-| Install and assert the pinned toolchain | success | success |
-| Assert exact `rustc`/`cargo` versions | success | success |
-| Fetch locked packages (only network Cargo acquisition) | success | success |
-| Component security gate — `cargo-deny 0.20.2` | success | success |
-| Advisory negative probe — RUSTSEC-2026-0009 | success | n/a (Linux-only) |
-| Workspace package-set gate | success | success |
-| Format check | success | success |
-| Strict lint (warnings are errors) | success | success |
-| Test (workspace, all targets, locked) | success | success |
-| **Architecture checker on the real checkout** | **success** | **success** |
-| Architecture refusal self-test | success | success |
-| Test-failure tripwire | success | success |
-| Release build (workspace, locked) | success | success |
-| Release CLI smoke on the built binary | success | success |
-| Forbidden import and bypass refusal with guaranteed restore | success | n/a (Linux-only) |
-| **Two clean release builds compared byte-for-byte** | **success** | n/a (Linux-only) |
-| Job summary | success | success |
+Four new files and two narrowly edited `lib.rs` files, all within the §1 ledger:
 
-Annotations on the green run:
+* **`solo-domain/src/source_selection.rs`** — the pure policy. `select_provisional_source` consumes the accepted `SourceCandidateSetV1` and typed observations (`Absent`, `Present(bytes)`, `Failure(kind)` with permission / other-I/O / unsafe-location / changed-during-read kept distinct). Declared JSON is considered first; present JSON is chosen without the Markdown body being requested; only a reported JSON `Absence` permits declared Markdown; a JSON `Failure` is an immediate refusal; an observation for an undeclared member, a missing observation, or Markdown bytes supplied alongside present JSON are refused. No I/O, no dependency, no `unsafe`, no clock, locale or directory state.
+* **`solo-adapters/src/source_body_preflight.rs`** — the inert preflight. Bounds the envelope *before* copying, refuses BOM, invalid UTF-8, trailing input, comments, non-finite literals and duplicate members at any depth by reusing the accepted duplicate-aware `DeclaredNode` visitor, then enforces the closed body root (§6.2E.1). Returns an owned immutable copy; `CONTENT_VALIDITY_PROVEN` and both authority accessors are `false`. `run_in_memory_source_pipeline` is the single documented trust boundary and performs no filesystem access anywhere, including in tests.
+* **`solo-domain/tests/source_selection.rs`**, **`solo-adapters/tests/source_body_preflight.rs`** — public-API matrix covering the precedence rules, absence-versus-error, no-fallback, the closed root, scalar and size boundaries at exactly 2 MiB and 1 MiB, caller-buffer mutation after preflight, and non-echoing diagnostics.
 
-- Ubuntu: `injected forbidden import refused with category 'undeclared-crate' and exit 1` — the load-bearing restore gate genuinely refused an injected violation and restored the tree.
-- Ubuntu: `advisory negative probe refused time 0.3.46 with RUSTSEC-2026-0009 and exit 1, while the unchanged locked workspace graph passed all four checks`.
-- Both: `component security gate passed: cargo-deny 0.20.2 … advisories, bans, licenses and sources all ok` — archive sha256 `9f12ed4c…` (Linux) / `975a2214…` (Windows), RustSec `7a40350e1b8ba5b656d909f88222a8059a83d88d` fetched `2026-11-09T03:42:01Z` (Linux) and `03:42:15Z` (Windows).
+**What this slice explicitly does not do:** no file is opened, no absence is confirmed, no confinement, no-follow identity, alias/hardlink/case equivalence or filesystem snapshot exists, no module/`props`/`presentation` schema is validated, no Markdown grammar is parsed, and nothing is publishable. §6.2C.3–§6.2C.4 remain unproven by design.
 
-### Why these step results are themselves the proof of the counts
+## Evidence quality — what is not proven
 
-The workflow **encodes** the exact expectations as failing assertions, so a green step is not a claim I am making — it is the gate refusing to pass otherwise:
+Recorded plainly, because a green badge was never obtained:
 
-- the architecture step fails unless the report matches `architecture=legal packages=4` **and** `edges=24`, which is why the two-host result proves the checker printed `edges=24` at `3a8af1b`;
-- the refusal self-test step fails unless `self-check=passed cases=29`, `^ok ` count is 29, `^FAIL` count is 0, `refused as ` count is **23** and `legal form accepted` count is **5**, plus the checker-bypass and dynamic-load probes — all of which therefore held;
-- the tripwire step fails unless the normal run passes *and* the deliberately injected failure is refused;
-- the reproducibility step fails unless two clean release builds are byte-identical.
-
-Raw job logs returned **HTTP 403** for this token, so I could not read log bodies first-hand. I am reporting that plainly rather than implying I read them: the evidence above is step-level conclusions plus the job annotations, and the per-count proof rests on the workflow's own failing assertions rather than on log text.
-
-
-## Security and dependency evidence
-
-| Property | Value |
-| --- | --- |
-| Locked packages | **15** (4 workspace + 11 external) — unchanged names, versions, sources and checksums |
-| Lock version | 4 |
-| `Cargo.lock` blob at start and unchanged since | `36125ff1be3eec79b30c5370a7ac4e2642e5d10d` |
-| Adapter external **normal** roots | `serde =1.0.229`, `serde_json =1.0.154` |
-| Adapter enumerated reachable closure | `itoa`, `memchr`, `proc-macro2`, `quote`, `serde`, `serde_core`, `serde_derive`, `serde_json`, `syn`, `unicode-ident`, `zmij` |
-| `solo-cli` externals | `serde_json`, `syn` — **dev only**, unchanged |
-| `solo-domain`, `solo-application` externals | **none of any kind** |
-
-**Runtime reachability changed and is not waved through.** `serde` and `serde_json` were previously reached only as development material of `solo-cli`; they are now **shipped** normal dependencies of `solo-adapters`, so the earlier "zero third-party normal dependencies" finding no longer holds and is not repeated here. What was re-measured first-hand at this commit is the consequence: a fresh two-host `cargo-deny 0.20.2` over the expanded shipped graph returned **advisories, bans, licenses and sources all ok**, and the disposable negative probe still refused the known-vulnerable fixture — i.e. the scanner is genuinely load-bearing, not merely quiet. No suppression, severity override, scanner substitution or vendor input was used, and no applicable critical/high or malicious component was left unresolved.
-
-## The frozen R02.B first slice
-
-Independently re-confirmed as published, byte-identical to the reviewed blobs, and **not edited** by this order — and now **`ACCEPT`ed by the Chief Architect** as the bounded first slice:
-
-| Property | State |
-| --- | --- |
-| `crates/solo-domain/src/source_locator.rs` | `2b507a8a…` — `std`-only logical `pages/` locator, precise refusals, non-empty set, logical reservation incl. absent candidates |
-| `crates/solo-adapters/src/publication_manifest.rs` | `f883dd93…` — duplicate-member refusal during map access at every depth; closed five-key root; exact `1.0.0`; size/UTF-8/BOM refusals |
-| Public parser outcome | `ParsedManifestCandidateV1`, untrusted and non-publishable; `is_publication_authorized()` is constant `false` |
-| `graph.rs` / `workspace_graph.rs` | `774d49fb…` / `9d9d2157…` — one reviewed owner/kind rule, enumerated closure, unconditional real-metadata test, adversarial negatives |
-
-**Proven by this slice:** strict duplicate rejection before value materialisation (including nested arbitrary and `properties`-nested duplicates); one Entity with accepted ID grammar, cardinality, per-parent uniqueness and authored ordering; budgets; inert bounded `properties`; declared and validated `sourceCandidates` with extension matching, reserved-stem and traversal refusal, and duplicate logical reservation even for a path that does not exist; a syntactically accepted declaration is never publication-authorized.
-
-**Explicitly *not* proven and not claimed:** filesystem no-follow confinement, alias/hardlink/case collision beyond logical comparison, snapshot atomicity, absence-versus-error semantics, effective JSON-first selection, selected body validity, canonical BCP47/Unicode/NFC conformance, route/URL/property-registry/visibility semantics, and any routing, HTTP, browser, provider, publication, release or deployment behaviour. `R02.B` and `R02.C` remain **open**; `C1` and `C2–C4` are **not** claimed complete; Stage 02 is not closed.
-
-## Versions and environment
-
-`rust-toolchain.toml` remains pinned at `1.99.1` with `rustfmt` and `clippy` and is byte-unchanged (`9ec55b3b…`). The two "Assert exact rustc/cargo versions" steps succeeded on both hosts, so the measured compiler and Cargo matched the pin exactly. Runner labels were `ubuntu-24.04` and `windows-2025`. Action pins, Node runtime and `deny.toml` (`3063e864…`) are unchanged, and the security gate re-verified its own archive digest (`9f12ed4c…` Linux, `975a2214…` Windows) rather than trusting a download.
-
-
-## Warnings, unknowns and limitations
-
-- Raw job logs: **HTTP 403 — `UNVERIFIED`** for bodies; step conclusions and annotations only, as stated above.
-- GitHub Dependabot and code-scanning alert endpoints remain **`UNVERIFIED`** (401) — never "clear". A scheduled Dependabot run is **`NOT OBSERVED`**, which is not a scan.
-- Browser, HTTP, accessibility, provider, UI, release and deployment checks: **`NOT APPLICABLE`** to this parser/CI slice, never PASS.
-- Release-only `unicode-ident` Unicode-3.0 attribution/NOTICE remains an **open** release obligation and is not waived.
-- Ubuntu `rustup 1.29.2` versus Windows `1.29.3` is a tracked low-urgency parity proposal, **not** an authorized upgrade; no toolchain change was made.
-- No warnings were suppressed, no step relabelled, and no green status is asserted without the gate inspection above.
+* **`NOT RUN` — compilation, lint, tests, architecture checker, refusal self-test, tripwire, release build, CLI smoke, byte-reproducibility.** All skipped behind the format gate. **No claim is made that any test passes**, and no test result can be inferred from the code being present.
+* **`PASSED` on every attempt** — locked fetch, pinned-toolchain assertion, `cargo-deny` advisories/bans/licenses/sources with a fresh RustSec refresh and recorded digest, the Ubuntu known-vulnerable advisory negative probe refusing `RUSTSEC-2026-0009`, and the workspace package-set gate.
+* **`UNVERIFIED`** — raw job logs (HTTP 403, no redirect available), GitHub alert APIs (401), so alert counts are unknown.
+* **`NOT OBSERVED`** — a scheduled Dependabot scan.
+* **`NOT APPLICABLE`** — browser, HTTP, rendering, release and deployment evidence; none exists for this slice.
+* `serde`/`serde_json` remain shipped adapter normal dependencies; the locked graph is unchanged at 15 packages with no new component. The `unicode-ident` Unicode-3.0 attribution/NOTICE obligation remains an open future-release prerequisite. Ubuntu `rustup 1.29.2` versus Windows `1.29.3` remains a tracked low-urgency parity proposal, not an authorised upgrade.
 
 ## State ledger and cleanup
 
@@ -151,27 +86,29 @@ Independently re-confirmed as published, byte-identical to the reviewed blobs, a
 
 | File | Blob | State |
 | --- | --- | --- |
-| `workorder-active.md` | `ea5f20b736483c2e102456be1cea9104059fc81a` | **neutralised** — exactly 40 bytes, `# Foundation Solo — Active Work Order` + one LF, its own commit `4cd3b3e`. **No work is authorized.** This is not a pause, freeze or reopening gate |
-| `plan-next.md` | `316ffc2fcf1600ec9f15547d8bc4c3c6027bb6bc` | **one remaining-R02.B candidate**, non-executable, gated on its own future Owner-issued order |
-| `plan-roadmap.md` | `18975332c2820170a32558c4ee224176667b91ab` | **byte-identical to the starting blob**; `R02.B`, `R02.C` and Stages 02–13 all intact |
+| `workorder-active.md` | `f7eb973e5cb9744036594ad77c9c58842261a21c` | **order installed and preserved** — not neutralised, because no `ACCEPT` occurred |
+| `plan-next.md` | `92fa562b1af0c54391851aa5c79bdeb1631127069` | neutral, exactly as this order required after issuance |
+| `plan-roadmap.md` | `18975332c2820170a32558c4ee224176667b91ab` | **byte-identical to the baseline**; `R02.B`, `R02.C` and Stages 02–13 intact |
 | `plan-outlook.md` | `cb9c7a610cf3c537557e060ca9656e44a053e69d` | byte-identical |
 
-### Exact path ledger for the whole order
+Exactly eight paths differ from the baseline, all within §1: the two WIP files above, the four new Rust files, and the two named `lib.rs` files. Every other baseline blob is unchanged, including `ARCHITECTURE.md`, both SOPs, `Cargo.toml`, `Cargo.lock`, `deny.toml`, `rust-toolchain.toml`, `.cargo/config.toml`, the workflow, the graph checker and every previously accepted domain/adapter source file.
 
-Four permanent paths differ from the starting HEAD `d6c0bc7`, exactly and only those §1 permits: `.documents/WIP/workorder-active.md` (issuance `80d1699`, neutralisation `4cd3b3e`), `.github/workflows/rust-verify.yml` (repair `3a8af1b`, two lines), `.documents/WIP/plan-next.md` (candidate `b8505d6`), and `.documents/Reports/execution-report.md` (this report). Every one of the 22 baseline blobs in the §2 ledger was re-verified unchanged at the end of the run, including all R02.B source, `Cargo.toml`, `Cargo.lock`, `deny.toml`, `rust-toolchain.toml`, both SOPs and `ARCHITECTURE.md`.
+**Cleanup.** No toolchain was installed, so no build artifacts and no `target/` exist. I created no scratch files in the repository and no `.temp/` content; the only temporaries were commit-message texts in the OS temp directory, each deleted immediately after use. The tree is clean, on one worktree with zero stashes, and `main` equals `origin/main`. No PR, branch, amend, rebase, reset, force-push, tag, release, workflow dispatch/rerun/cancel, settings change or other-repository write occurred.
 
-**Explicitly not claimed.** The accepted slice is a bounded first slice only: `R02.B` and `R02.C` remain **open**, Stage 02 is **not** closed, and `C1`/`C2–C4` are not asserted complete. I did not implement the NEXT candidate, did not self-accept, and did not begin the next slice.
+## Preserved history — not erased, not reinterpreted
 
-**Cleanup.** R03 produced no build or toolchain artifacts: no local toolchain was installed this run, no `target/` exists in the repository, and I created no scratch files — the only temporary files were three commit-message texts in the OS temp directory, each deleted immediately after use. Task-owned material from the previous run had already been removed, and pre-existing `.temp/` entries belonging to other tasks were left untouched rather than deleted. No PR, merge, branch, extra worktree, stash, amend, rebase, force-push, reset, tag, release, manual workflow dispatch/rerun/cancel, settings change or other-repository write occurred.
+* **`R01` STOP** (issuance omitted `workspace_graph.rs` from its ledger) and **`R02` STOP** (read-only workflow carried a stale edge count) remain in Git history, unwaived.
+* **`R03` was independently `ACCEPT`ed and closed**: the stale `edges=22` constant was repaired to `edges=24` in exactly two literals, both hosts went fully green, ACTIVE was neutralised to its 40-byte blob, and the report was published. That closure stands and is unaffected by this run.
+* **`R02.B`, `R02.C` and Stage 02 remain open.** Nothing here closes them, and the provisional-selection policy is not final effective-source selection.
 
-## Closing disposition
+## The smallest decision I need
 
-`SOLO-WO-045 R03` is **closed** on the Chief Architect's `ACCEPT` at `ea9f9fe` / `c4edd26a`, covering the R03 technical evidence phase and the bounded R02.B first implementation slice. The order's §§4.5–4.6 were then completed in sequence: one remaining-R02.B NEXT candidate recorded and verified green on both hosts, ACTIVE restored to its exact 40-byte neutral heading in its own commit, and this canonical report published last.
+`main` is currently **red** at `57c905a`: the format gate rejects revisions of four new files whose behaviour I cannot verify. I will not self-authorise a fix, a revert or a workaround. One of these is needed:
 
-Final state to verify at HEAD: the neutral ACTIVE blob above, byte-identical ROADMAP with `R02.B`/`R02.C` open, exactly four WIP files with no subdirectory, a clean local `main` equal to `origin/main`, one worktree, zero stash, no task-owned scratch, and both hosts green through the entire workflow.
+1. **Give the gate's actual output** — enable read access to the workflow logs (or paste the `cargo fmt` diff for this revision). One diff would let me correct every remaining line precisely, after which the full gate can finally run and produce real compile/lint/test/architecture evidence.
+2. **Provide the pinned toolchain** (`rustc`/`cargo`/`rustfmt` `1.99.1`) in this environment, so the exact formatter can be run before pushing.
+3. **Authorise a revert** of the seven commits to restore the last green baseline (`8f81078`), and re-issue the slice when either (1) or (2) is available.
 
-**The next remaining-R02.B slice requires a newly Owner-issued order with a matching handoff. This report authorizes nothing.**
+Until then the slice is **unproven, not accepted, and not rejected on its merits** — the failure is confined to formatting, and no functional judgement of the policy or the preflight has been made by anyone.
 
 **`agent report ready`**
-
-
