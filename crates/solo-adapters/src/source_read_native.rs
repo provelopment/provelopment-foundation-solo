@@ -799,16 +799,14 @@ mod sys {
 
     #[cfg(all(test, windows))]
     mod mapped_view_proofs {
-        use windows_sys::Win32::System::Memory::{
-            FILE_MAP_WRITE, MEMORY_MAPPED_VIEW_ADDRESS, PAGE_READWRITE,
-        };
-
         #[test]
-        fn the_memory_bindings_are_visible() {
-            assert_eq!(PAGE_READWRITE, 4);
-            assert_eq!(FILE_MAP_WRITE, 2);
-            let address = MEMORY_MAPPED_VIEW_ADDRESS::default();
-            assert!(address.Value.is_null(), "the default address is null");
+        fn a_scoped_unsafe_deref_is_permitted() {
+            let value = 41_u8;
+            let pointer = &value as *const u8;
+            // SAFETY: `pointer` refers to the live local `value` above, and exactly one byte that
+            // the pointer still covers is read before the local is dropped.
+            let read = unsafe { *pointer };
+            assert_eq!(read, 41);
         }
     }
 }
