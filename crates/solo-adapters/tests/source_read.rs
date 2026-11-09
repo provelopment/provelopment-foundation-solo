@@ -433,10 +433,14 @@ fn create_directory_link(target: &Path, link: &Path) {
     assert!(status.success(), "junction fixture creation failed");
 
     // Prove the fixture really is a reparse point *before* any refusal is claimed from it: an
-    // ordinary directory here would make the following assertion meaningless.
+    // ordinary directory here would make the following assertion meaningless. The attribute
+    // is checked directly, because a junction is a reparse point that `is_symlink` does not
+    // necessarily report.
+    use std::os::windows::fs::MetadataExt;
+    const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x0400;
     let metadata = fs::symlink_metadata(link).expect("the junction fixture exists");
     assert!(
-        metadata.file_type().is_symlink(),
+        metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0,
         "the fixture must be a reparse point, not an ordinary directory"
     );
 }

@@ -332,7 +332,7 @@ fn a_probe_to_read_replacement_that_keeps_identity_and_length_is_refused() {
         panic!("a body disagreeing with its probe must be refused, got {outcome:?}");
     };
     assert_eq!(refusal.kind(), SourceReadRefusalKind::ChangedDuringRead);
-    assert_eq!(refusal.code(), "SOURCE_CHANGED_DURING_READ");
+    assert_eq!(refusal.code(), "SNAPSHOT_CHANGED");
 }
 
 #[test]
