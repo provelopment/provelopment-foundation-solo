@@ -1,86 +1,76 @@
 # Execution Report
 
-**Work order:** `SOLO-WO-046 R01` — R02.B second bounded slice: provisional JSON/Markdown source selection plus inert body-byte preflight.
-**Disposition:** Chief Architect **ACCEPT**, received for the technical-evidence phase and for the second bounded R02.B slice, reviewed at report HEAD `1cd2751` / tree `bb718fb8`.
-**Lifecycle:** §§5.5–5.6 executed under the existing order. The one remaining-R02.B candidate is published in NEXT, ACTIVE is neutral, ROADMAP is unchanged, and `R02.B`, `R02.C` and Stage 02 remain open.
+**Work order:** `SOLO-WO-047 R01` — R02.B third bounded slice: capability-confined `SourceRead` and physical-identity evidence.
+**Result:** **STOP** under §1 and §7.3 of the order. No source file, dependency, lockfile, checker, workflow or licence file was written. The mandatory proof-before-library audit found two independent, individually fatal gaps that the exact authorized pin cannot close.
 
-## 1. Verified two-host green evidence
+## 1. Verified starting state and issuance
 
-| Revision | Tree | What it is | Run | ubuntu-24.04 | windows-2025 |
-| --- | --- | --- | --- | --- | --- |
-| `4fa9b51` | `f8561f12` | implementation of this slice | `42569678884` | job `129003918555` success | job `129003918886` success |
-| `1cd2751` | `bb718fb8` | report revision the Architect accepted | `42570426821` | job `129006305275` success | job `129006305283` success |
-| `3eb0a33` | `c23443c6` | NEXT reconciled to one remaining-R02.B candidate | `42571585235` | job `129009945031` success | job `129009944716` success |
-| `3cdc556` | `4874c204` | ACTIVE restored to the approved neutral file | `42571864925` | job `129010827487` success | job `129010827724` success |
+* Required start confirmed exactly: remote HEAD `4b50ef3ab8e34e44f4e9a884eda600476eedb259`, tree `95d4a167c7daf556d89412fb7a9027f81af2f9db`, `main` tracking the sole approved `origin`, one worktree, zero stashes, four WIP regular files with no subdirectory, one canonical report.
+* All seventeen §3 baseline blobs compared: **zero drift**. The five §2 paths that had to be absent were absent in both the tree and the checkout.
+* Issuance `224ff56` (tree `7f04535a`): ACTIVE committed byte-identically, blob `c9870fc06351bf4175f1728c5455f1c16999c34b`. Run `42576108632` green — Ubuntu job `129024075025` (22 applicable steps), Windows job `129024075397` (19 applicable steps), zero non-success steps.
+* NEXT neutralized in its own commit `1477c2b` (tree `24de656b`): 49-byte heading, blob `92fa562b1af0c54391851aa5c79deb1631127069`. Run `42576284482` green — Ubuntu job `129024625852`, Windows job `129024626177`.
+* `plan-roadmap.md` was never touched; ROADMAP remains `18975332` and `R02.B`, `R02.C` and Stage 02 remain open.
 
-Every applicable step passed on both hosts in each of those runs: toolchain assertion, locked fetch, the `cargo-deny 0.20.2` four-category gate with a fresh RustSec refresh, the package-set gate, format, strict Clippy with `-D warnings`, the full workspace test suite, the real-tree architecture checker with its 23 refusal fixtures, the test-failure tripwire, the release build, the release CLI smoke, the injected-forbidden-import refusal, and two byte-identical release builds.
+## 2. The blocker, part A — Windows physical identity is unavailable on stable Rust
 
-**This revision is verified by the run it triggers.** That outcome is not asserted in advance here: each lifecycle step above is verified at its own revision, and the final verification of this exact commit is identified by the run given with the handoff.
+The order requires Windows evidence of volume plus file-index identity and reparse/alias control on the actual handle. On the pinned stable toolchain the standard library marks exactly those accessors as unstable. From the `std 1.99.1` reference for `std::os::windows::fs::MetadataExt`:
 
-## 2. The source correction this slice required
+* `volume_serial_number() -> Option<u32>` — nightly-only experimental API, feature `windows_by_handle` (#63010).
+* `number_of_links() -> Option<u32>` — nightly-only experimental API, feature `windows_by_handle` (#63010).
+* `file_index() -> Option<u64>` — nightly-only experimental API, feature `windows_by_handle` (#63010).
 
-The exact-size test helper emitted malformed JSON. As a raw string, its `head` literal ended at the string terminator immediately after the opening bracket, swallowing the quote that should open the filler string, while its `tail` literal still supplied a closing quote. The generated body had an unquoted identifier where a string element belonged, so the exactly-at-limit case could never parse, and the test failed honestly instead of the boundary being tolerated with a malformed body.
+Only `file_attributes`, `creation_time`, `last_access_time`, `last_write_time` and `file_size` are stable. By-handle volume serial and file index are therefore reachable only through a nightly feature build, or through direct `unsafe` FFI via `windows-sys` or `winx`. Both routes are closed here: the toolchain is pinned stable, no direct OS crate is approved, and no `unsafe` block may be added while the crate-level `#![forbid(unsafe_code)]` stays in force. `cap-std` and `cap-primitives` publish no by-handle `BY_HANDLE_FILE_INFORMATION` accessor, so the `windows-sys` already inside their closure cannot be reached safely either. Hardlink, alias and case-collision refusal on the actual handle cannot be implemented, and the §5.5 cases cannot be satisfied or honestly reported as verified.
 
-Both literals are now escaped ordinary strings, so the filler is the single string element inside `blocks` and the body is valid in every other respect. Measured: head 52 + filler 2097097 + tail 3 = exactly 2097152 bytes, one element, parsing as JSON. No limit was raised, no assertion weakened, and no production validation changed. Committed as `4fa9b51`.
+## 3. The blocker, part B — no no-follow open exists in the authorized API
 
-Three earlier corrections are part of the same accepted record: `f902bec` applied the formatting changes without which the format gate never passed, `d1f2171` resolved E0106 in both `observations_both` helpers, and `1b75e2e` gave the no-echo fixture the member whose absence was masking the assertion it targets.
+The order requires refusal of any symlink, junction or reparse point at root, intermediate directory or leaf, proven by a handle-based mechanism. The audited 4.0.3 surface cannot express that request at all:
 
-## 3. Accepted scope
+* `cap_std::fs::OpenOptions` exposes exactly `new`, `read`, `write`, `append`, `truncate`, `create`, `create_new`, plus a Unix-only `OpenOptionsExt` carrying `mode` and `custom_flags`. There is no `follow`, `follow_symlinks` or `FollowSymlinks` control.
+* `cap_primitives::fs::OpenOptions` 4.0.3 documents the identical seven-method surface, and likewise none that selects follow behaviour.
+* `cap_std::fs::Dir::open_with` and `open_dir` accept no follow parameter; `Dir` imports the `FollowSymlinks` type internally and chooses the policy itself.
+* `Dir::symlink_metadata` exists, but using it as a pre-check and then opening is precisely the initial-check-then-unconstrained-open pattern the order classes as categorically insufficient.
 
-* `crates/solo-domain/src/source_selection.rs` (420 lines) — provisional selection over caller-supplied observations. Read order is fixed and independent of declaration order: a declared `json` member is considered first, present JSON ends the decision, and only a genuinely reported `Absent` permits considering `markdown`. A named failure is never converted into absence, and no fallback follows invalid selected JSON.
-* `crates/solo-domain/tests/source_selection.rs` — 14 tests covering read order, reported absence, four distinct failure kinds, refusal of observations for undeclared members, redundant Markdown refusal, empty bytes versus absence, determinism, and diagnostics that never echo a body.
-* `crates/solo-adapters/src/source_body_preflight.rs` (503 lines) — inert byte preflight of the selected body only: size envelope, strict UTF-8 without a byte-order mark, strict JSON with duplicate members refused at any depth, and the closed body root (`contentVersion` 1.0.0, `title` to 140 scalars, optional `summary` to 500, `blocks` 1 to 250).
-* `crates/solo-adapters/tests/source_body_preflight.rs` — 18 tests covering the closed root, scalar and block bounds, byte-level faults, syntax faults, duplicates at root and depth, exact size boundaries for both kinds, non-echoing refusals, owned bytes, and five in-memory pipeline cases.
+cap-std does confine a caller to a root directory, and that confinement is real. Following a symlink that stays inside the root is not the same property as refusing to follow it, and the order states explicitly that `cap-std::Dir::open` is not proof of symlink refusal, physical identity, race freedom or hardlink safety. The audit confirms the pin offers no public means to close that gap in safe Rust on the permitted paths.
 
-## 4. Security and dependency evidence
+## 4. The closure that would have been added, and why it does not help
 
-* `cargo-deny 0.20.2` verified archives: Ubuntu sha256 `9f12ed4c49936e09b48bf862b595cde2fe64fcbd9d74dfacac6131ca824c8d5f`, Windows sha256 `975a22143262fd27476d19ee00c7af67978426e40e1dee94eed6bbade1cf87dc`; RustSec `7a40350e1b8ba5b656d909f88222a8059a83d88d` fetched at `2026-11-09T05:51:48Z` and `05:52:30Z`; advisories, bans, licenses and sources all ok on the unchanged locked graph.
-* The negative probe resolves a disposable `time 0.3.46` manifest, refuses it with `RUSTSEC-2026-0009` and exit 1, and leaves the real locked graph passing all four checks, so the gate is proven capable of failing.
-* An injected forbidden import is refused with category `undeclared-crate` and exit 1, after which the tree is restored.
-* The architecture checker reports the approved inward-only graph on both hosts (`packages=4 targets=18 files=30 edges=24`, `self-check=passed cases=29`, as independently read by the Architect from the raw logs); the checkout carries 23 refusal fixtures.
+Had the pin been installed, `cap-std 4.0.3` would have pulled `cap-primitives ^4.0.3`, `io-extras ^0.19.0`, `io-lifetimes ^3.0.1`, and `rustix ^1.0.0` with the `fs` feature on non-Windows targets. `cap-primitives 4.0.3` in turn requires `ambient-authority ^0.0.2`, `fs-set-times ^0.20.0`, `io-extras ^0.19.0`, `io-lifetimes ^3.0.1`, `ipnet ^2.5.0`, `maybe-owned ^0.3.4`, `rustix` with `fs`, `process`, `termios` and `time` on non-Windows, `rustix-linux-procfs ^0.1.1` on Linux and Android, and on Windows `windows-sys >=0.60, <0.62` with eight Win32/Wdk feature groups plus `winx ^0.36.0`. That is a materially larger platform-split closure than the accepted fifteen packages, and its licence is `Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT`, which would have required its own evidence and an allow-list decision in `deny.toml`.
 
-## 5. Correction of an earlier claim in this report
+None of that expansion buys the two missing capabilities. The FFI crates are present but not exposed by any safe public API, and the no-follow selector does not exist at either layer. Installing the pin would have produced a bigger, more privileged dependency graph that still could not produce the required proofs, which is exactly what §7.3 asks this agent to establish before touching the lockfile.
 
-This report previously recorded the Ubuntu `cargo-deny` acquisition failure as outstanding and needing an Owner re-run. **That claim is withdrawn.** Run `42570194179` was transiently red at step 9, before `cargo-deny` executed, because the runner could not download the pinned release asset (`http 403`); its Windows leg was already green. Run `42570426821` then passed the entire workflow, every applicable step on both hosts, at the same report HEAD `1cd2751`. Nothing from that transient remains outstanding, and it was never a security finding, a masked gate or a repository defect.
+## 5. Why none of this is waivable under this order
 
-## 6. WIP transitions
+* §4 forbids `canonicalize`, string-prefix comparison, path `metadata` alone, a follow-symlinks API and any pre-open check as security evidence.
+* §5.4 and §5.5 make the leaf, intermediate, loop, junction, swap, volume-boundary, hardlink and alias cases mandatory, and state that partial support on only one host is not a pass.
+* §1 and §7.3 direct a STOP with a concrete architectural or security decision record when the mechanism cannot be implemented and executably proven with this exact pin, stable toolchain, listed paths and safe Rust, and forbid publishing tentative source code as if it were secure.
+* §8 forbids weakening an invariant, adding an unapproved crate or `unsafe`, and substituting permissive errors or untested platform assumptions.
 
-* **NEXT** moved from the neutral file (`92fa562b`) to the single remaining-R02.B candidate (`17b12f17`) at `3eb0a33`. The candidate carries both accepted slices forward as delivered work it must not rebuild and marks `READY` only on that recorded evidence, disclosing one authorization dependency rather than an unmet prerequisite: the native confinement mechanism, and any new vetted component, need their own Owner-issued order and security review. NEXT is never authorization.
-* **ACTIVE** at `3cdc556` was restored to the approved neutral file: 40 bytes, blob `ea5f20b736483c2e102456be1cea9104059fc81a`, verified with `git hash-object` before the commit. An empty slot means only that no work is authorized; it is not a project pause, a freeze or a reopening gate.
-* **ROADMAP** is byte-identical at `18975332`, so `R02.B`, `R02.C` and Stage 02 stay open. **OUTLOOK** is unchanged at `cb9c7a61`. The WIP holds exactly four files, with no subdirectory and no archive.
+Writing a reader that opened files through `cap-std` and reported success would have been a fabricated guarantee: it would follow leaf symlinks, could not distinguish a hardlink alias on Windows, and could not resample a stable by-handle identity. That is the single most damaging outcome available to this run, so nothing was published.
 
-## 7. Remaining limitations
+## 6. The smallest Owner decision this STOP requires
 
-* No file is opened anywhere in the accepted code or in its tests. A declared `Absent` is a report, never proof of absence.
-* Selection is provisional: `OBSERVATION_IS_FILESYSTEM_PROOF`, `PROVISIONAL_CHOICE_IS_FINAL_SELECTION` and `CONTENT_VALIDITY_PROVEN` are all `false`, and both authority accessors return `false`.
-* No immutable snapshot exists, so nothing yet prevents a selected body from changing beneath a reader.
-* Confinement, no-follow containment, and resolved alias, hardlink, separator and case collision refusal remain unproven. They are the NEXT candidate, not this slice.
-* Markdown grammar, raw-HTML refusal, heading and anchor semantics, link and URL safety, `props`, `presentation` and module-registry validity are out of scope, including for the selected body.
-* Nothing here is publishable, routable, visible or deployable: no route, representation, canonical, base URL, visibility or provider behaviour changed.
+Exactly one of the following, then this slice can be re-issued:
 
-## 8. Preserved history
+* **(a) Approve an explicit, separately reviewed platform layer.** Direct `rustix` for Unix (`O_NOFOLLOW`, `fstat` device, inode and link count) and direct `windows-sys` for Windows (`CreateFileW` with `FILE_FLAG_OPEN_REPARSE_POINT` and `FILE_FLAG_BACKUP_SEMANTICS`, then `GetFileInformationByHandle`), plus a bounded `unsafe` policy that names the crate, the single file, the review duty, and the replacement of `#![forbid(unsafe_code)]` for that crate only. `cap-std` may remain the confinement primitive above such a layer, but it cannot supply either property itself.
+* **(b) Replace the conditional `cap-std` selection** in Architecture §6A.8 with a different audited mechanism that already exposes no-follow opens and by-handle identity on both hosts on stable Rust.
+* **(c) Reduce the acceptance requirement** so this slice proves only logical reservation plus root confinement, deferring physical identity and leaf no-follow to a later Stage. Only the Owner can make that requirements change, and it would leave the §5.4 and §5.5 cases unsatisfied rather than verified.
 
-* The R01 STOP, the R02 STOP and the R03 ACCEPT stand unwaived. Each REVISE disposition on this slice, and the correction that closed it, remain in git history and in the commit messages that record them.
-* This is the one canonical report: overwritten each run, never dated, duplicated or archived, and never a source of authority.
+Whichever is chosen also settles two smaller items: the allow-list entry for `Apache-2.0 WITH LLVM-exception` if the cap-std family stays in the graph, and approval of the exact expanded closure before a lockfile is written.
 
-## 9. Changed-path ledger and invariants
+## 7. What this run explicitly does not claim
 
-Across the whole order, `8f81078..HEAD` changes exactly eight paths, all inside the nine permitted:
+Nothing was implemented, so nothing is claimed. No `SourceRead` port or adapter exists, no `cap-std` dependency was added, `Cargo.lock` still holds the accepted fifteen packages, and no checker, workflow, licence or security file changed. The accepted manifest parser, lexical locator, provisional selection policy and inert body preflight remain exactly as accepted: they still open no file and still prove no filesystem state. `R02.B`, `R02.C` and Stage 02 all remain open.
 
-| Path | Change |
-| --- | --- |
-| `.documents/Reports/execution-report.md` | modified |
-| `.documents/WIP/plan-next.md` | modified |
-| `crates/solo-domain/src/lib.rs` | modified |
-| `crates/solo-domain/src/source_selection.rs` | added |
-| `crates/solo-domain/tests/source_selection.rs` | added |
-| `crates/solo-adapters/src/lib.rs` | modified |
-| `crates/solo-adapters/src/source_body_preflight.rs` | added |
-| `crates/solo-adapters/tests/source_body_preflight.rs` | added |
+## 8. Preserved state
 
-`.documents/WIP/workorder-active.md` is the ninth permitted path and nets to no change: it was issued and then restored to its own baseline blob, so the final tree carries no installed order.
+ACTIVE still holds this order; a STOP does not consume or neutralize authorization. NEXT is neutral at the approved 49-byte heading. ROADMAP is byte-identical, so no `R02.B`, `R02.C` or Stage 02 item was consumed. The earlier STOPs and the R03 ACCEPT stand unwaived, and the previous report text remains in Git history.
 
-Unchanged against the baseline and verified by blob equality: `ARCHITECTURE.md`, both SOPs, `plan-roadmap.md`, `plan-outlook.md`, `Cargo.toml`, `Cargo.lock` (15 packages, identical blob), `rust-toolchain.toml`, `.cargo/config.toml`, `deny.toml`, `.github/workflows/rust-verify.yml`, the architecture checker sources, and the accepted R02.A and R02.B-first-slice domain and adapter sources and tests. No dependency, feature, target, workspace member, workflow, schema artifact or security rule was touched.
+## 9. Ledger actually used, CI and cleanup
 
-The repository holds one worktree and one remote, `origin` at the public Solo repository, with local `main` equal to `origin/main` and an empty working tree. No task-owned scratch remains: the order used no `.temp/` material this phase, and the disposable commit-message files it did create were removed. Four pre-existing `.temp/` folders from earlier runs (`architecture-fixtures`, `rt`, `w032`, `w033`) are not this order and were left untouched rather than deleted.
+Only three of the sixteen permitted paths changed: `.documents/WIP/workorder-active.md` (issued, byte-identical), `.documents/WIP/plan-next.md` (neutralized to the approved heading), and `.documents/Reports/execution-report.md` (this report). No other file in the repository was created, modified or deleted.
 
+This report is verified by the run that its own commit triggers; that outcome is not asserted here in advance. The two issuance revisions are verified above with their run and job identifiers.
+
+No task-owned scratch remains: no `.temp/` material and no Cline temporary files were created this run, and no fixture directory was made because no test could be executed locally. The four pre-existing `.temp/` folders from earlier orders (`architecture-fixtures`, `rt`, `w032`, `w033`) belong to those orders and were left untouched rather than deleted.
+
+Disclosure: this environment has no Rust toolchain, so no `cargo` command was run locally and no local compiler, test, format or lockfile result is claimed anywhere in this report.
