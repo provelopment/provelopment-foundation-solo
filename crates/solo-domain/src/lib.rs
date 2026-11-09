@@ -23,6 +23,9 @@
 //!   [`SourceCandidateReservationsV1`] — the cross-representation claim set. This is
 //!   the pure lexical half of the accepted portable-source contract: it opens no
 //!   file, tests no existence, selects no body and proves no filesystem identity.
+//! * [`ProvisionalSourceChoiceV1`] — the outcome of the pure JSON-first selection
+//!   policy over caller-supplied observations. It is *provisional*: it borrows the
+//!   caller's bytes, proves no confinement or snapshot and authorizes no publication.
 
 #![forbid(unsafe_code)]
 
@@ -30,6 +33,7 @@ mod base_candidate;
 mod efs_ownership;
 mod entity_id;
 mod source_locator;
+mod source_selection;
 
 pub use base_candidate::{
     BaseCandidateDetail, BaseCandidateError, BaseCandidateErrorKind, BaseCandidateV1, BaseScheme,
@@ -47,4 +51,9 @@ pub use source_locator::{
     RESERVED_WINDOWS_STEMS, SOURCE_NAMESPACE, SourceCandidateDraftV1, SourceCandidateKind,
     SourceCandidatePathV1, SourceCandidateReservationsV1, SourceCandidateSetV1, SourceClaimError,
     SourceClaimErrorKind, SourceLocatorError, SourceLocatorErrorKind,
+};
+pub use source_selection::{
+    OBSERVATION_IS_FILESYSTEM_PROOF, PROVISIONAL_CHOICE_IS_FINAL_SELECTION,
+    ProvisionalSourceChoiceV1, SourceFailureKind, SourceObservationV1, SourceSelectionRefusal,
+    SourceSelectionRefusalKind, SuppliedObservationsV1, select_provisional_source,
 };
