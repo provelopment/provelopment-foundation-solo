@@ -799,118 +799,81 @@ mod sys {
 
     #[cfg(all(test, windows))]
     mod mapped_view_proofs {
-        use std::fs::{self, File, OpenOptions};
-        use std::os::windows::io::AsRawHandle;
-        use std::ptr;
-        use windows_sys::Win32::Foundation::{CloseHandle, HANDLE};
-        use windows_sys::Win32::System::Memory::{
-            CreateFileMappingW, FILE_MAP_WRITE, MEMORY_MAPPED_VIEW_ADDRESS, MapViewOfFile,
-            PAGE_READWRITE, UnmapViewOfFile,
+        use crate::{ContentRootCapability, RootProvenanceV1};
+        use solo_application::{
+            SourceReadOutcomeV1, SourceReadRefusalKind, read_declared_source_v1,
         };
+        use solo_domain::{
+            SourceCandidateDraftV1, SourceCandidateKind, SourceCandidatePathV1,
+            SourceCandidateSetV1,
+        };
+        use std::fs;
+        use std::path::{Path, PathBuf};
 
         const BODY_LENGTH: usize = 4096;
 
-        struct Section(HANDLE);
+        struct Fixture {
+            base: PathBuf,
+        }
 
-        impl Section {
-            fn over(file: &File) -> Self {
-                // SAFETY: `file` is an open handle owned by the caller for this whole call, the
-                // security descriptor is default (null), `PAGE_READWRITE` is valid for a
-                // file-backed section, a zero maximum size means "the file's current size", and a
-                // null name creates an unnamed section. `Section` owns the handle and closes it
-                // once in `Drop`.
-                let section = unsafe {
-                    CreateFileMappingW(
-                        file.as_raw_handle() as HANDLE,
-                        ptr::null(),
-                        PAGE_READWRITE,
-                        0,
-                        0,
-                        ptr::null(),
-                    )
-                };
-                assert!(
-                    !section.is_null(),
-                    "CreateFileMappingW must return a handle"
-                );
-                Self(section)
+        impl Fixture {
+            fn new(tag: &str) -> Self {
+                let base =
+                    std::env::temp_dir().join(format!("solo-r04-b-{}-{tag}", std::process::id()));
+                let _ = fs::remove_dir_all(&base);
+                fs::create_dir_all(base.join("content").join("pages"))
+                    .expect("create the probe tree");
+                fs::write(Self::leaf_of(&base), vec![b'A'; BODY_LENGTH])
+                    .expect("write the probe body");
+                Self { base }
+            }
+
+            fn leaf_of(base: &Path) -> PathBuf {
+                base.join("content").join("pages").join("p.en-001.json")
+            }
+
+            fn content(&self) -> PathBuf {
+                self.base.join("content")
+            }
+
+            fn capability(&self) -> ContentRootCapability {
+                ContentRootCapability::adopt_bootstrap_path(
+                    &self.content(),
+                    RootProvenanceV1::OperatorDesignatedContentRoot,
+                )
+                .expect("adopt the probe content root")
             }
         }
 
-        impl Drop for Section {
+        impl Drop for Fixture {
             fn drop(&mut self) {
-                // SAFETY: `self.0` is the live section handle this value owns; closing it once
-                // cannot invalidate a view, because each view holds its own reference.
-                unsafe { CloseHandle(self.0) };
+                let _ = fs::remove_dir_all(&self.base);
             }
         }
 
-        struct WritableView {
-            address: MEMORY_MAPPED_VIEW_ADDRESS,
-            length: usize,
-        }
-
-        impl WritableView {
-            fn over(section: &Section, length: usize) -> Self {
-                // SAFETY: `section` is live, `FILE_MAP_WRITE` is permitted by the
-                // `PAGE_READWRITE` section, the offset is zero and a zero size maps the whole
-                // section. `WritableView` owns the address and unmaps it once in `Drop`.
-                let address = unsafe { MapViewOfFile(section.0, FILE_MAP_WRITE, 0, 0, 0) };
-                assert!(!address.Value.is_null(), "MapViewOfFile must map");
-                Self { address, length }
-            }
-
-            fn byte(&self, offset: usize) -> u8 {
-                assert!(offset < self.length, "offset inside the mapped extent");
-                // SAFETY: `offset` is inside the mapped length, the base address is live, and only
-                // that single byte is read.
-                unsafe { *self.address.Value.cast::<u8>().add(offset) }
-            }
-
-            fn fill(&self, value: u8) {
-                // SAFETY: the view maps exactly `self.length` bytes and `value` fills only that
-                // extent; the base address is live and not aliased.
-                unsafe { ptr::write_bytes(self.address.Value.cast::<u8>(), value, self.length) };
-            }
-        }
-
-        impl Drop for WritableView {
-            fn drop(&mut self) {
-                // SAFETY: the address came from `MapViewOfFile` and is unmapped exactly once here.
-                unsafe { UnmapViewOfFile(self.address) };
-            }
+        fn declaration() -> SourceCandidateSetV1 {
+            let locator =
+                SourceCandidatePathV1::parse("pages/p.en-001.json", SourceCandidateKind::Json)
+                    .expect("an accepted locator");
+            let mut draft = SourceCandidateDraftV1::new();
+            draft.json(locator).expect("json declared once");
+            draft.build().expect("a non-empty declaration")
         }
 
         #[test]
-        fn a_handed_off_view_still_writes_in_place() {
-            let base = std::env::temp_dir().join(format!("solo-r04-a-{}", std::process::id()));
-            let _ = fs::remove_dir_all(&base);
-            fs::create_dir_all(&base).expect("create the probe root");
-            let body = base.join("body.bin");
-            fs::write(&body, vec![b'A'; BODY_LENGTH]).expect("write the probe body");
-
-            let view = {
-                let writer = OpenOptions::new()
-                    .read(true)
-                    .write(true)
-                    .open(&body)
-                    .expect("open the probe body writable");
-                let section = Section::over(&writer);
-                let view = WritableView::over(&section, BODY_LENGTH);
-                drop(section);
-                drop(writer);
-                view
-            };
-
-            assert_eq!(view.byte(0), b'A', "the view must map the file");
-            view.fill(b'C');
-            assert_eq!(
-                view.byte(BODY_LENGTH - 1),
-                b'C',
-                "the view must write in place"
-            );
-            drop(view);
-            let _ = fs::remove_dir_all(&base);
+        fn the_product_reader_reads_a_plain_probe_body() {
+            let fixture = Fixture::new("plain");
+            let capability = fixture.capability();
+            let candidates = declaration();
+            match read_declared_source_v1(&capability, &candidates) {
+                SourceReadOutcomeV1::Chosen(choice) => {
+                    assert_eq!(choice.bytes(), vec![b'A'; BODY_LENGTH].as_slice());
+                }
+                SourceReadOutcomeV1::Refused(refusal) => {
+                    let _kind: SourceReadRefusalKind = refusal.kind();
+                    panic!("refused with {}", refusal.code())
+                }
+            }
         }
     }
 }
