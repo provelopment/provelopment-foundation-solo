@@ -694,7 +694,10 @@ mod d2_product {
         let before = fs::read_dir(&pages)
             .expect("list the pages directory")
             .count();
-        assert_eq!(descriptors_under(&scratch.base), 0);
+        // The capability itself legitimately holds the content root open, so the baseline is
+        // measured with it alive: what must not happen is a *per-read* descriptor surviving.
+        let baseline = descriptors_under(&scratch.base);
+        assert_eq!(baseline, 1, "only the capability's root handle is open");
 
         for _ in 0..24 {
             let choice = chosen(read_declared_source_v1(&capability, &candidates));
@@ -711,7 +714,7 @@ mod d2_product {
         );
         assert_eq!(
             descriptors_under(&scratch.base),
-            0,
+            baseline,
             "every snapshot descriptor must be closed before the read returns"
         );
     }
