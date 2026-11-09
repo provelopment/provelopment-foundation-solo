@@ -12,7 +12,7 @@
 | Required starting HEAD / tree | `8f81078ac42d26a882277a5e4bb954bba0303a07` / `ae83cf9c8d737c97cdc6f820bfe76291a361782f` — **matched exactly** |
 | §2 baseline blob ledger | **24 of 24 blobs verified, zero drift**; all four required-absent paths confirmed absent |
 | Current HEAD / tree | `57c905a86c525fef521d86b00be1d7c23ac4f609` / `1ba06d1a199e885473436d1a3860dfefce9d8ea6` |
-| **Status** | **`STOP`** — Architect returned `REVISE` at `6a2b794`; the three rustfmt hunks were not received and cannot be retrieved here, so **no code change was made this turn** |
+| **Status** | **`STOP` at step 16** — the Architect's three hunks are applied; both hosts now pass format (14) and strict Clippy (15); `cargo test` still fails on both hosts and its log body is unreadable from this environment |
 
 ## Outcome
 
@@ -20,7 +20,53 @@ The order's preflight, issuance, scope and refusal design were completed exactly
 
 I could not observe *why* formatting is rejected, so I am stopping rather than continuing to publish unverifiable corrections. This report records that honestly and asks for the smallest Owner decision.
 
-## Chief Architect disposition — `REVISE`, and what this turn could not obtain
+## Second `REVISE` turn — the patch landed, two gates cleared, step 16 still red
+
+The Architect supplied the three rustfmt hunks verbatim. They were applied exactly, and they were correct: **step 14 now passes on both hosts** for the first time in this slice's history.
+
+Applying them exposed the first real compiler verdict on this code, and two defects surfaced in sequence:
+
+| Run | Step 14 Format | Step 15 Clippy | Step 16 Test |
+| --- | --- | --- | --- |
+| `42567342400` @ `f902bec` | **success** | failure, exit `101` | skipped |
+| `42567693709` @ `d1f2171` | success | **success** | failure |
+| `42568029718` @ `1b75e2e` | success | success | failure |
+
+**Defect 1 — E0106, fixed in `d1f2171`.** Both `observations_both` test helpers declared two distinct anonymous input lifetimes (`SourceObservationV1<'_>`) while eliding the return lifetime, so rustc could not say whether the returned `SuppliedObservationsV1<'_>` borrowed from `json` or from `markdown`. Exit `101` was a compilation failure, not a lint nit. Both helpers now name one shared `'a`. Clippy then passed on both hosts with `-D warnings`.
+
+**Defect 2 — a fixture that never reached its own assertion, fixed in `1b75e2e`.** `a_refusal_never_echoes_the_authored_body` asserts that the refusal names `blocks`, but its body was `{"title":"SECRET-TITLE","blocks":[]}`, which omits `contentVersion`; the closed-root check therefore stopped at the *missing* `contentVersion` and correctly reported that location. The fixture now carries the required `contentVersion`, so validation reaches the empty-`blocks` check. No assertion was relaxed, no diagnostic changed, and production code was not touched.
+
+### Where it stands now, and what I cannot see
+
+Step 16 (`cargo test --workspace --all-targets --locked`) still fails. **I cannot read why**, and this time no amount of static reasoning closes the gap, because every assertion in both new test files was re-derived line by line against the implementation and the accepted APIs and is satisfied by it:
+
+* every `json_refusal` / `markdown_refusal` fixture was checked against the actual validation order (unknown member → `contentVersion` → `title` → `summary` → `blocks`), and each expected kind matches;
+* `PREFLIGHT_SOURCE_SELECTION_REFUSED`, `PREFLIGHT_SOURCE_BODY_REFUSED`, `PREFLIGHT_MANIFEST_INVALID` and `PREFLIGHT_SOURCE_PIPELINE_UNKNOWN_REPRESENTATION` were each confirmed against the literal their `code()` returns;
+* the mirrored duplicate-member token matches `publication_manifest`'s `DUPLICATE_KEY_TOKEN` exactly;
+* the manifest fixture was checked key by key against every `closed_keys` list and every required `member(...)` call in the accepted parser, and it satisfies each one;
+* every manifest accessor the pipeline calls (`entity`, `facets`, `sites`, `pages`, `representations`, `locale`, `source_candidates`, `id().as_str()`) exists with the signature used;
+* every symbol both test files import is actually exported by the two `lib.rs` files.
+
+Retrieval was attempted again through every channel available to this agent, and each one is closed:
+
+| Channel | Result |
+| --- | --- |
+| REST job logs / run logs | `403` |
+| Check-run annotations | generic "exit code 1/101" plus security notices |
+| Check-run `output.summary` / `output.text` | empty |
+| Run artifacts | `total_count = 0` |
+| Public job page, anonymous HTTP | renders the step list only, no log body |
+| Public job page, headless browser (no session) | same, `signedIn = false` |
+| Available integration toolkits | no GitHub log capability |
+
+What the evidence does say: the failure is confined to step 16, both hosts fail identically, so it is deterministic rather than flaky; and the step completes in well under a minute, so it is a single failing assertion or panic rather than a hang or a resource limit. That is not enough to name the test, and I will not convert "most likely" into an edit and call it verified — that is precisely the guessing the order forbids.
+
+**The smallest input that finishes this:** the failing test name(s) and assertion text from the step-16 log of run `42568029718`, or log read access for that run. With either, the remaining fix is likely one line, and the gates after 16 (architecture, refusal self-test, tripwire, release build, CLI smoke, byte reproducibility) have never yet had the chance to run and would run on the next push.
+
+
+### Record of the first `REVISE` turn — closed by the next handoff
+
+That turn ended with the three hunks unapplied and the gate red; the next handoff contained them verbatim, applying them cleared step 14, and this record survives only for the evidence it preserves.
 
 The Architect reviewed at `6a2b794be0486de6e48815c3115734fbd27887b5` and reported retrieving the raw Ubuntu and Windows logs for run **`42565562908`** (jobs `128991196631` Ubuntu, `128991196456` Windows, both `failure`), which establish **exactly three outstanding rustfmt differences**, stated to be reproduced in the review. **Those three differences did not reach this agent**, and I did not invent them.
 
@@ -144,13 +190,12 @@ Exactly eight paths differ from the baseline, all within §1: the two WIP files 
 
 ## The smallest decision I need
 
-`main` remains **red** at the implementation revision: the format gate rejects changes to the four new Rust files whose exact deviation I cannot observe, and my local model of rustfmt is now proven unsound. I will not self-authorise a fix, a revert, or a workaround. One of these is needed:
+`main` is **red** at step 16 on both hosts. Format and strict Clippy now pass — the first genuine compiler and linter verdict on this slice, and both are clean — so the two defects the Architect's patch exposed have been fixed and pushed. What remains is a single failing assertion inside the workspace test gate whose output this environment cannot read.
 
-1. **Send the three rustfmt hunks verbatim** — file, line range, and before/after for each. This is the smallest possible input and is sufficient: I can apply exactly those edits and then run every gate to a real result.
-2. **Enable read access to the workflow log body** for run `42565562908`, so the formatter output is directly observable rather than inferred.
-3. **Provide the pinned toolchain** (`rustc`/`cargo`/`rustfmt` `1.99.1`) in this environment, so the exact formatter can be run before pushing.
-4. **Authorise a revert** of the seven commits to restore the last green baseline (`8f81078`), and re-issue the slice when (1), (2) or (3) is available.
+I will not convert a probability into an edit and call it verified, and I will not weaken a test to make it pass. One of these closes it:
 
-Until one of these arrives, the slice is **unproven and unjudged on its merits** — the failure is confined to formatting, no functional judgement of the policy or the preflight has been made by anyone, and `R02.B`, `R02.C` and Stage 02 remain open.
+1. **Send the failing test name(s) and assertion text** from the step-16 log of run `42568029718` (or any later run at this revision). This is the smallest sufficient input: the remaining fix is likely one line, and the gates after 16 have not yet had the chance to run.
+2. **Enable read access to the workflow log body** for this repository, so test output is directly observable rather than inferred.
+3. **Authorise a revert** of the nine commits to restore the last green baseline (`8f81078`), and re-issue the slice when (1) or (2) is available.
 
-**`agent report ready`**
+Until one of these arrives, the slice remains **unproven and unjudged on its merits**: no functional judgement of the policy or the preflight has been made by anyone, two of its defects were found only by the compiler and one by the test gate, and `R02.B`, `R02.C` and Stage 02 remain open. The `R01`/`R02` STOPs and the `R03` ACCEPT stand unwaived in history.
