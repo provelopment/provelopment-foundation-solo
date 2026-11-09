@@ -15,11 +15,14 @@
 | R03 workflow-fix commit / tree / workflow blob | `3a8af1bab7e511a722be8bf8045e5c20200c32aa` / `eccb693c1f4f8436869136becb94c5458e7de95b` / `c12e622bfe5a2c36be2d6c9dd99592dc86b74134` |
 | Frozen R02.B code under review | `cf15cd5377663145e349f5344dedd593146f6396` / `1ba765005219a0935d8b3d9804deb645af5ac0e6` |
 | Green two-host CI | run **`42557798689`** (push, `3a8af1b`) — Ubuntu job `128967312322`, Windows job `128967312395`, **both `success`** |
-| **Status** | **`COMPLETE — evidence phase only`** |
+| Independent disposition | **`ACCEPT`** by the Chief Architect against HEAD `ea9f9fe55868a60338b7e04327279cd5c11d437b` / tree `c4edd26ab017412325631232815ae27c16427f6d` — R03 evidence phase **and** the bounded R02.B first slice |
+| §4.5 NEXT reconciliation | `b8505d6840b804c1735149d9937664369bf890be` / tree `42fa4891f93da9f9ed70e916ac1acc3a3cb871ed` / NEXT blob `316ffc2fcf1600ec9f15547d8bc4c3c6027bb6bc` — run `42559879125`, both hosts `success` |
+| §4.6 ACTIVE neutralisation | `4cd3b3ea0830700ec2557233261548e5161485ff` / tree `14ec0acbe5e6de3ef88d1f0eed068d78f0814269` / ACTIVE blob `ea5f20b736483c2e102456be1cea9104059fc81a` (exactly 40 bytes) |
+| **Status** | **`COMPLETE`** — R03 closed, first slice accepted, next slice **not** started |
 
 ## Outcome
 
-The stale expectation is repaired and the whole mandatory workflow is now green on both hosts, through **every** gate. The only change to shipped verification machinery was the two authorized literals; the R02.B source, dependency graph, security controls and refusal fixtures are byte-unchanged from the reviewed commit.
+The stale expectation is repaired, the whole mandatory workflow is green on both hosts through **every** gate, the bounded R02.B first slice is independently accepted, and the order is closed in the prescribed sequence. The only change to shipped verification machinery across the whole order was the two authorized literals; the R02.B source, dependency graph, security controls and refusal fixtures remain byte-unchanged from the reviewed commit.
 
 Both previous STOPs remain in Git history and are neither waived nor retroactively accepted:
 
@@ -30,8 +33,12 @@ Both previous STOPs remain in Git history and are neither waived nor retroactive
 | R02 report | `d6c0bc7` | run `42554037361` — FAILURE both hosts at `edges=22` | Truthful STOP report |
 | R03 issuance | `80d1699` | run `42557683069` — **expected FAILURE** both hosts at `edges=22` | Order issued under the still-stale workflow |
 | **R03 workflow fix** | **`3a8af1b`** | run **`42557798689`** — **SUCCESS both hosts** | **Fully green** |
+| R03 evidence report | `ea9f9fe` | run `42558461713` — **SUCCESS both hosts** | Report HEAD green; **ACCEPT** returned here |
+| §4.5 NEXT | `b8505d6` | run `42559879125` — **SUCCESS both hosts** | Candidate recorded, ACTIVE still issued |
+| §4.6 ACTIVE neutral | `4cd3b3e` | — (verified at the final HEAD) | Order closed; no work authorized |
 
 I verified the R03 issuance failure was the *same* mechanism, not a new defect, before repairing it: the Ubuntu annotation reads `failure: approved edge count changed`, with steps 1–16 already green.
+
 
 ## The workflow repair, exactly
 
@@ -111,7 +118,7 @@ Raw job logs returned **HTTP 403** for this token, so I could not read log bodie
 
 ## The frozen R02.B first slice
 
-Independently re-confirmed as published, byte-identical to the reviewed blobs, and **not edited** by this order:
+Independently re-confirmed as published, byte-identical to the reviewed blobs, and **not edited** by this order — and now **`ACCEPT`ed by the Chief Architect** as the bounded first slice:
 
 | Property | State |
 | --- | --- |
@@ -144,20 +151,27 @@ Independently re-confirmed as published, byte-identical to the reviewed blobs, a
 
 | File | Blob | State |
 | --- | --- | --- |
-| `workorder-active.md` | `543cc7ae0d1466f40d4fb8649b2d1dc0ef76c088` | **R03 order installed** (not neutralized — §4.4 ACCEPT has not occurred) |
-| `plan-next.md` | `92fa562b1af0c54391851aa5c79deb1631127069` | **neutral, untouched** (population is gated on ACCEPT) |
-| `plan-roadmap.md` | `18975332c2820170a32558c4ee224176667b91ab` | **byte-identical**; `R02.B`/`R02.C` and Stages 02–13 intact |
+| `workorder-active.md` | `ea5f20b736483c2e102456be1cea9104059fc81a` | **neutralised** — exactly 40 bytes, `# Foundation Solo — Active Work Order` + one LF, its own commit `4cd3b3e`. **No work is authorized.** This is not a pause, freeze or reopening gate |
+| `plan-next.md` | `316ffc2fcf1600ec9f15547d8bc4c3c6027bb6bc` | **one remaining-R02.B candidate**, non-executable, gated on its own future Owner-issued order |
+| `plan-roadmap.md` | `18975332c2820170a32558c4ee224176667b91ab` | **byte-identical to the starting blob**; `R02.B`, `R02.C` and Stages 02–13 all intact |
 | `plan-outlook.md` | `cb9c7a610cf3c537557e060ca9656e44a053e69d` | byte-identical |
 
-I did **not** self-accept the slice, close `R02.B`, neutralize ACTIVE or populate NEXT: §4.4 requires the Chief Architect's independent disposition first. Three paths differ from the starting HEAD, exactly as §1 permits: ACTIVE (issuance), the workflow (repair) and this report. `plan-next.md` is deliberately left neutral.
+### Exact path ledger for the whole order
 
-**Cleanup.** R03 produced no build or toolchain artifacts: no local toolchain was installed this run, no `target/` exists in the repository, and I created no scratch files. Task-owned material from the previous run had already been removed, and pre-existing `.temp/` entries belonging to other tasks were left untouched. No PR, merge, branch, extra worktree, stash, amend, rebase, force-push, reset, tag, release, manual workflow dispatch/rerun/cancel, settings change or other-repository write occurred.
+Four permanent paths differ from the starting HEAD `d6c0bc7`, exactly and only those §1 permits: `.documents/WIP/workorder-active.md` (issuance `80d1699`, neutralisation `4cd3b3e`), `.github/workflows/rust-verify.yml` (repair `3a8af1b`, two lines), `.documents/WIP/plan-next.md` (candidate `b8505d6`), and `.documents/Reports/execution-report.md` (this report). Every one of the 22 baseline blobs in the §2 ledger was re-verified unchanged at the end of the run, including all R02.B source, `Cargo.toml`, `Cargo.lock`, `deny.toml`, `rust-toolchain.toml`, both SOPs and `ARCHITECTURE.md`.
 
-## Disposition requested
+**Explicitly not claimed.** The accepted slice is a bounded first slice only: `R02.B` and `R02.C` remain **open**, Stage 02 is **not** closed, and `C1`/`C2–C4` are not asserted complete. I did not implement the NEXT candidate, did not self-accept, and did not begin the next slice.
 
-The **evidence phase** of `SOLO-WO-045 R03` is complete: the full mandatory workflow is green on both hosts at the workflow-fix commit, with every gate — including refusal self-test, tripwire, release smoke and byte-reproducibility — executing rather than skipped.
+**Cleanup.** R03 produced no build or toolchain artifacts: no local toolchain was installed this run, no `target/` exists in the repository, and I created no scratch files — the only temporary files were three commit-message texts in the OS temp directory, each deleted immediately after use. Task-owned material from the previous run had already been removed, and pre-existing `.temp/` entries belonging to other tasks were left untouched rather than deleted. No PR, merge, branch, extra worktree, stash, amend, rebase, force-push, reset, tag, release, manual workflow dispatch/rerun/cancel, settings change or other-repository write occurred.
 
-The Chief Architect should verify at exact GitHub HEAD — the two-line workflow diff, the unchanged R02.B code blobs, the real binary/test/refusal evidence, the shipped-dependency exposure and the run and job identifiers above — and return **`ACCEPT`**, **`REVISE`** or **`STOP`**. On `ACCEPT` of this bounded first slice only, §4.5–§4.6 remain: populate one remaining-R02.B NEXT candidate, verify its both-host CI, then neutralize ACTIVE to blob `ea5f20b736483c2e102456be1cea9104059fc81a` in its own commit and publish the final report. None of that has been started, and a separate order will be required before the next remaining-R02.B slice.
+## Closing disposition
+
+`SOLO-WO-045 R03` is **closed** on the Chief Architect's `ACCEPT` at `ea9f9fe` / `c4edd26a`, covering the R03 technical evidence phase and the bounded R02.B first implementation slice. The order's §§4.5–4.6 were then completed in sequence: one remaining-R02.B NEXT candidate recorded and verified green on both hosts, ACTIVE restored to its exact 40-byte neutral heading in its own commit, and this canonical report published last.
+
+Final state to verify at HEAD: the neutral ACTIVE blob above, byte-identical ROADMAP with `R02.B`/`R02.C` open, exactly four WIP files with no subdirectory, a clean local `main` equal to `origin/main`, one worktree, zero stash, no task-owned scratch, and both hosts green through the entire workflow.
+
+**The next remaining-R02.B slice requires a newly Owner-issued order with a matching handoff. This report authorizes nothing.**
 
 **`agent report ready`**
+
 
