@@ -594,7 +594,7 @@ jobs:
           step "mountpoint_create" mkdir -p "$mnt" "$tmp"
           step "btrfs_mount" sudo mount -o loop "$img" "$mnt"
           step "tmpfs_mount" sudo mount -t tmpfs -o size=16m,mode=0755 tmpfs "$tmp"
-          step "content_create" mkdir -p "$mnt/content"
+          step "content_create" sudo mkdir -p "$mnt/content"
           step "fixture_ownership" sudo chown -R "$(id -u):$(id -g)" "$mnt/content" "$tmp"
           step "supported_mount" findmnt -no FSTYPE,SOURCE,TARGET "$mnt"
           step "unsupported_mount" findmnt -no FSTYPE,SOURCE,TARGET "$tmp"
