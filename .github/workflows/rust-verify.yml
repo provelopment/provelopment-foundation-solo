@@ -560,10 +560,18 @@ jobs:
             Tee-Object -FilePath $log
           $status = $LASTEXITCODE
           if ($status -ne 0) {
-            Select-String -Path $log -Pattern '^---- .* stdout ----' |
-              ForEach-Object { Write-Output "::error title=failing-test::$($_.Line.Trim())" }
             Select-String -Path $log -Pattern '^test .* FAILED$' |
               ForEach-Object { Write-Output "::error title=failing-test::$($_.Line.Trim())" }
+            $lines = Get-Content -Path $log
+            for ($i = 0; $i -lt $lines.Count; $i++) {
+              if ($lines[$i] -match '^---- .* stdout ----') {
+                $detail = ''
+                for ($j = $i + 1; $j -lt $lines.Count -and $j -lt ($i + 12); $j++) {
+                  if ($lines[$j].Trim().Length -gt 0) { $detail = $lines[$j].Trim(); break }
+                }
+                Write-Output "::error title=failing-test::$($lines[$i].Trim()) :: $detail"
+              }
+            }
           }
           exit $status
 

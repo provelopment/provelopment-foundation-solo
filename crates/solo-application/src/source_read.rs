@@ -476,26 +476,26 @@ fn read_and_choose<P: SourceReadPort + ?Sized>(
             CandidateBodyV1::Refused(refusal) => return SourceReadOutcomeV1::Refused(refusal),
         };
 
+    // A second name for the same physical object is refused rather than shared: exactly one
+    // directory entry must own this object for it to count as this candidate's source. This
+    // is decided before any change comparison, because sharing is a collision, not a change.
+    if links != 1 {
+        return SourceReadOutcomeV1::Refused(SourceReadRefusalV1::new(
+            SourceReadRefusalKind::IdentityCollision,
+            Some(member),
+        ));
+    }
+
     // The read must agree with the evidence the probe recorded, not merely with its own
     // before/after samples. A same-size replacement, or a rewrite that keeps the inode,
     // therefore shows up here instead of being returned as a trustworthy body.
     let transferred = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
     let agrees = identity == probe.identity
-        && links == probe.links
         && changed_nanos == probe.changed_nanos
         && transferred == probe.byte_length;
     if !agrees {
         return SourceReadOutcomeV1::Refused(SourceReadRefusalV1::new(
             SourceReadRefusalKind::ChangedDuringRead,
-            Some(member),
-        ));
-    }
-
-    // A second name for the same physical object is refused rather than shared: exactly one
-    // directory entry must own this object for it to count as this candidate's source.
-    if links != 1 {
-        return SourceReadOutcomeV1::Refused(SourceReadRefusalV1::new(
-            SourceReadRefusalKind::IdentityCollision,
             Some(member),
         ));
     }

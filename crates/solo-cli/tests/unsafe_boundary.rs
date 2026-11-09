@@ -209,7 +209,10 @@ fn violations(path: &str, source: &str) -> Vec<String> {
     let mut problems = Vec::new();
     let native = path == NATIVE_MODULE;
 
-    if uses_unsafe(&code) && !native {
+    // The keyword and the `unsafe_code` lint name are both refusals: a file may not use
+    // unsafe, and it may not ask for an allowance that would make using it possible.
+    let mentions_unsafe = uses_unsafe(&code) || code.contains("unsafe_code");
+    if mentions_unsafe && !native {
         problems.push(format!("{path}: uses `unsafe` outside the approved module"));
     }
     if (code.contains("windows_sys") || code.contains("rustix")) && !native {

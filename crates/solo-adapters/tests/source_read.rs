@@ -310,34 +310,81 @@ fn a_missing_intermediate_directory_is_a_confirmed_absence() {
     assert_eq!(code, "SOURCE_NONE_EFFECTIVE");
 }
 
+/// A real content-root reader whose declared leaf is changed once, immediately after the
+/// probe has reported it.
+///
+/// This is the only deterministic way to exercise the probe-to-read race against a real
+/// filesystem: the mutation happens between the two calls `read_declared_source_v1` makes,
+/// so the object the reader opens is not the object the probe announced.
+struct ChangedAfterProbe<'a> {
+    inner: &'a ContentRootCapability,
+    leaf: PathBuf,
+    /// A byte rewrite in place, or a rename of a staged file over the leaf.
+    change: Change,
+    changed: std::cell::Cell<bool>,
+}
+
+enum Change {
+    Rewrite(Vec<u8>),
+    ReplaceWith(PathBuf),
+}
+
+impl SourceReadPort for ChangedAfterProbe<'_> {
+    fn probe_candidate(
+        &self,
+        member: SourceCandidateKind,
+        locator: &SourceCandidatePathV1,
+    ) -> CandidateProbeV1 {
+        let probe = self.inner.probe_candidate(member, locator);
+        if probe.located().is_some() && !self.changed.get() {
+            self.changed.set(true);
+            match &self.change {
+                Change::Rewrite(bytes) => fs::write(&self.leaf, bytes).expect("rewrite the leaf"),
+                Change::ReplaceWith(staged) => {
+                    fs::rename(staged, &self.leaf).expect("replace the leaf with another object");
+                }
+            }
+        }
+        probe
+    }
+
+    fn read_candidate(
+        &self,
+        member: SourceCandidateKind,
+        locator: &SourceCandidatePathV1,
+    ) -> CandidateBodyV1 {
+        self.inner.read_candidate(member, locator)
+    }
+}
+
 #[test]
 fn a_same_size_rewrite_between_probe_and_read_is_refused() {
     let scratch = Scratch::new("same-size");
     scratch.write("pages/p.en-001.json", JSON_BODY);
     let capability = scratch.capability();
-    let leaf = locator("pages/p.en-001.json", SourceCandidateKind::Json);
+    let candidates = declaration(Some("pages/p.en-001.json"), None);
 
-    // The probe records the identity, the length and the timestamps.
-    let probe = capability.probe_candidate(SourceCandidateKind::Json, &leaf);
-    assert!(
-        matches!(probe, CandidateProbeV1::Located { .. }),
-        "the fixture must be located before it is rewritten: {probe:?}"
-    );
-
-    // Same length, different bytes, same inode: only the timestamps can distinguish this
-    // from the object the probe reported, which is exactly why the read is compared with the
-    // probe and not only with its own before/after samples.
+    // Same length, different bytes, same inode: only the recorded timestamps distinguish
+    // this from the object the probe reported, which is exactly why the read is compared
+    // with the probe and not only with its own before/after samples.
     let mut rewritten = JSON_BODY.to_vec();
     rewritten[0] = b'[';
     assert_eq!(rewritten.len(), JSON_BODY.len());
-    scratch.write("pages/p.en-001.json", &rewritten);
+    let port = ChangedAfterProbe {
+        inner: &capability,
+        leaf: scratch.path("pages/p.en-001.json"),
+        change: Change::Rewrite(rewritten),
+        changed: std::cell::Cell::new(false),
+    };
 
-    match capability.read_candidate(SourceCandidateKind::Json, &leaf) {
-        CandidateBodyV1::Refused(refusal) => {
-            assert_eq!(refusal.kind(), SourceReadRefusalKind::ChangedDuringRead);
-        }
-        other => panic!("a same-size rewrite must be refused as a change, got {other:?}"),
-    }
+    let (kind, code) = refused(read_declared_source_v1(&port, &candidates));
+
+    assert!(
+        port.changed.get(),
+        "the fixture must actually have changed the leaf between probe and read"
+    );
+    assert_eq!(kind, SourceReadRefusalKind::ChangedDuringRead);
+    assert_eq!(code, "SNAPSHOT_CHANGED");
 }
 
 #[test]
@@ -345,29 +392,29 @@ fn a_leaf_replaced_by_another_object_between_probe_and_read_is_refused() {
     let scratch = Scratch::new("replaced-leaf");
     scratch.write("pages/p.en-001.json", JSON_BODY);
     let capability = scratch.capability();
-    let leaf = locator("pages/p.en-001.json", SourceCandidateKind::Json);
-    let probe = capability.probe_candidate(SourceCandidateKind::Json, &leaf);
-    assert!(
-        matches!(probe, CandidateProbeV1::Located { .. }),
-        "the fixture must be located before it is replaced: {probe:?}"
-    );
+    let candidates = declaration(Some("pages/p.en-001.json"), None);
 
-    // A different object, same size, same name: renamed over the declared leaf.
+    // A different object, same size, same name, renamed over the declared leaf after the
+    // probe reported the original: a new physical identity, so the read cannot agree.
     let mut replacement = JSON_BODY.to_vec();
     replacement[1] = b'X';
+    assert_eq!(replacement.len(), JSON_BODY.len());
     scratch.write("pages/replacement.tmp", &replacement);
-    fs::rename(
-        scratch.path("pages/replacement.tmp"),
-        scratch.path("pages/p.en-001.json"),
-    )
-    .expect("replace the declared leaf with a different object");
+    let port = ChangedAfterProbe {
+        inner: &capability,
+        leaf: scratch.path("pages/p.en-001.json"),
+        change: Change::ReplaceWith(scratch.path("pages/replacement.tmp")),
+        changed: std::cell::Cell::new(false),
+    };
 
-    match capability.read_candidate(SourceCandidateKind::Json, &leaf) {
-        CandidateBodyV1::Refused(refusal) => {
-            assert_eq!(refusal.kind(), SourceReadRefusalKind::ChangedDuringRead);
-        }
-        other => panic!("a replaced object must be refused as a change, got {other:?}"),
-    }
+    let (kind, code) = refused(read_declared_source_v1(&port, &candidates));
+
+    assert!(
+        port.changed.get(),
+        "the fixture must actually have replaced the leaf between probe and read"
+    );
+    assert_eq!(kind, SourceReadRefusalKind::ChangedDuringRead);
+    assert_eq!(code, "SNAPSHOT_CHANGED");
 }
 
 #[test]
