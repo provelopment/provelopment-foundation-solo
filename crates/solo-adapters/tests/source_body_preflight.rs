@@ -377,7 +377,7 @@ fn size_boundaries_are_exact_for_both_body_kinds() {
 
 #[test]
 fn a_refusal_never_echoes_the_authored_body() {
-    let body = br#"{"title":"SECRET-TITLE","blocks":[]}"#;
+    let body = br#"{"contentVersion":"1.0.0","title":"SECRET-TITLE","blocks":[]}"#;
     let candidates = json_candidates();
     let choice = select(&candidates, SourceCandidateKind::Json, body);
     let error = match preflight_selected_body(&choice) {
