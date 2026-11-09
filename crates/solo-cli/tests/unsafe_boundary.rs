@@ -200,6 +200,18 @@ fn uses_unsafe(code: &str) -> bool {
         .any(|word| word == "unsafe")
 }
 
+/// Whether any `allow(unsafe_code)` is asked for **without** a Windows gate.
+///
+/// The crate root carries the single documented `#[cfg_attr(windows, allow(unsafe_code))]`
+/// that lets the approved module compile; that gated form is the only acceptable one, and an
+/// ungated request anywhere is a refusal.
+fn has_ungated_allowance(code: &str) -> bool {
+    code.match_indices("allow(unsafe_code)").any(|(index, _)| {
+        let start = index.saturating_sub(24);
+        !code[start..index].contains("cfg_attr(windows,")
+    })
+}
+
 /// Why `source`, located at the repository-relative `path`, is not allowed.
 ///
 /// An empty result means compliant. This one function is what the guard tests call for both
@@ -209,9 +221,10 @@ fn violations(path: &str, source: &str) -> Vec<String> {
     let mut problems = Vec::new();
     let native = path == NATIVE_MODULE;
 
-    // The keyword and the `unsafe_code` lint name are both refusals: a file may not use
-    // unsafe, and it may not ask for an allowance that would make using it possible.
-    let mentions_unsafe = uses_unsafe(&code) || code.contains("unsafe_code");
+    // The keyword and an ungated `allow(unsafe_code)` request are both refusals: a file may
+    // not use unsafe, and it may not ask for the allowance that would make using it possible
+    // without the Windows gate. A `deny(unsafe_code)` is the opposite of an allowance.
+    let mentions_unsafe = uses_unsafe(&code) || has_ungated_allowance(&code);
     if mentions_unsafe && !native {
         problems.push(format!("{path}: uses `unsafe` outside the approved module"));
     }

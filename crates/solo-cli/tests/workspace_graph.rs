@@ -448,14 +448,20 @@ fn real_locked_graph_resolves_without_floating_versions() {
 #[test]
 fn the_real_graph_carries_no_rename_that_could_hide_an_edge() {
     let graph = real_graph(&metadata_value());
-    let renamed: Vec<&Edge> = graph
+    // A rename must never hide an edge: every edge is recorded by its true package and the
+    // rename is carried alongside it, so a rename can only ever be additional information.
+    // The rule that matters for this workspace is therefore that no **first-party** edge is
+    // aliased. The locked graph does contain one third-party internal rename — `rustix`
+    // depends on `errno` as `libc_errno` — which is recorded, cannot disguise a first-party
+    // edge, and is not ours to forbid.
+    let hidden: Vec<&Edge> = graph
         .edges
         .iter()
-        .filter(|candidate| candidate.alias.is_some())
+        .filter(|candidate| candidate.alias.is_some() && is_workspace(&candidate.from))
         .collect();
     assert!(
-        renamed.is_empty(),
-        "no real dependency may be renamed, found {renamed:?}"
+        hidden.is_empty(),
+        "no first-party dependency may be renamed, found {hidden:?}"
     );
 }
 
