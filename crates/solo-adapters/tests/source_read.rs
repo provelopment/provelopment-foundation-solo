@@ -319,14 +319,9 @@ fn a_missing_intermediate_directory_is_a_confirmed_absence() {
 struct ChangedAfterProbe<'a> {
     inner: &'a ContentRootCapability,
     leaf: PathBuf,
-    /// A byte rewrite in place, or a rename of a staged file over the leaf.
-    change: Change,
+    /// The file renamed over the leaf once the probe has reported the original.
+    staged: PathBuf,
     changed: std::cell::Cell<bool>,
-}
-
-enum Change {
-    Rewrite(Vec<u8>),
-    ReplaceWith(PathBuf),
 }
 
 impl SourceReadPort for ChangedAfterProbe<'_> {
@@ -338,12 +333,8 @@ impl SourceReadPort for ChangedAfterProbe<'_> {
         let probe = self.inner.probe_candidate(member, locator);
         if probe.located().is_some() && !self.changed.get() {
             self.changed.set(true);
-            match &self.change {
-                Change::Rewrite(bytes) => fs::write(&self.leaf, bytes).expect("rewrite the leaf"),
-                Change::ReplaceWith(staged) => {
-                    fs::rename(staged, &self.leaf).expect("replace the leaf with another object");
-                }
-            }
+            fs::rename(&self.staged, &self.leaf)
+                .expect("replace the leaf with another object after its probe");
         }
         probe
     }
@@ -357,35 +348,12 @@ impl SourceReadPort for ChangedAfterProbe<'_> {
     }
 }
 
-#[test]
-fn a_same_size_rewrite_between_probe_and_read_is_refused() {
-    let scratch = Scratch::new("same-size");
-    scratch.write("pages/p.en-001.json", JSON_BODY);
-    let capability = scratch.capability();
-    let candidates = declaration(Some("pages/p.en-001.json"), None);
-
-    // Same length, different bytes, same inode: only the recorded timestamps distinguish
-    // this from the object the probe reported, which is exactly why the read is compared
-    // with the probe and not only with its own before/after samples.
-    let mut rewritten = JSON_BODY.to_vec();
-    rewritten[0] = b'[';
-    assert_eq!(rewritten.len(), JSON_BODY.len());
-    let port = ChangedAfterProbe {
-        inner: &capability,
-        leaf: scratch.path("pages/p.en-001.json"),
-        change: Change::Rewrite(rewritten),
-        changed: std::cell::Cell::new(false),
-    };
-
-    let (kind, code) = refused(read_declared_source_v1(&port, &candidates));
-
-    assert!(
-        port.changed.get(),
-        "the fixture must actually have changed the leaf between probe and read"
-    );
-    assert_eq!(kind, SourceReadRefusalKind::ChangedDuringRead);
-    assert_eq!(code, "SNAPSHOT_CHANGED");
-}
+// A same-size in-place rewrite is deliberately **not** claimed as a host case. It is only
+// observable through the recorded change timestamps, and on Windows those advance on a system
+// timer tick, so a rewrite microseconds after the probe can be genuinely indistinguishable from
+// it. The rule itself — a body that disagrees with its probe is refused — is proved
+// deterministically by the application-level fake-port test, and the always-observable host
+// case below proves the refusal on real filesystems of both hosts.
 
 #[test]
 fn a_leaf_replaced_by_another_object_between_probe_and_read_is_refused() {
@@ -403,7 +371,7 @@ fn a_leaf_replaced_by_another_object_between_probe_and_read_is_refused() {
     let port = ChangedAfterProbe {
         inner: &capability,
         leaf: scratch.path("pages/p.en-001.json"),
-        change: Change::ReplaceWith(scratch.path("pages/replacement.tmp")),
+        staged: scratch.path("pages/replacement.tmp"),
         changed: std::cell::Cell::new(false),
     };
 
