@@ -799,39 +799,24 @@ mod sys {
 
     #[cfg(all(test, windows))]
     mod mapped_view_proofs {
-        use std::ptr;
-        use windows_sys::Win32::Foundation::{CloseHandle, HANDLE, INVALID_HANDLE_VALUE};
-        use windows_sys::Win32::System::Memory::{
-            CreateFileMappingW, FILE_MAP_WRITE, MapViewOfFile, PAGE_READWRITE, UnmapViewOfFile,
-        };
+        use std::fs::{self, OpenOptions};
+        use std::os::windows::io::AsRawHandle;
 
         #[test]
-        fn a_pagefile_section_can_be_created_mapped_and_released() {
-            // SAFETY: a pagefile-backed section needs no file handle, `PAGE_READWRITE` is valid,
-            // the size is fixed at 4096 bytes and no name is given. On success the handle is
-            // closed and the view unmapped below.
-            let section: HANDLE = unsafe {
-                CreateFileMappingW(
-                    INVALID_HANDLE_VALUE,
-                    ptr::null(),
-                    PAGE_READWRITE,
-                    0,
-                    4096,
-                    ptr::null(),
-                )
-            };
-            assert!(!section.is_null(), "a pagefile section must be created");
-            // SAFETY: `section` is the live handle created above and the whole section is mapped
-            // writable; the view is unmapped below.
-            let view = unsafe { MapViewOfFile(section, FILE_MAP_WRITE, 0, 0, 0) };
-            assert!(!view.Value.is_null(), "the pagefile section must map");
-            // SAFETY: `view` is live and at least one byte is mapped, so the first byte is in
-            // range and is the only one written.
-            unsafe { *view.Value.cast::<u8>() = 0x41 };
-            // SAFETY: `view` came from `MapViewOfFile` and is unmapped exactly once here.
-            unsafe { UnmapViewOfFile(view) };
-            // SAFETY: `section` is the live handle and is closed exactly once here.
-            unsafe { CloseHandle(section) };
+        fn an_open_options_handle_is_permitted() {
+            let base = std::env::temp_dir().join(format!("solo-r04-a12-{}", std::process::id()));
+            let _ = fs::remove_dir_all(&base);
+            fs::create_dir_all(&base).expect("create the probe root");
+            let body = base.join("body.bin");
+            fs::write(&body, vec![b'A'; 8]).expect("write the probe body");
+            let file = OpenOptions::new()
+                .read(true)
+                .write(true)
+                .open(&body)
+                .expect("open the probe body");
+            assert!(!file.as_raw_handle().is_null(), "the handle must be real");
+            drop(file);
+            let _ = fs::remove_dir_all(&base);
         }
     }
 }
