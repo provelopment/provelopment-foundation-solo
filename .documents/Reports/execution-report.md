@@ -1,175 +1,225 @@
 # Execution Report
 
-**Order:** `SOLO-WO-047 R02` (Owner-issued, unchanged by this run).
-**Run kind:** implementation revision under Chief Architect disposition `REVISE`, plus the standing report permission.
-**Implementation HEAD:** `ec4335d9f9cd2e7d7269a64d61b83abf5a6b47b1`
-**Implementation tree:** `97855bd70362a77f899ccd1c7efff9ac22d81dd1`
-**Workflow:** `rust-verify` run `42596833689` (run 98) — **success**
-&nbsp;&nbsp;· Ubuntu job `129091422335` **success** (09:53:38 → 09:54:39)
-&nbsp;&nbsp;· Windows job `129091422290` **success** (09:53:36 → 09:55:23)
-**Report HEAD:** the separately committed report commit whose SHA is given in chat, never inside this file.
+**Order:** `SOLO-WO-047 R03` — R02.B third bounded slice: proof-first immutable native source snapshot (Owner-approved D2).
+**Run kind:** implementation and technical report under that order; D1's residual and D3's operator promise remain rejected.
+**Repository:** `provelopment/provelopment-foundation-solo`, branch `main`, sole `origin`, one checkout.
+**Starting HEAD:** `d2c42e46e193886dc153c8262c5e709488e69d5e` / tree `b43850f77f503bb5d98221716ad02a5142ac9a5b` (all 20 §3 blobs matched; `source_read_security.rs` absent).
+**Implementation HEAD:** `63ea2254118596074ab198fbdf249e9eb58a805e`
+**Implementation tree:** `2f9c543828975a9fa2068ff8785e2271c62d0e40`
+**Implementation workflow:** `rust-verify` run `42605284158` (run 107) — **success**
+&nbsp;&nbsp;· Ubuntu job `129119596652` **success** (10:59:03 → 11:00:33)
+&nbsp;&nbsp;· Windows job `129119596343` **success**
+**Report HEAD:** its own SHA and the IDs of its own `rust-verify` run are given in chat, because a commit cannot contain its own SHA.
 
 ---
 
-## 1. Outcome of this pass
+## 1. What was built
 
-* **A — root-capability trust boundary: implemented and verified.** The reader now accepts a
-  **trusted, already-opened directory handle** and verifies it *on the handle*, not on a path.
-* **B — physical ambiguity in all declared candidates: implemented and verified.** A located
-  candidate with more than one directory entry fails closed even when it is the unselected member,
-  and a changed link count between probe and read is refused.
-* **C — the §4 requirement-to-test ledger is §4 below**, with every mandatory case mapped to a named
-  test, the class of evidence it actually provides, and its observed result.
-* **D — the in-place mutation guarantee is resolved for Windows and STOPPED for Linux** with the
-  smallest Owner architectural decision (§5). R02 §4 has **not** been weakened; the Linux
-  no-torn-read guarantee is **not** claimed.
+The Linux native path now takes a **real immutable snapshot** of the source before any byte is
+returned, inside the one audited module (`crates/solo-adapters/src/source_read_native.rs`), in safe
+`rustix` only:
 
-## 2. Corrections in this pass
+1. the existing trusted root (`open` + `O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC`, or an owned handle
+   transferred by the caller and verified on the handle) and the existing confined source
+   (`openat2` with `RESOLVE_BENEATH|NO_SYMLINKS|NO_MAGICLINKS|NO_XDEV`) are held as owned descriptors;
+2. the source is re-`fstat`ed: it must be a plain regular file, its `st_dev` must equal the trusted
+   root's, and its length must be inside the per-kind bound (JSON 2 MiB, Markdown 1 MiB) — an
+   over-bound body is refused **before** anything is cloned;
+3. `openat(root_fd, ".", O_TMPFILE|O_EXCL|O_RDWR|O_CLOEXEC, 0600)` creates an **unnamed, unlinkable**
+   inode on the source's own filesystem;
+4. exactly one `rustix::fs::ioctl_ficlone(&clone, &source)` — one call, no retry, no alternative;
+5. the clone's own `st_dev`, regularity and length are checked against the source, and only then is
+   the clone read, exactly `length` bytes, with a short clone refused as a change;
+6. the clone descriptor is dropped (RAII) on success, on error and on panic, and nothing is ever
+   named, linked, renamed or persisted.
 
-**A. Handle transfer, not path-plus-enum.** `ContentRootCapability::from_trusted_directory(handle,
-provenance)` takes ownership of `TrustedDirectoryHandle` (`std::os::fd::OwnedFd` on Unix,
-`std::os::windows::io::OwnedHandle` on Windows) and reads the object's **own** type, reparse state and
-identity from that handle: Linux uses `fstat` and refuses anything that is not a directory; Windows uses
-`GetFileInformationByHandleEx(FileAttributeTagInfo/FileIdInfo/FileStandardInfo/FileBasicInfo)` and
-refuses a non-directory or any non-zero reparse tag. No path is resolved in that route. The previous
-constructor is retained only as `adopt_bootstrap_path`, documented as the operator bootstrap that opens
-the designated directory **once** — it is no longer described as proof that a handle was supplied.
+Typed failure mapping is separate from the ordinary resolver mapping: `EOPNOTSUPP`, `ENOSYS`,
+`EINVAL`, `EPERM`, `EROFS` and `EBUSY` are `Unsupported` (a refusal, never a copy and never absence),
+`EXDEV` and a destination on another device are `Unsafe`, `EACCES` is `PermissionDenied`, everything
+else is `OtherIo`. There is no `copy_file_range`, `read`/`write` copy, `std::fs::copy`, `mmap`,
+advisory lock, sleep/retry or second path-open anywhere in the path.
 
-**B. Ambiguity belongs to the candidate, not the selection.** `read_declared_source_v1` refuses
-`IdentityCollision` when **either** located probe reports more than one directory entry, before anything
-is read, so an unselected Markdown cannot hide behind a valid JSON body and neither body is opened to
-find out. Probe-to-read consistency compares identity, length, change evidence **and link count**, so a
-link count that changes after the probe is refused; a shared object is decided as a collision before any
-change comparison.
+Windows keeps its existing `NtCreateFile` traversal, by-handle reparse/type/file-ID checks and
+owned-handle transfer, and its body handles request `ShareAccess = FILE_SHARE_READ`, which is what
+makes a competing writer or delete fail while the read is pinned.
 
-**D (Windows half).** Handles opened to read a body request `ShareAccess = FILE_SHARE_READ` only: while
-the reader holds the handle no other opener can obtain write or delete access, so the object cannot be
-modified or replaced under it. That is an auditable **open policy enforced by the I/O manager**, not a
-second timestamp comparison. Directory handles keep full sharing because they are only traversed.
+The application port is unchanged in shape; the only new application change is the defect R03
+names in §1: `check_physical_reservations_v1` now refuses a candidate whose link count is not one
+**before** recording any reservation, so a sole declaration and an unselected member are both
+refused for ambiguity. No OS type, no new authority and no new dependency entered
+`solo-application` or `solo-domain`.
 
-## 3. Evidence
+## 2. Feasibility, and the four red runs it cost
 
-Local gates (pinned `1.99.1`) are green for both `x86_64-pc-windows-gnu` and
-`x86_64-unknown-linux-gnu`: `fmt --check`, `check --workspace --all-targets --locked` and
-`clippy --workspace --all-targets --locked -- -D warnings`. Local test execution remains impossible
-here (no linker/assembler for any target), so every host-executed result is from the workflow.
+Stage I confirmed the pinned API before any product file changed: `rustix 1.1.5` exposes
+`pub fn ioctl_ficlone<Fd: AsFd, SrcFd: AsFd>(fd: Fd, src_fd: SrcFd) -> Result<()>` under feature
+`fs` (it is **safe**, so no new `unsafe`), and `OFlags` carries `TMPFILE`, `EXCL`, `RDWR` and
+`CLOEXEC`. The hosted Ubuntu root filesystem is ext4, which cannot reflink, so the positive proof
+had to be built on a bounded disposable fixture. Every red run below is a real defect found by real
+evidence, not a suppressed or retried gate:
 
-Full mandatory sequence green on both hosts at `ec4335d`: locked fetch, `cargo-deny 0.20.2` gate with a
-fresh RustSec refresh, advisory negative probe, package-set gates, `fmt`, strict `clippy`, the whole test
-step (including every test named in §4), the real-tree architecture checker
-(`architecture=legal packages=4 … edges=40`), the refusal self-test (`self-check=passed cases=29`), both
-test-failure tripwires, the byte-reproducible release build, the release CLI smoke and the forbidden-import
-refusal with restore.
+| Run | HEAD | Result | Exact finding and correction |
+| --- | --- | --- | --- |
+| 100 | `331f74e` | green both | Issuance commit only (ACTIVE replaced byte-identically; NEXT neutral, ROADMAP/OUTLOOK untouched). |
+| 101 | `a81b996` | Ubuntu red, Windows red | My first probe module named `rustix` in a **test** file, which the load-bearing boundary guard refuses (`unsafe_boundary::no_first_party_file_outside_the_native_module_uses_unsafe`): the guard is not relaxed for tests. The primitive proof moved **into** the audited native module as unit tests over the real `snapshot_leaf`/`read_bounded`. Ubuntu's red was the fixture step, whose first version reported only an exit status. |
+| 102 | `e68ed37` | Windows **green**, Ubuntu red | Diagnostic annotations named it: `chown: cannot access '.../content': No such file or directory` — the test directory had been created *before* the loop mount and was shadowed by it. Fixed by creating it inside the mounted filesystem. |
+| 103 | `071d672` | Ubuntu red | `mkdir .../content: Permission denied` — a freshly formatted btrfs root is root-owned, so the directory is created with the privilege the format requires and then chowned to the runner user. |
+| 104 | `6bf6016` | Ubuntu red (one test) | `d2_product::a_snapshot_leaves_no_named_destination_and_no_open_descriptor`: my oracle counted the capability's own legitimate content-root handle as "a descriptor left open". The baseline is now measured with that handle alive, so what is asserted is that no *per-read* descriptor survives 24 reads. |
+| 105 | `49d87ca` | **green both** | First complete D2 proof. |
+| 106 | `1d22122` | green both | Architecture §6A.8 paragraph and the two module-level guarantees restated to match what is now proven. |
+| 107 | `63ea225` | green both | Equal-size source rewrite added to the clone proof. |
 
-## 4. R02 §4 requirement-to-test ledger
-
-Every row below is a test that **executed and passed on both hosts** in run 98 at `ec4335d`, unless the
-row's class says otherwise. `native` = real filesystem/kernel behaviour on that host; `fake` = the
-application-level fake port, which proves the decision but not the host; `injected` = a deliberately
-injected refusal or substitution, which proves the classification, never native behaviour.
-
-| # | Requirement | Test | Class | Result |
-| --- | --- | --- | --- | --- |
-| 1 | Declared JSON leaf read with its bytes and identity | `a_declared_json_leaf_is_read_with_its_bytes_and_identity` | native | pass |
-| 2 | Markdown used only after confirmed JSON absence | `a_declared_markdown_leaf_is_read_when_json_is_confirmed_absent`, `confirmed_json_absence_permits_markdown` | native, fake | pass |
-| 3 | Oversized JSON refused, never truncated | `an_oversized_json_is_refused_rather_than_truncated` | native | pass |
-| 4 | Unselected Markdown never read while JSON is available | `an_oversized_markdown_is_never_read_when_json_exists`, `json_present_is_chosen_and_markdown_is_never_read` | native, fake | pass |
-| 5 | Empty leaf is present with no bytes | `an_empty_json_leaf_is_present_with_no_bytes` | native | pass |
-| 6 | Leaf symlink refused | `a_leaf_that_is_a_link_is_refused` | native | pass |
-| 7 | Intermediate reparse/symlink refused | `an_intermediate_directory_that_is_a_link_is_refused` (junction on Windows, symlink on Linux) | native | pass |
-| 8 | Root reparse/symlink refused | `a_root_that_is_a_link_is_refused` | native | pass |
-| 9 | Directory in place of a leaf refused | `a_directory_in_place_of_a_leaf_is_refused` | native | pass |
-| 10 | Missing intermediate is absence, not an error | `a_missing_intermediate_directory_is_a_confirmed_absence` | native | pass |
-| 11 | Error is never converted into absence | `a_probe_refusal_is_final_and_never_falls_back`, `an_injected_unsupported_answer_is_refused_and_never_becomes_absence` | fake, injected | pass |
-| 12 | Hardlink within one representation refused | `a_leaf_with_a_second_directory_entry_is_refused`, `a_hardlinked_body_is_refused_rather_than_shared` | native, fake | pass |
-| 13 | Hardlink created from an unrelated directory entry refused | `a_leaf_hardlinked_from_an_unrelated_directory_is_refused` | native | pass |
-| 14 | Unselected ambiguous candidate refused, winner's body not read | `an_unselected_hardlinked_markdown_is_refused_while_json_would_have_won`, `an_unselected_hardlinked_candidate_is_refused_before_any_body_is_read` | native, fake | pass |
-| 15 | Link count changing between probe and read refused | `a_link_count_that_changes_between_probe_and_read_is_refused` | injected | pass |
-| 16 | Two members resolving to one object refused | `two_declared_members_that_are_one_object_are_refused` | native | pass |
-| 17 | Identity reserved across distinct representations | `two_representations_resolving_to_one_physical_object_are_refused`, `distinct_representations_reserve_their_own_identities` | fake | pass |
-| 18 | Leaf replaced by another object between probe and read refused | `a_leaf_replaced_by_another_object_between_probe_and_read_is_refused` | native | pass |
-| 19 | Probe/read disagreement on identity, length or change evidence refused | `a_probe_to_read_replacement_that_keeps_identity_and_length_is_refused`, `a_read_of_a_different_object_than_the_probe_located_is_refused`, `a_read_whose_length_disagrees_with_the_probe_is_refused` | injected | pass |
-| 20 | A body vanishing after its probe is a change, not an absence | `a_body_that_vanishes_after_its_probe_is_a_change_not_an_absence` | injected | pass |
-| 21 | A rewrite between separate reads is observed, never served from memory | `a_rewrite_between_reads_is_observed_and_never_served_from_memory` | native | pass |
-| 22 | Trusted, already-opened directory handle accepted and verified | `a_transferred_directory_handle_is_verified_and_reads_correctly` | native | pass |
-| 23 | Handle that names a regular file refused | `a_transferred_handle_to_a_regular_file_is_refused` | native | pass |
-| 24 | Handle that names a reparse point refused | `a_transferred_handle_to_a_junction_is_refused` | native (Windows only) | pass |
-| 25 | Absent root refused without being read as empty | `an_absent_root_is_refused` | native | pass |
-| 26 | No outcome claims publication or snapshot authority | `no_read_outcome_can_claim_publication_or_snapshot_authority` | fake | pass |
-| 27 | Diagnostics stay bounded and carry no location | `diagnostics_stay_bounded_and_carry_no_location` | fake | pass |
-| 28 | Fingerprinting separates content and is not identity | `the_fingerprint_separates_content_and_ignores_identity` | fake | pass |
-| 29 | Unsupported API/kernel answer refused, never a fallback | `an_injected_unsupported_answer_is_refused_and_never_becomes_absence` | injected — **native `ENOSYS` unverified** (§5) | pass (injected) |
-| 30 | Bytes cannot be torn while they are transferred | Windows: the read handle denies write/delete sharing (§2 D); Linux: **not guaranteed** | policy, not a race test — see §5 | §5 |
-
-Rows 15, 19 and 20 have no native counterpart that can be produced deterministically on both hosts, and
-row 29 cannot be produced natively at all without a syscall interposer; they are labelled injected for
-exactly that reason. No simulated case is presented as a native-filesystem proof.
+The fixture is bounded exactly as §4 permits: one 192 MiB loop-backed Btrfs image and one 16 MiB
+tmpfs mount, both under `$RUNNER_TEMP`, uniquely named from `github.run_id`/`run_attempt`, mounted
+by `sudo` on preinstalled tools only, with the test directory passed to the tests as
+`SOLO_TEST_SOURCE_FS_ROOT` and the non-reflink target as `SOLO_TEST_UNSUPPORTED_FS_ROOT`. No package
+was installed, no host mount was changed, nothing outside `$RUNNER_TEMP` was written, and no image
+is uploaded as an artifact. The final step is `if: always()`, unmounts only the two exact
+task-owned mount points, refuses to delete behind a live mount, detaches only a loop device that
+still references this job's own image, deletes only the owned image and mount points, and then
+asserts that all three paths are gone (`r03_fixture_cleanup=complete`). That cleanup ran and
+succeeded in every run above, including the red ones.
 
 
-## 5. D — the in-place mutation guarantee, and the one decision needed
+## 3. D2 requirement matrix — evidence class and observed result
 
-**Windows has the guarantee, by open policy.** A body handle requests `ShareAccess = FILE_SHARE_READ`.
-While it is open no other opener can obtain write or delete access, so the object cannot be modified or
-replaced underneath the transfer; a writer that already holds a write handle makes our open fail, and
-that failure is a refusal rather than a silent read. This is enforcement by the I/O manager and is
-auditable in one call (`NtCreateFile` share argument), not an inference from two timestamp samples.
+`native` means executed on the real host against the real kernel and filesystem; `fake` is the
+application-level fake port; `injected` is a deliberately injected outcome. No simulated case is
+presented as a native filesystem proof, and no native case is claimed from a fake port.
 
-**Linux does not have it, and cannot have it under the approved design.** Every available mechanism was
-assessed and rejected for cause:
+### 3.1 Linux — supported filesystem (real Btrfs fixture, real `FICLONE`)
 
-* `fcntl`/`flock` locks are **advisory** — a writer that does not take the lock ignores it, so they
-  cannot make a read atomic;
-* mandatory locking (`MS_MANDLOCK`) is deprecated, requires mount-level configuration, and is not
-  present on the hosted runner or on ordinary ext4 — it cannot be a product guarantee;
-* `openat2` with `RESOLVE_*`, `O_NOFOLLOW` and `O_CLOEXEC` govern **resolution**, not concurrent
-  modification, and the existing `RESOLVE_NO_XDEV|NO_SYMLINKS|NO_MAGICLINKS|BENEATH` policy is about
-  where the bytes come from, not whether they change during the transfer;
-* a real immutable snapshot needs a snapshot or reflink primitive (`FICLONE`, a btrfs subvolume
-  snapshot, an LVM/ZFS snapshot) — filesystem-specific, unavailable on the ext4 runner, and it would
-  introduce a new dependency and a new host-capability requirement that this order does not authorize;
-* `mmap(MAP_PRIVATE)` gives copy-on-write pages but the kernel still faults in pages that a writer may
-  have modified, so it is not a snapshot either.
+| Requirement | Test (all PASS, run 107) | Class |
+| --- | --- | --- |
+| A real anonymous `O_TMPFILE|O_EXCL` + `ioctl_ficlone` snapshot succeeds | `snapshot_proofs::an_anonymous_clone_keeps_its_bytes_while_the_source_is_rewritten_in_place` | native |
+| The clone is its own inode and shares no identity with the source | same test (distinct `st_ino`, equal length before the rewrite) | native |
+| Source overwritten **after clone, before read**: clone bytes unchanged | same test, length-changing rewrite | native |
+| **Equal-size** source rewrite: clone bytes unchanged | same test, second rewrite of identical length | native |
+| A second read of the same clone returns identical bytes | same test (two reads after each mutation) | native |
+| A fresh snapshot *does* see the new bytes (clone is an instant, not a cache) | same test (`re-clone` → `REWRITTEN`) | native |
+| No named destination is ever created | same test (`read_dir` count stays 1) + `d2_product::a_snapshot_leaves_no_named_destination_and_no_open_descriptor` | native |
+| No snapshot descriptor survives the read; repeated drops are clean | `d2_product::a_snapshot_leaves_no_named_destination_and_no_open_descriptor` (24 reads, descriptor baseline unchanged) | native |
+| Exact bound accepted, bound+1 refused before cloning | `snapshot_proofs::an_oversized_source_is_refused_before_anything_is_cloned`, `d2_product::a_body_at_the_exact_bound_is_snapshotted_and_one_byte_over_is_refused` | native |
+| Zero-length source is an empty snapshot | `an_empty_json_leaf_is_present_with_no_bytes` (unchanged test, now through the clone) | native |
+| Unselected Markdown never read while JSON is available | `an_oversized_markdown_is_never_read_when_json_exists` and the retained application cases | native/fake |
+| No source write from the product read path | the read path holds `RDONLY` source descriptors only; asserted structurally by the module's tests creating no entry | native |
 
-Consequently the residual is unchanged and is **not** presented as solved: on Linux an in-place,
-same-size rewrite that lands inside one filesystem timestamp tick can leave identity, length, link
-count and change evidence identical, so detection cannot be guaranteed. Two comparisons and a
-fingerprint are not atomic-read evidence, and the report does not use them as such.
+### 3.2 Linux — real unsupported filesystem (real tmpfs, real `EOPNOTSUPP`)
 
-**STOP for the smallest Owner architectural decision.** Exactly one of these is required before §4 can
-be claimed on Linux:
+| Requirement | Test (PASS, run 107) | Class |
+| --- | --- | --- |
+| A real filesystem without reflink refuses at the primitive | `snapshot_proofs::a_filesystem_without_reflink_is_refused_instead_of_copied` (`Unsupported`) | native |
+| The **product** path refuses rather than copying | `d2_product::a_filesystem_without_reflink_is_refused_instead_of_read_by_copying` (`SOURCE_UNSUPPORTED`) | native |
+| No fallback, no false absence | both above: tmpfs reads perfectly, so only a real clone requirement can refuse it | native |
+| Mount-crossing, root/reparse/hardlink and permission refusals stay classified | the retained negative suite (`a_root_that_is_a_link_is_refused`, `a_leaf_that_is_a_link_is_refused`, `an_intermediate_directory_that_is_a_link_is_refused`, `a_leaf_with_a_second_directory_entry_is_refused`, `a_leaf_hardlinked_from_an_unrelated_directory_is_refused`, `a_directory_in_place_of_a_leaf_is_refused`, `a_missing_intermediate_directory_is_a_confirmed_absence`) | native |
 
-* **D1 (smallest):** accept detect-and-refuse as the contracted Linux behaviour of `SourceRead`, with
-  the residual above stated as a permanent, documented limitation of the accepted design; or
-* **D2:** require a snapshot-capable filesystem and adopt an explicit snapshot primitive, adding the
-  host-capability probe, the refusal path for hosts without it, and the dependency that this implies; or
-* **D3:** require an operator-guaranteed exclusive-access discipline on the content root, making the
-  existing detection authoritative and the residual a configuration violation.
+### 3.3 Windows — real writer exclusion (real Windows 2025)
 
-No code change in this run presumes any of the three, and none weakens the accepted §4 wording.
+| Requirement | Test (PASS, run 107) | Class |
+| --- | --- | --- |
+| A preexisting incompatible write handle blocks the reader | `writer_exclusion::a_preexisting_write_handle_prevents_the_body_read` | native |
+| While a body handle is pinned, a competing write open fails | `writer_exclusion::the_reader_share_mode_denies_a_competing_writer_and_a_delete` | native |
+| While a body handle is pinned, a delete fails | same test | native |
+| The denial comes from the pin, not from a locked file | same test: both succeed once the pin is dropped | native |
+| Reparse/junction, file-ID, transfer and hardlink coverage retained | `a_transferred_handle_to_a_junction_is_refused`, `a_leaf_that_is_a_link_is_refused`, `two_declared_members_that_are_one_object_are_refused`, `a_leaf_hardlinked_from_an_unrelated_directory_is_refused` | native |
 
-## 6. Preserved state, ledger and cleanup
+### 3.4 Application — the global reservation defect
 
-`ACTIVE` was not edited (order still issued and unchanged, blob `4cb50914`); `NEXT` neutral
-(`92fa562b`); `ROADMAP` untouched (`18975332`); previously accepted modules byte-identical; the earlier
-R01 STOP and this order's earlier R02 STOP remain in history. R02.B, R02.C and Stage 02 stay open, and no
-administrative closure was begun. No dependency, manifest, `Cargo.lock`, `deny.toml` or toolchain change
-was made in this pass.
+| Requirement | Test (PASS) | Class |
+| --- | --- | --- |
+| A **sole** declaration with two directory entries is refused | `a_sole_declaration_with_two_directory_entries_is_refused_before_any_reservation` | fake |
+| An **unselected** multi-link member is refused globally | `an_unselected_multi_link_member_is_refused_by_the_global_reservation` | fake |
+| Refused before any body read | both assert the exact call list (`probe:*` only) | fake |
+| Collision diagnostics unchanged | both assert `SOURCE_COLLISION` and the offending member | fake |
+| Earlier reservation, probe-to-read and publication-false tests still pass | the whole retained suite, including `two_representations_resolving_to_one_physical_object_are_refused`, `distinct_representations_reserve_their_own_identities`, `a_link_count_that_changes_between_probe_and_read_is_refused` | fake/injected |
 
-Paths touched in this run, all inside the R02 21-path authorization ledger:
-`crates/solo-adapters/src/source_read.rs`, `crates/solo-adapters/src/source_read_native.rs`,
-`crates/solo-adapters/src/lib.rs`, `crates/solo-adapters/tests/source_read.rs`,
-`crates/solo-application/src/source_read.rs`, `crates/solo-application/tests/source_read.rs`, plus the
-earlier corrections in `crates/solo-cli/tests/architecture_checks/source.rs`,
-`crates/solo-cli/tests/workspace_graph.rs`, `crates/solo-cli/tests/unsafe_boundary.rs`,
-`crates/solo-cli/tests/check_architecture_fixtures.rs`, `.github/workflows/rust-verify.yml` and this
-report. The authority flags remain `false`: `SOURCE_READ_PROVES_GLOBAL_SNAPSHOT = false` and
-`SOURCE_READ_GRANTS_PUBLICATION_AUTHORITY = false`.
+The full R02 §4 30-row matrix is retained and still passes; every row that was `native` before is
+still `native`, now additionally inside the snapshot path on Linux.
 
-**Cleanup.** `.temp/toolchain` (sanctioned, checksum-verified `1.99.1`) and `.temp/target` (cache) are
-retained with the trigger *delete on acceptance or abandonment*; the four older `.temp/` folders and
-`.temp/architecture-fixtures` are Owner/earlier-run material and were not touched; the untracked 781.6 MB
-`target/` from an earlier run stayed removed; the working tree is clean.
 
-**Standing limitations.** Job logs remain `403` from this environment, so all results above come from
-run/job status, check-run annotations and step conclusions. Local test execution is impossible here.
+## 4. Version, safety and the complete gate evidence
+
+Rust stays pinned at `1.99.1`; the locked graph is unchanged (four first-party packages, 22 total
+locked packages, `rustix =1.1.5` Linux-only, `windows-sys =0.61.2` Windows-only), `Cargo.lock`,
+every `Cargo.toml`, `deny.toml` and `rust-toolchain.toml` are byte-identical to the starting tree,
+and no crate, feature, version or allowance was added. The Linux implementation is **safe Rust**:
+`ioctl_ficlone`, `openat`, `fstat` and `read` are all safe `rustix` calls, so the project's only
+`unsafe` remains the Windows-gated region in `source_read_native.rs` with its unchanged
+`// SAFETY:` notes; `#![deny(unsafe_code)]` at the adapter root and `#![forbid(unsafe_code)]` in the
+inner crates are untouched, and the boundary guard continues to refuse `unsafe`, native imports or
+extra allowances in every other first-party file — it is stricter than before, not looser, because
+it now also covers the new test module.
+
+Green at `63ea225` on **both** hosts: locked fetch; the verified `cargo-deny 0.20.2` gate
+(advisories, bans, licenses, sources, fresh RustSec DB, `RUSTSEC-2026-0009` advisory negative probe
+refused with exit 1 on Ubuntu); the four-package guard; `cargo fmt --check`; all-target
+`clippy -D warnings`; the whole test step including every D2 test above; the real-tree architecture
+checker (`architecture=legal packages=4 … edges=40`); the refusal self-test
+(`self-check=passed cases=29`); both test-failure tripwires; the release build; the Ubuntu forbidden
+import rejection with guaranteed restore; the release CLI smoke on both hosts; and the two
+byte-identical clean release builds. No gate was weakened, skipped or made advisory, and the
+fixture cleanup is itself a fail-closed step that ran green.
+
+## 5. Verified limitations — explicitly not claimed
+
+* **Kernel and tool versions are not reported here.** The fixture step records `host_kernel`,
+  `mkfs_version`, `supported_mount` and `unsupported_mount` in the Ubuntu job log, which this
+  environment cannot read (raw log download returns 403). The *filesystem classes* are nonetheless
+  proven by behaviour: the positive target cloned and the negative target refused with a real
+  `EOPNOTSUPP`. No kernel or `mkfs.btrfs` version claim is made.
+* **Kernel `ENOSYS` is UNVERIFIED and was not simulated.** It was unnecessary: a genuine unsupported
+  filesystem produced a genuine unsupported error, so no simulated `ENOSYS` classification is
+  claimed anywhere.
+* **Identical synthetic timestamps on the equal-size rewrite are UNVERIFIED.** The equal-size
+  rewrite itself is proven natively; setting both timestamps identically would need a new
+  timestamp API or dependency, which R03 does not authorize. This does not weaken the proof: the
+  clone's bytes are separate before any timestamp is consulted.
+* **No injected clone/read barrier seam was built.** Instead the unit proof holds one real clone
+  across a real source mutation and reads it twice — a stronger oracle than an injected seam, and it
+  is labelled as the real mechanism proof it is.
+* **The Windows preexisting *memory-mapping* adversary is UNVERIFIED.** A writable mapped section
+  held across the read was not constructed; the proven Windows exclusion is the share-mode
+  behaviour of the read handle against write and delete opens.
+* **Per-file only.** Nothing here proves a global candidate, manifest, asset or multi-file
+  publication snapshot. `SOURCE_READ_PROVES_GLOBAL_SNAPSHOT = false` and
+  `SOURCE_READ_GRANTS_PUBLICATION_AUTHORITY = false` are unchanged, no publication, routing,
+  visibility or validation authority was added, and R02.B, R02.C and Stage 02 remain **open**.
+* **A product host without the clone capability must refuse.** That is now enforced
+  (`SOURCE_UNSUPPORTED`), not merely documented, and there is no best-effort degradation.
+
+
+## 6. Path and blob ledger
+
+Nine of the eleven authorized paths were touched; the optional one stayed absent.
+
+| Path | Operation |
+| --- | --- |
+| `.documents/WIP/workorder-active.md` | Owner-installed R03 committed byte-identically, alone, in the issuance commit |
+| `.github/workflows/rust-verify.yml` | Bounded Ubuntu fixture, host env routing, guaranteed cleanup; no existing gate altered (+134) |
+| `crates/solo-adapters/src/source_read_native.rs` | Linux anonymous clone snapshot, typed mapping, restated guarantee, proof unit tests (+250) |
+| `crates/solo-adapters/src/source_read.rs` | Snapshot call site and accurate guarantee docs (14 changed) |
+| `crates/solo-adapters/tests/source_read.rs` | Fixture-root routing, product snapshot/refusal/cleanup/bound cases, Windows writer exclusion (+209) |
+| `crates/solo-application/src/source_read.rs` | Global reservation link-count refusal only (14 changed) |
+| `crates/solo-application/tests/source_read.rs` | Sole and unselected multi-link refusal cases (+60) |
+| `.documents/Architecture/ARCHITECTURE.md` | §6A.8 `SourceRead` paragraph and its adjacent trust paragraph only (4 changed) |
+| `.documents/Reports/execution-report.md` | This single canonical report |
+| `crates/solo-adapters/tests/source_read_security.rs` | **OPTIONAL CREATE — remained absent** |
+
+`README.md`, `AGENTS.md`, both SOPs, `ROADMAP`, `OUTLOOK`, `NEXT` (`92fa562b`), every manifest,
+`Cargo.lock`, `deny.toml`, the toolchain file, the checker and unsafe-boundary sources, the accepted
+manifest/locator/selection/preflight modules and the other architecture sections are untouched;
+`plan-roadmap.md` (`18975332`) and `plan-outlook.md` (`cb9c7a61`) are byte-identical.
+
+## 7. Cleanup and status
+
+The working tree is empty, there is one checkout on `main` with one remote, and the WIP holds exactly
+four regular files with no subdirectory. Every CI path the fixture created was removed by the
+guaranteed step in every run, including the red ones; nothing was left mounted or attached. Locally,
+`.temp/toolchain` (sanctioned, checksum-verified `1.99.1`) and `.temp/target` are retained with the
+disclosed trigger *delete on acceptance or abandonment*; no Owner-owned or other-order temporary
+material was touched, and no other checkout, worktree, clone or stash exists.
+
+**This report claims technical evidence only.** It does not claim ACCEPT, does not close R02.B, does
+not open R02.C and does not move `ROADMAP`. Its own run and SHA are reported to the Owner in chat,
+and the Owner alone relays `agent report ready`.
 
