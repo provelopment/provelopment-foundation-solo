@@ -137,8 +137,8 @@ fn json_with_blocks(count: usize) -> Vec<u8> {
 
 /// A JSON body of exactly `target` bytes, valid in every other respect.
 fn json_of_exact_size(target: usize) -> Vec<u8> {
-    let head = r#"{"contentVersion":"1.0.0","title":"Home","blocks":["#;
-    let tail = r#""]}"#;
+    let head = "{\"contentVersion\":\"1.0.0\",\"title\":\"Home\",\"blocks\":[\"";
+    let tail = "\"]}";
     let filler = target - head.len() - tail.len();
     let mut text = String::with_capacity(target);
     text.push_str(head);
