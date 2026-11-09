@@ -57,4 +57,4 @@ pub use source_body_preflight::{
     InertBodyCandidateV1, MAX_BLOCKS, MAX_JSON_BODY_BYTES, MAX_MARKDOWN_BODY_BYTES,
     MAX_SUMMARY_SCALARS, MAX_TITLE_SCALARS, preflight_selected_body, run_in_memory_source_pipeline,
 };
-pub use source_read::{ContentRootCapability, RootProvenanceV1};
+pub use source_read::{ContentRootCapability, RootProvenanceV1, TrustedDirectoryHandle};

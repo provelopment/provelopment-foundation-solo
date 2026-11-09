@@ -515,3 +515,110 @@ fn no_read_outcome_can_claim_publication_or_snapshot_authority() {
     assert!(!publication_authority);
     assert!(!snapshot_authority);
 }
+
+/// A located probe that reports a second directory entry for the same object.
+fn located_hardlinked(value: u64, length: u64) -> CandidateProbeV1 {
+    CandidateProbeV1::Located {
+        identity: identity(value),
+        byte_length: length,
+        links: 2,
+        changed_nanos: STAMP,
+    }
+}
+
+/// A present body that claims a different number of directory entries than its probe did.
+fn present_with_links(bytes: &[u8], value: u64, links: u64) -> CandidateBodyV1 {
+    CandidateBodyV1::Present {
+        fingerprint: fingerprint_of(bytes),
+        bytes: bytes.to_vec(),
+        identity: identity(value),
+        links,
+        changed_nanos: STAMP,
+    }
+}
+
+#[test]
+fn an_unselected_hardlinked_candidate_is_refused_before_any_body_is_read() {
+    // A valid JSON member would win the selection, but the *unselected* Markdown is ambiguous.
+    // The ambiguity belongs to the candidate, so neither body is read.
+    let fake = FakePort::new()
+        .with(
+            SourceCandidateKind::Json,
+            (located(1, JSON_BODY.len() as u64), present(JSON_BODY, 1)),
+        )
+        .with(
+            SourceCandidateKind::Markdown,
+            (
+                located_hardlinked(2, MARKDOWN_BODY.len() as u64),
+                present(MARKDOWN_BODY, 2),
+            ),
+        );
+    let candidates = declaration(Some("pages/p.en-001.json"), Some("pages/p.en-001.md"));
+
+    let outcome = read_declared_source_v1(&fake, &candidates);
+
+    let SourceReadOutcomeV1::Refused(refusal) = outcome else {
+        panic!("an ambiguous declared candidate must be refused, got {outcome:?}");
+    };
+    assert_eq!(refusal.kind(), SourceReadRefusalKind::IdentityCollision);
+    assert_eq!(refusal.member(), Some(SourceCandidateKind::Markdown));
+    assert_eq!(fake.calls(), vec!["probe:json", "probe:markdown"]);
+}
+
+#[test]
+fn a_link_count_that_changes_between_probe_and_read_is_refused() {
+    // One directory entry at probe time, two when the same name is read: ambiguity arriving
+    // after the probe is a collision, not a benign change.
+    let fake = FakePort::new().with(
+        SourceCandidateKind::Json,
+        (
+            located(1, JSON_BODY.len() as u64),
+            present_with_links(JSON_BODY, 1, 2),
+        ),
+    );
+    let candidates = declaration(Some("pages/p.en-001.json"), None);
+
+    let outcome = read_declared_source_v1(&fake, &candidates);
+
+    let SourceReadOutcomeV1::Refused(refusal) = outcome else {
+        panic!("a changed link count must be refused, got {outcome:?}");
+    };
+    assert_eq!(refusal.kind(), SourceReadRefusalKind::IdentityCollision);
+    assert_eq!(refusal.code(), "SOURCE_COLLISION");
+}
+
+#[test]
+fn an_injected_unsupported_answer_is_refused_and_never_becomes_absence() {
+    // This is an **injected** mapping, not a host observation: it proves the fail-closed
+    // classification of an unsupported/native-less answer, which no mechanism available in
+    // this environment can force from a real kernel.
+    let fake = FakePort::new()
+        .with(
+            SourceCandidateKind::Json,
+            (
+                CandidateProbeV1::Refused(SourceReadRefusalV1::new(
+                    SourceReadRefusalKind::Unsupported,
+                    Some(SourceCandidateKind::Json),
+                )),
+                present(JSON_BODY, 1),
+            ),
+        )
+        .with(
+            SourceCandidateKind::Markdown,
+            (
+                located(2, MARKDOWN_BODY.len() as u64),
+                present(MARKDOWN_BODY, 2),
+            ),
+        );
+    let candidates = declaration(Some("pages/p.en-001.json"), Some("pages/p.en-001.md"));
+
+    let outcome = read_declared_source_v1(&fake, &candidates);
+
+    let SourceReadOutcomeV1::Refused(refusal) = outcome else {
+        panic!("an unsupported answer must be refused, got {outcome:?}");
+    };
+    assert_eq!(refusal.kind(), SourceReadRefusalKind::Unsupported);
+    assert_eq!(refusal.code(), "SOURCE_UNSUPPORTED");
+    // Neither a fallback nor an absence is inferred from it.
+    assert_eq!(fake.calls(), vec!["probe:json", "probe:markdown"]);
+}

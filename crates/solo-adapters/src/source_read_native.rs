@@ -96,8 +96,23 @@ pub(crate) struct RootHandle {
 
 impl RootHandle {
     /// Opens `path` once and records the identity of what was actually opened.
-    pub(crate) fn adopt(path: &Path) -> Result<Self, NativeError> {
+    ///
+    /// This is the **bootstrap** route: the path names the operator-designated content root,
+    /// and after this call it is never consulted again. It is deliberately *not* the trusted
+    /// handle transfer — see [`RootHandle::from_trusted_directory`], which accepts a handle
+    /// that was already opened and verified by the caller.
+    pub(crate) fn adopt_bootstrap_path(path: &Path) -> Result<Self, NativeError> {
         let (raw, identity) = sys::adopt_root(path)?;
+        Ok(Self { raw, identity })
+    }
+
+    /// Takes ownership of an already-opened directory handle and verifies it on the handle.
+    ///
+    /// Nothing here resolves a path: the object under test is the handle the caller supplied.
+    /// Its own type, reparse state and identity are read from the handle, so a handle that
+    /// names a regular file, or a reparse point, is refused rather than trusted.
+    pub(crate) fn from_trusted_directory(handle: TrustedDirectory) -> Result<Self, NativeError> {
+        let (raw, identity) = sys::adopt_owned_root(handle)?;
         Ok(Self { raw, identity })
     }
 
@@ -111,6 +126,14 @@ impl RootHandle {
         sys::MECHANISM
     }
 }
+
+/// The owned directory handle a trusted bootstrap hands to [`RootHandle`].
+#[cfg(unix)]
+pub(crate) type TrustedDirectory = std::os::fd::OwnedFd;
+
+/// The owned directory handle a trusted bootstrap hands to [`RootHandle`].
+#[cfg(windows)]
+pub(crate) type TrustedDirectory = std::os::windows::io::OwnedHandle;
 
 /// Opens one leaf by single relative names beneath `root`, without following anything.
 ///
@@ -216,6 +239,22 @@ mod sys {
             Mode::empty(),
         )
         .map_err(map_err)?;
+        let identity = facts_of(&fd)?.identity;
+        Ok((DirHandle { fd }, identity))
+    }
+
+    /// Verifies an already-opened directory descriptor and takes ownership of it.
+    ///
+    /// The object under test is the descriptor the caller supplied: its own type and identity
+    /// are read with `fstat`, so a descriptor naming a regular file, a device or a symlinked
+    /// object is refused. No path is resolved or re-resolved here.
+    pub(super) fn adopt_owned_root(
+        fd: rustix::fd::OwnedFd,
+    ) -> Result<(DirHandle, PhysicalIdentityV1), NativeError> {
+        let stat = rustix::fs::fstat(&fd).map_err(map_err)?;
+        if rustix::fs::FileType::from_raw_mode(stat.st_mode) != rustix::fs::FileType::Directory {
+            return Err(NativeError::Unsafe);
+        }
         let identity = facts_of(&fd)?.identity;
         Ok((DirHandle { fd }, identity))
     }
@@ -505,6 +544,20 @@ mod sys {
         Ok((DirHandle { handle }, facts.identity))
     }
 
+    /// Verifies an already-opened directory handle and takes ownership of it.
+    ///
+    /// Type, reparse state and identity are read from the handle the caller supplied, so a
+    /// handle naming a regular file or a reparse point is refused. No path is resolved here.
+    pub(super) fn adopt_owned_root(
+        handle: OwnedHandle,
+    ) -> Result<(DirHandle, PhysicalIdentityV1), NativeError> {
+        let (facts, is_dir) = handle_facts(handle.as_raw_handle())?;
+        if !is_dir {
+            return Err(NativeError::Unsafe);
+        }
+        Ok((DirHandle { handle }, facts.identity))
+    }
+
     /// Opens one single relative name under an already-open parent handle.
     ///
     /// `OBJ_CASE_INSENSITIVE` is deliberately **not** requested: the lookup is meant to be
@@ -543,6 +596,15 @@ mod sys {
             };
         let access =
             FILE_READ_ATTRIBUTES | SYNCHRONIZE | if want_read { FILE_READ_DATA } else { 0 };
+        // A handle used to read a body denies write and delete sharing for as long as it is
+        // open, so no other opener can modify the object under this handle: that is what makes
+        // the read atomic on this host rather than merely sampled. Directory handles keep full
+        // sharing, because they are only traversed.
+        let share = if want_read {
+            FILE_SHARE_READ
+        } else {
+            SHARE_ALL
+        };
 
         // SAFETY: `parent` is a live handle owned by the caller for this call; `unicode`
         // names `wide`, which is a NUL-free UTF-16 buffer alive across the call and whose
@@ -559,7 +621,7 @@ mod sys {
                 ptr::from_mut(&mut io_status),
                 ptr::null(),
                 0,
-                SHARE_ALL,
+                share,
                 FILE_OPEN,
                 options,
                 ptr::null(),

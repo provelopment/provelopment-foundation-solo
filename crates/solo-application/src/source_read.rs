@@ -491,6 +491,7 @@ fn read_and_choose<P: SourceReadPort + ?Sized>(
     // therefore shows up here instead of being returned as a trustworthy body.
     let transferred = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
     let agrees = identity == probe.identity
+        && links == probe.links
         && changed_nanos == probe.changed_nanos
         && transferred == probe.byte_length;
     if !agrees {
@@ -590,6 +591,24 @@ pub fn read_declared_source_v1<P: SourceReadPort + ?Sized>(
             SourceReadRefusalKind::IdentityCollision,
             Some(Markdown),
         ));
+    }
+
+    // A located candidate that shares its physical object with another directory entry is
+    // refused here, before anything is read. The ambiguity belongs to the candidate, not to
+    // the selection, so an **unselected** member cannot escape it and the other member's body
+    // is never opened to find out.
+    for (member, probe) in [
+        (SourceCandidateKind::Json, json_probe.as_ref()),
+        (SourceCandidateKind::Markdown, markdown_probe.as_ref()),
+    ] {
+        if let Some((_, CandidateProbeV1::Located { links, .. })) = probe
+            && *links != 1
+        {
+            return SourceReadOutcomeV1::Refused(SourceReadRefusalV1::new(
+                SourceReadRefusalKind::IdentityCollision,
+                Some(member),
+            ));
+        }
     }
 
     if let Some((locator, probe)) = &json_probe

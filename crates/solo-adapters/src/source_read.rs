@@ -48,6 +48,14 @@ impl RootProvenanceV1 {
     }
 }
 
+/// The owned directory handle a trusted bootstrap hands to the reader.
+#[cfg(unix)]
+pub type TrustedDirectoryHandle = std::os::fd::OwnedFd;
+
+/// The owned directory handle a trusted bootstrap hands to the reader.
+#[cfg(windows)]
+pub type TrustedDirectoryHandle = std::os::windows::io::OwnedHandle;
+
 /// An explicitly trusted, already-opened content-root capability.
 ///
 /// The caller supplies the root *once*. Everything afterwards is relative to this handle, so
@@ -59,20 +67,44 @@ pub struct ContentRootCapability {
 }
 
 impl ContentRootCapability {
-    /// Adopts `path` as the trusted content root, on the caller's explicit assertion.
+    /// Opens `path` **once** as the operator-designated content root and records what was
+    /// opened.
     ///
-    /// This is the single trust decision in the reader. Trust is not derivable from a path,
-    /// so it is not derived: `provenance` is a required argument naming *why* the caller
-    /// asserts this directory is the installation content root, it is recorded on the
-    /// capability, and no bare path text can become a root capability without it. The call
-    /// opens the directory once and records the physical identity of what was actually opened.
+    /// This is the bootstrap route, not the trusted-handle transfer. The path is the operator's
+    /// designation; it is resolved exactly once, and every later operation is relative to the
+    /// resulting handle, so no later path text can redirect a read. `provenance` records which
+    /// assertion the caller made; it is not evidence about the handle, which is why the handle
+    /// route [`Self::from_trusted_directory`] exists for a caller that already holds one.
     ///
     /// # Errors
     ///
     /// Returns a refusal when the root cannot be opened, is not a directory, or is itself a
     /// symlink or reparse point.
-    pub fn adopt(path: &Path, provenance: RootProvenanceV1) -> Result<Self, SourceReadRefusalV1> {
-        native::RootHandle::adopt(path)
+    pub fn adopt_bootstrap_path(
+        path: &Path,
+        provenance: RootProvenanceV1,
+    ) -> Result<Self, SourceReadRefusalV1> {
+        native::RootHandle::adopt_bootstrap_path(path)
+            .map(|root| Self { root, provenance })
+            .map_err(|error| map_native(error, None))
+    }
+
+    /// Takes ownership of a directory handle a trusted bootstrap already opened.
+    ///
+    /// This is the trusted-handle route R02 §1 requires. The object under test is the handle
+    /// itself: its own type, reparse state and identity are read from it, so a handle naming a
+    /// regular file or a reparse point is refused, and the path that opened it is never
+    /// consulted again — there is no later path.
+    ///
+    /// # Errors
+    ///
+    /// Returns a refusal when the supplied handle is not a directory, names a symlink or
+    /// reparse point, or cannot be interrogated.
+    pub fn from_trusted_directory(
+        handle: TrustedDirectoryHandle,
+        provenance: RootProvenanceV1,
+    ) -> Result<Self, SourceReadRefusalV1> {
+        native::RootHandle::from_trusted_directory(handle)
             .map(|root| Self { root, provenance })
             .map_err(|error| map_native(error, None))
     }

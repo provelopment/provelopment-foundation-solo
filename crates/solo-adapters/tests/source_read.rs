@@ -12,7 +12,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use solo_adapters::{ContentRootCapability, RootProvenanceV1};
+use solo_adapters::{ContentRootCapability, RootProvenanceV1, TrustedDirectoryHandle};
 use solo_application::{
     CandidateBodyV1, CandidateProbeV1, SourceReadOutcomeV1, SourceReadPort, SourceReadRefusalKind,
     read_declared_source_v1,
@@ -55,8 +55,9 @@ impl Scratch {
     }
 
     fn capability(&self) -> ContentRootCapability {
-        let capability = ContentRootCapability::adopt(&self.content(), TRUSTED)
+        let capability = ContentRootCapability::adopt_bootstrap_path(&self.content(), TRUSTED)
             .expect("adopt the scratch content root");
+
         // The trust input is explicit and recorded, never inferred from the path.
         assert_eq!(capability.provenance(), TRUSTED);
         capability
@@ -266,7 +267,7 @@ fn a_root_that_is_a_link_is_refused() {
     let linked_root = scratch.base.join("content-link");
     create_directory_link(&scratch.content(), &linked_root);
 
-    let adopted = ContentRootCapability::adopt(&linked_root, TRUSTED);
+    let adopted = ContentRootCapability::adopt_bootstrap_path(&linked_root, TRUSTED);
 
     match adopted {
         Ok(_) => panic!("a root that is a link must not be adopted"),
@@ -279,7 +280,7 @@ fn an_absent_root_is_refused() {
     let scratch = Scratch::new("absent-root");
     let missing = scratch.base.join("does-not-exist");
 
-    match ContentRootCapability::adopt(&missing, TRUSTED) {
+    match ContentRootCapability::adopt_bootstrap_path(&missing, TRUSTED) {
         Ok(_) => panic!("a missing root must not be adopted"),
         Err(refusal) => assert_ne!(refusal.kind(), SourceReadRefusalKind::NoneEffective),
     }
@@ -458,4 +459,155 @@ fn create_directory_link(target: &Path, link: &Path) {
         metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0,
         "the fixture must be a reparse point, not an ordinary directory"
     );
+}
+
+// ---------------------------------------------------------------------------
+// R02 §1 — the trusted, already-opened directory handle.
+//
+// The handle is the object under test. Nothing below hands the reader a path and then
+// describes that as a handle transfer.
+// ---------------------------------------------------------------------------
+
+#[cfg(unix)]
+fn open_directory_handle(path: &Path) -> TrustedDirectoryHandle {
+    use std::os::fd::OwnedFd;
+    OwnedFd::from(fs::File::open(path).expect("open the content root as a directory handle"))
+}
+
+#[cfg(windows)]
+fn open_directory_handle(path: &Path) -> TrustedDirectoryHandle {
+    use std::os::windows::fs::OpenOptionsExt;
+    use std::os::windows::io::OwnedHandle;
+    const FILE_FLAG_BACKUP_SEMANTICS: u32 = 0x0200_0000;
+    let file = fs::File::options()
+        .read(true)
+        .custom_flags(FILE_FLAG_BACKUP_SEMANTICS)
+        .open(path)
+        .expect("open the content root as a directory handle");
+    OwnedHandle::from(file)
+}
+
+#[cfg(unix)]
+fn open_file_handle(path: &Path) -> TrustedDirectoryHandle {
+    use std::os::fd::OwnedFd;
+    OwnedFd::from(fs::File::open(path).expect("open the leaf as a handle"))
+}
+
+#[cfg(windows)]
+fn open_file_handle(path: &Path) -> TrustedDirectoryHandle {
+    use std::os::windows::io::OwnedHandle;
+    OwnedHandle::from(fs::File::open(path).expect("open the leaf as a handle"))
+}
+
+/// Opens a reparse point as itself, so a junction can be presented to the reader unchanged.
+#[cfg(windows)]
+fn open_reparse_handle(path: &Path) -> TrustedDirectoryHandle {
+    use std::os::windows::fs::OpenOptionsExt;
+    use std::os::windows::io::OwnedHandle;
+    const FILE_FLAG_BACKUP_SEMANTICS: u32 = 0x0200_0000;
+    const FILE_FLAG_OPEN_REPARSE_POINT: u32 = 0x0020_0000;
+    let file = fs::File::options()
+        .read(true)
+        .custom_flags(FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT)
+        .open(path)
+        .expect("open the reparse point as a handle");
+    OwnedHandle::from(file)
+}
+
+#[test]
+fn a_transferred_directory_handle_is_verified_and_reads_correctly() {
+    let scratch = Scratch::new("trusted-handle");
+    scratch.write("pages/p.en-001.json", JSON_BODY);
+
+    // The same directory reached two ways must report one identity: the handle is the
+    // authority and the bootstrap path agrees with it.
+    let by_path = scratch.capability();
+    let by_handle = ContentRootCapability::from_trusted_directory(
+        open_directory_handle(&scratch.content()),
+        TRUSTED,
+    )
+    .expect("a real directory handle must be accepted");
+
+    assert_eq!(by_handle.provenance(), TRUSTED);
+    assert_eq!(by_handle.identity(), by_path.identity());
+    assert!(!by_handle.mechanism().is_empty());
+
+    let candidates = declaration(Some("pages/p.en-001.json"), None);
+    let choice = chosen(read_declared_source_v1(&by_handle, &candidates));
+    assert_eq!(choice.bytes(), JSON_BODY);
+}
+
+#[test]
+fn a_transferred_handle_to_a_regular_file_is_refused() {
+    let scratch = Scratch::new("trusted-file");
+    scratch.write("pages/p.en-001.json", JSON_BODY);
+    let file_handle = open_file_handle(&scratch.path("pages/p.en-001.json"));
+
+    match ContentRootCapability::from_trusted_directory(file_handle, TRUSTED) {
+        Ok(_) => panic!("a handle naming a regular file must not become a content root"),
+        Err(refusal) => assert_eq!(refusal.kind(), SourceReadRefusalKind::UnsafeLocation),
+    }
+}
+
+#[cfg(windows)]
+#[test]
+fn a_transferred_handle_to_a_junction_is_refused() {
+    let scratch = Scratch::new("trusted-junction");
+    scratch.write("pages/p.en-001.json", JSON_BODY);
+    let linked = scratch.base.join("content-junction");
+    create_directory_link(&scratch.content(), &linked);
+
+    match ContentRootCapability::from_trusted_directory(open_reparse_handle(&linked), TRUSTED) {
+        Ok(_) => panic!("a handle naming a reparse point must be refused"),
+        Err(refusal) => assert_eq!(refusal.kind(), SourceReadRefusalKind::UnsafeLocation),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// R02 §4 — physical ambiguity in every declared candidate, not just the winner.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn a_leaf_hardlinked_from_an_unrelated_directory_is_refused() {
+    let scratch = Scratch::new("foreign-hardlink");
+    scratch.write("pages/p.en-001.json", JSON_BODY);
+    // A second directory entry for the same object, created somewhere else entirely.
+    fs::create_dir_all(scratch.path("pages/holding")).expect("create the unrelated directory");
+    fs::hard_link(
+        scratch.path("pages/p.en-001.json"),
+        scratch.path("pages/holding/other.json"),
+    )
+    .expect("create a hardlink from an unrelated directory entry");
+
+    let capability = scratch.capability();
+    let candidates = declaration(Some("pages/p.en-001.json"), None);
+
+    let (kind, code) = refused(read_declared_source_v1(&capability, &candidates));
+
+    assert_eq!(kind, SourceReadRefusalKind::IdentityCollision);
+    assert_eq!(code, "SOURCE_COLLISION");
+}
+
+#[test]
+fn an_unselected_hardlinked_markdown_is_refused_while_json_would_have_won() {
+    let scratch = Scratch::new("unselected-hardlink");
+    scratch.write("pages/p.en-001.json", JSON_BODY);
+    scratch.write("pages/p.en-001.md", MARKDOWN_BODY);
+    // The Markdown the selection would never read is the ambiguous one.
+    fs::create_dir_all(scratch.path("pages/holding")).expect("create the unrelated directory");
+    fs::hard_link(
+        scratch.path("pages/p.en-001.md"),
+        scratch.path("pages/holding/copy.md"),
+    )
+    .expect("create a hardlink to the unselected member");
+
+    let capability = scratch.capability();
+    let candidates = declaration(Some("pages/p.en-001.json"), Some("pages/p.en-001.md"));
+
+    let (kind, code) = refused(read_declared_source_v1(&capability, &candidates));
+
+    // The ambiguity belongs to the candidate, not to the selection, so a perfectly good JSON
+    // body is not returned either.
+    assert_eq!(kind, SourceReadRefusalKind::IdentityCollision);
+    assert_eq!(code, "SOURCE_COLLISION");
 }
