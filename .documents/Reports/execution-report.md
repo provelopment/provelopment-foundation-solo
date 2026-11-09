@@ -1,11 +1,12 @@
 # Execution Report
 
 **Order:** `SOLO-WO-047 R04` — R02.B third bounded slice: the Windows writable-mapping adversary under the Owner-approved **W-A**, superseding the STOPPED R03.
-**Disposition: technical completion, proof PASSED on the host.** The mandatory in-process writable-mapping adversary was executed on `windows-2025` and the immutable-read guarantee held: a writable section whose originating handles are all closed still keeps the file object open with write access, so the reader's `ShareAccess = FILE_SHARE_READ` body open is refused. No mapped write ever reached bytes the reader returned, and no remedy was implemented because none is required.
+**Disposition: technical completion, proof PASSED on the host; technical ACCEPT issued; administrative closure completed.** The mandatory in-process writable-mapping adversary was executed on `windows-2025` and the immutable-read guarantee held: a writable section whose originating handles are all closed still keeps the file object open with write access, so the reader's `ShareAccess = FILE_SHARE_READ` body open is refused. No mapped write ever reached bytes the reader returned, and no remedy was implemented because none is required. The Chief Architect independently audited report HEAD `3085af8634b930d946d8a5bccf056b88a98bfb52` and issued **ACCEPT** for this third bounded R02.B slice only; the same-order closure sequence then ran to completion in three separately green two-host commits (§12).
 **Date:** 2026-11-09.
 **Repository:** `provelopment/provelopment-foundation-solo`, branch `main`, sole `origin`, one checkout, one worktree.
 **Starting HEAD:** `81a6a023929024f4a8474e55593c2a789c0cb3cc` / tree `dd77fc934812d8ac1a259c3c9b93fbff294572ab` (all 22 ledger blobs verified exact; `crates/solo-adapters/tests/source_read_security.rs` absent).
 **Implementation HEAD:** `c7dc378a70268a416bd9edfd8b9b4d991ab44a52` / tree `d17cb32feb8f150eceedfa86a5f68e03382b0ede` — `rust-verify` run `131` (id `42631309708`) **success**: Ubuntu job `129208016023`, Windows job `129208015658`. (The proof itself was first green at `12b3eea` / run `129`; this HEAD carries the Architect-required fixture-ownership correction, described in §5 and §11.)
+**Closure HEAD:** `c9eac0164670745b5cec9e8ffb63a0de85adad62` / tree `2a714f368f301c2299dc18d81bb3bbe5fc2107e3` — the last implementation-bearing commit; ACTIVE there is the exact baseline blob `ea5f20b736483c2e102456be1cea9104059fc81a` and NEXT holds exactly one remaining-R02.B candidate. `rust-verify` run `134` (id `42635324393`) **success**: Ubuntu job `129221838513`, Windows job `129221838494`. Full closure record in §12.
 **Report HEAD:** its SHA and its own run/job IDs are given to the Owner in chat; a commit cannot contain its own SHA.
 
 ---
@@ -50,6 +51,8 @@ Cases 1–5 are real host executions on `windows-2025` of the actual adapter pat
 | `12b3eea16314affb0bb9717bb4ec759e9f47fc19` | measured guarantee stated in the three approved documents | 129 `42624789054` | **success** — Ubuntu `129185662421`, Windows `129185663034` |
 | `c5e41b628bd151cb194906dc1c9cb4ea18fe83ab` | canonical report (first submission, audited by the Architect) | 130 `42625876210` | **success** — Ubuntu `129189412102`, Windows `129189412664` |
 | `c7dc378a70268a416bd9edfd8b9b4d991ab44a52` | **Architect-required correction**: exclusive fail-closed fixture creation, ownership guard before any child file, collision-preservation case (**implementation HEAD**) | 131 `42631309708` | **success** — Ubuntu `129208016023`, Windows `129208015658` |
+| `d586d905d4ddd7ee24078079f8e6cc33aa480708` | closure step 1: exactly one remaining-R02.B candidate installed in NEXT | 133 `42634422927` | **success** — Ubuntu `129218704522`, Windows `129218704854` |
+| `c9eac0164670745b5cec9e8ffb63a0de85adad62` | closure step 2: ACTIVE neutralized to the exact baseline blob `ea5f20b7…` (**closure HEAD**) | 134 `42635324393` | **success** — Ubuntu `129221838513`, Windows `129221838494` |
 
 Every failing run above is the real, disclosed record. None of them is counted as a completed adversary, and none was hidden by rewriting history.
 
@@ -57,8 +60,8 @@ Every failing run above is the real, disclosed record. None of them is counted a
 
 | Path | Operation performed |
 | --- | --- |
-| `.documents/WIP/workorder-active.md` | Issuance commit only; R04 stays issued (blob `edf31b17…`). |
-| `.documents/WIP/plan-next.md` | Untouched; still the neutral blob `92fa562b…`. |
+| `.documents/WIP/workorder-active.md` | Issuance commit at the start of this order; then, at closure step 2, neutralized to the **exact baseline blob** `ea5f20b736483c2e102456be1cea9104059fc81a` (40 bytes, hash re-verified). |
+| `.documents/WIP/plan-next.md` | Untouched during implementation (neutral blob `92fa562b…`); at closure step 1 replaced by exactly **one** remaining-R02.B candidate, drawn from ROADMAP Stage 02 and explicitly non-authorizing. |
 | `crates/solo-adapters/Cargo.toml` | **One** literal `"Win32_System_Memory"` feature entry added to the existing pinned `windows-sys = "=0.61.2"` `cfg(windows)` dependency. Version, target scope, every other feature and every other byte preserved. |
 | `crates/solo-adapters/src/source_read_native.rs` | `#[cfg(all(test, windows))] mod mapped_view_proofs` inside the audited Windows-gated `sys` module: `Section` and `WritableView` RAII guards, five native tests, module documentation brought to measured truth. **No product read-path or `ShareAccess` change.** |
 | `crates/solo-adapters/src/source_read.rs` | **Docs only**: the public boundary now states the measured Windows exclusion. No code change. |
@@ -121,11 +124,11 @@ Retained and untouched: the Linux anonymous `FICLONE` snapshot with its Btrfs po
 
 At report time: clean `git status`, one checkout and worktree, one remote `origin`, `HEAD` equal to `origin/main`, exactly four regular files in `.documents/WIP` with no subdirectory, and the optional security-test path still absent.
 
-Task-owned temporary material: `.temp/toolchain` (2.0 GB) and `.temp/target` (680 MB) remain the sanctioned local toolchain and build caches, still under the previously disclosed delete-on-accepted-closure trigger. `.temp/architecture-fixtures`, `.temp/rt`, `.temp/w032` and `.temp/w033` are empty or near-empty directories dated 2026-11-08/09, **not created by this order**; they were left in place rather than deleted as unknown material. A planned scratch file under `.temp` was never created because its write failed. The Linux proof's filesystem fixture is CI-only, created and removed by the workflow on every run.
+Task-owned temporary material, cleaned at closure under the disclosed delete-on-accepted-closure trigger: `.temp/toolchain` (**2,098.2 MB / 2,679 files**) and `.temp/target` (**680.3 MB / 3,363 files**) were deleted with an explicit resolved-path check first, about **2.73 GB** in total, and both are verified absent afterwards. Solo `.temp/` now holds only the four pre-existing near-empty directories `.temp/architecture-fixtures`, `.temp/rt`, `.temp/w032` and `.temp/w033` (each ≈0 MB, dated 2026-11-08/09), which are **not created by this order** and were preserved untouched as unknown material rather than deleted; `.temp/` remains ignored by `.gitignore:20` and `git status` stayed clean across the cleanup. No `solo-r04-*` or `solo-r03-*` fixture directory exists in the OS temp root: the exclusive-creation and RAII guards removed every local fixture, and the CI fixtures are created and removed by the workflow on every run. Ten `proceed-while-running-*.log` files (2026-11-07 → 2026-11-09) remain in Cline's own shared temp folder; they are IDE-managed logs outside the Solo repository, not provably this order's alone and one of them is open by the running session, so they were **retained** rather than deleted — cleanup trigger: Cline/IDE-managed rotation or Owner clearing. A planned scratch file under `.temp` was never created because its write failed.
 
 ## 10. Requested next step
 
-Nothing is blocked and no STOP decision is requested. The acceptance path applies: the Owner relays **`agent report ready`**, and the Chief Architect independently audits this report, the exact source diff, the measured mapping outcomes and the SOP A1 gates, then issues `ACCEPT / REVISE / STOP` for **this third bounded R02.B slice only**. ACTIVE stays issued and NEXT stays neutral until that ACCEPT; the administrative closeout sequence (one remaining-R02.B NEXT candidate, then ACTIVE neutralisation to the baseline blob, then the reconciled final closure report, each in its own fully green two-host commit) is authorized only afterwards. R02.B, R02.C and Stage 02 remain open, and no publication, release or deployment action was taken or is implied.
+Nothing is blocked and no STOP decision is requested, and the administrative closure authorized in SOLO-WO-047 R04 §6 is now complete. The Owner relays **`agent report ready`** for the Chief Architect's separate **final administrative** audit of this report at its exact revision (§12), the closure commits, the neutralized ACTIVE blob, the single NEXT candidate and the cleanup record. R02.B remains open pending the NEXT candidate's own separately Owner-issued order; R02.C and Stage 02 remain open and untouched. No successor order is started, and no publication, release or deployment action was taken or is implied. Acceptance of this slice is not authorization for the next order.
 
 ## 11. Correction applied under the Chief Architect REVISE
 
@@ -137,6 +140,16 @@ The Architect's first audit of `c5e41b628bd151cb194906dc1c9cb4ea18fe83ab` accept
 * **New negative case** `a_pre_existing_fixture_name_is_preserved_and_never_adopted` claims the exact name the fixture tries first, plants sentinel bytes there, then creates a fixture while that name is taken, and asserts that the directory and its sentinel survive byte-identically, that the fixture does not adopt the taken path, and that the skipped name still yields a usable tree and a full body. It ran on both hosts in run 131.
 * **Unchanged by design**: the Windows mapping mechanism, `ShareAccess = FILE_SHARE_READ`, the Linux D2 clone and refusal path, the dependency manifest (still the single `Win32_System_Memory` entry), the lockfile (`8bd0bb00…`), the architecture and unsafe checkers, the workflow, ROADMAP/OUTLOOK/NEXT, and both `false` authority flags.
 
-This report is a report-only commit; the correction is the only source/test change since the Architect's audit.
+That correction was the only source/test change made between the Architect's first audit and the ACCEPT, and no code changed at all during the administrative closure (§12).
 
+## 12. Administrative closure record (post-ACCEPT)
 
+The Architect's independent audit of report HEAD `3085af8634b930d946d8a5bccf056b88a98bfb52` issued **ACCEPT** for the third bounded R02.B technical slice — the Windows writable-mapping adversary, the corrected exclusive-ownership test fixture, the Linux D2 immutable snapshot, the architecture boundaries and the complete two-host gates. Under that unchanged authorization the closure proceeded in three separate commits, each fully green on both hosts before the next began:
+
+| Step | Commit / tree | What changed | CI |
+| --- | --- | --- | --- |
+| 1 | `d586d905d4ddd7ee24078079f8e6cc33aa480708` / `b2b746571a5ce0ea488cce75060abac375e8f449` | `.documents/WIP/plan-next.md` only (+30/−0): exactly one remaining-R02.B candidate — whole-set source/content validation and the complete immutable candidate — explicitly non-authorizing, with R02.C unopened, its prerequisites, the evidence it would owe and its exclusions | run 133 `42634422927`: Ubuntu `129218704522`, Windows `129218704854` |
+| 2 | `c9eac0164670745b5cec9e8ffb63a0de85adad62` / `2a714f368f301c2299dc18d81bb3bbe5fc2107e3` | `.documents/WIP/workorder-active.md` only (−126): neutralized to the exact baseline blob `ea5f20b736483c2e102456be1cea9104059fc81a`, written from the blob itself and re-verified by `git hash-object` (40 bytes) | run 134 `42635324393`: Ubuntu `129221838513`, Windows `129221838494` |
+| 3 | this report-only commit | `.documents/Reports/execution-report.md` only | its own run and job IDs are given to the Owner in chat |
+
+**Preserved exactly.** ROADMAP (blob `18975332…`) and OUTLOOK (blob `cb9c7a61…`) are byte-identical to the start of the order; no code, `Cargo.toml`, `Cargo.lock` (`8bd0bb00…`), architecture checker, unsafe checker, workflow, dependency, security test, SOP or Architecture text was touched in any closure commit. The accepted implementation stands at `c7dc378a…` untouched, the historical R01/R02/R03 STOP reports and the red runs 109/110 remain in Git history unrevised, and `SOURCE_READ_PROVES_GLOBAL_SNAPSHOT` and `SOURCE_READ_GRANTS_PUBLICATION_AUTHORITY` remain `false`. Four WIP regular files, no subdirectory, one checkout, one worktree, one remote, clean tree. Nothing was archived, duplicated or dated, and no successor order was started.
