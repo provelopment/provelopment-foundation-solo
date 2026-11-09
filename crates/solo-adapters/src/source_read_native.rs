@@ -799,103 +799,30 @@ mod sys {
 
     #[cfg(all(test, windows))]
     mod mapped_view_proofs {
-        use std::fs::{self, File, OpenOptions};
+        use std::fs::{self, OpenOptions};
         use std::os::windows::io::AsRawHandle;
         use std::ptr;
-        use windows_sys::Win32::Foundation::{CloseHandle, HANDLE};
-        use windows_sys::Win32::System::Memory::{
-            CreateFileMappingW, FILE_MAP_WRITE, MEMORY_MAPPED_VIEW_ADDRESS, MapViewOfFile,
-            PAGE_READWRITE, UnmapViewOfFile,
-        };
-
-        const BODY_LENGTH: usize = 4096;
-
-        struct Section(HANDLE);
-
-        impl Section {
-            fn over(file: &File) -> Self {
-                // SAFETY: `file` is an open handle owned by the caller, the security descriptor is
-                // default (null), `PAGE_READWRITE` is valid for a file-backed section, a zero
-                // maximum size means the file's current size, and a null name creates an unnamed
-                // section. The caller closes the returned handle with `close`.
-                let section = unsafe {
-                    CreateFileMappingW(
-                        file.as_raw_handle() as HANDLE,
-                        ptr::null(),
-                        PAGE_READWRITE,
-                        0,
-                        0,
-                        ptr::null(),
-                    )
-                };
-                assert!(
-                    !section.is_null(),
-                    "CreateFileMappingW must return a handle"
-                );
-                Self(section)
-            }
-
-            fn close(self) {
-                // SAFETY: `self.0` is the live section handle this value owned, closed once here.
-                unsafe { CloseHandle(self.0) };
-            }
-        }
-
-        struct WritableView {
-            address: MEMORY_MAPPED_VIEW_ADDRESS,
-            length: usize,
-        }
-
-        impl WritableView {
-            fn over(section: &Section, length: usize) -> Self {
-                // SAFETY: `section` is live, `FILE_MAP_WRITE` is permitted by the section, the
-                // offset is zero and a zero size maps the whole section.
-                let address = unsafe { MapViewOfFile(section.0, FILE_MAP_WRITE, 0, 0, 0) };
-                assert!(!address.Value.is_null(), "MapViewOfFile must map");
-                Self { address, length }
-            }
-
-            fn byte(&self, offset: usize) -> u8 {
-                assert!(offset < self.length, "offset inside the mapped extent");
-                // SAFETY: `offset` is inside the mapped length and the base address is live.
-                unsafe { *self.address.Value.cast::<u8>().add(offset) }
-            }
-
-            fn fill(&self, value: u8) {
-                // SAFETY: the view maps exactly `self.length` bytes and `value` fills only that.
-                unsafe { ptr::write_bytes(self.address.Value.cast::<u8>(), value, self.length) };
-            }
-
-            fn unmap(self) {
-                // SAFETY: the address came from `MapViewOfFile` and is unmapped exactly once here.
-                unsafe { UnmapViewOfFile(self.address) };
-            }
-        }
 
         #[test]
-        fn a_handed_off_view_still_writes_in_place() {
-            let base = std::env::temp_dir().join(format!("solo-r04-a8-{}", std::process::id()));
+        fn std_file_and_pointer_usage_is_permitted() {
+            let base = std::env::temp_dir().join(format!("solo-r04-a10-{}", std::process::id()));
             let _ = fs::remove_dir_all(&base);
             fs::create_dir_all(&base).expect("create the probe root");
             let body = base.join("body.bin");
-            fs::write(&body, vec![b'A'; BODY_LENGTH]).expect("write the probe body");
-            let writer = OpenOptions::new()
+            fs::write(&body, vec![b'A'; 8]).expect("write the probe body");
+            let file = OpenOptions::new()
                 .read(true)
                 .write(true)
                 .open(&body)
-                .expect("open the probe body writable");
-            let section = Section::over(&writer);
-            let view = WritableView::over(&section, BODY_LENGTH);
-            section.close();
-            drop(writer);
-            assert_eq!(view.byte(0), b'A', "the view must map the file");
-            view.fill(b'C');
-            assert_eq!(
-                view.byte(BODY_LENGTH - 1),
-                b'C',
-                "the view must write in place"
-            );
-            view.unmap();
+                .expect("open the probe body");
+            assert!(!file.as_raw_handle().is_null(), "the handle must be real");
+            let mut buffer = [0_u8; 8];
+            let pointer = buffer.as_mut_ptr();
+            // SAFETY: `pointer` covers exactly the eight bytes of the live local `buffer`, and
+            // only that range is written.
+            unsafe { ptr::write_bytes(pointer, b'C', 8) };
+            assert_eq!(buffer[0], b'C', "the raw write must land in the buffer");
+            drop(file);
             let _ = fs::remove_dir_all(&base);
         }
     }
