@@ -40,7 +40,7 @@ Every revision above was fully green on **both** hosts before the next began. Th
 
 ## 3. Frozen path ledger — exactly the authorized operations
 
-Nine paths changed in total (`git diff --name-status 9a9a01a..HEAD`), and every one is inside the §2 ledger: `+1,793` / `−35`.
+Ten paths changed in total (`git diff --name-status 9a9a01a..HEAD`), including this report: ledger items **1, 2, 4, 5, 6, 7, 8, 9, 10 and 12**. Items **3** (ROADMAP) and **11** (the existing preflight) were not touched at all, and no path outside the ledger was written.
 
 | # | Path | Operation performed |
 | --- | --- | --- |
