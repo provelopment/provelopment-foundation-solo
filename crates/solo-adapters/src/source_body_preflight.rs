@@ -501,7 +501,3 @@ pub fn run_in_memory_source_pipeline(
     let preflighted = preflight_selected_body(&choice);
     preflighted.map_err(InMemorySourceRefusalV1::Body)
 }
-
-
-
-

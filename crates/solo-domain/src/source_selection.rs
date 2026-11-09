@@ -418,6 +418,3 @@ pub fn select_provisional_source<'a>(
 
     Err(SourceSelectionRefusal::neither_present())
 }
-
-
-
