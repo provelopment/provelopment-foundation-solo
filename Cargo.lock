@@ -78,6 +78,8 @@ dependencies = [
 name = "solo-adapters"
 version = "0.1.0"
 dependencies = [
+ "serde",
+ "serde_json",
  "solo-application",
  "solo-domain",
 ]

@@ -19,12 +19,17 @@
 //!   structure. Facets, Sites, Pages and representation membership keys are
 //!   validated and refused rather than repaired, direct containment is the only
 //!   parentage, and locale keys are membership keys rather than validated tags.
+//! * [`SourceCandidatePathV1`] — one validated logical `sourceCandidates` path, and
+//!   [`SourceCandidateReservationsV1`] — the cross-representation claim set. This is
+//!   the pure lexical half of the accepted portable-source contract: it opens no
+//!   file, tests no existence, selects no body and proves no filesystem identity.
 
 #![forbid(unsafe_code)]
 
 mod base_candidate;
 mod efs_ownership;
 mod entity_id;
+mod source_locator;
 
 pub use base_candidate::{
     BaseCandidateDetail, BaseCandidateError, BaseCandidateErrorKind, BaseCandidateV1, BaseScheme,
@@ -37,3 +42,9 @@ pub use efs_ownership::{
     MAX_REPRESENTATIONS_PER_PAGE, PageDraft, PageIdV1, PageNode, SiteDraft, SiteIdV1, SiteNode,
 };
 pub use entity_id::{ENTITY_ID_MAX_BYTES, EntityIdError, EntityIdErrorKind, EntityIdV1};
+pub use source_locator::{
+    FILESYSTEM_IDENTITY_PROVEN, MAX_LOCATOR_BYTES, MAX_LOCATOR_SEGMENTS, MAX_SEGMENT_BYTES,
+    RESERVED_WINDOWS_STEMS, SOURCE_NAMESPACE, SourceCandidateDraftV1, SourceCandidateKind,
+    SourceCandidatePathV1, SourceCandidateReservationsV1, SourceCandidateSetV1, SourceClaimError,
+    SourceClaimErrorKind, SourceLocatorError, SourceLocatorErrorKind,
+};

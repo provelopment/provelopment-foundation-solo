@@ -29,6 +29,52 @@ pub const APPROVED_EXTERNAL_DEV: [&str; 2] = ["serde_json", "syn"];
 /// The only package permitted to declare an approved external dev-dependency.
 pub const APPROVED_DEV_OWNER: &str = "solo-cli";
 
+/// External crates approved as **normal** (shipped) dependencies of exactly one owner:
+/// the outer parsing adapter. The list is closed and named by root, so a root that is
+/// not written here is unapproved whatever version or feature selection it carries.
+pub const APPROVED_ADAPTER_EXTERNAL_NORMAL: [&str; 2] = ["serde", "serde_json"];
+
+/// The only package permitted to declare an approved external normal dependency.
+pub const APPROVED_ADAPTER_EXTERNAL_OWNER: &str = "solo-adapters";
+
+/// The exact audited locked dependency closure reachable from the two approved adapter
+/// roots, taken from the one tracked `Cargo.lock`.
+///
+/// It is enumerated rather than computed so that a new transitive component cannot
+/// appear silently: an unlisted node is an unapproved reachability and is refused.
+pub const APPROVED_ADAPTER_CLOSURE: [&str; 11] = [
+    "itoa",
+    "memchr",
+    "proc-macro2",
+    "quote",
+    "serde",
+    "serde_core",
+    "serde_derive",
+    "serde_json",
+    "syn",
+    "unicode-ident",
+    "zmij",
+];
+
+/// The single reviewed owner/kind/root rule for external dependency declarations.
+///
+/// Returns the **only** dependency kind `owner` may use to declare the external package
+/// `target`, or `None` when that declaration is not permitted at all. Both the Cargo
+/// graph guard and the real-metadata assertion call this one function, so the two layers
+/// cannot drift into divergent copied allowlists.
+#[must_use]
+pub fn external_declaration_kind(owner: &str, target: &str) -> Option<DepKind> {
+    if owner == APPROVED_DEV_OWNER && APPROVED_EXTERNAL_DEV.contains(&target) {
+        return Some(DepKind::Dev);
+    }
+    if owner == APPROVED_ADAPTER_EXTERNAL_OWNER
+        && APPROVED_ADAPTER_EXTERNAL_NORMAL.contains(&target)
+    {
+        return Some(DepKind::Normal);
+    }
+    None
+}
+
 /// Dependency kind as declared in the manifest and reported by Cargo.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum DepKind {
@@ -101,17 +147,34 @@ pub fn edge_allowed(edge: &Edge) -> bool {
         "solo-domain" => false,
         // The application layer may depend on the domain only.
         "solo-application" => edge.to == "solo-domain",
-        // The adapter may depend on the application and the domain.
-        "solo-adapters" => edge.to == "solo-domain" || edge.to == "solo-application",
+        // The adapter may depend on the application and the domain, and — as the outer
+        // parsing adapter — on the two reviewed external parser roots as *normal*
+        // dependencies. It may never depend outward on the composition root.
+        "solo-adapters" => {
+            edge.to == "solo-domain"
+                || edge.to == "solo-application"
+                || external_declaration_kind("solo-adapters", &edge.to) == Some(edge.kind)
+        }
         // The composition root may depend on inward workspace crates, and — in
         // development only — on the approved external crates.
         "solo-cli" => {
             is_workspace(&edge.to)
-                || (edge.kind == DepKind::Dev && APPROVED_EXTERNAL_DEV.contains(&edge.to.as_str()))
+                || external_declaration_kind("solo-cli", &edge.to) == Some(edge.kind)
         }
         // Internals of a third-party crate are outside this slice's boundary rule.
         _ => true,
     }
+}
+
+/// Whether `root` may reach the external package `node` **transitively** under the
+/// reviewed rule.
+///
+/// Only the outer adapter may reach external code at all, and only inside its exact
+/// audited locked closure. The domain and the application may reach none, so this
+/// answers `false` for them however the closure is defined.
+#[must_use]
+pub fn adapter_closure_allows(root: &str, node: &str) -> bool {
+    root == APPROVED_ADAPTER_EXTERNAL_OWNER && APPROVED_ADAPTER_CLOSURE.contains(&node)
 }
 
 pub fn is_inner_layer(name: &str) -> bool {
@@ -200,7 +263,7 @@ pub fn check(graph: &Graph) -> Result<(), Vec<Violation>> {
                         format!("transitive forbidden reachability {root} -> {node}"),
                     ));
                 }
-            } else {
+            } else if !adapter_closure_allows(root, node) {
                 violations.push(Violation::new(
                     Category::GraphExternalReach,
                     format!("graph:{root}->{node}"),
