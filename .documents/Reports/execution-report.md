@@ -5,14 +5,14 @@
 **Date:** 2026-11-09.
 **Repository:** `provelopment/provelopment-foundation-solo`, branch `main`, sole `origin`, one checkout, one worktree.
 **Starting HEAD:** `81a6a023929024f4a8474e55593c2a789c0cb3cc` / tree `dd77fc934812d8ac1a259c3c9b93fbff294572ab` (all 22 ledger blobs verified exact; `crates/solo-adapters/tests/source_read_security.rs` absent).
-**Implementation HEAD:** `12b3eea16314affb0bb9717bb4ec759e9f47fc19` / tree `fb907490aaebd9f4805a848b3e3808ff7db02f60` — `rust-verify` run `129` (id `42624789054`) **success**: Ubuntu job `129185662421`, Windows job `129185663034`.
+**Implementation HEAD:** `c7dc378a70268a416bd9edfd8b9b4d991ab44a52` / tree `d17cb32feb8f150eceedfa86a5f68e03382b0ede` — `rust-verify` run `131` (id `42631309708`) **success**: Ubuntu job `129208016023`, Windows job `129208015658`. (The proof itself was first green at `12b3eea` / run `129`; this HEAD carries the Architect-required fixture-ownership correction, described in §5 and §11.)
 **Report HEAD:** its SHA and its own run/job IDs are given to the Owner in chat; a commit cannot contain its own SHA.
 
 ---
 
 ## 1. What was proven, in one table
 
-Every case below is a real host execution on `windows-2025` of the actual adapter path, using the pinned generated `windows-sys =0.61.2` bindings and a real `PAGE_READWRITE` file section over a synthetic 4096-byte fixture body. None is fake, simulated or injected.
+Cases 1–5 are real host executions on `windows-2025` of the actual adapter path, using the pinned generated `windows-sys =0.61.2` bindings and a real `PAGE_READWRITE` file section over a synthetic 4096-byte fixture body; case 6 is the fixture-ownership case and creates no mapping. None is fake, simulated or injected.
 
 | # | Native case | Measured observation | Classification |
 | --- | --- | --- | --- |
@@ -21,6 +21,7 @@ Every case below is a real host execution on `windows-2025` of the actual adapte
 | 3 | **Pinned body open against a handed-off view (decisive).** With only the view alive, the reader opens the body through the real native `open_leaf`, and the contrast case runs after the view is released. | While the view lives the open fails; after `drop(view)` the same body opens, reads the full 4096 bytes, and `recheck` reports identical facts. | `NativeError::OtherIo` while mapped. The refusal is caused by the mapping, not by the fixture — the same file opens and reads normally the moment the view goes away. |
 | 4 | **End-to-end product selection.** `read_declared_source_v1` over the safe capability while the handed-off view is alive. | `Refused` with kind `OtherIo` (`SOURCE_OBSERVATION_IO_ERROR`). | Never `Chosen`, and never a confirmed absence. A mutable or torn body cannot be accepted because no body is produced at all. |
 | 5 | **Lifetime and cleanup.** The view is unmapped and dropped, then the ordinary product reader runs, then the fixture body is removed. | `Chosen` with the flushed `C` content; the fixture `pages` directory lists zero entries afterwards; every guard (`Drop` for the section handle and for the view) released its resource. | No leaked handle, section, view or retained fixture content; the reader works normally once the mapping is gone. |
+| 6 | **Fixture ownership (negative).** A directory holding sentinel content is claimed at the exact name the fixture tries first, then a fixture is created while that name is taken. | The pre-existing directory and its sentinel bytes are unchanged; the fixture skips to the next candidate name, still produces a usable tree and a full body, and never removes, resets or adopts the taken path. | A name collision can only ever produce a fresh directory. Destructive pre-cleaning is gone, so material this test did not create is never touched. |
 
 **Why the guarantee holds.** A Windows section object holds its own reference to the file object, and that reference carries the access the section was created with. Closing the *user* file handle therefore does not drop the file's write access for sharing purposes: the reader's `NtCreateFile` body open, which requests share-read only, is still denied by a sharing violation while any `PAGE_READWRITE` section over the file exists. The reader consequently never opens the file, never reads it, and cannot return mutated or torn bytes. This is a measured host result, not an assumption.
 
@@ -46,7 +47,9 @@ Every case below is a real host execution on `windows-2025` of the actual adapte
 | `8ee8f55` | diagnostic A12: `OpenOptions` + raw handle only | 126 `42622683773` | failure |
 | `082102f` | diagnostic A13: raw pointer fill only | 127 `42622716941` | success |
 | `392601b` | **final adversary module** restored, using only permitted constructs | 128 `42623916479` | **success** — `129182684549` / `129182684890` |
-| `12b3eea16314affb0bb9717bb4ec759e9f47fc19` | measured guarantee stated in the three approved documents (**implementation HEAD**) | 129 `42624789054` | **success** — Ubuntu `129185662421`, Windows `129185663034` |
+| `12b3eea16314affb0bb9717bb4ec759e9f47fc19` | measured guarantee stated in the three approved documents | 129 `42624789054` | **success** — Ubuntu `129185662421`, Windows `129185663034` |
+| `c5e41b628bd151cb194906dc1c9cb4ea18fe83ab` | canonical report (first submission, audited by the Architect) | 130 `42625876210` | **success** — Ubuntu `129189412102`, Windows `129189412664` |
+| `c7dc378a70268a416bd9edfd8b9b4d991ab44a52` | **Architect-required correction**: exclusive fail-closed fixture creation, ownership guard before any child file, collision-preservation case (**implementation HEAD**) | 131 `42631309708` | **success** — Ubuntu `129208016023`, Windows `129208015658` |
 
 Every failing run above is the real, disclosed record. None of them is counted as a completed adversary, and none was hidden by rewriting history.
 
@@ -83,7 +86,7 @@ No hand-declared `extern` block, raw DLL load, unapproved feature, separate proc
 
 The section handle and the mapped view are each owned by a guard whose `Drop` releases exactly one resource, so a panic cannot leak either. Every `unsafe` block carries an adjacent `// SAFETY:` note stating pointer validity, mapped extent, access rights, lifetime and why a use-after-unmap cannot occur; the file stays within the standing one-note-per-block rule (15 blocks, 16 notes). The module is `#[cfg(all(test, windows))]` **inside** the audited Windows-gated `sys` module, so the project-owned `unsafe` cannot compile off Windows and cannot escape the single approved scope; `solo-adapters` keeps `#![deny(unsafe_code)]` with the one `cfg_attr(windows, allow(unsafe_code))` module allowance, and every other crate keeps `#![forbid(unsafe_code)]`. The AST guard and its negative injection tests are unchanged and passed.
 
-The fixture is a synthetic 4096-byte file in a task-owned temporary directory, written and removed by the test, never an authored Page source, and its `Drop` removes the tree on every path including panics.
+The fixture is a synthetic 4096-byte file beneath the runner's task-owned temporary root, never an authored Page source. Ownership is established by an **exclusive** `create_dir`, never by a destructive pre-clean: a name that already exists is skipped untouched — not removed, reset, adopted or written into — and the ownership guard is constructed the instant the base directory exists, before any child directory or body file is created, so a failed write or a later panic still removes exactly the tree this test created. Names carry the process id, the case tag and a bounded attempt number; exhausting the bound fails loudly rather than reusing or clearing anything. `Drop` therefore only ever removes a directory the test itself created.
 
 ## 6. Historical evidence kept honest
 
@@ -123,4 +126,17 @@ Task-owned temporary material: `.temp/toolchain` (2.0 GB) and `.temp/target` (68
 ## 10. Requested next step
 
 Nothing is blocked and no STOP decision is requested. The acceptance path applies: the Owner relays **`agent report ready`**, and the Chief Architect independently audits this report, the exact source diff, the measured mapping outcomes and the SOP A1 gates, then issues `ACCEPT / REVISE / STOP` for **this third bounded R02.B slice only**. ACTIVE stays issued and NEXT stays neutral until that ACCEPT; the administrative closeout sequence (one remaining-R02.B NEXT candidate, then ACTIVE neutralisation to the baseline blob, then the reconciled final closure report, each in its own fully green two-host commit) is authorized only afterwards. R02.B, R02.C and Stage 02 remain open, and no publication, release or deployment action was taken or is implied.
+
+## 11. Correction applied under the Chief Architect REVISE
+
+The Architect's first audit of `c5e41b628bd151cb194906dc1c9cb4ea18fe83ab` accepted the technical evidence and returned exactly one correction: `mapped_view_proofs::Fixture::new` removed a predictable process-id directory before ownership was established, which violates the task-owned temporary-material rule. That is corrected in `c7dc378a70268a416bd9edfd8b9b4d991ab44a52` (run 131), and nothing else was changed in that commit.
+
+* **Destructive pre-cleaning removed.** The fixture now claims its directory with an **exclusive** `create_dir`. `AlreadyExists` means the name is skipped untouched, so a pre-existing path is never removed, reset, adopted or written into — even when it carries the fixture's own expected name.
+* **Ownership before children.** The guard value exists immediately after the base directory is created and before any child directory or body file is written, so a failed child creation or a later panic still releases exactly the tree that was created. `Drop` can therefore only ever remove a directory this test itself made.
+* **Bounded, fail-closed naming.** Candidate names carry process id, case tag and an attempt index; exhausting the bound fails loudly rather than clearing or reusing anything.
+* **New negative case** `a_pre_existing_fixture_name_is_preserved_and_never_adopted` claims the exact name the fixture tries first, plants sentinel bytes there, then creates a fixture while that name is taken, and asserts that the directory and its sentinel survive byte-identically, that the fixture does not adopt the taken path, and that the skipped name still yields a usable tree and a full body. It ran on both hosts in run 131.
+* **Unchanged by design**: the Windows mapping mechanism, `ShareAccess = FILE_SHARE_READ`, the Linux D2 clone and refusal path, the dependency manifest (still the single `Win32_System_Memory` entry), the lockfile (`8bd0bb00…`), the architecture and unsafe checkers, the workflow, ROADMAP/OUTLOOK/NEXT, and both `false` authority flags.
+
+This report is a report-only commit; the correction is the only source/test change since the Architect's audit.
+
 
