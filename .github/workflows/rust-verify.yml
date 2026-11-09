@@ -549,7 +549,23 @@ jobs:
         run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 
       - name: Test (workspace, all targets, locked)
-        run: cargo test --workspace --all-targets --locked
+        # The step must still fail if any test fails, and it must name what failed: a bare
+        # exit status cannot be reviewed and cannot be acted on. `--no-fail-fast` runs every
+        # test so one run reveals every failure, and each failing test is surfaced as an
+        # annotation. No assertion is skipped, weakened or made advisory.
+        shell: pwsh
+        run: |
+          $log = Join-Path $env:RUNNER_TEMP 'test.log'
+          cargo test --workspace --all-targets --locked --no-fail-fast 2>&1 |
+            Tee-Object -FilePath $log
+          $status = $LASTEXITCODE
+          if ($status -ne 0) {
+            Select-String -Path $log -Pattern '^---- .* stdout ----' |
+              ForEach-Object { Write-Output "::error title=failing-test::$($_.Line.Trim())" }
+            Select-String -Path $log -Pattern '^test .* FAILED$' |
+              ForEach-Object { Write-Output "::error title=failing-test::$($_.Line.Trim())" }
+          }
+          exit $status
 
 
       # ---------------------------------------------------------------------------
