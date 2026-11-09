@@ -89,7 +89,7 @@ fn a_provisional_choice_claims_no_authority_and_no_snapshot() {
     // Bind first so these stay runtime observations rather than constant assertions.
     let filesystem_proof: bool = OBSERVATION_IS_FILESYSTEM_PROOF;
     let final_selection: bool = PROVISIONAL_CHOICE_IS_FINAL_SELECTION;
-    assert!(!filesystem_proof, "an observation proves no filesystem state");
+    assert!(!filesystem_proof, "an observation proves nothing");
     assert!(!final_selection, "selection stays provisional");
 
     let candidates = json_only("pages/home.en-001.json");

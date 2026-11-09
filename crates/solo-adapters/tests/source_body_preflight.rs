@@ -120,15 +120,19 @@ fn markdown_refusal(bytes: &[u8]) -> BodyPreflightRefusalKind {
 
 /// A JSON body with the supplied `title` and exactly one empty block.
 fn json_with_title(title: &str) -> Vec<u8> {
-    format!(r#"{{"contentVersion":"{BODY_CONTENT_VERSION}","title":"{title}","blocks":[{{}}]}}"#)
-        .into_bytes()
+    let text = format!(
+        r#"{{"contentVersion":"{BODY_CONTENT_VERSION}","title":"{title}","blocks":[{{}}]}}"#
+    );
+    text.into_bytes()
 }
 
 /// A JSON body with the supplied number of empty blocks.
 fn json_with_blocks(count: usize) -> Vec<u8> {
     let items = vec!["{}"; count].join(",");
-    format!(r#"{{"contentVersion":"{BODY_CONTENT_VERSION}","title":"Home","blocks":[{items}]}}"#)
-        .into_bytes()
+    let text = format!(
+        r#"{{"contentVersion":"{BODY_CONTENT_VERSION}","title":"Home","blocks":[{items}]}}"#
+    );
+    text.into_bytes()
 }
 
 /// A JSON body of exactly `target` bytes, valid in every other respect.
@@ -214,13 +218,13 @@ fn the_closed_body_root_is_enforced() {
     );
     assert_eq!(
         json_refusal(
-            br#"{"contentVersion":"1.0.0","title":"Home","blocks":[{}],"draft":true}"#
+            br#"{"title":"a","blocks":[{}],"draft":true}"#
         ),
         BodyPreflightRefusalKind::UnknownMember
     );
     assert_eq!(
         json_refusal(
-            br#"{"contentVersion":"2.0.0","title":"Home","blocks":[{}]}"#
+            br#"{"contentVersion":"2.0.0","title":"a","blocks":[1]}"#
         ),
         BodyPreflightRefusalKind::UnsupportedContentVersion
     );
@@ -247,10 +251,10 @@ fn title_and_summary_scalar_bounds_are_enforced() {
     );
 
     let with_summary = |summary: &str| {
-        format!(
+        let text = format!(
             r#"{{"contentVersion":"1.0.0","title":"Home","summary":"{summary}","blocks":[{{}}]}}"#
-        )
-        .into_bytes()
+        );
+        text.into_bytes()
     };
     assert!(
         preflight_json(&with_summary(&"a".repeat(500))).is_ok(),
@@ -321,11 +325,11 @@ fn byte_level_faults_are_refused_for_both_body_kinds() {
 #[test]
 fn json_syntax_faults_are_refused_without_fallback() {
     assert_eq!(
-        json_refusal(br#"{"contentVersion":"1.0.0","title":"Home","blocks":[{}]} trailing"#),
+        json_refusal(br#"{"title":"a"} trailing"#),
         BodyPreflightRefusalKind::MalformedJson
     );
     assert_eq!(
-        json_refusal(b"{\"contentVersion\":\"1.0.0\",\"title\":\"Home\",\"blocks\":[{},]}"),
+        json_refusal(b"{\"blocks\":[{},]}"),
         BodyPreflightRefusalKind::MalformedJson
     );
     assert_eq!(
@@ -333,7 +337,7 @@ fn json_syntax_faults_are_refused_without_fallback() {
         BodyPreflightRefusalKind::MalformedJson
     );
     assert_eq!(
-        json_refusal(br#"{"contentVersion":"1.0.0","title":"Home","blocks":[{"a":NaN}]}"#),
+        json_refusal(br#"{"blocks":[{"a":NaN}]}"#),
         BodyPreflightRefusalKind::MalformedJson
     );
 }
@@ -341,15 +345,11 @@ fn json_syntax_faults_are_refused_without_fallback() {
 #[test]
 fn duplicate_members_are_refused_at_the_root_and_at_depth() {
     assert_eq!(
-        json_refusal(
-            br#"{"contentVersion":"1.0.0","title":"Home","title":"Again","blocks":[{}]}"#
-        ),
+        json_refusal(br#"{"title":"a","title":"b"}"#),
         BodyPreflightRefusalKind::DuplicateMember
     );
     assert_eq!(
-        json_refusal(
-            br#"{"contentVersion":"1.0.0","title":"Home","blocks":[{"a":{"b":{"c":1,"c":2}}}]}"#
-        ),
+        json_refusal(br#"{"a":{"b":{"c":1,"c":2}}}"#),
         BodyPreflightRefusalKind::DuplicateMember
     );
 }
@@ -381,11 +381,11 @@ fn size_boundaries_are_exact_for_both_body_kinds() {
 
 #[test]
 fn a_refusal_never_echoes_the_authored_body() {
-    let body = br#"{"contentVersion":"1.0.0","title":"SECRET-TITLE","blocks":[]}"#;
+    let body = br#"{"title":"SECRET-TITLE","blocks":[]}"#;
     let candidates = json_candidates();
     let choice = select(&candidates, SourceCandidateKind::Json, body);
     let error = match preflight_selected_body(&choice) {
-        Ok(candidate) => panic!("body must be refused, accepted {} bytes", candidate.len()),
+        Ok(candidate) => panic!("body must be refused, got {} bytes", candidate.len()),
         Err(error) => error,
     };
 
@@ -541,7 +541,8 @@ fn the_pipeline_refuses_an_unmatched_representation() {
     let request = pipeline_request(&manifest, "de-DE", observations);
 
     let error = pipeline_error(&request);
-    assert!(matches!(error, InMemorySourceRefusalV1::UnknownRepresentation));
+    let unmatched = matches!(error, InMemorySourceRefusalV1::UnknownRepresentation);
+    assert!(unmatched);
     let code = error.code();
     assert_eq!(code, "PREFLIGHT_SOURCE_PIPELINE_UNKNOWN_REPRESENTATION");
 }

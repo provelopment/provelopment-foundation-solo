@@ -271,8 +271,8 @@ fn validate_json_root(node: &DeclaredNode) -> Result<(), BodyPreflightRefusal> {
         }
     }
 
-    let version = member(members, "contentVersion")
-        .ok_or(refusal(BodyPreflightRefusalKind::MissingMember, "contentVersion"))?;
+    let missing_version = refusal(BodyPreflightRefusalKind::MissingMember, "contentVersion");
+    let version = member(members, "contentVersion").ok_or(missing_version)?;
     match version {
         DeclaredNode::String(value) if value.as_str() == BODY_CONTENT_VERSION => {}
         DeclaredNode::String(_) => {
