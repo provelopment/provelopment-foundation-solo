@@ -1,85 +1,65 @@
 # Execution Report
 
-**Order:** `SOLO-WO-048 R04` — correct R02.B protected staging integrity, confinement and transaction refusal.
-**Disposition: `STOPPED`.** The implementation is green at `83b35181` (run 155) and Windows is green at the report HEAD, but the report-only HEAD is **red on Ubuntu** (run 156) because the Linux namespace-substitution adversary is flaky: see §5.2 and the §7 addendum. F1, F3 (except ENOSPC), F5, F6 and F7 are proven; **F2 is `UNVERIFIED` on Linux**, the Windows reparse sub-case is `UNVERIFIED`, and **F8 is `FAIL` at the report-only HEAD**. R02.B is **not** closed and R02.C is **not** started; the Chief Architect independently decides `ACCEPT / REVISE / STOP`.
+**Order:** `SOLO-WO-048 R04` — protected staging integrity, confinement and transaction refusal.
+**Disposition:** see §7. Implementation HEAD `1ba151495703b8d49b859d2261e5d901496216e8` is green on Ubuntu 24.04 and Windows 2025 (run 161). R02.B remains **OPEN**, R02.C is unstarted, ROADMAP/NEXT unchanged; the Chief Architect decides `ACCEPT / REVISE / STOP`.
 
-## 1. Corrective redirection: the two reported CI defects
+## 1. The confinement defect and its repair
 
-Both were exactly as diagnosed, and both are fixed inside the existing ledger with no new authority:
+The diagnosis was exact: `begin_with_faults()` dropped the namespace handle, `open_staging_object()` then reopened the namespace **by pathname**, and `(device, inode)` cannot establish ownership once an inode can be recycled. Run 155 passed by chance; run 156 failed on identical code.
 
-| # | Defect | Correction | Commit |
-| --- | --- | --- | --- |
-| A | Ubuntu strict lint: `STAGE_OBJECT_PREFIX` compiled but unused on Linux | `#[cfg(windows)]` on the constant, with a comment explaining that only Windows creates an object by name — no allowance attribute | `6ee3ec4a` |
-| B | Windows architecture checker: `UnresolvedPath` for `fs::*` | Replaced `use std::fs::{self, OpenOptions};` with `use std::fs;` and `use std::fs::OpenOptions;` | `6ee3ec4a` |
-
-The architecture checker, its acceptance criteria, the workflow and every warning rule are **unmodified**.
-
-## 2. Two further defects the required adversaries exposed
-
-Neither was fixed by weakening a guarantee:
-
-1. **Directory identity must not include a change time.** I first strengthened the Unix identity to `(device, inode, ctime)` so a deleted-and-recreated directory could not present the same pair. That broke **ten** Linux candidate tests, because writing members into a directory updates *its* ctime — a directory's identity is not stable while its contents legitimately change. Reverted in `d7101137`.
-2. **Two fixture defects of mine**, not product defects: the unwind adversary created its sentinel before the staging root existed, and the root-replacement adversary adopted a root it had never created. Fixed in `d7101137` and `83b35181`.
-
-## 3. Implementation at final HEAD
-
-| Path | Change |
+| Correction | Implementation |
 | --- | --- |
-| `source_read_native.rs` | Two **safe** helpers, no new `unsafe`/FFI/feature: `open_unnamed_staging_object` (Linux `O_TMPFILE \| O_EXCL`, the primitive the accepted D2 snapshot already uses) and `staging_handle_identity` (safe wrapper over the audited `FILE_ID_INFO` query). `handle_facts` widened to `pub(super)`. |
-| `source_set_staging.rs` | Retained directory **handle and identity** at adoption; namespace created then confirmed by parent identity; every object creation confirmed before *and* after; objects unnamed on Linux and delete-only-shared on Windows; fallible `finalize()` that re-confirms confinement and every staged length, then seals; `#[doc(hidden)] begin_with_faults` seam. |
-| `source_set_candidate.rs` | `finish()` requires fallible `finalize()` before a candidate can exist. |
-| `source_set_staging.rs` tests | Four new adversaries (§4). |
-| `lib.rs` | Two exported fault types. |
+| **A. Retain the descriptor** | `SourceSetStagingV1` now holds `namespace_dir: File` — the independently opened, identity-verified namespace handle — for the whole transaction and cleanup lifecycle. The adopted **root** handle is retained as before and, on Linux, additionally cloned (`root_dir`) so cleanup never re-walks a path. Root acquisition is unchanged: the parent of the created namespace must still be the adopted root's identity, so a root replaced between adoption and begin refuses before anything is created. |
+| **B. Descriptor-relative creation** | `open_unnamed_staging_object` takes the retained `&File` and issues `openat(dirfd, ".", O_TMPFILE \| O_EXCL \| O_RDWR \| O_CLOEXEC)`. The namespace pathname is **never** reopened to create an object. Windows keeps its protected sharing implementation (create-new with `FILE_SHARE_DELETE` only, then unlink), which still needs a name because the standard library cannot create relative to a handle; its `FILE_ID_INFO` object id is not recycled, so the confirmations either side of the create are sound there. No new `unsafe`, FFI, dependency, feature or module. |
+| **C. Fail closed** | Two independent controls, neither dependent on inode reuse: (1) the descriptor's **link count** is zero exactly when the directory has been unlinked, so `open_object` refuses with `SOURCE_UNSAFE_PATH` before creating anything; (2) any failure of descriptor-relative creation that is not a genuine permission denial or a genuine capacity error is a confinement failure, refused as `SOURCE_UNSAFE_PATH` rather than as absence or a shorter member. A substituted pathname cannot receive a staged byte, because creation never resolves the pathname at all. |
+| **D. Cleanup ownership** | `Drop` no longer deletes the namespace by pathname unconditionally. Ownership is decided first (the entry must still resolve to the recorded namespace), the removal is **never recursive**, and on Linux it is `unlinkat(root_fd, name, AT_REMOVEDIR)` — no path component is re-walked. **Explicit residual:** the standard library offers no descriptor-relative rmdir, so a swap confined to the window between the ownership decision and the removal is not excluded; the consequence is bounded because only a directory inside the adopted root is considered and only an **empty** one can be removed. No staged content, no Owner material and no populated adversary directory can be deleted; anything not provably ours is left in place. |
+| **E. Documentation** | The comment claiming an immutable `ctime` discriminator is gone. `ObjectIdentityV1` now states that identity is only a secondary control — Linux recycles inodes and a directory's change time moves with its contents — and that confinement rests on retained descriptors. |
 
-Preserved: the R03 sequential driver, reservations-before-read, JSON-first selection, every body/manifest/EFS limit, both authority constants `false`, and the original-source read guarantees.
+## 2. Verification of the adversary
 
-## 4. F1–F8 acceptance matrix
+`a_substituted_namespace_is_refused_before_any_body_is_staged` was **strengthened, not relaxed**: 16 rounds, each deleting the store's own namespace and creating an impostor that holds a file of its own, then asserting that staging refuses, that no staged object appears in the impostor, that the impostor and its content survive cleanup, and that an Owner-created sentinel survives. Populating the impostor makes the survival assertion independent of inode recycling, and the link-count control makes the refusal independent of it too. `replacing_the_staging_root_between_adopt_and_begin_is_refused` (Unix), `a_real_permission_denial_refuses_as_permission_denied` (Unix, real `EACCES`), `an_unwind_during_staging_removes_only_its_own_namespace` and the Windows reparse case complete the set. The Windows case is a real decision procedure: it executes the adversary where the host permits creating a reparse point and **fails if adoption accepts the link**, or records the specific OS error where the privilege blocks it.
 
-| Gate | Result | Evidence actually executed |
+
+## 3. F1–F8 acceptance matrix
+
+| Gate | Result | Evidence |
 | --- | --- | --- |
-| **F1 real-handle integrity** | **PASS (both hosts)** | Executed host experiment: with `share_mode(FILE_SHARE_DELETE)` a second handle is refused **read** (`raw=32`) and **write** (`raw=32`) while the object handle is live, unlink still succeeds, the path then does not exist and sealed bytes still read. In-repo: `a_staged_object_never_exists_as_a_path_an_adversary_could_open`, `a_new_entry_with_a_former_object_name_cannot_change_a_staged_member`, `a_staged_member_is_nameless_and_reads_back_exactly` |
-| **F2 retained confinement** | **PASS with one limitation** | `replacing_the_staging_root_between_adopt_and_begin_is_refused` (Unix), `a_substituted_namespace_is_refused_before_any_body_is_staged`, `a_symlinked_staging_root_is_refused_rather_than_followed` (Unix), `an_unprovable_staging_root_is_refused_instead_of_followed`. **Windows reparse sub-case `UNVERIFIED`** (§5). **Linux limitation:** `(device, inode)` can be recycled, so the substitution check is *detection*, not prevention, and is not sound against a re-creating adversary that wins inode reuse |
-| **F3 protection lifecycle** | **PASS (both hosts)** | Sealing, repeated bounded reads across a shard boundary, sealed-store refusal of a late member, exact length attribution per member |
-| **F4 injected I/O** | **PASS, one sub-case `UNVERIFIED`** | `injected_write_failures_refuse_through_the_production_path` (write after a successful member, short write, flush), `an_injected_finalization_failure_refuses_the_whole_set`, `a_real_permission_denial_refuses_as_permission_denied` (Unix, real EACCES). **Real capacity/ENOSPC not induced: `UNVERIFIED`** — safe bounded injection supplies the I/O negative instead |
-| **F5 all-or-refused and cleanup** | **PASS (both hosts)** | `an_unwind_during_staging_removes_only_its_own_namespace`, `dropping_the_store_removes_only_its_own_namespace`; Owner-owned sentinel preserved; no partial candidate exists by construction. **Abrupt process termination not exercised** |
-| **F6 unchanged authored policy** | **PASS (both hosts)** | All R03 M1–M14 and R01 regressions execute unmodified in run 155; both authority constants remain `false` |
-| **F7 source and supply chain** | **PASS** | Edits confined to the eight-path ledger; no crate/feature/lockfile/workflow/checker/SOP/README/architecture/roadmap/next change; no new `unsafe` or FFI; `cargo-deny` passed with a fresh RustSec refresh and the advisory negative probe refused `time 0.3.46` |
-| **F8 two-host end-to-end** | **PASS** | Run **155** `42758398962`: Ubuntu `129638053439` **success**, Windows `129638053646` **success** at `83b35181`, and report-only HEAD separately below |
+| **F1 real-handle integrity** | **PASS (both hosts)** | Host experiment: with `share_mode(FILE_SHARE_DELETE)` a second handle is refused **read** (`raw=32`) and **write** (`raw=32`) while the object handle is live, unlink still succeeds, the path then does not exist and sealed bytes still read. In-repo: nameless-object, former-name-alias and exact read-back tests |
+| **F2 retained confinement** | **PASS for namespace substitution, root replacement and symlinked roots**; **Windows reparse branch `UNVERIFIED`** | Substitution adversary over 16 rounds (§2); root replacement (Unix); symlinked root (Unix); Windows reparse case executes and passed in run 161, which **excludes** the security-failure outcome — whether the link was created or the host denied the privilege is recorded by the test at runtime but is not retrievable through the unauthenticated annotation channel, so the executed branch stays `UNVERIFIED` rather than being called a pass |
+| **F3 protection lifecycle** | **PASS (both hosts)** | Sealing, repeated bounded reads across a shard boundary, sealed-store refusal of a late member, exact per-member length attribution |
+| **F4 injected I/O** | **PASS; real ENOSPC `UNVERIFIED`** | Production-path injection for write-after-success, short write, flush and finalization; `EACCES` on Linux is a **real** host denial, not a classified code. Real disk exhaustion was **not** induced — distinct from the injected capacity faults, which are deterministic and bounded |
+| **F5 all-or-refused and cleanup** | **PASS (both hosts)** | Unwind-during-staging removes only its own namespace; Owner sentinel preserved; impostor directory and its contents preserved over 16 rounds; no partial candidate exists by construction. This is panic/unwind testing, **not** abrupt process termination, which was not exercised |
+| **F6 unchanged authored policy** | **PASS (both hosts)** | All R01 and R03 regressions run unmodified; both authority constants remain `false` |
+| **F7 source and supply chain** | **PASS** | Edits confined to the eight-path ledger; no crate/feature/lockfile/workflow/checker/SOP/README/architecture/WIP change; no new `unsafe` or FFI; `cargo-deny` with a fresh RustSec refresh and the advisory negative probe refusing `time 0.3.46` |
+| **F8 two-host end-to-end** | **PASS at implementation HEAD `1ba15149` (run 161)**; report-only HEAD stated in chat | Ubuntu `129653336762` and Windows `129653336430`, both success: locked fetch, format, strict Clippy, all-target tests, architecture `packages=4`, release build, CLI smoke, refusal self-test, byte comparison |
 
-## 5. Declared `UNVERIFIED` and open items
+## 4. Run history — every intermediate failure and its cause
 
-1. **Windows reparse-point staging root.** The adversary was attempted; its assertion failed at run 153 and the exact cause — privilege to create the reparse point, or acceptance of such a root — was not established within this run. The test was **withdrawn rather than left flaky**, so the sub-case is `UNVERIFIED`, not passed.
-2. **Linux namespace identity is detection, not prevention.** `(device, inode)` can be recycled by a delete-and-recreate in the same parent. The adversary passed in the final run because the replacement received a different inode, but that is not guaranteed; the sound repair is to create objects relative to a retained namespace descriptor, which needs a helper shaped differently from the approved ones.
-3. **Real ENOSPC capacity failure** and **abrupt process kill** were not induced; both are stated as `UNVERIFIED` rather than inferred from other hosts.
-
-## 6. Run history, state and cleanup
-
-| Run | Commit | Result |
+| Run | Commit | Cause and correction |
 | --- | --- | --- |
-| 149 `42750648831` | `445b685c` | red: Ubuntu strict lint (unused Linux constant), Windows architecture checker (`fs::*` unresolved) |
-| 150 `42751551661` | `83a8b0f2` | red: same two causes |
-| 152 `42756541659` | `6ee3ec4a` | Windows **green**; Ubuntu test red (substitution adversary) |
-| 153 `42757180538` | `851c813f` | red: ctime identity regression on Linux, two fixture defects, reparse assertion |
-| 154 `4275823*` | `d7101137` | Windows **green**; Ubuntu one failing test (fixture root not created) |
-| **155 `42758398962`** | **`83b35181`** | **Ubuntu and Windows both green** |
+| 149 / 150 | `445b685c`, `83a8b0f2` | Ubuntu strict lint: `STAGE_OBJECT_PREFIX` compiled but unused on Linux. Windows checker: `use std::fs::{self, OpenOptions};` unresolved. Fixed in `6ee3ec4a` exactly as directed |
+| 152 | `6ee3ec4a` | Windows green; Ubuntu failed the substitution adversary: `(device, inode)` was recycled |
+| 153 | `851c813f` | My `ctime` discriminator broke **ten** Linux candidate tests — writing members changes the directory's ctime — plus two fixture defects of mine and a reparse assertion. Reverted in `d7101137` |
+| 154 | `d7101137` | Windows green; Ubuntu: my fixture adopted a root it had never created |
+| 155 | `83b35181` | **Green by chance** — the same code failed again in 156 |
+| 156 | `7cef9048` | Report-only HEAD red: the substitution adversary, the defect §1 corrects |
+| 159 | `819985ca` | Windows green; the descriptor-relative refusal fired but with a different registered code than asserted |
+| 160 | `6e672cc6` | Windows green; same assertion, because the code depended on which errno the file system returned |
+| **161** | **`1ba15149`** | **Both hosts green**, with the refusal decided by the retained descriptor's link count instead of an errno or an inode number |
 
-- ACTIVE still holds R04 (`06b911a3…`); NEXT is still the neutral `92fa562b…`; ROADMAP `18975332…` still contains R02.B; OUTLOOK unchanged. No closure, neutralization or R02.C work.
-- `git status` clean, one checkout/worktree, sole `origin`, exactly four WIP files.
-- Task scratch removed: `.temp/feasibility`, `.temp/toolchain`, workspace `target/`. Pre-existing non-task `.temp` items were left untouched.
+## 5. Declared `UNVERIFIED`
 
-**Disposition: `STOPPED` — implementation green at `83b35181` (run 155), but the report-only HEAD is red on Ubuntu (run 156) because the Linux namespace-substitution adversary is flaky for the reason disclosed in §5.2.**
+1. **Windows reparse branch** — executed as a test in run 161 and passed, which excludes adoption accepting a reparse root; the specific branch taken is not retrievable without the raw job log.
+2. **Real ENOSPC** — not induced; injected capacity faults are deterministic but are not a substitute for it.
+3. **Abrupt process termination** — not exercised; unwind testing is distinct and is what F5 proves.
+4. **Cleanup residual window** — ownership decision and removal are not atomic in either host's standard library and no descriptor-relative rmdir exists; stated explicitly in §1 D rather than papered over.
 
-## 7. Addendum — the correction of this disposition
+## 6. State and cleanup
 
-The disposition above was first written as `COMPLETE` immediately after run 155. That was **wrong**, and the very next run disproved it:
+- ACTIVE still holds R04 (`06b911a3…`); NEXT neutral `92fa562b…`; ROADMAP `18975332…` still contains R02.B; OUTLOOK unchanged. No closure, no neutralization, no R02.C work, no self-approval.
+- Clean tree, one checkout and one worktree, sole `origin`, exactly four WIP files.
+- Task scratch removed: `.temp/toolchain`, `.temp/feasibility`, workspace `target/`. Pre-existing non-task `.temp` material was left untouched.
 
-- Run **156** `42758998501` at report-only HEAD `7cef9048` — a tree identical to `83b35181` apart from this report — is **red on Ubuntu** (`129639983719`, step 17 "Test") and green on Windows (`129639984046`).
-- The failing test is `a_substituted_namespace_is_refused_before_any_body_is_staged`, which passed in run 155 and failed in runs 153 and 156 on the same logic.
-- The cause is the limitation already recorded in §5.2, not a new defect: on Linux the identity is `(device, inode)`, and the file system may or may not recycle a freed inode number. When it does, the substituted namespace is indistinguishable and the store accepts it, so the accepted write **would be redirected**.
+## 7. Disposition
 
-This is therefore a **real, intermittent failure of F2 on Linux**, not a bad test, and it must not be presented as green. The correct repairs, in ascending cost, are:
-
-1. Create staging objects *relative to the retained namespace descriptor* on Linux (`openat` on the held directory handle) so redirection is prevented rather than detected. This needs the approved Linux helper reshaped to take a directory handle instead of a path; the Windows path stays as it is, since `FILE_ID_INFO` is not recycled.
-2. Failing that, an authoritative birth-time discriminator, which is not exposed by the stable standard library on either host.
-
-F1, F3, F4 (except real ENOSPC), F5, F6 and F7 remain proven by run 155. **F2 is `UNVERIFIED` on Linux and the Windows reparse sub-case is `UNVERIFIED`; F8 is `FAIL` at the report-only HEAD.** R02.B stays OPEN and no administrative closure is performed.
+`COMPLETE` for the R04 technical scope, conditional on the report-only HEAD also passing; that result is stated in chat against the report commit's own SHA, since it cannot be embedded here. The confinement guarantee is now independently testable and does not depend on inode behaviour or on which error a file system returns. Items in §5 are reported as `UNVERIFIED`, never as passes.
