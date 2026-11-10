@@ -33,6 +33,7 @@
 #![deny(unsafe_code)]
 
 mod bootstrap_cli;
+mod property_resolution;
 mod publication_manifest;
 mod source_body_preflight;
 mod source_read;
@@ -44,6 +45,10 @@ mod source_set_staging;
 pub use bootstrap_cli::{
     CliOutcome, CliRefusal, CliRefusalCode, EXIT_INTERNAL, EXIT_OK, EXIT_REFUSED, FLAG_BASE_URL,
     FLAG_ENTITY_ID, SUBCOMMAND, parse_request, run,
+};
+pub use property_resolution::{
+    ManifestPropertyCandidateV1, ManifestPropertyRefusalKind, ManifestPropertyRefusalV1,
+    validate_manifest_property_candidate_v1,
 };
 pub use publication_manifest::{
     BaseDeclarationV1, DeclaredCaseMatching, DeclaredMissingTranslation, DeclaredNode,

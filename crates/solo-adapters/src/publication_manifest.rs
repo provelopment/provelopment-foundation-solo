@@ -736,6 +736,18 @@ impl InertPropertiesV1 {
     pub fn names(&self) -> impl Iterator<Item = &str> {
         self.entries.iter().map(|(name, _)| name.as_str())
     }
+
+    /// The declared entries as `(name, authored value)` pairs, in authored order.
+    ///
+    /// The accessor is read-only: it exposes neither a mutable entry list nor a way to
+    /// change this inert candidate, so a translator can inspect the authored property input
+    /// without gaining any publication authority. Each value is still the raw
+    /// [`DeclaredNode`] tree; only the property-registry translation validates it.
+    pub fn entries(&self) -> impl Iterator<Item = (&str, &DeclaredNode)> {
+        self.entries
+            .iter()
+            .map(|(name, value)| (name.as_str(), value))
+    }
 }
 
 fn build_properties(
