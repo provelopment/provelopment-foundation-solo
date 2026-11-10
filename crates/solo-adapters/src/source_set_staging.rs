@@ -611,7 +611,6 @@ impl SourceSetStagingV1 {
     /// How many staging objects (open handles) this store holds.
     ///
     /// It grows with the total staged size, not with the declaration count.
-    #[must_use]
     /// How many staging-owned names in the adopted root a caller could actually open.
     ///
     /// Linux links no name at all. On Windows this store's own names may be enumerable as
