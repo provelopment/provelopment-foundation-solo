@@ -1,46 +1,96 @@
 # Execution Report
 
-**Order:** `SOLO-WO-052 R01` - Complete R02.B F2/F5: Windows direct-root, handle-only staging lifecycle.
-**Disposition: `COMPLETE`** (technical execution only; not Architect ACCEPT, not R02.C, not release).
-**Substantive revision:** `46b3148d1cca1199f3b9bdcebfff0be6143bbe15` (merge of `1d6faaf0` + `826a1c77`), tree `639a1b59f20e577b47e0cfdd34352d6b44f5607c`.
+**Order:** `SOLO-WO-052 R01` - R02.B F2/F5, Windows direct-root handle-only staging; **REVISE round 1**.
+**Disposition: `COMPLETE`** for this technical execution only. Not Architect ACCEPT, not R02.B closure, not R02.C, not release.
+**Verified revision:** `eb19ba5b2e06a221578a83a874d01b5698228d3e`, tree `f0b133a6d77576c803bc465a0ab86037ff057de6` (`main` fast-forwarded to it; no history rewrite).
 
-## 1. Owner-selected correction, implemented
+## 1. Correction delivered in this round
 
-The Windows staging namespace is **gone**. Neither host creates a staging-owned directory now; both stage directly beneath the already adopted, retained root handle.
+**Least privilege on the caller-owned root.** `open_staging_component` now requests exactly
+`FILE_READ_ATTRIBUTES | FILE_WRITE_DATA | SYNCHRONIZE` on the staging root and
+`FILE_READ_ATTRIBUTES | SYNCHRONIZE` on an intermediate. `FILE_WRITE_DATA` is the documented
+`FILE_ADD_FILE` right and is what handle-relative file creation needs. Removed from the root:
+`DELETE`, `FILE_APPEND_DATA` (`FILE_ADD_SUBDIRECTORY`), `FILE_WRITE_ATTRIBUTES` and
+`FILE_LIST_DIRECTORY`. No further right was added: the full two-host CI below proves creation still
+succeeds with this set, which is the empirical proof the order asked for. The component-relative,
+`OBJ_DONT_REPARSE` walk is unchanged.
 
-- **Linux (preserved):** `openat2` with `BENEATH | NO_SYMLINKS | NO_MAGICLINKS | NO_XDEV` plus `O_TMPFILE | O_EXCL` anonymous inodes through the retained descriptor; zero directory entries at any instant and no pathname delete. Mandatory Btrfs fixture still runs on real CI.
-- **Windows (rewritten):** `NtCreateFile(FILE_CREATE)` relative to `OBJECT_ATTRIBUTES.RootDirectory = held_root` with `OBJ_DONT_REPARSE`, an exact one-component unique name, `FILE_NON_DIRECTORY_FILE | FILE_SYNCHRONOUS_IO_NONALERT | FILE_DELETE_ON_CLOSE`, `DELETE` rights and **share mode zero**; then `FileDispositionInfoEx(DELETE | POSIX_SEMANTICS)` on that same held handle **before the first plaintext byte**; the handle is retained for bounded positional reads after `finalize`. `create_staging_namespace`, `namespace_path`, the namespace identity/disposal path and the finalize-time directory delete were deleted outright, so no cleanup-by-name exists to be misused.
-- **Honest trade-off:** on the tested host a Windows delete-pending name remains *enumerable* while the retained handle is open. It cannot be reopened, read, written, truncated, mapped or renamed into a usable alias, and it disappears when the last handle closes, including at process death. `FILE_DELETE_ON_CLOSE` is retained as the crash net. This is not the Linux zero-entry promise and no test claims it is.
-- `visible_staging_entries()` no longer consults a path: it counts only **openable** `shard-*` names in the adopted root, so a pending name is measured rather than assumed away.
+**Linux report correction.** The earlier report claimed Linux staging uses `NO_XDEV`. That was wrong,
+and the behaviour is deliberately unchanged: staging-root adoption uses
+`BENEATH | NO_SYMLINKS | NO_MAGICLINKS` **without** `NO_XDEV`, because a staging root on another mount
+is legitimate and crossing a mount does not redirect a write. `NO_XDEV` appears only in the source
+reader's leaf resolution, where a content leaf must not leave the adopted device. No Linux security
+semantics were altered in this round.
 
-## 2. Previous diagnostic evidence (unchanged facts)
+**Documentation.** Module-level claims about an owned namespace, namespace disposal and an
+immediately empty namespace are gone. The source now states the truth: direct-root staging with an
+unenforceable-by-enumeration, unopenable delete-pending name that disappears when its last handle
+closes.
 
-`FileDispositionInfoEx` succeeded on a shard but its entry stayed `DELETE_PENDING` (by-name probe returned `2`), so deleting the containing namespace failed with `ERROR_DIR_NOT_EMPTY` (`145`). Those codes belonged to the removed namespace design; they are not present in the final lifecycle.
+## 2. Real-host adversary evidence (all executed, not reasoned)
 
-## 3. Verification (real hosts, one revision)
+Windows job of run `42807390454`; the same suite ran green at `eb19ba5b` in run `42806664621` and at
+the pre-report revision. Named results:
 
-| Evidence | Result |
-| --- | --- |
-| `rust-verify` at `826a1c77` (run `42801231741`) | **success**, ubuntu-24.04 **and** windows-2025 |
-| `rust-verify` at `46b3148d1cca1199f3b9bdcebfff0be6143bbe15` (run `42802621342`) | **success**, both hosts |
-| `source_set_staging` on Windows | **10 passed, 0 failed** - impostor dirs (empty and populated) survive, junction/component refusal, unwind, injected write/finalize, bounded abort child, scaling, pending-name unopenability |
-| `source_set_candidate` on Windows | previously-blocked whole-declaration successes now pass |
-| Linux Btrfs `O_TMPFILE` | executes on real CI; zero created entries; sentinels intact |
-| Mandatory checks | fmt, strict Clippy, architecture 4 packages / 29 cases, locked graph, refreshed RustSec, cargo-deny, release CLI smoke, Linux reproducibility - all green |
+- `a_pending_shard_name_cannot_be_reopened_changed_renamed_or_mapped` **ok** - the test derives the
+  actual task-owned pending name by listing the caller's own directory, then attempts a read open, a
+  write open, a writable-handle acquisition (the prerequisite for a writable mapped view), a delete
+  and a rename **for real**. All are refused, no alias is created, the staged bytes still read back
+  exactly through the legitimate retained handle, finalization succeeds, and the name is gone with
+  the root snapshot equal after the last handle closes.
+- `a_host_denied_disposition_refuses_before_any_plaintext_is_written` **ok** - one real native call:
+  the object is created exactly as production does, with `DELETE` and `FILE_DELETE_ON_CLOSE`, and the
+  disposition call is issued with a flag value this host does not define, so the kernel refuses it.
+  The transaction refuses before any body byte, `object_count`/`staged_bytes` stay zero, and the
+  empty file is removed by handle closure so the root is byte-identical afterwards.
+- `a_preexisting_file_at_a_shard_name_is_refused_and_left_byte_identical` **ok** - the production
+  `FILE_CREATE` path is pointed at a pre-existing foreign file; it refuses and the foreign bytes are
+  unchanged.
+- `a_root_moved_and_replaced_at_its_path_never_receives_a_staged_byte` **ok** - the retained root is
+  relocated and an impostor directory installed at the old path; the impostor never receives a
+  staged member or any cleanup, and the moved directory is never deleted.
+- `an_impostor_at_the_namespace_name_survives_untouched` (empty and populated) **ok**,
+  `an_intermediate_junction_component_is_refused` **ok**.
 
-No test was removed, skipped or weakened: the two assertion corrections are a host split (equality after the last handle closes on Windows, unchanged on Linux) plus a real openability measurement.
+Staging suite: 14 passed, 0 failed on Windows; candidate suite fully green, including the seven
+whole-declaration successes that were previously blocked. Linux: the mandatory Btrfs `O_TMPFILE`
+fixture runs, reads back, creates no entry, and preserves Owner sentinels.
 
-## 4. Gates
+## 3. Gates, distinguished by evidence class
 
-H1 **PASS** (full two-host suite) - H2 **PASS** (held-root confinement, both hosts) - H3 **PASS** (Btrfs anonymous lifecycle) - H4 **PASS** (component-relative, reparse-refusing root) - H5 **PASS** (exclusive handle, disposition before first byte, retained reads, crash cleanup via delete-on-close) - H6 **PASS** (no unowned deletion possible: no directory is created or removed; impostors and sentinels byte-identical) - H7 **PASS** (injected faults, real denial, unwind, abort child) - H8 **PASS** (`unsafe` confined to the named native helpers; no dependency, feature, workflow or lock change) - H9 **PASS** (same-revision both-host green plus report-HEAD green) - H10 **PASS** (four WIP files, clean tree, canonical report).
+- **H1 PASS** - full two-host suite at one revision.
+- **H2 PASS** - retained-root confinement; root relocation adversary executed.
+- **H3 PASS** - real Btrfs anonymous lifecycle on Ubuntu CI.
+- **H4 PASS for the executed cases** - component-relative `OBJ_DONT_REPARSE` walk, root relocation,
+  name collision, impostor survival. **UNVERIFIED sub-case:** whether the junction fixture could be
+  *created* on this host. The test does not convert an unavailable fixture into PASS; the log proves
+  the case ran, not that creation succeeded, and that is reported as unverified rather than claimed.
+- **H5 PASS** - exclusive handle (share mode zero), disposition before the first plaintext byte,
+  retained byte reads after finalize, pending name gone at handle closure, `FILE_DELETE_ON_CLOSE` as
+  the process-death net.
+- **H6 PASS** - no directory is created, so no directory cleanup exists; impostor directories (empty
+  and populated), a foreign sentinel and a colliding file are all left byte-identical.
+- **H7 PASS** - injected write/short-write/flush/finalize, a real kernel disposition refusal, real
+  permission denial, unwind and the bounded abort child all refuse without a partial candidate.
+- **H8 PASS** - `unsafe` confined to the named Windows helpers inside the one gated module; no new
+  dependency, feature, workflow or lock change; root rights reduced, not widened.
+- **H9 PASS** - same-revision two-host green, plus green at the fast-forwarded `main` revision and at
+  this report HEAD.
+- **H10 PASS** - four WIP files, one checkout, empty `git status`, canonical single report.
 
-R04: F1, F3, F4, F6, F7, F8 unchanged. **F2 and F5 close technically** on the evidence above. Residual risk, stated plainly: a Windows pending name is visible to directory enumeration until the owning handle closes; no plaintext is reachable through it, and no directory of ours can be left behind because none is created. R02.B remains **OPEN** for independent Architect acceptance.
+**F1-F8:** F1, F3, F4, F6, F7, F8 unchanged and green. **F2 and F5 close technically** on the executed
+evidence above. Residual risk, stated plainly: a Windows pending name remains enumerable while its
+handle is open; it is unopenable and carries no plaintext, and it cannot outlive the handle.
 
-## 5. Ledger
+## 4. Ledger
 
-Implementation commits: `3100809`, `42ac3a3`, `b1766e5`, `8f30cfe`, `7885dbf`, `a8dc2ba`, `786913d`, `6448f9c`, `826a1c7` on `solo-wo-051-r01`, integrated by merge `46b3148d1cca1199f3b9bdcebfff0be6143bbe15`; ACTIVE installation `1d6faaf0`; earlier STOP report `79de89da`.
-Changed paths: `crates/solo-adapters/src/source_set_staging.rs`, `src/source_read_native.rs`, `src/source_set_candidate.rs`, `tests/source_set_staging.rs`. Untouched: `Cargo.toml`, `Cargo.lock`, `deny.toml`, workflow, checkers, SOPs, `lib.rs`, candidate test expectations.
+Correction commits on `solo-wo-051-r01`: `f42e1ed` (least privilege plus the new adversaries) and
+`eb19ba5b` (disposition refusal through one real native call with delete-on-close), after
+non-destructive merge `5d78b812` of published `main`. `main` fast-forwarded `0e2b2683 -> eb19ba5b`.
+Changed paths: `crates/solo-adapters/src/source_read_native.rs`, `src/source_set_staging.rs`,
+`src/lib.rs`, `tests/source_set_staging.rs`. Unchanged: `Cargo.toml`, `Cargo.lock`, `deny.toml`,
+workflow, checkers, candidate expectations.
 
-Git state: `main` = `46b3148d1cca1199f3b9bdcebfff0be6143bbe15`, remote `origin` synced, one worktree, one checkout, `git status` empty, `target/` removed, no task scratch retained.
+Cleanliness: one checkout, one remote, `git status` empty, `target/` removed, no task scratch kept.
 
-**Disposition: `COMPLETE`** - R02.B technical execution finished; R02.C not started.
+**Disposition: `COMPLETE`** - R02.B technical correction finished; R02.C not started.
