@@ -114,6 +114,17 @@ fn identity_of(file: &File) -> Result<ObjectIdentityV1, SourceReadRefusalV1> {
     }
 }
 
+/// Whether a retained directory descriptor is still linked into the namespace tree.
+///
+/// A directory's link count drops to zero when its entry is removed, and the count is read from the
+/// handle this store holds rather than from a name, so the answer cannot be redirected. It is the
+/// deterministic form of "the namespace this store created is still there".
+#[cfg(unix)]
+fn descriptor_is_linked(directory: &File) -> Result<bool, SourceReadRefusalV1> {
+    use std::os::unix::fs::MetadataExt;
+    Ok(directory.metadata().map_err(classify_io)?.nlink() > 0)
+}
+
 /// Opens a directory as a retained handle.
 ///
 /// The handle, not the string, is what later operations depend on, and its identity is what
@@ -737,6 +748,16 @@ impl SourceSetStagingV1 {
         // creates it by name, so the entry is confirmed immediately before and after the create:
         // a namespace substituted during the create is detected before a byte is written into the
         // object it produced.
+        #[cfg(target_os = "linux")]
+        {
+            // The link count of the directory this store holds is zero exactly when it has been
+            // unlinked from the tree. That is decided on the descriptor itself, so the refusal does
+            // not depend on which error a particular file system happens to return for a create in
+            // a deleted directory, nor on whether a successor reused the freed inode number.
+            if !descriptor_is_linked(&self.namespace_dir)? {
+                return Err(unsafe_location());
+            }
+        }
         #[cfg(not(target_os = "linux"))]
         self.confirm_namespace()?;
         let index = self.shards.len();
