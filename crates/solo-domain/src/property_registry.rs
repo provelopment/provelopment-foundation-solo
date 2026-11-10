@@ -365,11 +365,13 @@ impl PropertyRefusalKind {
 
 /// Refusal of one authored property declaration.
 ///
-/// The value carries only the refusal category, so a diagnostic can never echo the
-/// refused property content.
+/// The value carries only the refusal category and, when the refusal is specific to one
+/// registered key, that key. It never carries authored content, so a diagnostic can never
+/// echo a refused property value.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PropertyDeclarationRefusalV1 {
     kind: PropertyRefusalKind,
+    key: Option<PropertyKey>,
 }
 
 impl PropertyDeclarationRefusalV1 {
@@ -380,13 +382,28 @@ impl PropertyDeclarationRefusalV1 {
     /// typed category as a domain-level refusal.
     #[must_use]
     pub const fn of(kind: PropertyRefusalKind) -> Self {
-        Self { kind }
+        Self { kind, key: None }
+    }
+
+    /// Attaches the registered key this refusal is specific to.
+    #[must_use]
+    pub const fn with_key(self, key: PropertyKey) -> Self {
+        Self {
+            kind: self.kind,
+            key: Some(key),
+        }
     }
 
     /// The refusal category.
     #[must_use]
     pub const fn kind(&self) -> PropertyRefusalKind {
         self.kind
+    }
+
+    /// The registered key this refusal is specific to, when known.
+    #[must_use]
+    pub const fn key(&self) -> Option<PropertyKey> {
+        self.key
     }
 
     /// Stable engineering code for this refusal.
@@ -1538,23 +1555,27 @@ impl DeclaredOwnerPropertiesV1 {
     ) -> Result<Self, PropertyDeclarationRefusalV1> {
         for (index, (key, declaration)) in entries.iter().enumerate() {
             if !key.allows_level(owner.level()) {
-                return Err(PropertyDeclarationRefusalV1::of(
-                    PropertyRefusalKind::WrongLevel,
-                ));
+                return Err(
+                    PropertyDeclarationRefusalV1::of(PropertyRefusalKind::WrongLevel)
+                        .with_key(*key),
+                );
             }
             if entries[..index].iter().any(|(seen, _)| seen == key) {
                 return Err(PropertyDeclarationRefusalV1::of(
                     PropertyRefusalKind::DuplicatePropertyEntry,
-                ));
+                )
+                .with_key(*key));
             }
             let values = declaration.current_context().values();
             if values.len() > MAX_LOCAL_ENTRIES {
                 return Err(PropertyDeclarationRefusalV1::of(
                     PropertyRefusalKind::TooManyLocalEntries,
-                ));
+                )
+                .with_key(*key));
             }
             for value in values {
-                validate_value_for_key(*key, value.value())?;
+                validate_value_for_key(*key, value.value())
+                    .map_err(|refusal| refusal.with_key(*key))?;
             }
         }
         Ok(Self { owner, entries })

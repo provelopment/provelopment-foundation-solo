@@ -548,12 +548,19 @@ impl ValidatedPropertyInputV1 {
                 continue;
             };
             match envelope.inheritance() {
-                Inheritance::Inherit => resolution_events.push(ResolutionEventV1::new(
-                    owner.clone(),
-                    ResolutionOperation::Inherited,
-                    None,
-                    None,
-                )),
+                // `inherited` records an explicit declaration that actually carried
+                // inherited values; a root declaration has nothing to inherit and records
+                // only its own `added` events.
+                Inheritance::Inherit => {
+                    if !values.is_empty() {
+                        resolution_events.push(ResolutionEventV1::new(
+                            owner.clone(),
+                            ResolutionOperation::Inherited,
+                            None,
+                            None,
+                        ));
+                    }
+                }
                 Inheritance::Suppress => {
                     values.clear();
                     resolution_events.push(ResolutionEventV1::new(

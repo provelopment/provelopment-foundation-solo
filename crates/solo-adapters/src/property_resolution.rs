@@ -369,7 +369,7 @@ fn translate_owner(
             refuse(
                 ManifestPropertyRefusalKind::DeclarationRefused(declined.kind()),
                 Some(owner),
-                None,
+                declined.key(),
             )
         })
 }

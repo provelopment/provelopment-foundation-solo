@@ -672,11 +672,13 @@ fn r03a_04_ordering_provenance_and_field_origins_are_exact() {
         vec![
             (ResolutionOperation::Added, Some(0)),
             (ResolutionOperation::Added, Some(1)),
+            (ResolutionOperation::Inherited, None),
             (ResolutionOperation::Added, Some(0)),
         ]
     );
     assert_eq!(record.resolution_events()[0].owner(), &entity_owner());
     assert_eq!(record.resolution_events()[2].owner(), &site_owner());
+    assert_eq!(record.resolution_events()[3].owner(), &site_owner());
 
     // A non-location property carries no field origins at all.
     let graphic = validate_declared_properties_v1(
@@ -1174,7 +1176,8 @@ fn r03a_08_identical_page_ids_under_different_sites_and_locales_never_mix() {
             .values_of(PropertyKey::ContactEmail)
             .is_empty()
     );
-    // Another locale of the same Page is a different representation.
+    // Another locale of the same Page is a different representation key, but it is a member
+    // of the same Page, so it inherits the Page-level value without adding one of its own.
     let indonesian = QualifiedOwnerV1::representation(
         entity_id(),
         facet("main"),
@@ -1182,20 +1185,25 @@ fn r03a_08_identical_page_ids_under_different_sites_and_locales_never_mix() {
         page("home"),
         locale("id-ID"),
     );
-    assert!(
-        input
-            .resolve(&indonesian)
-            .expect("a valid resolution")
+    let indonesian_resolved = input.resolve(&indonesian).expect("a valid resolution");
+    assert_eq!(
+        indonesian_resolved
             .values_of(PropertyKey::ContactEmail)
-            .is_empty()
+            .len(),
+        1
     );
-    // The Page is not its representation, and the Site is not its Page.
-    assert!(
+    assert_eq!(
+        indonesian_resolved.values_of(PropertyKey::ContactEmail)[0].origin_owner(),
+        &page_owner()
+    );
+    // The Page itself owns the authored value; the Site above it does not inherit it.
+    assert_eq!(
         input
             .resolve(&page_owner())
             .expect("a valid resolution")
             .values_of(PropertyKey::ContactEmail)
-            .is_empty()
+            .len(),
+        1
     );
     assert!(
         input
