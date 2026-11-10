@@ -206,26 +206,185 @@ pub(crate) fn open_unnamed_staging_object(
     Ok(std::fs::File::from(fd))
 }
 
-/// Safe, staging-only: removes one directory entry **relative to a retained parent handle**.
-///
-/// Resolving the entry through the retained parent descriptor avoids re-walking any path
-/// component, so a replaced ancestor cannot redirect the removal. A non-empty directory is
-/// refused by the kernel (`ENOTEMPTY`), which is what keeps an adversary-created directory that
-/// happens to reuse the namespace name from being removed.
-#[cfg(target_os = "linux")]
-pub(crate) fn remove_staging_namespace_entry(
-    parent: &std::fs::File,
-    name: &std::ffi::OsStr,
-) -> std::io::Result<()> {
-    use std::os::fd::AsFd;
-    rustix::fs::unlinkat(parent.as_fd(), name, rustix::fs::AtFlags::REMOVEDIR).map_err(staging_io)
-}
-
 /// Maps one `rustix` error onto the host's own I/O error, so every staging failure is classified
 /// in exactly one place rather than gaining a second, weaker vocabulary.
 #[cfg(target_os = "linux")]
 fn staging_io(error: rustix::io::Errno) -> std::io::Error {
     std::io::Error::from_raw_os_error(error.raw_os_error())
+}
+
+#[cfg(target_os = "linux")]
+pub(crate) fn adopt_staging_root(path: &std::path::Path) -> std::io::Result<std::fs::File> {
+    use std::os::unix::ffi::OsStrExt;
+
+    // The caller's path is parsed by component and never re-encoded: each `Normal` component keeps
+    // its original bytes, so the name the kernel resolves is exactly the name that was authored.
+    let mut relative = std::ffi::OsString::new();
+    let mut saw_root = false;
+    for component in path.components() {
+        match component {
+            std::path::Component::RootDir if !saw_root && relative.is_empty() => {
+                saw_root = true;
+            }
+            std::path::Component::Normal(name) => {
+                if !saw_root || name.as_bytes().contains(&0) {
+                    return Err(unsafe_staging_root());
+                }
+                if !relative.is_empty() {
+                    relative.push("/");
+                }
+                relative.push(name);
+            }
+            // A prefix, a `.` segment or any `..` is refused: none of them can be trusted to
+            // describe a directory this process may write into.
+            _ => return Err(unsafe_staging_root()),
+        }
+    }
+    if !saw_root {
+        return Err(unsafe_staging_root());
+    }
+
+    // `/` is the one trusted starting point, opened with no name resolution at all.
+    let slash = rustix::fs::open(
+        c"/",
+        rustix::fs::OFlags::RDONLY | rustix::fs::OFlags::DIRECTORY | rustix::fs::OFlags::CLOEXEC,
+        rustix::fs::Mode::empty(),
+    )
+    .map_err(staging_io)?;
+
+    if relative.is_empty() {
+        return Ok(std::fs::File::from(slash));
+    }
+
+    // Every remaining component is resolved by the kernel under `BENEATH | NO_SYMLINKS |
+    // NO_MAGICLINKS`: an intermediate symlink, a magic link or any attempt to leave the directory
+    // below `/` is refused by the kernel rather than inspected by this process first. `NO_XDEV` is
+    // deliberately absent: a staging root on another mount is legitimate and crossing a mount
+    // does not by itself redirect a write.
+    let held = rustix::fs::openat2(
+        &slash,
+        relative.as_os_str(),
+        rustix::fs::OFlags::RDONLY | rustix::fs::OFlags::DIRECTORY | rustix::fs::OFlags::CLOEXEC,
+        rustix::fs::Mode::empty(),
+        rustix::fs::ResolveFlags::BENEATH
+            | rustix::fs::ResolveFlags::NO_SYMLINKS
+            | rustix::fs::ResolveFlags::NO_MAGICLINKS,
+    )
+    .map_err(staging_io)?;
+    Ok(std::fs::File::from(held))
+}
+
+/// The refusal a path shape that cannot be trusted is reported as.
+///
+/// `InvalidInput` carries it because it is distinguishable from every errno the resolution itself
+/// can produce; the caller maps it to `SOURCE_UNSAFE_PATH`.
+#[cfg(target_os = "linux")]
+fn unsafe_staging_root() -> std::io::Error {
+    std::io::Error::new(
+        std::io::ErrorKind::InvalidInput,
+        "an unsafe staging-root shape was refused before resolution",
+    )
+}
+
+/// The closed outcome vocabulary of the Windows staging-only helpers.
+#[cfg(windows)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum StagingNativeError {
+    /// Not the directory this store may write into, or a reparse point was met.
+    Unsafe,
+    /// The host denied the operation.
+    PermissionDenied,
+    /// This host cannot perform the operation at all.
+    Unsupported,
+    /// The host answered with an error this boundary cannot interpret.
+    ///
+    /// Deliberately distinct from `Unsafe`: a real native failure must be reported as an I/O
+    /// failure instead of being concealed as a path refusal.
+    NativeFailure,
+}
+
+#[cfg(windows)]
+impl StagingNativeError {
+    fn from_native(error: NativeError) -> Self {
+        match error {
+            NativeError::PermissionDenied => Self::PermissionDenied,
+            NativeError::Unsupported => Self::Unsupported,
+            // A native failure stays an I/O failure; only a proven path or object defect is
+            // reported as an unsafe location.
+            NativeError::OtherIo => Self::NativeFailure,
+            _ => Self::Unsafe,
+        }
+    }
+}
+
+/// Safe, staging-only: opens the caller-selected staging root as a retained directory handle.
+///
+/// Only the drive root (`C:\`) is opened by name, and it contains no component the caller chose.
+/// Every following component is opened **relative to the handle of the directory above it** with
+/// `OBJ_DONT_REPARSE` and `FILE_FLAG_OPEN_REPARSE_POINT`, so a junction, symlink or other reparse
+/// point anywhere in the path is refused instead of traversed. A relative, UNC or device form is
+/// refused rather than reinterpreted.
+#[cfg(windows)]
+pub(crate) fn adopt_staging_root(
+    path: &std::path::Path,
+) -> Result<std::fs::File, StagingNativeError> {
+    use std::os::windows::io::{FromRawHandle, IntoRawHandle};
+    let handle = sys::open_staging_root(path).map_err(StagingNativeError::from_native)?;
+    let raw = handle.into_raw_handle();
+    // SAFETY: `raw` came from `open_staging_root`, which released an `OwnedHandle` through
+    // `into_raw_handle`; the value is moved exactly once into this `File`, which becomes its only
+    // owner and closes it on drop.
+    Ok(unsafe { std::fs::File::from_raw_handle(raw) })
+}
+
+/// Safe, staging-only: creates the task-owned namespace relative to the held root handle.
+#[cfg(windows)]
+/// Safe, staging-only: creates one shard relative to the retained root and detaches its name.
+///
+/// The name exists only between the create and the disposition below, and the object is created
+/// with **no sharing at all**, so during that interval no other opener can read, write, delete or
+/// map it. The disposition then unlinks the name through the object's own handle *before the caller
+/// writes a single byte*, so:
+///
+/// * no name ever reaches a staged byte;
+/// * an abruptly terminated process can leave only an **empty** named object, never recoverable
+///   plaintext;
+/// * the detach is not deferred to handle closure, so the namespace is empty — and therefore
+///   removable by its own handle — while every staged member is still readable.
+#[cfg(windows)]
+pub(crate) fn create_staging_shard(
+    parent: &std::fs::File,
+    name: &str,
+) -> Result<std::fs::File, StagingNativeError> {
+    use std::os::windows::io::{AsRawHandle, FromRawHandle, IntoRawHandle};
+    let handle = sys::create_relative(parent.as_raw_handle(), name, false)
+        .map_err(StagingNativeError::from_native)?;
+    let raw = handle.into_raw_handle();
+    // SAFETY: a fresh, unowned handle moved exactly once into a `File`.
+    let file = unsafe { std::fs::File::from_raw_handle(raw) };
+    if let Err(error) = dispose_staging_object(&file) {
+        // A failed detach refuses the member: the handle is closed at once. The object it leaves is
+        // empty, and the namespace it sits in is then not removable, so the failure is reported
+        // instead of being papered over.
+        drop(file);
+        return Err(error);
+    }
+    // Proven on Windows Server 2025: the delete disposition above succeeds, yet the detached name
+    // remains DELETE_PENDING until this handle closes, so the entry survives in the namespace. That
+    // is what makes an immediate namespace removal impossible while a member stays readable.
+    Ok(file)
+}
+
+/// Safe, staging-only: marks **this exact held object** for deletion and unlinks its name.
+///
+/// The call takes a handle, never a path, so a directory entry that was renamed, replaced or
+/// recreated at the same name cannot be the object that is removed.
+/// `FILE_DISPOSITION_FLAG_POSIX_SEMANTICS` makes the name disappear at once while the handle stays
+/// valid, which is what lets a staged shard remain readable after its name is gone.
+#[cfg(windows)]
+pub(crate) fn dispose_staging_object(object: &std::fs::File) -> Result<(), StagingNativeError> {
+    use std::os::windows::io::AsRawHandle;
+    sys::dispose_held(object.as_raw_handle()).map_err(StagingNativeError::from_native)
 }
 
 /// Safe, staging-only: the retained identity of an already-open handle.
@@ -796,6 +955,311 @@ mod sys {
         // unowned, and is moved exactly once into this `OwnedHandle`, which becomes its
         // only owner.
         Ok(unsafe { OwnedHandle::from_raw_handle(out) })
+    }
+
+    /// Opens one relative directory component with the rights staging needs.
+    ///
+    /// Deliberately separate from the reader's opener: the reader must not gain create or delete
+    /// rights, and staging must not depend on rights the reader happens to hold.
+    /// `FILE_WRITE_DATA` and `FILE_APPEND_DATA` are the documented `FILE_ADD_FILE` and
+    /// `FILE_ADD_SUBDIRECTORY` rights on a directory, which is what makes handle-relative creation
+    /// possible at all.
+    pub(super) fn open_staging_component(
+        parent: HANDLE,
+        name: &str,
+        is_staging_root: bool,
+    ) -> Result<OwnedHandle, NativeError> {
+        use windows_sys::Win32::Storage::FileSystem::{
+            DELETE, FILE_APPEND_DATA, FILE_LIST_DIRECTORY, FILE_WRITE_ATTRIBUTES, FILE_WRITE_DATA,
+        };
+
+        if name.is_empty() || name.contains('\0') || name.contains(['/', '\\']) {
+            return Err(NativeError::Unsafe);
+        }
+        let wide: Vec<u16> = name.encode_utf16().collect();
+        let Ok(byte_len) = u16::try_from(wide.len().saturating_mul(2)) else {
+            return Err(NativeError::Unsupported);
+        };
+        let unicode = UNICODE_STRING {
+            Length: byte_len,
+            MaximumLength: byte_len,
+            Buffer: wide.as_ptr().cast_mut(),
+        };
+        let mut attributes: OBJECT_ATTRIBUTES = zeroed();
+        attributes.Length = size_u32::<OBJECT_ATTRIBUTES>();
+        attributes.RootDirectory = parent;
+        attributes.ObjectName = ptr::from_ref(&unicode);
+        attributes.Attributes = OBJ_DONT_REPARSE;
+        let mut io_status: IO_STATUS_BLOCK = zeroed();
+        let mut out: HANDLE = ptr::null_mut();
+        // Only the final component must receive children and be disposable; an intermediate is
+        // only traversed, and requesting create or delete rights on a directory the caller does not
+        // own (for example `C:\Users`) would be denied for a standard user.
+        let access = if is_staging_root {
+            FILE_LIST_DIRECTORY
+                | FILE_WRITE_DATA
+                | FILE_APPEND_DATA
+                | FILE_READ_ATTRIBUTES
+                | FILE_WRITE_ATTRIBUTES
+                | DELETE
+                | SYNCHRONIZE
+        } else {
+            FILE_READ_ATTRIBUTES | SYNCHRONIZE
+        };
+        let options = FILE_OPEN_REPARSE_POINT | FILE_SYNCHRONOUS_IO_NONALERT | FILE_DIRECTORY_FILE;
+
+        // SAFETY: `parent` is a live handle owned by the caller for this call; `unicode` names
+        // `wide`, a NUL-free UTF-16 buffer alive across the call whose byte length is exactly
+        // `Length`; `attributes` is initialised in full with `OBJ_DONT_REPARSE`; `io_status` and
+        // `out` are valid, aligned writable outputs; allocation size and EA are the "none" form.
+        let status = unsafe {
+            NtCreateFile(
+                ptr::from_mut(&mut out),
+                access,
+                ptr::from_ref(&attributes),
+                ptr::from_mut(&mut io_status),
+                ptr::null(),
+                0,
+                SHARE_ALL,
+                FILE_OPEN,
+                options,
+                ptr::null(),
+                0,
+            )
+        };
+        if status != STATUS_SUCCESS {
+            return Err(map_status(status));
+        }
+        if out.is_null() || out == INVALID_HANDLE_VALUE {
+            return Err(NativeError::OtherIo);
+        }
+        // SAFETY: a fresh, unowned handle from a successful `NtCreateFile`, moved exactly once
+        // into an `OwnedHandle` that becomes its only owner.
+        Ok(unsafe { OwnedHandle::from_raw_handle(out) })
+    }
+
+    /// Opens a drive root by name as the bootstrap parent for the first component.
+    ///
+    /// `C:\` is a fixed bootstrap prefix that carries no component the caller chose, so it only
+    /// needs traversal and attribute rights: it is never created in or disposed of.
+    pub(super) fn open_staging_drive_root(letter: u8) -> Result<OwnedHandle, NativeError> {
+        let root: Vec<u16> = vec![u16::from(letter), u16::from(b':'), u16::from(b'\\'), 0];
+        let access = FILE_READ_ATTRIBUTES | SYNCHRONIZE;
+        // SAFETY: `root` is a NUL-terminated UTF-16 buffer alive for the call; the flags are the
+        // documented directory-open combination with `FILE_FLAG_OPEN_REPARSE_POINT`.
+        let raw = unsafe {
+            CreateFileW(
+                root.as_ptr(),
+                access,
+                SHARE_ALL,
+                ptr::null(),
+                OPEN_EXISTING,
+                FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT,
+                ptr::null_mut(),
+            )
+        };
+        if raw == INVALID_HANDLE_VALUE {
+            return Err(last_error());
+        }
+        // SAFETY: a fresh handle from `CreateFileW`, moved exactly once into its only owner.
+        let handle = unsafe { OwnedHandle::from_raw_handle(raw) };
+        let (_, is_dir) = handle_facts(handle.as_raw_handle())?;
+        if !is_dir {
+            return Err(NativeError::Unsafe);
+        }
+        Ok(handle)
+    }
+
+    /// Opens the caller-selected staging root, one verified component at a time.
+    ///
+    /// Only the drive root is opened by name; every other component is opened relative to the
+    /// handle of its own parent, so no part of the caller's path is ever re-resolved as a string
+    /// and no intermediate reparse point can be traversed. The type of every component is read
+    /// from the handle that was opened, never assumed from the name that was used.
+    pub(super) fn open_staging_root(path: &Path) -> Result<OwnedHandle, NativeError> {
+        use std::path::{Component, Prefix};
+
+        let mut components = path.components();
+        let Some(Component::Prefix(prefix)) = components.next() else {
+            return Err(NativeError::Unsafe);
+        };
+        let Prefix::Disk(letter) = prefix.kind() else {
+            return Err(NativeError::Unsafe);
+        };
+        if components.next() != Some(Component::RootDir) {
+            return Err(NativeError::Unsafe);
+        }
+        let mut names: Vec<&str> = Vec::new();
+        for component in components {
+            let Component::Normal(name) = component else {
+                return Err(NativeError::Unsafe);
+            };
+            let Some(text) = name.to_str() else {
+                return Err(NativeError::Unsafe);
+            };
+            if text.is_empty()
+                || text.contains(['/', '\\'])
+                || text.contains('\0')
+                || text == "."
+                || text == ".."
+            {
+                return Err(NativeError::Unsafe);
+            }
+            names.push(text);
+        }
+
+        let mut walked = open_staging_drive_root(letter)?;
+        let last = names.len().saturating_sub(1);
+        for (index, name) in names.iter().enumerate() {
+            let child = open_staging_component(walked.as_raw_handle(), name, index == last)?;
+            let (_, is_dir) = handle_facts(child.as_raw_handle())?;
+            if !is_dir {
+                return Err(NativeError::Unsafe);
+            }
+            walked = child;
+        }
+        Ok(walked)
+    }
+
+    /// Creates one single-component object relative to a held parent directory handle.
+    ///
+    /// `RootDirectory` is that parent handle and `ObjectName` is exactly one component, so the
+    /// object is created inside the directory this process already holds rather than inside
+    /// whatever a later path lookup would find. `FILE_DELETE_ON_CLOSE` on a shard is the crash
+    /// safety net for the interval before its name is detached.
+    pub(super) fn create_relative(
+        parent: HANDLE,
+        name: &str,
+        directory: bool,
+    ) -> Result<OwnedHandle, NativeError> {
+        use windows_sys::Wdk::Storage::FileSystem::{
+            FILE_CREATE, FILE_DELETE_ON_CLOSE, FILE_DIRECTORY_FILE as CREATE_DIRECTORY_FILE,
+            FILE_NON_DIRECTORY_FILE as CREATE_NON_DIRECTORY_FILE, FILE_SYNCHRONOUS_IO_NONALERT,
+        };
+        use windows_sys::Win32::Storage::FileSystem::{
+            DELETE, FILE_APPEND_DATA, FILE_LIST_DIRECTORY, FILE_READ_ATTRIBUTES, FILE_READ_DATA,
+            FILE_WRITE_ATTRIBUTES, FILE_WRITE_DATA,
+        };
+
+        const STATUS_OBJECT_NAME_COLLISION: NTSTATUS = 0xC000_0035u32 as NTSTATUS;
+
+        if name.is_empty()
+            || name.contains(['/', '\\'])
+            || name.contains('\0')
+            || name == "."
+            || name == ".."
+        {
+            return Err(NativeError::Unsafe);
+        }
+        let wide: Vec<u16> = name.encode_utf16().collect();
+        let Ok(byte_len) = u16::try_from(wide.len().saturating_mul(2)) else {
+            return Err(NativeError::Unsupported);
+        };
+        let unicode = UNICODE_STRING {
+            Length: byte_len,
+            MaximumLength: byte_len,
+            Buffer: wide.as_ptr().cast_mut(),
+        };
+        let mut attributes: OBJECT_ATTRIBUTES = zeroed();
+        attributes.Length = u32::try_from(std::mem::size_of::<OBJECT_ATTRIBUTES>()).unwrap_or(0);
+        attributes.RootDirectory = parent;
+        attributes.ObjectName = ptr::from_ref(&unicode).cast_mut();
+        attributes.Attributes = OBJ_DONT_REPARSE;
+
+        let (access, share, options) = if directory {
+            (
+                FILE_LIST_DIRECTORY
+                    | FILE_WRITE_DATA
+                    | FILE_APPEND_DATA
+                    | FILE_READ_ATTRIBUTES
+                    | FILE_WRITE_ATTRIBUTES
+                    | DELETE
+                    | SYNCHRONIZE,
+                SHARE_ALL,
+                CREATE_DIRECTORY_FILE | FILE_SYNCHRONOUS_IO_NONALERT,
+            )
+        } else {
+            (
+                FILE_READ_DATA | FILE_WRITE_DATA | FILE_READ_ATTRIBUTES | DELETE | SYNCHRONIZE,
+                // No sharing at all: while the shard still has its transient name no second
+                // reader, writer, mapper or deleter can open it. Proven on the real host: granting
+                // delete sharing does not make the detach unlink immediately, so the strongest
+                // share mode costs nothing.
+                0,
+                // `FILE_DELETE_ON_CLOSE` is the crash-safety net for the interval before the name is
+                // detached: if this process dies in that instant the object is still removed when
+                // its handle closes, and in any case it holds no plaintext, because the disposition
+                // below runs before the first byte is written.
+                CREATE_NON_DIRECTORY_FILE | FILE_SYNCHRONOUS_IO_NONALERT | FILE_DELETE_ON_CLOSE,
+            )
+        };
+
+        let mut io_status: IO_STATUS_BLOCK = zeroed();
+        let mut out: HANDLE = ptr::null_mut();
+
+        // SAFETY: `parent` is a live handle owned by the caller for this call; `unicode` names
+        // `wide`, a NUL-free UTF-16 buffer alive across the call whose byte length is exactly
+        // `Length`; `attributes` is initialised in full with its documented `Length`, a borrowed
+        // `ObjectName` pointer, the retained `RootDirectory` and `OBJ_DONT_REPARSE`; `io_status`
+        // and `out` are valid, aligned writable outputs; the allocation-size and EA arguments are
+        // null with length zero, the documented "none" form. `FILE_CREATE` and the create options
+        // are passed in their two separate documented parameters.
+        let status = unsafe {
+            NtCreateFile(
+                ptr::from_mut(&mut out),
+                access,
+                ptr::from_ref(&attributes),
+                ptr::from_mut(&mut io_status),
+                ptr::null(),
+                0,
+                share,
+                FILE_CREATE,
+                options,
+                ptr::null(),
+                0,
+            )
+        };
+        if status == STATUS_OBJECT_NAME_COLLISION {
+            return Err(NativeError::Unsafe);
+        }
+        if status != STATUS_SUCCESS {
+            return Err(map_status(status));
+        }
+        if out.is_null() || out == INVALID_HANDLE_VALUE {
+            return Err(NativeError::OtherIo);
+        }
+        // SAFETY: `out` is a valid handle returned by this successful `NtCreateFile`, is unowned,
+        // and is moved exactly once into an `OwnedHandle` that becomes its only owner.
+        Ok(unsafe { OwnedHandle::from_raw_handle(out) })
+    }
+
+    /// Marks the exact held object for deletion and unlinks its name.
+    ///
+    /// `FileDispositionInfoEx` is applied to the handle itself, so the object removed is the one
+    /// this process owns even if its former name now belongs to somebody else's directory.
+    pub(super) fn dispose_held(handle: HANDLE) -> Result<(), NativeError> {
+        use windows_sys::Win32::Storage::FileSystem::{
+            FILE_DISPOSITION_FLAG_DELETE, FILE_DISPOSITION_FLAG_POSIX_SEMANTICS,
+            FILE_DISPOSITION_INFO_EX, FileDispositionInfoEx, SetFileInformationByHandle,
+        };
+        let disposition = FILE_DISPOSITION_INFO_EX {
+            Flags: FILE_DISPOSITION_FLAG_DELETE | FILE_DISPOSITION_FLAG_POSIX_SEMANTICS,
+        };
+        // SAFETY: `handle` is a live handle the caller owns for this call; `disposition` is a
+        // fully initialised `FILE_DISPOSITION_INFO_EX` and the size passed is exactly that
+        // structure's size, which is what this information class expects for this buffer.
+        let ok = unsafe {
+            SetFileInformationByHandle(
+                handle,
+                FileDispositionInfoEx,
+                ptr::from_ref(&disposition).cast::<core::ffi::c_void>(),
+                std::mem::size_of::<FILE_DISPOSITION_INFO_EX>() as u32,
+            )
+        };
+        if ok == 0 {
+            return Err(last_error());
+        }
+        Ok(())
     }
 
     pub(super) fn open_leaf(

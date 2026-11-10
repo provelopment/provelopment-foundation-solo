@@ -5,14 +5,16 @@
 //! small handle-and-range reference per representation. What the candidate exposes afterwards is
 //! a **fallible, bounded** read of one member at a time.
 //!
-//! **What makes a staged object safe without `unsafe`.** Each object is created with exclusive
-//! creation inside a namespace this run created itself, and its directory entry is then
-//! *removed while the handle stays open*: on Linux through ordinary unlink-while-open semantics,
-//! on Windows because `std` opens files with `FILE_SHARE_DELETE`, so a delete-pending name
-//! disappears immediately. From that moment the bytes are reachable only through the handle this
-//! module owns. There is no path to replace, truncate, redirect or re-open, no memory mapping and
-//! no second writable alias — which is exactly why no `unsafe`, no FFI and no new dependency is
-//! needed to hold immutability across the candidate's lifetime.
+//! **What makes a staged object safe.** Linux opens every shard as an `O_TMPFILE | O_EXCL` inode
+//! *through the retained descriptor of the caller's own staging root*: the object never acquires a
+//! directory entry, so there is no window in which a second handle could open it, and no
+//! transaction-owned directory or entry is ever created or removed. Windows creates one task-owned
+//! namespace and each shard **relative to a retained parent handle** with
+//! `NtCreateFile(FILE_CREATE)`, without sharing, then removes the shard's transient name **by that
+//! same handle** through `SetFileInformationByHandle(FileDispositionInfoEx)`. From that moment the
+//! bytes are reachable only through the handle this module owns: no path can replace, truncate,
+//! redirect or re-open them, and there is no second writable alias and no memory mapping.
+
 //!
 //! Objects are grouped into shards of at most [`STAGE_SHARD_TARGET_BYTES`], so the number of
 //! live handles depends on the total staged size rather than on how many representations were
@@ -21,12 +23,13 @@
 //! **What this is not.** It is temporary internal processing: not a source root, not a second
 //! manifest, not generated output and not a publication artefact. It authorizes nothing.
 //!
-//! **Cleanup.** Dropping the store closes every handle and removes only the namespace directory
-//! this run created, and only when it is empty. It never pre-cleans, never removes a directory
-//! it does not own, never adopts a pre-existing one and never touches a shared OS temp root.
-//! Because every object is nameless while it exists, an abruptly terminated process leaves
-//! either nothing or an empty directory behind: there are no plaintext directory entries to
-//! recover.
+//! **Cleanup.** Dropping the store closes every shard handle. On Linux that is the whole of
+//! cleanup: the inodes were never linked, so nothing is left to remove and no pathname is deleted.
+//! On Windows every shard name was already detached by handle, and the one owned namespace is
+//! disposed by its retained handle — before success is exposed in `finalize`, and best-effort in
+//! `Drop` if the transaction failed earlier. An entry that was renamed, removed or replaced by
+//! another process is never the object this store disposes, so an impostor survives untouched.
+
 //!
 //! **Threat boundary, stated honestly.** A same-user process that can reach this namespace may
 //! create *new* entries inside it, but it cannot reach, mutate or replace an object this store
@@ -34,21 +37,17 @@
 //! differently. This is a claim about these staged bytes, not a claim that a same-user attacker
 //! cannot interfere with the wider process.
 
-use std::fs::{DirBuilder, File, OpenOptions};
+use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+
+#[cfg(windows)]
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use solo_application::{SourceReadRefusalKind, SourceReadRefusalV1};
 
-/// `FILE_SHARE_DELETE`. A literal because naming the native crate outside the approved module is
-/// forbidden; the value is the documented Windows constant and nothing else is shared.
 #[cfg(windows)]
-const FILE_SHARE_DELETE_ONLY: u32 = 0x0000_0004;
-
-/// `FILE_FLAG_BACKUP_SEMANTICS`: what lets a directory be opened as a handle at all.
-#[cfg(windows)]
-const FILE_FLAG_BACKUP_SEMANTICS: u32 = 0x0200_0000;
+use crate::source_read_native::StagingNativeError;
 
 /// A retained operating-system identity: what the handle *is*, never what a path claims.
 ///
@@ -125,118 +124,90 @@ fn descriptor_is_linked(directory: &File) -> Result<bool, SourceReadRefusalV1> {
     Ok(directory.metadata().map_err(classify_io)?.nlink() > 0)
 }
 
-/// Opens a directory as a retained handle.
-///
-/// The handle, not the string, is what later operations depend on, and its identity is what
-/// confinement comparisons use. Windows refuses an ordinary `File::open` on a directory, so the
-/// safe backup-semantics flag is required there.
-fn open_directory(path: &Path) -> Result<File, SourceReadRefusalV1> {
-    let mut options = OpenOptions::new();
-    options.read(true);
+/// Adopts the caller's staging root through the host's confined opener.
+fn adopt_root_handle(root: &Path) -> Result<File, SourceReadRefusalV1> {
+    #[cfg(target_os = "linux")]
+    {
+        if !root.is_absolute() {
+            return Err(unsafe_location());
+        }
+        crate::source_read_native::adopt_staging_root(root).map_err(classify_adoption)
+    }
     #[cfg(windows)]
     {
-        use std::os::windows::fs::OpenOptionsExt;
-        options.custom_flags(FILE_FLAG_BACKUP_SEMANTICS);
+        crate::source_read_native::adopt_staging_root(root).map_err(staging_native)
     }
-    let file = options.open(path).map_err(classify_io)?;
-    if !file.metadata().map_err(classify_io)?.is_dir() {
-        return Err(unsafe_location());
+    #[cfg(not(any(target_os = "linux", windows)))]
+    {
+        let _ = root;
+        Err(unsupported())
     }
-    Ok(file)
 }
 
-/// Creates one staging object that no other handle can read from or write to.
+/// Classifies a Linux adoption failure.
 ///
-/// Linux creates an `O_TMPFILE | O_EXCL` inode: it never has a directory entry, so there is no
-/// window in which an alias could be opened. Windows establishes the guarantee atomically in the
-/// create itself by sharing only delete, so no other handle can obtain read or write access; the
-/// unlink that follows then leaves no path to reach it either.
+/// A denial is reported as a denial, an unavailable kernel primitive as unsupported, and every
+/// other answer — a missing directory, a symlink the kernel refused, an unsafe shape — as an
+/// unprovable location rather than something to invent or fall back from.
 #[cfg(target_os = "linux")]
-fn open_staging_object(
-    _namespace: &Path,
-    directory: &File,
-    _index: usize,
-) -> Result<File, SourceReadRefusalV1> {
-    match crate::source_read_native::open_unnamed_staging_object(directory) {
-        Ok(file) => Ok(file),
-        // A genuine denial or a genuine lack of space is reported as what it is.
-        Err(error)
-            if error.kind() == std::io::ErrorKind::PermissionDenied
-                || is_capacity_error(&error) =>
-        {
-            Err(classify_io(error))
+fn classify_adoption(error: std::io::Error) -> SourceReadRefusalV1 {
+    /// `EACCES`.
+    const ACCESS: i32 = 13;
+    /// `EPERM`.
+    const PERM: i32 = 1;
+    /// `ENOSYS`.
+    const NOSYS: i32 = 38;
+    /// `EINVAL`.
+    const INVAL: i32 = 22;
+    /// `EOPNOTSUPP`.
+    const OPNOTSUPP: i32 = 95;
+    match error.raw_os_error() {
+        Some(ACCESS | PERM) => {
+            SourceReadRefusalV1::new(SourceReadRefusalKind::PermissionDenied, None)
         }
-        // Anything else means this store could not create an object inside the directory it
-        // provably holds — the namespace has been unlinked from the tree, or the host answered
-        // with something this store cannot interpret. Either way confinement is unproven, so it is
-        // refused as an unsafe location and never as an absence or a shorter member.
-        Err(_) => Err(unsafe_location()),
+        Some(NOSYS | INVAL | OPNOTSUPP) => unsupported(),
+        _ => unsafe_location(),
     }
 }
 
-/// Whether the host reported that the file system is out of space rather than a confinement
-/// fault. Read from the raw code so no unstable `ErrorKind` variant is required.
+/// Classifies a Linux shard-creation failure.
+///
+/// A genuine denial or a genuine lack of space is reported as what it is. Anything else means this
+/// store could not create an inode inside the directory it provably holds — the root was unlinked,
+/// or the host answered with something this store cannot interpret — so confinement is unproven
+/// and the answer is an unsafe location, never an absence or a shorter member.
 #[cfg(target_os = "linux")]
-fn is_capacity_error(error: &std::io::Error) -> bool {
+fn classify_object_creation(error: std::io::Error) -> SourceReadRefusalV1 {
     /// `ENOSPC`.
     const NO_SPACE: i32 = 28;
     /// `EDQUOT`.
     const QUOTA_EXCEEDED: i32 = 122;
-    matches!(error.raw_os_error(), Some(NO_SPACE | QUOTA_EXCEEDED))
-}
-
-/// The share mode is the guarantee here; the unlink removes the path as well.
-///
-/// Windows cannot create a file relative to a retained directory handle through the standard
-/// library, so the object is created by name inside the confirmed namespace. The object id this
-/// host reports is not recycled, so the confirmation either side of the create is sound here.
-#[cfg(windows)]
-fn open_staging_object(
-    namespace: &Path,
-    _directory: &File,
-    index: usize,
-) -> Result<File, SourceReadRefusalV1> {
-    use std::os::windows::fs::OpenOptionsExt;
-    let path = namespace.join(format!("{STAGE_OBJECT_PREFIX}{index}.bin"));
-    let file = OpenOptions::new()
-        .read(true)
-        .write(true)
-        .create_new(true)
-        .share_mode(FILE_SHARE_DELETE_ONLY)
-        .open(&path)
-        .map_err(classify_io)?;
-    if let Err(error) = std::fs::remove_file(&path) {
-        drop(file);
-        let _ = std::fs::remove_file(&path);
-        return Err(classify_io(error));
+    match error.raw_os_error() {
+        Some(NO_SPACE | QUOTA_EXCEEDED) => classify_io(error),
+        Some(_) if error.kind() == std::io::ErrorKind::PermissionDenied => classify_io(error),
+        _ => unsafe_location(),
     }
-    Ok(file)
 }
 
-/// Other Unix hosts have no proven unnamed primitive here, so staging refuses rather than guess.
-#[cfg(all(unix, not(target_os = "linux")))]
-fn open_staging_object(
-    _namespace: &Path,
-    _directory: &File,
-    _index: usize,
-) -> Result<File, SourceReadRefusalV1> {
-    Err(SourceReadRefusalV1::new(
-        SourceReadRefusalKind::Unsupported,
-        None,
-    ))
+/// Classifies one Windows staging-native outcome onto the registered vocabulary.
+#[cfg(windows)]
+fn staging_native(error: StagingNativeError) -> SourceReadRefusalV1 {
+    match error {
+        StagingNativeError::Unsafe => unsafe_location(),
+        StagingNativeError::PermissionDenied => {
+            SourceReadRefusalV1::new(SourceReadRefusalKind::PermissionDenied, None)
+        }
+        StagingNativeError::Unsupported => unsupported(),
+        // A genuine native failure is an I/O failure, never a claimed path refusal.
+        StagingNativeError::NativeFailure => {
+            SourceReadRefusalV1::new(SourceReadRefusalKind::OtherIo, None)
+        }
+    }
 }
 
-/// Hosts with neither primitive refuse for the same reason.
-#[cfg(not(any(unix, windows)))]
-fn open_staging_object(
-    _namespace: &Path,
-    _directory: &File,
-    _index: usize,
-) -> Result<File, SourceReadRefusalV1> {
-    Err(SourceReadRefusalV1::new(
-        SourceReadRefusalKind::Unsupported,
-        None,
-    ))
+/// `SOURCE_UNSUPPORTED`: this host cannot perform the operation at all.
+fn unsupported() -> SourceReadRefusalV1 {
+    SourceReadRefusalV1::new(SourceReadRefusalKind::Unsupported, None)
 }
 
 /// The deterministic staging fault a test asks the **production** path to hit.
@@ -296,14 +267,13 @@ pub const STAGE_SHARD_TARGET_BYTES: u64 = 64 * 1024 * 1024;
 /// The buffer this module uses when it streams one staged member back out.
 pub const STAGE_READ_CHUNK_BYTES: usize = 8 * 1024;
 
-/// The prefix of the namespace directory this module creates inside an adopted staging root.
+/// The prefix of the one namespace directory Windows creates inside an adopted staging root.
+///
+/// Linux creates none at all: its shards are anonymous inodes in the caller's own directory.
+#[cfg(windows)]
 const STAGE_NAMESPACE_PREFIX: &str = "solo-source-stage-";
 
-/// The prefix of every staging object inside that namespace.
-///
-/// Only the Windows implementation creates an object *by name* and then detaches it; Linux
-/// creates an `O_TMPFILE` inode that never has one, so the constant is compiled there and not
-/// merely unused.
+/// The prefix of the transient shard name Windows detaches immediately after creation.
 #[cfg(windows)]
 const STAGE_OBJECT_PREFIX: &str = "shard-";
 
@@ -311,6 +281,7 @@ const STAGE_OBJECT_PREFIX: &str = "shard-";
 ///
 /// A name counter, never a store of content: it exists so two live stores in one process cannot
 /// choose the same namespace name.
+#[cfg(windows)]
 static STAGE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 /// An explicitly adopted, already-existing private directory that staging may use.
@@ -339,22 +310,11 @@ impl StagingRootCapability {
     /// Returns `SOURCE_UNSAFE_PATH` for a relative path, a symbolic link or a non-directory, and
     /// the classified staging refusal when the directory cannot be opened.
     pub fn adopt(root: &Path) -> Result<Self, SourceReadRefusalV1> {
-        if !root.is_absolute() {
-            return Err(unsafe_location());
-        }
-        let metadata = match std::fs::symlink_metadata(root) {
-            Ok(metadata) => metadata,
-            // A staging root that is not there cannot be proven to be the private directory the
-            // caller intended, so it is an unsafe location rather than an absence to invent.
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                return Err(unsafe_location());
-            }
-            Err(error) => return Err(classify_io(error)),
-        };
-        if metadata.file_type().is_symlink() || !metadata.is_dir() {
-            return Err(unsafe_location());
-        }
-        let handle = open_directory(root)?;
+        // The host adapter opens the directory itself: Linux resolves the whole path from `/`
+        // under `BENEATH | NO_SYMLINKS | NO_MAGICLINKS`, and Windows walks one component at a time
+        // relative to the handle above it, refusing every reparse point. Neither inspects the path
+        // with `symlink_metadata` first, because a check before an open is a check that races.
+        let handle = adopt_root_handle(root)?;
         let identity = identity_of(&handle)?;
         Ok(Self {
             root: root.to_path_buf(),
@@ -392,59 +352,39 @@ impl StagingRootCapability {
         &self,
         faults: StagingFaultsV1,
     ) -> Result<SourceSetStagingV1, SourceReadRefusalV1> {
-        let namespace = self.root.join(namespace_name());
         // The retained capability must still be the live directory it was adopted as. This reads
-        // the handle, not the string, so a root that disappeared or stopped being a directory
-        // refuses before anything is created.
+        // the handle, not a string, so a root that disappeared, was replaced or stopped being a
+        // directory refuses before anything is created or written.
         if !self.handle.metadata().map_err(classify_io)?.is_dir() {
             return Err(unsafe_location());
         }
         if !identity_of(&self.handle)?.same_object(self.identity) {
             return Err(unsafe_location());
         }
-        create_private_directory(&namespace)?;
 
-        let namespace_handle = match open_directory(&namespace) {
-            Ok(handle) => handle,
-            Err(refusal) => {
-                // Only the empty directory this call just created, and only on this failure path.
-                let _ = std::fs::remove_dir(&namespace);
-                return Err(refusal);
-            }
-        };
-        let namespace_identity = identity_of(&namespace_handle)?;
-
-        // Confinement is decided by identity, not by the string: the parent of the namespace we
-        // just created must be the very directory this capability adopted. A redirected path
-        // component or a root replaced between adoption and now fails here, before any byte is
-        // written or any object created.
-        let parent = match open_directory(&namespace.join("..")) {
-            Ok(handle) => handle,
-            Err(refusal) => {
-                let _ = std::fs::remove_dir(&namespace);
-                return Err(refusal);
-            }
-        };
-        if !identity_of(&parent)?.same_object(self.identity) {
-            let _ = std::fs::remove_dir(&namespace);
-            return Err(unsafe_location());
+        #[cfg(any(target_os = "linux", windows))]
+        {
+            // Nothing is created here. Shards are anonymous inodes opened later through this
+            // retained descriptor, and the caller's directory is never written by name.
+            let root_dir = self.handle.try_clone().map_err(classify_io)?;
+            Ok(SourceSetStagingV1 {
+                root_dir,
+                root_identity: self.identity,
+                root_path: self.root.clone(),
+                shards: Vec::new(),
+                staged_bytes: 0,
+                max_member_bytes: 0,
+                staged_members: 0,
+                sealed: false,
+                faults,
+            })
         }
 
-        #[cfg(target_os = "linux")]
-        let root_dir = self.handle.try_clone().map_err(classify_io)?;
-        Ok(SourceSetStagingV1 {
-            namespace,
-            namespace_dir: namespace_handle,
-            #[cfg(target_os = "linux")]
-            root_dir,
-            namespace_identity,
-            shards: Vec::new(),
-            staged_bytes: 0,
-            max_member_bytes: 0,
-            staged_members: 0,
-            sealed: false,
-            faults,
-        })
+        #[cfg(not(any(target_os = "linux", windows)))]
+        {
+            let _ = faults;
+            Err(unsupported())
+        }
     }
 }
 
@@ -496,13 +436,11 @@ impl StagedBodyV1 {
 /// It exists only while an attempt is in flight: either the assembled candidate owns it, or a
 /// failure drops it and its [`Drop`] closes every handle and removes the empty namespace.
 pub struct SourceSetStagingV1 {
-    namespace: PathBuf,
-    /// The retained namespace descriptor every staging object is created through.
-    namespace_dir: File,
-    /// The adopted root descriptor, used to remove the namespace entry without re-walking a path.
-    #[cfg(target_os = "linux")]
+    /// The retained descriptor of the caller's staging root, on both hosts.
     root_dir: File,
-    namespace_identity: ObjectIdentityV1,
+    root_identity: ObjectIdentityV1,
+    /// The adopted root's path, for observation only — never a creation or deletion authority.
+    root_path: PathBuf,
     shards: Vec<StageShardV1>,
     staged_bytes: u64,
     max_member_bytes: u64,
@@ -594,16 +532,16 @@ impl SourceSetStagingV1 {
 
     /// Seals the store once every member is staged.
     ///
-    /// It re-confirms that the namespace is still the directory this store created and that every
-    /// object still reports exactly the length that was written. A last-write, finalization or
-    /// substitution failure is refused here rather than becoming an accepted candidate, and no
-    /// public value exists until this returns `Ok`.
+    /// It re-confirms that the retained root is still the directory this store adopted and that
+    /// every object still reports exactly the length that was written, then disposes the Windows
+    /// namespace by handle. A last-write, finalization or disposal failure is refused here rather
+    /// than becoming an accepted candidate, and no public value exists until this returns `Ok`.
     ///
     /// # Errors
     ///
     /// Returns `SOURCE_OBSERVATION_IO_ERROR` for an injected or real finalization failure,
     /// `SOURCE_OBSERVATION_CHANGED_DURING_READ` when an object no longer reports its own length,
-    /// and `SOURCE_UNSAFE_PATH` when the namespace is no longer the one this store created.
+    /// and `SOURCE_UNSAFE_PATH` when the retained root is no longer the adopted directory.
     pub fn finalize(&mut self) -> Result<(), SourceReadRefusalV1> {
         if self.sealed {
             return Ok(());
@@ -613,77 +551,33 @@ impl SourceSetStagingV1 {
         {
             return Err(out_of_capacity());
         }
-        self.confirm_namespace()?;
+        self.confirm_root()?;
         for shard in &self.shards {
             let observed = shard.file.metadata().map_err(classify_io)?.len();
             if observed != shard.written {
                 return Err(changed());
             }
         }
+
+        // No staging-owned directory exists on either host, so there is nothing to remove here.
         self.sealed = true;
         Ok(())
     }
 
-    /// Confirms that the directory staging writes into is still this store's own.
+    /// Confirms that the retained root is still the directory this store adopted.
     ///
-    /// On Linux the control is the descriptor, not a name: objects are created *through* the
-    /// retained namespace handle, so a substituted pathname never receives a byte and re-resolving
-    /// the path here would only add a check-then-use window. Comparing the descriptor with the
-    /// identity recorded when it was created is a cheap sanity check, not the guarantee.
-    ///
-    /// Windows creates objects by name inside the namespace, so the entry must additionally still
-    /// resolve to this store's directory. Its object id is not recycled, which is what makes that
-    /// comparison sound there.
+    /// The control is the descriptor, not a name: every shard is created *through* a retained
+    /// handle, so a substituted pathname never receives a byte and re-resolving a path here would
+    /// only add a check-then-use window. This comparison is a cheap sanity check on that handle.
     ///
     /// # Errors
     ///
-    /// Returns `SOURCE_UNSAFE_PATH` when the descriptor is no longer the recorded namespace, and on
-    /// Windows also when the namespace entry no longer resolves to it.
-    fn confirm_namespace(&self) -> Result<(), SourceReadRefusalV1> {
-        if !identity_of(&self.namespace_dir)?.same_object(self.namespace_identity) {
+    /// Returns `SOURCE_UNSAFE_PATH` when the descriptor is no longer the adopted root.
+    fn confirm_root(&self) -> Result<(), SourceReadRefusalV1> {
+        if !identity_of(&self.root_dir)?.same_object(self.root_identity) {
             return Err(unsafe_location());
         }
-        #[cfg(not(target_os = "linux"))]
-        {
-            let handle = open_directory(&self.namespace)?;
-            if !identity_of(&handle)?.same_object(self.namespace_identity) {
-                return Err(unsafe_location());
-            }
-        }
         Ok(())
-    }
-
-    /// Removes this store's own, now-empty namespace — and nothing else.
-    ///
-    /// Ownership is decided before anything is removed, and the removal is deliberately not
-    /// recursive. A swap confined to the window between that decision and the removal is not
-    /// excluded by the standard library, so the consequence is bounded instead: only a directory
-    /// inside the adopted root is ever considered, and only an **empty** one can be removed. No
-    /// staged content, no Owner material and no populated adversary directory can be deleted, and
-    /// a directory that is not provably this store's is left in place rather than forced.
-    fn remove_namespace(&self) {
-        let is_ours = match open_directory(&self.namespace) {
-            Ok(handle) => identity_of(&handle)
-                .map(|found| found.same_object(self.namespace_identity))
-                .unwrap_or(false),
-            Err(_) => false,
-        };
-        if !is_ours {
-            return;
-        }
-        #[cfg(target_os = "linux")]
-        {
-            // Resolved through the retained root descriptor, so no path component is re-walked and
-            // a replaced ancestor cannot redirect the removal.
-            if let Some(name) = self.namespace.file_name() {
-                let _ =
-                    crate::source_read_native::remove_staging_namespace_entry(&self.root_dir, name);
-            }
-        }
-        #[cfg(not(target_os = "linux"))]
-        {
-            let _ = std::fs::remove_dir(&self.namespace);
-        }
     }
 
     /// A bounded reader over one staged member.
@@ -717,55 +611,73 @@ impl SourceSetStagingV1 {
     /// How many staging objects (open handles) this store holds.
     ///
     /// It grows with the total staged size, not with the declaration count.
-    #[must_use]
+    /// How many staging-owned names in the adopted root a caller could actually open.
+    ///
+    /// Linux links no name at all. On Windows this store's own names may be enumerable as
+    /// delete-pending entries, but a name that cannot be opened is not a reachable plaintext path,
+    /// so only an **openable** staging-owned name is counted. A non-zero answer is a real defect.
+    ///
+    /// # Errors
+    ///
+    /// Returns the classified refusal when the adopted root cannot be listed.
+    pub fn visible_staging_entries(&self) -> Result<usize, SourceReadRefusalV1> {
+        let entries = std::fs::read_dir(&self.root_path).map_err(classify_io)?;
+        let mut reachable = 0_usize;
+        for entry in entries {
+            let entry = entry.map_err(classify_io)?;
+            let name = entry.file_name();
+            let Some(name) = name.to_str() else {
+                continue;
+            };
+            if !name.starts_with("shard-") {
+                continue;
+            }
+            if std::fs::File::open(entry.path()).is_ok() {
+                reachable += 1;
+            }
+        }
+        Ok(reachable)
+    }
+
     pub fn object_count(&self) -> usize {
         self.shards.len()
     }
 
-    /// How many directory entries are visible inside the namespace.
-    ///
-    /// A sealed store has **none**: every object is nameless while it lives. This is observed
-    /// state, not an assertion about intent, and it is what proves on a real host that no
-    /// plaintext path exists to read, replace or recover.
-    ///
-    /// # Errors
-    ///
-    /// Returns the classified staging refusal when the namespace cannot be listed.
-    pub fn visible_object_entries(&self) -> Result<usize, SourceReadRefusalV1> {
-        let entries = std::fs::read_dir(&self.namespace).map_err(classify_io)?;
-        let mut count = 0_usize;
-        for entry in entries {
-            entry.map_err(classify_io)?;
-            count += 1;
-        }
-        Ok(count)
-    }
-
-    /// Creates one nameless staging object inside this store's own namespace.
+    /// Creates one nameless staging object directly in the retained staging root.
     fn open_object(&mut self) -> Result<(), SourceReadRefusalV1> {
-        // Linux creates the object through the retained namespace descriptor, so a substituted
-        // pathname cannot receive a byte and there is no check-then-use window to lose. Windows
-        // creates it by name, so the entry is confirmed immediately before and after the create:
-        // a namespace substituted during the create is detected before a byte is written into the
-        // object it produced.
         #[cfg(target_os = "linux")]
         {
-            // The link count of the directory this store holds is zero exactly when it has been
-            // unlinked from the tree. That is decided on the descriptor itself, so the refusal does
-            // not depend on which error a particular file system happens to return for a create in
-            // a deleted directory, nor on whether a successor reused the freed inode number.
-            if !descriptor_is_linked(&self.namespace_dir)? {
+            // A root that was unlinked while this store holds it cannot accept a new inode, and
+            // that link count is read from the descriptor itself rather than from a name.
+            if !descriptor_is_linked(&self.root_dir)? {
                 return Err(unsafe_location());
             }
+            let file = crate::source_read_native::open_unnamed_staging_object(&self.root_dir)
+                .map_err(classify_object_creation)?;
+            self.shards.push(StageShardV1 { file, written: 0 });
+            Ok(())
         }
-        #[cfg(not(target_os = "linux"))]
-        self.confirm_namespace()?;
-        let index = self.shards.len();
-        let file = open_staging_object(&self.namespace, &self.namespace_dir, index)?;
-        #[cfg(not(target_os = "linux"))]
-        self.confirm_namespace()?;
-        self.shards.push(StageShardV1 { file, written: 0 });
-        Ok(())
+
+        #[cfg(windows)]
+        {
+            // Creation is relative to the retained root handle itself: no staging-owned directory
+            // exists, so there is nothing to clean up and nothing to substitute. The name is
+            // derived here and never re-resolved, so a hostile same-name entry is never adopted.
+            let name = format!(
+                "{STAGE_OBJECT_PREFIX}{}-{}.bin",
+                self.shards.len(),
+                staging_name()
+            );
+            let file = crate::source_read_native::create_staging_shard(&self.root_dir, &name)
+                .map_err(staging_native)?;
+            self.shards.push(StageShardV1 { file, written: 0 });
+            Ok(())
+        }
+
+        #[cfg(not(any(target_os = "linux", windows)))]
+        {
+            Err(unsupported())
+        }
     }
 }
 
@@ -900,12 +812,11 @@ fn read_object_at(file: &File, out: &mut [u8], at: u64) -> std::io::Result<usize
 
 impl Drop for SourceSetStagingV1 {
     fn drop(&mut self) {
-        // Objects are nameless on Linux and already detached on Windows, so closing every handle is
-        // the whole of object cleanup.
+        // Objects are anonymous on Linux and name-detached on Windows, so closing every shard
+        // handle is the whole of cleanup: on Windows the pending entry disappears when the last
+        // handle closes, including at process death. No directory is removed because none was
+        // created.
         self.shards.clear();
-        // Then the entry itself, and only when it is provably still this store's own empty
-        // namespace. A namespace an adversary substituted is left where it is.
-        self.remove_namespace();
     }
 }
 
@@ -948,7 +859,11 @@ fn out_of_capacity() -> SourceReadRefusalV1 {
 }
 
 /// A namespace name that no other live store in this process can be holding.
-fn namespace_name() -> String {
+///
+/// Windows is the only host that creates one: Linux stages into anonymous inodes in the caller's
+/// own directory and never names anything.
+#[cfg(windows)]
+fn staging_name() -> String {
     let sequence = STAGE_SEQUENCE.fetch_add(1, Ordering::Relaxed);
     let nanos = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -958,25 +873,6 @@ fn namespace_name() -> String {
         "{STAGE_NAMESPACE_PREFIX}{}-{sequence}-{nanos}",
         std::process::id()
     )
-}
-
-/// Creates one namespace with exclusive creation and owner-only permissions where the host has
-/// them.
-fn create_private_directory(path: &Path) -> Result<(), SourceReadRefusalV1> {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::DirBuilderExt;
-        DirBuilder::new()
-            .mode(0o700)
-            .create(path)
-            .map_err(classify_io)
-    }
-    #[cfg(not(unix))]
-    {
-        // Other hosts have no per-directory mode to set here; the private namespace is still
-        // created exclusively, and the ACL of the adopted root is the caller's decision.
-        DirBuilder::new().create(path).map_err(classify_io)
-    }
 }
 
 #[cfg(test)]

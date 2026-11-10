@@ -340,15 +340,16 @@ impl SourceSetCandidateV1 {
         self.staging.object_count()
     }
 
-    /// How many directory entries are visible inside the private staging namespace.
+    /// How many staging-owned names a caller could actually open in the adopted root.
     ///
-    /// A live candidate has none, which is the on-host proof that no plaintext path exists.
+    /// A live candidate has none, which is the on-host proof that no reachable plaintext path
+    /// exists: Linux links no name at all, and a Windows delete-pending name cannot be opened.
     ///
     /// # Errors
     ///
-    /// Returns the typed staging refusal when the namespace cannot be listed.
+    /// Returns the classified refusal when the adopted root cannot be listed.
     pub fn visible_staging_entries(&self) -> Result<usize, SourceReadRefusalV1> {
-        self.staging.visible_object_entries()
+        self.staging.visible_staging_entries()
     }
 
     /// Whether this candidate may be published. It never may.
