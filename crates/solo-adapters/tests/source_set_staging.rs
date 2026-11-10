@@ -111,13 +111,23 @@ fn a_staged_member_is_nameless_and_reads_back_exactly() {
 
     store.finalize().expect("seal the store");
 
-    // No name of ours exists inside the caller's directory on either host: Linux never links the
-    // inode, and Windows detaches each shard name at creation.
+    // Linux links nothing at all. On Windows the task-owned shard names may still be enumerable as
+    // delete-pending entries while the handles that keep the members readable are open, so entry
+    // equality is asserted there only after the last handle closes. Bytes stay readable here.
+    #[cfg(target_os = "linux")]
     assert_eq!(
         entries(&fixture.staging()),
         before,
         "staging must not create an entry in the adopted root"
     );
+    let mut read_after_sealing = Vec::new();
+    store
+        .reader(first_body)
+        .expect("a reader after finalization")
+        .read_whole(&mut read_after_sealing)
+        .expect("read the first member after finalization");
+    assert_eq!(read_after_sealing, first);
+
     drop(store);
     assert_eq!(
         entries(&fixture.staging()),
@@ -443,26 +453,29 @@ fn open_object_count_follows_staged_size_not_member_count() {
 
     #[cfg(windows)]
     {
-        let namespace = store
-            .namespace_path()
-            .expect("Windows owns a temporary namespace");
-        assert!(namespace.is_dir(), "the owned namespace must still exist");
-        assert!(
-            entries(namespace).is_empty(),
-            "no staged shard may remain visible by name"
-        );
-        // The adopted root gained exactly this store's own temporary namespace and nothing else,
-        // and every foreign or Owner entry is still there.
-        let mut expected = before.clone();
-        if let Some(name) = namespace.file_name() {
-            expected.push(name.to_string_lossy().into_owned());
-        }
-        expected.sort();
+        // Windows may still enumerate its own delete-pending shard names while the retained handles
+        // keep the members readable. Every extra entry must be task-owned and must not be openable,
+        // and no foreign or Owner entry may be added, removed or altered.
+        let mut extra: Vec<String> = entries(&fixture.staging())
+            .into_iter()
+            .filter(|name| !before.contains(name))
+            .collect();
+        extra.sort();
         assert_eq!(
-            entries(&fixture.staging()),
-            expected,
-            "staging added more to the adopted root than its own namespace"
+            extra.len(),
+            store.object_count(),
+            "only one pending name per staged object may appear"
         );
+        for name in &extra {
+            assert!(
+                name.starts_with("shard-"),
+                "a staging-owned name must carry the module's prefix, saw {name}"
+            );
+            assert!(
+                std::fs::File::open(fixture.staging().join(name)).is_err(),
+                "a pending shard name must not be openable by a second opener"
+            );
+        }
     }
 
     for staged_body in &staged {
@@ -569,27 +582,29 @@ fn an_impostor_at_the_namespace_name_survives_untouched() {
         });
         let capability = fixture.root();
         let mut store = capability.begin().expect("begin a private staging store");
-        let namespace = store
-            .namespace_path()
-            .expect("windows keeps an observable namespace path")
-            .to_path_buf();
-        assert!(
-            namespace.exists(),
-            "the owned namespace must exist while the transaction is open"
-        );
-
-        // Detach the store's own directory entry and install an impostor at the same name.
-        fs::remove_dir(&namespace).expect("remove the store's own empty namespace");
-        fs::create_dir(&namespace).expect("create the impostor");
+        // A pre-existing directory at the name a prior namespace mechanism used, plus a foreign
+        // sentinel. This design creates no directory at all, so neither may be touched.
+        let namespace = fixture.staging().join("solo-source-stage-impostor");
+        fs::create_dir(&namespace).expect("create the impostor directory");
         if populated {
             fs::write(namespace.join("impostor.txt"), b"not staged")
                 .expect("populate the impostor");
         }
+        let sentinel = fixture.staging().join("owner-sentinel.txt");
+        fs::write(&sentinel, b"owner").expect("write a foreign sentinel");
         let before = entries(&namespace);
 
-        // Whatever the host answers for a create inside a detached directory, the impostor must
-        // never receive a staged byte.
-        let _ = store.stage_body(b"adversary round");
+        // The transaction must succeed beside them, and the impostor must never receive a byte.
+        let staged = store
+            .stage_body(b"adversary round")
+            .expect("stage beside an impostor");
+        assert!(
+            store
+                .reader(staged)
+                .expect("a reader")
+                .matches(b"adversary round")
+                .expect("compare")
+        );
         assert_eq!(
             entries(&namespace),
             before,

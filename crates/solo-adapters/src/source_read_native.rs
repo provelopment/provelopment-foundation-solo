@@ -339,19 +339,7 @@ pub(crate) fn adopt_staging_root(
 
 /// Safe, staging-only: creates the task-owned namespace relative to the held root handle.
 #[cfg(windows)]
-pub(crate) fn create_staging_namespace(
-    parent: &std::fs::File,
-    name: &str,
-) -> Result<std::fs::File, StagingNativeError> {
-    use std::os::windows::io::{AsRawHandle, FromRawHandle, IntoRawHandle};
-    let handle = sys::create_relative(parent.as_raw_handle(), name, true)
-        .map_err(StagingNativeError::from_native)?;
-    let raw = handle.into_raw_handle();
-    // SAFETY: as above: a fresh, unowned handle moved exactly once into a `File`.
-    Ok(unsafe { std::fs::File::from_raw_handle(raw) })
-}
-
-/// Safe, staging-only: creates one shard relative to the held namespace and detaches its name.
+/// Safe, staging-only: creates one shard relative to the retained root and detaches its name.
 ///
 /// The name exists only between the create and the disposition below, and the object is created
 /// with **no sharing at all**, so during that interval no other opener can read, write, delete or
@@ -1145,7 +1133,7 @@ mod sys {
         directory: bool,
     ) -> Result<OwnedHandle, NativeError> {
         use windows_sys::Wdk::Storage::FileSystem::{
-            FILE_CREATE, FILE_DIRECTORY_FILE as CREATE_DIRECTORY_FILE,
+            FILE_CREATE, FILE_DELETE_ON_CLOSE, FILE_DIRECTORY_FILE as CREATE_DIRECTORY_FILE,
             FILE_NON_DIRECTORY_FILE as CREATE_NON_DIRECTORY_FILE, FILE_SYNCHRONOUS_IO_NONALERT,
         };
         use windows_sys::Win32::Storage::FileSystem::{
@@ -1198,11 +1186,11 @@ mod sys {
                 // delete sharing does not make the detach unlink immediately, so the strongest
                 // share mode costs nothing.
                 0,
-                // Deliberately **not** `FILE_DELETE_ON_CLOSE`: such an object keeps its directory
-                // entry pending until the handle closes, so the namespace can never become empty
-                // while a staged member is still readable. The name is unlinked by handle
-                // immediately after creation instead, before a single byte is written.
-                CREATE_NON_DIRECTORY_FILE | FILE_SYNCHRONOUS_IO_NONALERT,
+                // `FILE_DELETE_ON_CLOSE` is the crash-safety net for the interval before the name is
+                // detached: if this process dies in that instant the object is still removed when
+                // its handle closes, and in any case it holds no plaintext, because the disposition
+                // below runs before the first byte is written.
+                CREATE_NON_DIRECTORY_FILE | FILE_SYNCHRONOUS_IO_NONALERT | FILE_DELETE_ON_CLOSE,
             )
         };
 

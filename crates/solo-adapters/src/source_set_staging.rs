@@ -362,7 +362,7 @@ impl StagingRootCapability {
             return Err(unsafe_location());
         }
 
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", windows))]
         {
             // Nothing is created here. Shards are anonymous inodes opened later through this
             // retained descriptor, and the caller's directory is never written by name.
@@ -370,31 +370,6 @@ impl StagingRootCapability {
             Ok(SourceSetStagingV1 {
                 root_dir,
                 root_identity: self.identity,
-                shards: Vec::new(),
-                staged_bytes: 0,
-                max_member_bytes: 0,
-                staged_members: 0,
-                sealed: false,
-                faults,
-            })
-        }
-
-        #[cfg(windows)]
-        {
-            // One namespace, created by handle relative to the retained root. Its path is kept for
-            // test observation only; ownership is the handle, never the name.
-            let name = namespace_name();
-            let namespace_dir =
-                crate::source_read_native::create_staging_namespace(&self.handle, &name)
-                    .map_err(staging_native)?;
-            let namespace_identity = identity_of(&namespace_dir)?;
-            let root_dir = self.handle.try_clone().map_err(classify_io)?;
-            Ok(SourceSetStagingV1 {
-                root_dir,
-                root_identity: self.identity,
-                namespace_dir: Some(namespace_dir),
-                namespace_identity,
-                namespace_path: self.root.join(name),
                 shards: Vec::new(),
                 staged_bytes: 0,
                 max_member_bytes: 0,
@@ -463,15 +438,6 @@ pub struct SourceSetStagingV1 {
     /// The retained descriptor of the caller's staging root, on both hosts.
     root_dir: File,
     root_identity: ObjectIdentityV1,
-    /// The one namespace Windows creates. Ownership is this handle; it is disposed before success
-    /// is exposed, and again best-effort if the transaction failed earlier.
-    #[cfg(windows)]
-    namespace_dir: Option<File>,
-    #[cfg(windows)]
-    namespace_identity: ObjectIdentityV1,
-    /// The namespace's own path. Observation for tests only — never a deletion authority.
-    #[cfg(windows)]
-    namespace_path: PathBuf,
     shards: Vec<StageShardV1>,
     staged_bytes: u64,
     max_member_bytes: u64,
@@ -590,22 +556,7 @@ impl SourceSetStagingV1 {
             }
         }
 
-        #[cfg(windows)]
-        {
-            // The namespace is empty: every shard name was detached at creation, by handle. It is
-            // disposed **here**, before the store can be observed as successful, so a cleanup
-            // failure refuses the transaction instead of leaving a directory behind while claiming
-            // success. Only the object behind this held handle can be removed.
-            if let Some(namespace) = self.namespace_dir.take() {
-                if let Err(error) = crate::source_read_native::dispose_staging_object(&namespace) {
-                    // Keep the handle so `Drop` can try once more, and refuse the transaction.
-                    self.namespace_dir = Some(namespace);
-                    return Err(staging_native(error));
-                }
-                drop(namespace);
-            }
-        }
-
+        // No staging-owned directory exists on either host, so there is nothing to remove here.
         self.sealed = true;
         Ok(())
     }
@@ -662,24 +613,7 @@ impl SourceSetStagingV1 {
         self.shards.len()
     }
 
-    /// The namespace path, for test observation only.
-    ///
-    /// It is never an authority: adoption, creation and deletion all use retained handles. Linux
-    /// creates no namespace at all, so it returns `None` there.
-    #[must_use]
-    #[doc(hidden)]
-    pub fn namespace_path(&self) -> Option<&Path> {
-        #[cfg(windows)]
-        {
-            Some(&self.namespace_path)
-        }
-        #[cfg(not(windows))]
-        {
-            None
-        }
-    }
-
-    /// Creates one nameless staging object inside this store's own namespace.
+    /// Creates one nameless staging object directly in the retained staging root.
     fn open_object(&mut self) -> Result<(), SourceReadRefusalV1> {
         #[cfg(target_os = "linux")]
         {
@@ -696,14 +630,15 @@ impl SourceSetStagingV1 {
 
         #[cfg(windows)]
         {
-            // Creation is relative to the held namespace handle, so a substituted pathname cannot
-            // receive a byte; the identity check is a sanity check on that handle, not the control.
-            let namespace = self.namespace_dir.as_ref().ok_or_else(unsafe_location)?;
-            if !identity_of(namespace)?.same_object(self.namespace_identity) {
-                return Err(unsafe_location());
-            }
-            let name = format!("{STAGE_OBJECT_PREFIX}{}.bin", self.shards.len());
-            let file = crate::source_read_native::create_staging_shard(namespace, &name)
+            // Creation is relative to the retained root handle itself: no staging-owned directory
+            // exists, so there is nothing to clean up and nothing to substitute. The name is
+            // derived here and never re-resolved, so a hostile same-name entry is never adopted.
+            let name = format!(
+                "{STAGE_OBJECT_PREFIX}{}-{}.bin",
+                self.shards.len(),
+                staging_name()
+            );
+            let file = crate::source_read_native::create_staging_shard(&self.root_dir, &name)
                 .map_err(staging_native)?;
             self.shards.push(StageShardV1 { file, written: 0 });
             Ok(())
@@ -847,18 +782,11 @@ fn read_object_at(file: &File, out: &mut [u8], at: u64) -> std::io::Result<usize
 
 impl Drop for SourceSetStagingV1 {
     fn drop(&mut self) {
-        // Objects are anonymous on Linux and already name-detached on Windows, so closing every
-        // shard handle is the whole of object cleanup.
+        // Objects are anonymous on Linux and name-detached on Windows, so closing every shard
+        // handle is the whole of cleanup: on Windows the pending entry disappears when the last
+        // handle closes, including at process death. No directory is removed because none was
+        // created.
         self.shards.clear();
-        #[cfg(windows)]
-        {
-            // Then this store's own namespace, by its retained handle only. A directory that an
-            // adversary renamed, removed or replaced is never the object disposed here.
-            if let Some(namespace) = self.namespace_dir.take() {
-                let _ = crate::source_read_native::dispose_staging_object(&namespace);
-                drop(namespace);
-            }
-        }
     }
 }
 
@@ -905,7 +833,7 @@ fn out_of_capacity() -> SourceReadRefusalV1 {
 /// Windows is the only host that creates one: Linux stages into anonymous inodes in the caller's
 /// own directory and never names anything.
 #[cfg(windows)]
-fn namespace_name() -> String {
+fn staging_name() -> String {
     let sequence = STAGE_SEQUENCE.fetch_add(1, Ordering::Relaxed);
     let nanos = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
