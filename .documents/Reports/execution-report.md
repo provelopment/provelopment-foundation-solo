@@ -56,7 +56,7 @@ No second candidate, no execution authorization and no implementation claim is p
 `workorder-active.md` was reset to exactly one neutral line and nothing else:
 
 ```markdown
-# Foundation Solo - Active Work Order
+# Foundation Solo — Active Work Order
 ```
 
 It contains no `OWNER-ISSUED` marker and no active work-order ID. That is ordinary absence of
