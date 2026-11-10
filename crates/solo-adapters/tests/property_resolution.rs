@@ -150,7 +150,7 @@ fn graph_from(parsed: &ParsedManifestCandidateV1) -> EfsOwnershipGraph {
         .expect("the test manifests describe a valid one-Entity structure")
 }
 
-fn parsed(bytes: &str) -> ParsedManifestCandidateV1 {
+fn parse_document(bytes: &str) -> ParsedManifestCandidateV1 {
     parse_manifest_bytes(bytes.as_bytes()).expect("the test manifest is strict valid JSON")
 }
 
@@ -169,7 +169,7 @@ fn r03a_09_real_manifest_bytes_resolve_all_five_levels() {
         r#"{ "seo.description": { "inheritance": "inherit", "currentContext": [ { "text": "Everything about our work in Bali", "exposure": "public" } ] } }"#,
         r#"{ "location": { "inheritance": "inherit", "currentContext": [ { "operation": "add", "factId": "bali-base", "kind": "association", "fields": { "countryCode": "ID", "locality": "Denpasar" }, "exposure": "public" } ] } }"#,
     );
-    let parsed = parsed(&document);
+    let parsed = parse_document(&document);
     assert!(!parsed.is_publication_authorized());
     let graph = graph_from(&parsed);
     let candidate =
@@ -254,7 +254,7 @@ fn page_level_refusal_kind(properties: &str) -> ManifestPropertyRefusalKind {
         properties,
         NO_PROPERTIES,
     );
-    let parsed = parsed(&document);
+    let parsed = parse_document(&document);
     let graph = graph_from(&parsed);
     validate_manifest_property_candidate_v1(&parsed, &graph, &representation_owner())
         .expect_err("the authored declaration must refuse")
@@ -272,7 +272,7 @@ fn r03a_09_unknown_property_refuses_by_category() {
         NO_PROPERTIES,
         NO_PROPERTIES,
     );
-    let parsed = parsed(&document);
+    let parsed = parse_document(&document);
     let graph = graph_from(&parsed);
     let refusal = validate_manifest_property_candidate_v1(&parsed, &graph, &entity_owner())
         .expect_err("an unregistered property refuses");
@@ -294,7 +294,7 @@ fn r03a_09_wrong_level_declaration_refuses() {
         NO_PROPERTIES,
         NO_PROPERTIES,
     );
-    let parsed = parsed(&document);
+    let parsed = parse_document(&document);
     let graph = graph_from(&parsed);
     let refusal = validate_manifest_property_candidate_v1(&parsed, &graph, &entity_owner())
         .expect_err("an Entity-level seo.title refuses");
@@ -356,7 +356,7 @@ fn r03a_09_closed_envelope_forms_refuse() {
         r#"{ "seo.title": { "inheritance": "suppress", "currentContext": "none" } }"#,
         NO_PROPERTIES,
     );
-    let parsed = parsed(&document);
+    let parsed = parse_document(&document);
     let graph = graph_from(&parsed);
     let candidate =
         validate_manifest_property_candidate_v1(&parsed, &graph, &representation_owner())
@@ -461,7 +461,7 @@ fn r03a_09_effective_cardinality_and_duplicates_refuse() {
         r#"{ "seo.title": { "inheritance": "inherit", "currentContext": [ { "text": "Page title", "exposure": "public" } ] } }"#,
         NO_PROPERTIES,
     );
-    let parsed = parsed(&two_titles);
+    let parsed = parse_document(&two_titles);
     let graph = graph_from(&parsed);
     let refusal = validate_manifest_property_candidate_v1(&parsed, &graph, &representation_owner())
         .expect_err("two effective titles refuse");
@@ -480,7 +480,7 @@ fn r03a_09_effective_cardinality_and_duplicates_refuse() {
         NO_PROPERTIES,
         NO_PROPERTIES,
     );
-    let parsed = parsed(&duplicate_source);
+    let parsed = parse_document(&duplicate_source);
     let graph = graph_from(&parsed);
     let refusal = validate_manifest_property_candidate_v1(&parsed, &graph, &representation_owner())
         .expect_err("a repeated background source refuses");
@@ -498,7 +498,7 @@ fn r03a_09_effective_cardinality_and_duplicates_refuse() {
         NO_PROPERTIES,
         r#"{ "location": { "inheritance": "inherit", "currentContext": [ { "operation": "add", "factId": "bali-base", "kind": "association", "fields": { "locality": "Denpasar" }, "exposure": "public" }, { "operation": "add", "factId": "bali-base", "kind": "association", "fields": { "locality": "Ubud" }, "exposure": "public" } ] } }"#,
     );
-    let parsed = parsed(&duplicate_fact);
+    let parsed = parse_document(&duplicate_fact);
     let graph = graph_from(&parsed);
     let refusal = validate_manifest_property_candidate_v1(&parsed, &graph, &representation_owner())
         .expect_err("a repeated original location identity refuses");
@@ -521,7 +521,7 @@ fn r03a_09_recognized_extend_is_refused_by_name() {
         NO_PROPERTIES,
         r#"{ "location": { "inheritance": "inherit", "currentContext": [ { "operation": "extend", "target": { "owner": { "entity": "example", "facet": "main" }, "factId": "bali-base" }, "set": { "locality": "Ubud" } } ] } }"#,
     );
-    let parsed = parsed(&document);
+    let parsed = parse_document(&document);
     let graph = graph_from(&parsed);
     let refusal = validate_manifest_property_candidate_v1(&parsed, &graph, &representation_owner())
         .expect_err("R03.A refuses an extension at resolution");
@@ -601,7 +601,7 @@ fn r03a_09_unlisted_sibling_declaration_fails_closed() {
     let invalid = manifest_with_unlisted_sibling(
         r#"{ "seo.title": { "inheritance": "inherit", "currentContext": [ { "text": "<b>not plain</b>", "exposure": "public" } ] } }"#,
     );
-    let parsed = parsed(&invalid);
+    let parsed = parse_document(&invalid);
     let graph = graph_from(&parsed);
     let refusal = validate_manifest_property_candidate_v1(&parsed, &graph, &representation_owner())
         .expect_err("an invalid unlisted declaration fails the whole candidate");
@@ -617,7 +617,7 @@ fn r03a_09_unlisted_sibling_declaration_fails_closed() {
     let valid = manifest_with_unlisted_sibling(
         r#"{ "seo.title": { "inheritance": "inherit", "currentContext": [ { "text": "Beranda", "exposure": "public" } ] } }"#,
     );
-    let parsed = parsed(&valid);
+    let parsed = parse_document(&valid);
     let graph = graph_from(&parsed);
     let english = validate_manifest_property_candidate_v1(&parsed, &graph, &representation_owner())
         .expect("a valid unlisted declaration does not block the public target");
