@@ -1,162 +1,198 @@
 # Foundation Solo — Active Work Order
 
-**OWNER-ISSUED — SOLO-WO-050 R01**  
-**Title:** Complete R02.B staging-security correction — executable Linux Btrfs and Windows handle-bound proof  
+**OWNER-ISSUED — SOLO-WO-051 R01**  
+**Title:** Complete R02.B F2/F5 staging-security correction with real-host branch CI and verified publication on `main`  
 **Repository:** `provelopment/provelopment-foundation-solo`  
-**Execution branch:** `main`; exactly one verified Solo checkout/worktree; sole remote `origin`.  
-**Owner-local checkout:** `C:\Users\Sean\Documents\Provelopment\00.foundation-solo` (verify actual root; do not assume access to any other checkout).  
-**Supersedes:** `SOLO-WO-049 R01`, whose published report at `811c509a09aac2d731bc93633cde7a0b56811e40` was `STOPPED` without any product-source changes. R04's F2/F5 defects remain unresolved. This order is the sole executable authority after its installation and matching Owner handoff. It does not accept R04/R01 or close R02.B in advance.
+**Owner-local root:** `C:\Users\Sean\Documents\Provelopment\00.foundation-solo`  
+**Execution:** Single verified checkout and worktree, sole remote `origin`; transition on `main`, bounded development on `solo-wo-051-r01`, then verified fast-forward to `main`.  
+**Replaces:** `SOLO-WO-050 R01`, stopped without published product edits. No R02.B or R04 F2/F5 acceptance is inherited from that run.
 
-## 1. Objective and mandated result
+## 1. Required outcome — deliver the correction
 
-**Implement and prove** the hybrid host-specific staging correction for the already implemented R02.B whole-source-set candidate pipeline. Do not stop merely because the Owner's Windows workstation has no preinstalled Rust or the local WSL filesystem is ext4. The established GitHub `rust-verify` workflow already installs pinned Rust `1.99.1` on **both** hosts and, on Ubuntu, mounts a **real loop-backed Btrfs filesystem** before executing workspace tests. Use these actual proof venues.
+**Implement, compile, test, correct and publish** the previously specified hybrid staging-security repair. **Do not end with an uncompiled local rewrite.** Use the existing GitHub-hosted Ubuntu 24.04 and Windows 2025 runners for successive real compilation and adversarial test cycles on the **single authorized development branch**. Only fast-forward a verified green candidate to `main`.
 
-The current `source_set_staging.rs` implementation remains defective: `StagingRootCapability::adopt` first checks only the last path component and opens the whole path by name; `begin_with_faults` creates a named namespace through the path and checks ancestry only after creation; `remove_namespace` and its error paths remove selected **names**, which can delete a foreign replacement. Eliminate these defects, including the R04 F2/F5 adversaries, without sacrificing source-selection, stage immutability, fail-closed behavior or other accepted contracts.
+1. **Linux:** adopt the entire author-specified staging root without following any intermediate or final symlink/magic link; resolve from a held `/` descriptor with pinned `rustix::fs::openat2` (`BENEATH | NO_SYMLINKS | NO_MAGICLINKS`, **not** `NO_XDEV`). Create all staging shards directly in the retained root with `O_TMPFILE | O_EXCL`, owner-only mode, zero staging-owned filesystem names and **no name-directed cleanup**. Handle closure owns shard cleanup. Validate actual Btrfs behavior using the already-mounted CI fixture.
+2. **Windows:** securely adopt the drive-qualified root by component-relative opens and reparse refusal. Create a private namespace and shards with pinned `NtCreateFile(FILE_CREATE)` **relative to held parent handles**. Keep shards inaccessible to any second reader, writer or mapper; detach each shard from its temporary name using **its own held handle** before making it usable; delete the owned empty namespace **by its own held handle**, never by name. Preserve crash, failure and foreign-impostor safety.
+3. **Candidate contract:** retain the sequential `drive_declared_source_set_v1` driver, whole-declaration reservations, JSON-first selected-only preflight, present-but-invalid preferred JSON refusal, 2 MiB manifest/JSON and 1 MiB Markdown bounds, 64 MiB shard target, one selected body resident at a time, bounded peak RAM independent of total staged bytes, original physical source identity/provenance and registered diagnostics. Never reopen the original body after staging. Preserve exactly `SOURCE_READ_PROVES_GLOBAL_SNAPSHOT = false` and `SOURCE_READ_GRANTS_PUBLICATION_AUTHORITY = false`; a staged candidate does not publish anything and is not a whole-filesystem snapshot.
+4. **Finish R02.B's technical correction:** close both recorded defects F2 (path-redirection) and F5 (unowned-object deletion) with real-host adversaries, including the *unowned empty-directory* replacement. No test weakening, security-contract reduction or hidden fallback.
 
-- **Linux:** securely adopt the entire requested absolute root through a pinned descriptor using `rustix::fs::openat2` and `BENEATH | NO_SYMLINKS | NO_MAGICLINKS`; create unnamed, non-linkable staging objects **directly in the held root** using `O_TMPFILE | O_EXCL` and explicit owner-only permissions. No transaction-owned staging namespace, shard entry, pathname write, pathname cleanup, or deletion of any root entry.
-- **Windows:** traverse the caller-selected root component by component, refusing reparse/junction/symlink redirection. Create each transaction-owned namespace and shard **relative to retained parent directory handles** through the existing pinned `NtCreateFile` binding in the `FILE_CREATE` form. Keep temporary staged data inaccessible to a second reader/writer/mapper; remove its name by **held-handle disposition**, never name lookup. Remove only an exactly held owned namespace handle, and never a replacement/foreign object. Prove crash-safe transient-name handling and the final sealed-read lifetime on real Windows 2025.
-- **Whole candidate:** keep the sequential `drive_declared_source_set_v1` driver, all-of-set reservations, selected-body-only JSON-first preflight, invalid preferred JSON refusal rather than Markdown fallback, 2 MiB manifest/JSON and 1 MiB Markdown limits, 64 MiB staging shard target, bounded peak memory independently of cumulative selected bytes, precise per-member provenance and failure classification, no original-body reopen after staging, and exactly `SOURCE_READ_PROVES_GLOBAL_SNAPSHOT = false` and `SOURCE_READ_GRANTS_PUBLICATION_AUTHORITY = false`. Stage output is neither public authority nor a whole-filesystem atomic snapshot.
+This order implements the exact R02.B security correction. **R02.B remains in ROADMAP and R02.C is not started** until independent Chief Architect acceptance and separate Owner-authorized reconciliation. No release, deployment or other product stage is included.
 
-**Completion** requires real executable evidence on both CI hosts and the independent A1 review of the published substantive revision. No self-acceptance, premature R02.B closure, R02.C execution, release, merge or deployment.
+## 2. Exact authorized permanent file ledger
 
-## 2. Frozen permanent-write ledger — eight paths, no ninth file
-
-| # | Authorized permanent path | Exact authority |
+| # | Repository path | Authorized action |
 | --- | --- | --- |
-| 1 | `.documents/WIP/workorder-active.md` | Commit only the complete Owner-installed R01 replacement with this `SOLO-WO-050 R01` text as a single ACTIVE-only transition; then leave the text frozen. |
-| 2 | `.documents/Reports/execution-report.md` | Overwrite the single canonical report after execution, including on failure; publish it in a final report-only commit. |
-| 3 | `crates/solo-adapters/src/source_set_staging.rs` | Correct Linux held-root anonymous staging and Windows handle-bound namespace, shard, disposal and failure lifetimes. Remove forbidden pathname deletion. |
-| 4 | `crates/solo-adapters/src/source_read_native.rs` | The only native expansion boundary. Implement safe Linux `rustix` helpers and the specifically approved Windows handle-relative `NtCreateFile(FILE_CREATE)` and `SetFileInformationByHandle(FileDispositionInfoEx)` operations, with minimal Windows-only `unsafe` and explicit safety comments. Preserve the original-source native reader. |
-| 5 | `crates/solo-adapters/tests/source_set_staging.rs` | Mandatory real-host adversaries, actual Btrfs `O_TMPFILE` evidence through the existing CI fixture, Windows reparse/root substitution/foreign cleanup tests and crash/fault behavior. |
-| 6 | `crates/solo-adapters/src/source_set_candidate.rs` | Optional minimal stage-lifetime/error integration only; no source-policy rewrite. |
-| 7 | `crates/solo-adapters/tests/source_set_candidate.rs` | Optional additional whole-set late-failure, atomically refused candidate and no-reopen regression tests. |
-| 8 | `crates/solo-adapters/src/lib.rs` | Optional minimal internal export adjustment. No public privilege or publication authority. |
+| 1 | `.documents/WIP/workorder-active.md` | Commit **this entire Owner-installed `SOLO-WO-051 R01` text only** in one initial ACTIVE-only transition on `main`. Freeze afterwards. |
+| 2 | `.documents/Reports/execution-report.md` | Overwrite one canonical report at run end, including on STOP; final **report-only** commit on `main`. No duplicates/archives. |
+| 3 | `crates/solo-adapters/src/source_set_staging.rs` | Linux no-namespace lifecycle, Windows held-namespace/shard lifecycle, fallible finalization and ownership-safe cleanup. |
+| 4 | `crates/solo-adapters/src/source_read_native.rs` | Safe Linux `rustix` descriptor primitives; **sole** new Windows native/`unsafe` boundary for relative `NtCreateFile(FILE_CREATE)` and held-handle `SetFileInformationByHandle(FileDispositionInfoEx)`. Do not alter the original-source native read/clone/recheck path. |
+| 5 | `crates/solo-adapters/tests/source_set_staging.rs` | Migrate every old namespace test to the new host-specific lifecycle; add exact root/adoption, Btrfs, Windows reparse, foreign replacement, failure and process-lifetime adversaries. |
+| 6 | `crates/solo-adapters/src/source_set_candidate.rs` | Optional minimum stage/finalization/error integration only. |
+| 7 | `crates/solo-adapters/tests/source_set_candidate.rs` | Optional full-set late-failure/atomic-refusal regression evidence. |
+| 8 | `crates/solo-adapters/src/lib.rs` | Optional minimum internal test/export wiring. |
 
-**All other tracked files are read-only.** In particular, do not modify `README.md`, `AGENTS.md`, About/Architecture/SOP, ROADMAP/NEXT/OUTLOOK, Cargo manifests/lock, pinned toolchain, `deny.toml`, `.github/workflows/rust-verify.yml`, checker/fixtures, application/domain crates or `source_read.rs`. Do not install a new crate, add a Cargo feature, create a new native module, add a workflow file or alter the original-source/native read mechanisms. No sibling/parent repository write, extra checkout, worktree, PR, branch, remote or archival report.
+**Nothing else may be changed permanently.** Do not touch `README.md`, `AGENTS.md`, Architecture/About/SOP, NEXT/ROADMAP/OUTLOOK, `.github/workflows/**`, manifests, lockfile, `deny.toml`, toolchain, checker/fixtures, source-body reader, application/domain crates, other repositories or hosting configuration. No dependency/feature changes, ad hoc FFI declarations or ninth file.
 
-**Scoped development-environment authority:** On the verified Owner-local Windows workstation and its WSL2 instance only, install the official **pinned Rust `1.99.1` toolchain**, Cargo, rustfmt and Clippy with first-party `rustup` as needed, in the standard current-user toolchain directories. The official HTTPS installer and locked Cargo dependency acquisition are authorized network uses for this task. Before running the installer, verify its official source and provenance; record what was installed. Do not install global packages, upgrade the OS, alter system security settings, install new compiler versions, add persistent PATH changes beyond the standard user-level Rust setup, or touch unknown files. The existing hosted CI already provides both required build hosts and Btrfs; no separate Btrfs host or filesystem package installation is authorized or needed. Installing local Rust is a convenience for fast correction, **not an acceptance gate and not a reason to STOP if unavailable**: exact-head CI on the existing hosted hosts is the authoritative real-host proof.
+**Additional, exact Git/GitHub authority for this order:** after the initial ACTIVE-only transition, create and push **one** short-lived ordinary branch named `solo-wo-051-r01` from verified `main` in the **same checkout**, make and push iterative commits on that branch containing only paths 3–8, invoke the existing `rust-verify.yml` `workflow_dispatch` against that branch, and inspect the actual Actions jobs/logs. The branch may temporarily fail CI; **`main` must not receive known-broken source**. The agent may use an authenticated `gh` CLI or equivalent first-party GitHub Actions REST dispatch and read operations with already available credentials. The agent may install a user-scoped `gh` CLI only from its official verified release if absent; do not expose, print or create new tokens. If dispatch is unavailable, **one conventional non-draft PR from that same branch to `main` is authorized solely to trigger the existing `pull_request` CI**, with no PR merge; verify that its tested merge tree matches the candidate tree, and still require final `main` CI. PR descriptions must not disclose confidential vulnerability details. Close that PR after successful publication.
 
-Use only verified Solo `.temp/` or the active Cline task scratch for task-owned disposable experiments. **There were 2813 pre-existing, unowned/unattributed `.temp/` entries at the prior run**: do not delete or modify them merely to claim cleanliness. Create uniquely identified task-owned scratch paths and remove only those after use. A separate source checkout or worktree is prohibited, even inside scratch.
+**Exact integration authority:** after two-host success at the selected branch candidate (or tree-equivalent PR candidate), unchanged frozen paths and fresh remote-state checks, **fast-forward only** the verified branch into `main` and push `origin/main` (no GitHub PR merge, no squash, no rebase of published commits, no force). Verify the complete existing workflow succeeds again at that **exact substantive `main` SHA**, on both hosts, before publishing a `COMPLETE` report. The Owner's installation of this entire order expressly authorizes this bounded fast-forward for this order alone under Architect SOP §6B; it grants no unrelated merge, release or deployment authority. Once both final runs and report publication are verified, remove **only** the task-owned remote/local branch and close the task-owned PR if any. Never delete the branch while unaccepted work is its only remaining copy.
 
-## 3. Frozen starting point and mandatory preflight
+**Build tools:** the previously installed user Rust `1.99.1` remains available. **Local MSVC `link.exe` and WSL compilation are not prerequisites.** Do not install Visual Studio Build Tools, a global compiler or a new Linux distribution. The GitHub runners already install pinned Rust and compile both OS targets. Locked dependency fetch/security/advisory traffic already used by the workflow is authorized. The existing Ubuntu workflow creates real loop-backed Btrfs, verifies `fstype=btrfs` and exports `SOLO_TEST_SOURCE_FS_ROOT`. Do not alter that workflow or request a new Btrfs machine.
 
-**Reviewed published anchor:** `811c509a09aac2d731bc93633cde7a0b56811e40`, Git tree `9edb0db7e1a913c03f41ca833c2e3cfcd6245c3b`, whose parent is the R01 ACTIVE-only transition `f519f97571c04466682f04fb96ad1d60c928f3a3`. Anchor changes relative to that parent are report-only. CI `rust-verify` run **165** completed successfully on `ubuntu-24.04` (job `129691614357`) and `windows-2025` (job `129691614743`). The published R01 canonical report blob at the anchor is `eb3dc7c666022570f674f01a7a2ca563cc33b9c9`. The previously frozen source blobs remain unchanged: staging `e20054c76a4296c187d0ccbbf87601737c9c5c88`, native `ab6a392ec45d6a6b946bdf8a6e4ce9a567b3ae26`, candidate `311d44c807f7fbc55df175161054041c78012869`, tests staging `dd2b71f31b09c4ee1067aa98d27aef21d19fccfe`, tests candidate `4c3cbad0aa274871689f031c105dbafd2d7cb779`, `lib.rs` `31bee760d918e014fc6378ef40ec1e9eb058449f`. NEXT `92fa562b1af0c54391851aa5c79deb1631127069`, ROADMAP `18975332c2820170a32558c4ee224176667b91ab`, OUTLOOK `cb9c7a610cf3c537557e060ca9656e44a053e69d` stay frozen.
+Temporary fixtures may live only in Solo `.temp/`, the active agent's own scratch, or existing per-job CI runner temporary roots; never create a clone or secondary source tree. Do not delete or modify the **2813 previously observed, unattributed** `.temp/` entries. Remove only provably task-owned scratch; report any unavoidable owned residue.
 
-1. Verify actual root, `git rev-parse --show-toplevel`, branch `main`, exact current HEAD/remote tracking, `git status --porcelain`, one worktree and sole `origin` with URL `provelopment/provelopment-foundation-solo`. Verify exactly the four prescribed regular WIP files; verify that the Owner-installed local ACTIVE contains **this entire** `SOLO-WO-050 R01` order, and that the Owner handoff names the same ID and edition. An unrecognized remote change or other dirty path is STOP, not permission to overwrite.
-2. Read README, AGENTS, both SOPs, relevant Architecture sections, all four WIP files, the last report, the existing staging/native code and tests. Verify HEAD ancestry and unchanged frozen files. Do not confuse the last report's `STOPPED` disposition with a new current result.
-3. Commit/push **only** the Owner-installed ACTIVE replacement as the first commit; verify existing Ubuntu/Windows CI is green. No implementation source edits in this transition.
-4. Inspect the current CI before coding. Existing `.github/workflows/rust-verify.yml` already mounts a loop-backed **Btrfs** image on Ubuntu, confirms `supported_fstype: fstype=btrfs`, exports `SOLO_TEST_SOURCE_FS_ROOT` and `SOLO_TEST_UNSUPPORTED_FS_ROOT` to the test step, and cleans owned mount/image paths afterward. Run 165's Ubuntu raw log proves this. The Windows runner already installs `1.99.1` before testing. **Do not request new test hosts, workflow edits, or Btrfs packages.**
+## 3. Frozen anchor and transition preflight
 
-## 4. Implementation sequence — implement a complete, testable correction
+**Exact reviewed anchor:** `625a3798fee1177e9ba2f26aea7bb6f87621243e`, Git tree `957406a8e3b210f02caeda93b084e9ec385a0625`, prior report `STOPPED` (`.documents/Reports/execution-report.md` blob `23f2bb434dcb5c9508a122f3d10226b8001c2365`). Its parent is the `SOLO-WO-050` ACTIVE-only transition `2e6006c095887ead0b8cdab6dfa9e2089722ae98`; report-only CI run 167 was green but **proved no new security correction**.
 
-The preceding order's scratch-experiment-before-any-source rule is **replaced** by this executable sequence. Build and run isolated local probes when useful, but do not block on the unavailable local test venues. Integrate the actual host probes into the **authorized existing staging tests**, implement the corresponding production mechanisms, and use the existing real-host GitHub CI at the same substantive revision for proof. Do not commit a deliberately failing adversary or a known incomplete host half. A genuine failed CI run is an engineering failure to diagnose and repair under this same scope; it is not an authorization to weaken a test. Commits correcting code/tests inside this ledger are authorized until a complete substantive revision passes on both hosts.
+**Frozen starting blobs:** previous ACTIVE `c1388487f7dad8cff8eee56d091ea303d59a766b`; NEXT `92fa562b1af0c54391851aa5c79deb1631127069`; ROADMAP `18975332c2820170a32558c4ee224176667b91ab`; OUTLOOK `cb9c7a610cf3c537557e060ca9656e44a053e69d`; staging `e20054c76a4296c187d0ccbbf87601737c9c5c88`; native `ab6a392ec45d6a6b946bdf8a6e4ce9a567b3ae26`; staging tests `dd2b71f31b09c4ee1067aa98d27aef21d19fccfe`; candidate `311d44c807f7fbc55df175161054041c78012869`; candidate tests `4c3cbad0aa274871689f031c105dbafd2d7cb779`; `lib.rs` `31bee760d918e014fc6378ef40ec1e9eb058449f`. Read-only canonical Architecture/SOP and CI files remain unchanged.
 
-### 4A. Linux — retained root and zero named staging objects
+1. Verify root, branch `main`, clean Git status except the **Owner-installed** exact replacement ACTIVE, sole `origin` pointing to `provelopment/provelopment-foundation-solo`, one worktree, exact four WIP files, `HEAD == origin/main`, anchor ancestry, no unauthorized drift. Read `README.md`, `AGENTS.md`, relevant Architecture, **both SOPs including Architect SOP §6B/§7B**, all four WIP files, the published `SOLO-WO-050` report and the current source/tests. A mismatch that is not exclusively allowed report-only ancestry is a STOP requiring review. Do not erase unknown files or adopt another repository.
+2. Confirm the installed ACTIVE text bears this order ID and title and the Owner handoff names **`SOLO-WO-051 R01`**. Commit/push **only** ACTIVE as the first commit to `main`. Verify GitHub shows it and Ubuntu/Windows CI is green.
+3. From that verified transition SHA, create `solo-wo-051-r01` in the **same** checkout. Do **not** make an additional worktree, clone, source copy, branch for each test, or a competing WIP artifact. A short-lived branch is explicitly authorized here because the previous two executions were unable to compile locally and must never test a knowingly broken `main`.
 
-1. Remove staging-root pathname-open validation from the protected Linux path. Parse the caller's absolute `Path` by components without lossy re-encoding; refuse NUL, relative, parent traversal and unsafe components. Start with an opened `/` descriptor and resolve all following components using `rustix::fs::openat2` with **`ResolveFlags::BENEATH | ResolveFlags::NO_SYMLINKS | ResolveFlags::NO_MAGICLINKS`** and `OFlags::DIRECTORY | OFlags::CLOEXEC`. Do not add `NO_XDEV`, call `canonicalize` as security preflight, or fall back to a path-based `open`. Treat the filesystem `/` root explicitly. Prove actual descriptor identity and refusal classes; inspect the held descriptor when testing known root unlink/replacement.
-2. Open every staging shard through the **retained root descriptor** using `rustix::fs::openat(&root_fd, ".", OFlags::TMPFILE | OFlags::EXCL | OFlags::RDWR | OFlags::CLOEXEC, owner_only_mode)` (exact type/imports confirmed against locked `rustix 1.1.5`). Hold the returned owned descriptor for the shard lifetime; write, seek, flush, seal and read only through it. Use `O_EXCL` to prohibit later linking of an `O_TMPFILE` inode. No created namespace and no staging-root pathname used for a later create/remove.
-3. Remove Linux namespace creation and `remove_namespace` code paths entirely from the Linux compilation path. Dropping the last shard handle performs cleanup. The caller-owned root and every foreign entry remain untouched. Preserve stage size, member limits, disk-backed bounded memory, all read/finalize refusals, and no exposure on a late member failure. The source-read snapshot code remains unchanged.
-4. Migrate Linux tests that formerly counted named staging directories into tests that snapshot the directory's entries before/during/after staging and assert that **no staging-owned entry ever appears**; check success, late failure, injected capacity/flush, unwind/drop, retained-handle replacement and a bounded crash child. Use synthetic content only.
+## 4. Direct implementation instructions
 
-**Implementation pattern (adapt to existing types; use the locked API, not ad hoc syscalls):**
+### 4A. Migrate the test harness before pushing source
+
+The existing `tests/source_set_staging.rs` assumes a visible namespace on **both** hosts. Its functions `a_new_entry_with_a_former_object_name_cannot_change_a_staged_member`, `dropping_the_store_removes_only_its_own_namespace`, `a_staged_object_never_exists_as_a_path_an_adversary_could_open`, `a_substituted_namespace_is_refused_before_any_body_is_staged`, `an_unwind_during_staging_removes_only_its_own_namespace`, and `a_real_permission_denial_refuses_as_permission_denied` must be **rewritten or host-split**, not left asserting an intentionally removed Linux namespace. Retain every underlying security assertion.
+
+- **Linux tests:** use an exclusive, task-owned staging directory. Take a sorted directory-entry snapshot *before*, *during* and *after* staged writes, finalization, errors, drop and unwind. Assert **zero new staging-owned entries**, byte-exact sealed reads, unchanged foreign sentinel and root survival. Replace namespace replacement with stronger root-ancestor symlink, final symlink, root substitution and retained-descriptor attacks; they must exercise real traversal refusal or prove that accepted writes cannot redirect. Do not reintroduce a directory merely to satisfy old tests.
+- **Btrfs test (mandatory):** on `target_os=linux`, consume `SOLO_TEST_SOURCE_FS_ROOT` from the existing CI Btrfs mount; create one exclusively owned child under it, adopt it as the staging root and execute the actual `O_TMPFILE` stage/read/drop path. In GitHub CI, **fail if the variable is missing or if this mandatory adversary does not run**. Outside CI, a missing fixture is reported as a local environment limitation and not called PASS; ordinary ext4 tests still run. The workflow already creates and cleans the Btrfs mount. Keep the owned child cleanup scoped to its own directory. The earlier GitHub run 167 Ubuntu log recorded `fstype=btrfs` and the exported variable.
+- **Windows tests:** keep the real created namespace observable while testing foreign replacement. Assert no accepted shard name after detach and no second read/write/mapping alias. Replace a namespace with an **empty impostor** and with a **populated impostor** at the exact same name; both must remain untouched after the transaction, while only the held owned object is disposed. Exercise intermediate junction/reparse points: if creating one is denied, classify **only** the exact applicable privilege error as `UNVERIFIED`; all unrelated errors fail, and a created attack must execute and refuse. Do not pretend an unexercised attack passed.
+- **Cross-host:** retain positive roundtrip, repeated bounded sealed reads, no further writes after finalize, write/short-write/flush/finalize injected failures, full-set late-member refusal, ownership and sentinel isolation. Keep real permission-denial tests where the host allows the condition, and distinguish unavailable privilege from a passed check. Add a bounded child-process-abort test using synthetic content: record pre-crash ownership, terminate the child, assert no recoverable stage plaintext/foreign deletions, and report a genuine host limitation explicitly.
+
+**Representative Linux root-entry assertion (adapt to existing `Fixture`/store APIs):**
 
 ```rust
-use rustix::fs::{openat, openat2, Mode, OFlags, ResolveFlags};
-
-// `slash` is an already opened, trusted descriptor for `/`.
-// `safe_relative` has been built from the original absolute Path components.
-let held_root = openat2(
-    &slash,
-    safe_relative,
-    OFlags::RDONLY | OFlags::DIRECTORY | OFlags::CLOEXEC,
-    Mode::empty(),
-    ResolveFlags::BENEATH | ResolveFlags::NO_SYMLINKS | ResolveFlags::NO_MAGICLINKS,
-)?;
-let shard = openat(
-    &held_root,
-    ".",
-    OFlags::TMPFILE | OFlags::EXCL | OFlags::RDWR | OFlags::CLOEXEC,
-    Mode::from_raw_mode(0o600),
-)?;
+#[cfg(target_os = "linux")]
+{
+    let before = entries(&fixture.staging());
+    let root = StagingRootCapability::adopt(&fixture.staging()).unwrap();
+    let mut store = root.begin().unwrap();
+    let body = store.stage_body(b"synthetic staged bytes").unwrap();
+    assert_eq!(entries(&fixture.staging()), before, "O_TMPFILE created a name");
+    assert!(store.reader(body).unwrap().matches(b"synthetic staged bytes").unwrap());
+    store.finalize().unwrap();
+    drop(store);
+    assert_eq!(entries(&fixture.staging()), before, "cleanup touched a name");
+}
 ```
 
-Use the appropriate existing refusal mapping, not `?` into an unrelated error type; verify the `Mode` constructor against the locked version before finalizing.
+This is a test *pattern*, not permission to use `unwrap()` in production, omit negative cases, or silently skip Btrfs CI.
 
-### 4B. Windows — handle-relative create and handle-directed deletion
+### 4B. Linux held-root and unnamed-object production path
 
-1. **Separate staging adoption from the existing original-body reader.** For staging, bootstrap the drive-qualified absolute root safely and open every subsequent component **relative to the retained parent handle**, using `NtCreateFile` with no-follow/reparse controls and by-handle type, tag and physical-identity checks. Reject unexpected UNC/device syntax, ambiguous components and all intermediate/final reparse traversal; do not resolve the whole untrusted pathname with `CreateFileW` and only inspect its last component. Keep UTF-16 exact; do not normalize by `to_string_lossy`.
-2. Create the transaction namespace with `NtCreateFile(FILE_CREATE | FILE_DIRECTORY_FILE)` expressed as the correctly separated creation-disposition and create-options arguments, and with `OBJECT_ATTRIBUTES.RootDirectory` set to the already held root handle. Create each shard the same way with `RootDirectory` set to the held namespace handle, `FILE_CREATE` disposition and `FILE_NON_DIRECTORY_FILE` option. Give each call a validated **single component**. Request exact access including `DELETE` for by-handle disposition; set sharing to prevent a second reader/writer/mapper. Never retry by concatenating a pathname after an error. The returned `OwnedHandle`, not a subsequent lookup, is the ownership capability.
-3. Before any stage member is admitted as usable, detach its temporary name through `SetFileInformationByHandle` using `FileDispositionInfoEx` and `FILE_DISPOSITION_INFO_EX` with the appropriate tested `FILE_DISPOSITION_FLAG_DELETE | FILE_DISPOSITION_FLAG_POSIX_SEMANTICS` flags and handle lifecycle. Preserve a valid sealed read handle while ensuring no name remains reachable after successful detach. Prove whether `FILE_DELETE_ON_CLOSE` is necessary and compatible for process-death cleanup between creation and detach. Do not assume POSIX-name disappearance occurs at a particular instant merely because an API returns success: test the exact close sequence and confirm it on Windows 2025.
-4. Dispose of the **held owned namespace** by handle only, after all owned shards are closed and only when the kernel confirms deletion can succeed. An adversary may rename/remove the namespace's directory entry and replace it with an empty or nonempty impostor at the same name; **the impostor must survive untouched**. A foreign object must not be removed even when empty. Never call `remove_dir`, `remove_file`, `DeleteFileW` or name-directed `unlinkat` on that protected lifecycle, including early-return paths. Cleanup failures must preserve refusal or be explicitly reported; never transform cleanup failure into a successful candidate.
-5. Confine all new or modified Windows `unsafe` to the existing audited `crates/solo-adapters/src/source_read_native.rs` file. Use the exact already-feature-enabled bindings from `windows-sys =0.61.2`; no manually defined C structs, guessed offsets or new FFI declarations. Include narrow per-call `// SAFETY:` notes for pointer sizes, owned handle lifetime, UTF-16 buffer lifetime, access/share flags, the exact disposition structure and error conversion. Keep the original-source `NtCreateFile(FILE_OPEN)` reader unchanged.
+1. Replace `StagingRootCapability::adopt`'s current `symlink_metadata(root)` + path-authoritative `open_directory(root)` on Linux. Validate absolute `Path` components without lossy conversion or traversal, open `/` as the trusted descriptor, then call pinned `rustix::fs::openat2` relative to it with `ResolveFlags::BENEATH | ResolveFlags::NO_SYMLINKS | ResolveFlags::NO_MAGICLINKS`; use `OFlags::RDONLY | DIRECTORY | CLOEXEC`. No `NO_XDEV`, `canonicalize`, intermediate pathname dereference, or weaker fallback. Define and test root `/`, parent traversal and known replaced/unlinked directory states.
+2. Hold the opened directory `File`/descriptor and its identity throughout the stage lifetime. On Linux there is **no private staging namespace**: `begin_with_faults` creates no `solo-source-stage-*` directory, and `open_object` opens shards directly from the held root. Use safe `rustix::fs::openat(&held_root, ".", OFlags::TMPFILE | OFlags::EXCL | OFlags::RDWR | OFlags::CLOEXEC, owner_only_mode)`; check exact API constants against pinned `rustix 1.1.5`. Never use an object path or remove a named entry. Preserve open-handle and 64 MiB shard accounting and existing staged-member offsets.
+3. Make all success/error/drop/unwind code paths close only **owned** anonymous descriptors. Failure to create/read/finalize refuses the whole candidate; no JSON-to-Markdown fallback or re-read of original source. Unsupported filesystem/kernel behavior refuses explicitly, not via a path fallback.
 
-**Verified symbol names to import from the existing `Win32_Storage_FileSystem` feature:**
+**Descriptor-use pattern:**
+
+```rust
+let fd = rustix::fs::openat(
+    &held_root,
+    ".",
+    rustix::fs::OFlags::TMPFILE
+        | rustix::fs::OFlags::EXCL
+        | rustix::fs::OFlags::RDWR
+        | rustix::fs::OFlags::CLOEXEC,
+    owner_only_mode,
+).map_err(map_native_staging_error)?;
+let shard: std::fs::File = fd.into();
+```
+
+`held_root`, `owner_only_mode` and `map_native_staging_error` denote values/functions from the implemented native boundary; do not introduce a new public API just to reproduce this illustration. Confirm types and modes with the pinned crate.
+
+### 4C. Windows handle-relative creation and held-handle disposition
+
+1. Implement staging-specific secure root adoption in `source_read_native.rs`. Bootstrap a supported drive-root path, open each subsequent component relative to the retained parent with `NtCreateFile` and no-follow `OBJ_DONT_REPARSE`/`FILE_OPEN_REPARSE_POINT`, then check type, reparse tag and physical identity **on the returned handle**. Preserve exact UTF-16. Reject unprovable UNC/device paths, reparse/junction intermediate components and changed target. Do not weaken or rewrite original authored-body read/clone/recheck behavior.
+2. Create exactly one task-owned namespace relative to the held root and each shard relative to that held namespace. `NtCreateFile` accepts **separate** `CreateDisposition = FILE_CREATE` and `CreateOptions = FILE_DIRECTORY_FILE` or `FILE_NON_DIRECTORY_FILE`; never combine disposition with options. Use a validated, single-component name, exclusive creation, correct `DELETE`/data/access rights and share flags, and a returned `OwnedHandle`. **Never create by `std::fs::create_dir(path)` then inspect after creation.** Do not re-open a concatenated path to recover from native failure.
+3. For a shard, ensure no second writer, reader or mapped view can access a transient name; use the proven share-denial and `FILE_DELETE_ON_CLOSE`/equivalent owned-handle lifetime. Detach the shard name using `SetFileInformationByHandle(held_shard, FileDispositionInfoEx, ...)` with the existing `windows-sys 0.61.2` exact bindings; verify `DELETE | POSIX_SEMANTICS` host semantics, close ordering and retained sealed-read handle before admitting it. If the host rejects one flag combination, determine the exact safe supported disposition sequence within these same approved native calls and prove it; **never** fall back to a visible accepted shard or name-based deletion.
+4. At finalization and all relevant failures, dispose of the **held owned namespace handle** only. The old `remove_namespace` check-then-`remove_dir(path)` and early-return `remove_dir`/`remove_file` paths must disappear. Handle-directed disposition must never remove an empty or populated substitute located at the former namespace name. A failed disposal must refuse success; preserve the object for safe handle closure and report any actual residue. Protect adversary entries and Owner sentinels even when they are empty.
+5. New/modified Windows `unsafe` is allowed **only** within `source_read_native.rs` for the named functions, with per-call pointer, lifetime, buffer, access-right and ownership `// SAFETY:` explanations. Import exactly the audited pinned symbols; no generated binding edits, manual structs, new FFI, dependencies or feature flags.
+
+**Correct binding shape (confirmed against locked sources by the prior report; test actual host semantics):**
 
 ```rust
 use windows_sys::Win32::Storage::FileSystem::{
     SetFileInformationByHandle, FileDispositionInfoEx, FILE_DISPOSITION_INFO_EX,
     FILE_DISPOSITION_FLAG_DELETE, FILE_DISPOSITION_FLAG_POSIX_SEMANTICS,
 };
-
-// A held, DELETE-access-capable, owned handle; never a pathname lookup.
-let disposition = FILE_DISPOSITION_INFO_EX {
+let info = FILE_DISPOSITION_INFO_EX {
     Flags: FILE_DISPOSITION_FLAG_DELETE | FILE_DISPOSITION_FLAG_POSIX_SEMANTICS,
 };
 let ok = unsafe {
     SetFileInformationByHandle(
         held_handle,
         FileDispositionInfoEx,
-        (&disposition as *const FILE_DISPOSITION_INFO_EX).cast(),
+        (&raw const info).cast(),
         std::mem::size_of::<FILE_DISPOSITION_INFO_EX>() as u32,
     )
 };
 if ok == 0 {
-    // Translate GetLastError immediately to the existing registered refusal.
-    // Ensure every owned handle is closed without deleting any foreign name.
+    // Immediately capture the native error, close owned handles, and refuse.
 }
 ```
 
-The example establishes the binding and call shape, **not** a proven safe lifetime. Finish the exact handle rights, sharing, name-detach, mapped-view and delete-pending behavior by running Windows-native adversaries. `NtCreateFile` continues to take separate `FILE_CREATE` creation-disposition and `FILE_DIRECTORY_FILE`/`FILE_NON_DIRECTORY_FILE` create-options fields; do not bitwise-OR them into one argument.
+This snippet illustrates the API boundary, **not** an assertion that these flags suffice on every host or a replacement for an ownership-proving test. Keep F1's actual no-alias/nameless-after-create guarantee, F2 confinement and F5 unowned-empty survival.
 
-### 4C. Cross-host candidate integration and negative cases
+### 4D. Candidate integration and security regressions
 
-1. Do not return a completed source-set candidate until **every declared representation** has been accepted and staged with all required handle cleanup/detach guarantees. Keep each member's original selected locator, identity, snapshot provenance and failure attribution.
-2. Preserve actual production-path injection for write/short-write, capacity, flush/finalization, permission and cleanup failures. An invalid preferred JSON never falls through to Markdown. A failed later member returns no earlier staged member to a caller. No new public publication authority.
-3. Build deterministic real adversaries for (a) ancestor symlink/reparse; (b) adopted root rename/replacement; (c) namespace substitution before/at deletion; (d) **empty foreign directory** replacement (must survive); (e) populated foreign directory; (f) second writer/reader/mapped view; (g) injected errors after earlier successful members; (h) bounded child-process abrupt exit. A test must assert that its hostile operation truly occurred before it claims the production refusal or protected survival.
-4. Windows reparse/junction tests must attempt a real junction or symlink under owned scratch. Log created-and-tested refusal; classify only the precise host privilege denial as `UNVERIFIED` for that **specific** unavailable adversary. Any other setup error fails. At least one actually executed component-redirection adversary is mandatory for H4; a Windows CI job that runs none cannot pass H4.
-5. The Btrfs staging test is mandatory **inside the existing** `crates/solo-adapters/tests/source_set_staging.rs`. On Ubuntu CI, read the already exported `SOLO_TEST_SOURCE_FS_ROOT` (known `btrfs` mount) and create a uniquely named, task-owned child staging directory there; open `O_TMPFILE` shards inside that child and assert zero staging-owned entries. The existing workflow cleans its Btrfs mount. **Make a missing CI Btrfs fixture a test failure**, not a silent skip; local runs without the CI environment can report the host-specific test as not run, but cannot be cited as its proof. Do not edit the CI workflow to create a second mount or introduce a ninth file.
+Preserve original-source read identity/snapshot guarantees, manifest/source locator logic, member ownership, selected-only preflight, error vocabulary and all R01/R03 M1–M14 and R04 F1/F3/F4/F6/F7 tests. Propagate every fallible `finalize`/cleanup error through the source-set candidate; never return a partially staged candidate on a late fault. Keep source reads and staged reads separate. No global RAM accumulation or new source-set size ceiling. Preserve the checked 64 MiB shard target and limit changes to the authorized files.
 
-## 5. Real execution, CI and failure discipline
+## 5. Build–verify–fix–publish execution sequence
 
-1. After the single ACTIVE transition, implement the **entire** cross-platform correction and adversaries within the authorized ledger; use local pinned tools for fast `cargo fmt --all --check`, `cargo clippy --workspace --all-targets --locked -- -D warnings`, and `cargo test --workspace --all-targets --locked` when available. Use the existing official first-party rustup installer for pinned `1.99.1` on the Owner-local host as needed, and fetch only already locked crates. No other install or manifest alteration.
-2. Commit/push a coherent substantive implementation with the adversaries **together**, not an intentionally broken test-only intermediate, to existing `origin/main` using the permitted Git preflight. The existing CI's Ubuntu Btrfs fixture and Windows 2025 runner are the actual host proof. Read **raw job logs** and every warning/skip. Repair substantive CI failures in bounded follow-up commits touching only the same ledger paths; rerun the full two-host CI until a common exact substantive HEAD is green. Do not mask failures, skip tests, replace native adversaries with fakes, weaken refusal codes, add manual assumptions or change the runner.
-3. Test case requirements: Windows namespace and shard creation/ownership, `FileDispositionInfoEx`, transient-name and crash process behavior; Linux actual mounted Btrfs `O_TMPFILE` + ext4 root behavior where run; adversary replacement of a foreign **empty** directory; root/ancestor substitution; unauthorized alias access; original source-set M1–M14 regression and every applicable R04 F1–F8 guard. Preserve full `cargo-deny` security, architecture checker, format/lint, all-target tests, release CLI smoke and release-byte reproducibility gates.
-4. **No fabricated success.** The only acceptable substantive `COMPLETE` report follows passing actual production-path tests at the verified source commit on both CI hosts. Distinguish `REAL`, `INJECTED` and `PURE` evidence. A host-only permission restriction may leave a narrowly identified nonessential case `UNVERIFIED`, but never call H2/H3/H4/H5/H6 or the F2/F5 security obligations `PASS` without their real attack/execution proof. If the necessary kernel operation itself cannot provide the required guarantee, stop with the exact binding/OS failure; do not loosen the contract or invent another native privilege.
-5. Overwrite only `.documents/Reports/execution-report.md` with exact results, publish it in one **report-only** commit and verify fresh two-host CI at that final report HEAD; independently confirm `HEAD == origin/main`, sole worktree/remote, clean tracked tree and exactly four WIP files. Do not embed the final report commit SHA in its own content; deliver that SHA in the agent's final chat message.
+**Phase A — install/transition (on `main` only)**
 
-**Authorized Git actions for the Implementation Agent:** exact ACTIVE transition, necessary substantive commits correcting the same authorized source/test paths, a single report-only completion or STOP report, safe push to existing `origin/main`, post-push revision and CI verification. **Not authorized:** self-approval, checkout duplication, branch/PR creation, force-push, unrelated write, Git-history rewrite, merge, release, deployment, new credentials or services. The Chief Architect has no GitHub write role; none is conferred by this order.
+1. Complete §3 preflight and commit/push only the Owner-installed ACTIVE file; verify both hosts green at that transition.
+2. Create the one task branch and commit the **coherent** migrated test suite and production changes there. It is acceptable for early **task-branch** revisions to be red. Do not push intentionally incomplete code to `main`.
 
-## 6. Acceptance matrix — every applicable gate must be independently reviewable
+**Phase B — real CI iteration (on the one task branch)**
 
-| Gate | Required executable evidence |
+3. Use the exact existing workflow, no workflow edit. Normal command pattern after branch push:
+
+```bash
+git push -u origin solo-wo-051-r01
+gh workflow run rust-verify.yml --ref solo-wo-051-r01
+gh run list --workflow rust-verify.yml --branch solo-wo-051-r01 --limit 10
+gh run view <actual-run-id> --log-failed
+```
+
+`<actual-run-id>` is a placeholder for a real returned ID, never a hard-coded invented result. Use native PowerShell syntax or an authenticated REST equivalent as appropriate. If the dispatch permission is unavailable, use the specifically authorized single PR fallback to trigger existing CI, verify tested tree identity, and retain the full final-`main` exact-SHA requirement. Record actual workflow event and SHA.
+
+4. Iterate on the **same** branch. For each failing Ubuntu/Windows job, read actual compiler/lint/test output; correct the specific source or test; re-run. Typical blockers to check first: Linux cfg-gating and `rustix` types; Windows generated import types, `NTSTATUS`, raw-handle conversions and share-rights; obsolete namespace expectations in existing tests; owned handle close order and destination identity; Btrfs test actually consuming `SOLO_TEST_SOURCE_FS_ROOT`. **A normal compile error, unavailable local MSVC, or a failed branch CI run is not itself grounds to abandon the task**; diagnose, fix and re-test within the same ledger. Never claim branch CI succeeded until both real jobs succeeded for one exact candidate tree/revision.
+5. Review actual warnings, skips and test names, not just the workflow's green summary. A CI `success` that never executed an essential adversary is **UNVERIFIED**, not PASS. No `#[ignore]`, `continue-on-error`, deleted adversary, false-positive acceptance, swallowed error or changed checker to manufacture green.
+
+**Phase C — verified main and report**
+
+6. Re-fetch `origin/main` and confirm it is exactly the authorized transition (or has only nonconflicting, independently reviewed report-only ancestry); confirm only authorized source/test paths differ, no unowned edits, no uncommitted work, and CI green for the exact branch candidate. Fast-forward `main` to that exact verified branch revision—**no rebase/force/squash or PR merge**. Push `origin/main` and verify its new SHA/tree. Run/check `rust-verify` at that exact substantive main SHA; both OS jobs must pass. If the publish or main CI fails, do not mark `COMPLETE`: preserve evidence and correct only through the authorized branch procedure, without rewriting published history.
+7. Overwrite `.documents/Reports/execution-report.md` **only on `main`**, commit/push this single file, confirm the final report SHA and that `rust-verify` is green on both hosts again. Do not embed the report's own final SHA inside it; give it in chat. Verify `git status --porcelain` empty, `HEAD == origin/main`, exactly four WIP files, one worktree, sole remote; clean task-owned scratch and preserve unknown items.
+8. After verifying the report and retained code on `main`, remove only the task-owned branch (and close its task-owned PR if used), without destroying any unrelated work. No release, deployment, R02.B administrative closure, R02.C or WIP pruning.
+
+**Hard STOP conditions:** actual violation of Owner scope or repository identity; missing required credential privilege with neither approved CI trigger available; Windows by-handle/name-detach semantics disproven by real-host evidence with no safe solution inside this native boundary; an essential attack that cannot be exercised; new vulnerability or security regression; unavoidable unauthorized dependency/feature/unsafe expansion; unsafe cleanup; inability to preserve Owner/unattributed data. Publish a factual `STOPPED` report. **Do not stop merely for lack of local MSVC, a normal first CI failure, or limited per-session convenience.** Where an exact safe change is in progress but cannot be finished, preserve it on the single expressly authorized task branch with exact SHA and report its state instead of deleting the only implementation.
+
+## 6. Mandatory acceptance evidence — H1–H10
+
+| Gate | Required direct proof; all apply to the corrected source |
 | --- | --- |
-| **H1 — source-selection integrity** | R01/R03 M1–M14 and existing F1/F3/F4/F6 preserve reservations, JSON-first selection, limits, provenance, bounded staging memory, no original reopen and both `false` authority constants. |
-| **H2 — Linux root confinement** | `openat2` rejects real intermediate/final symlink/magic-link escapes and unsafe traversal; root substitution cannot redirect a held-descriptor write; no name-based fallback. |
-| **H3 — actual Btrfs zero-name lifecycle** | Ubuntu CI's existing `SOLO_TEST_SOURCE_FS_ROOT` really reports Btrfs; `O_TMPFILE | O_EXCL` shards are opened/read successfully there, and normal/fault/drop/unwind leaves **zero transaction-created entries** and zero pathname deletions. Owned caller root and foreign entries remain. |
-| **H4 — Windows root and create confinement** | Actual Windows 2025 relative-handle create and reparse/junction/ancestor/root adversaries execute, reject redirection and cannot write outside the held parent. Test setup branches are classified precisely. |
-| **H5 — Windows sealed stage and name removal** | Actual Windows second reader/writer/mapping attempts fail; held shard becomes unreachable by former name before member admission; read handle remains valid, `DELETE` access and disposition are proven; crash/restart does not expose orphan plaintext. |
-| **H6 — owned-only deletion and whole-candidate refusal** | Deterministic Windows **empty and populated** foreign replacement objects survive cleanup; all actual deletion targets verified owned handles; Linux performs no pathname deletion; late failures expose no partial candidate or staged data. |
-| **H7 — failure and lifetime truth** | Production-path injected write/short-write/capacity/flush/finalization/handle errors and host permission failures preserve registered refusals; real bounded process termination is distinguished from unwind. |
-| **H8 — limited native authority** | Only existing approved native source file contains new Windows-specific `unsafe` for the exact two call families; zero new dependency, feature, toolchain pin, workflow change, external native declaration or original-source read change. |
-| **H9 — two-host A1 and security** | Exact substantive and report-HEAD Ubuntu 24.04 + Windows 2025 CI fully green; real raw logs, fresh advisory/licence/source checks, strict lint/tests, architecture checker/refusal fixture, byte reproducibility, CLI smoke, warning/skip inventory and exact versions documented. |
-| **H10 — repository and governance** | Exact eight-path ledger, one ACTIVE, frozen other three WIP blobs, report-only final commit, clean one-worktree/sole-origin state, only task-owned scratch removed, no self-ACCEPT, R02.B and R02.C untouched administratively. |
+| **H1 Source policy/regression** | M1–M14 and F1/F3/F4/F6/F7: reservation, JSON-first invalid-preferred refusal, source identity, selected-only bounded preflight, original-source no-reopen and both `false` constants; exact source and limits intact. |
+| **H2 Linux confinement** | Actual symlinked intermediate and final components, `..`, root substitution/retained-descriptor and supported mount cases; no redirected accepted write and no unchecked pathname fallback. |
+| **H3 Linux unnamed lifecycle** | **Real Btrfs** via `SOLO_TEST_SOURCE_FS_ROOT` plus ext4 general cases: staged readable `O_TMPFILE` objects, zero new staging-owned entries, owner root/sentinels unchanged on write, finalize, error, unwind, drop and bounded abort. Mandatory Btrfs test executes in CI. |
+| **H4 Windows confinement** | Real Windows 2025 drive-root/component-relative creation and intermediate reparse/junction, replacement and refusal; creation confirmed against held handles. Real attack exercised or privilege-specific non-pass recorded. |
+| **H5 Windows staged-byte safety** | No second read/write/mapping of transient named shard, no pathname reaches detached shard, immutable repeated sealed reads, verified `FILE_DELETE_ON_CLOSE` and by-handle disposition semantics, process-crash limits. |
+| **H6 Ownership-bound cleanup/atomicity** | Linux no name deletion; Windows held-handle disposal; **empty and populated impostors both survive**, even at former owned name; Owner sentinels untouched; late source/member/disposition failures refuse and never expose partial candidate. |
+| **H7 Error/lifetime** | Real and injected permission/write/short-write/capacity/flush/finalize/disposition failures classified accurately; unwind and abort differentiated, no missing-JSON fallbacks or hidden partial success. |
+| **H8 Confined native scope** | All new `unsafe` limited to named Windows native helpers in `source_read_native.rs`, exact bindings reviewed, no crate feature/lock/workflow/checker/other-native-reader changes. |
+| **H9 Host CI + A1** | Two-host CI green for one substantive branch candidate (or proven tree-identical PR CI), **and again at exact substantive `main` SHA and final report-only SHA**; review job logs, emitted test counts/names, warning and skip inventory, architecture checker/refusal self-tests, cargo-deny refreshed RustSec, locks, lint, release smoke and reproducibility. Full A1 dependency/security/currency review of actual versions, not green alone. |
+| **H10 Governance and report** | Initial ACTIVE-only transition; only eight permanent ledger files; exact four WIP files, no extra worktree/checkout/remote, final clean tracked tree, safely owned scratch cleanup, verified report, R02.B still OPEN, R02.C unstarted, no self-ACCEPT. |
 
-Use `PASS`, `FAIL`, `UNVERIFIED` or reasoned `NOT APPLICABLE` for every H gate and each preserved R04 F1–F8. H2–H6, F2 and F5 must be proven for technical `COMPLETE`. A1 is binding at the exact candidate revision, including current component advisories, vulnerabilities, versions, warning/skip currency and relevant security refusals. An independently unverified requirement is not a pass.
+For each H1–H10 and R04 F1–F8 record `PASS`, `FAIL`, `UNVERIFIED` or genuinely `NOT APPLICABLE` with reason and exact runnable evidence (`REAL`, `INJECTED` or `PURE`). **No partial acceptance.** Green CI plus unexercised host attacks is not an acceptable technical completion. Independently verify that the two original defects are fixed by the actual source and not only by tests asserting the intended result.
 
-## 7. Canonical reporting and final handoff
+## 7. Canonical execution report and handoff
 
-Overwrite `.documents/Reports/execution-report.md` with: order ID/edition, prior R01 STOP and anchor, Git preflight/transition/substantive/report revision evidence, exact path diff, Rust installation source and actual versions, Windows 0.61.2 binding audit and exact native flags/rights/`unsafe` comments, Linux Btrfs mount identification and O_TMPFILE results, ownership and empty-impostor negatives, source-stage limits and no-reopen regression, H1–H10 and F1–F8 crosswalk, `REAL/INJECTED/PURE` evidence, exact GitHub run/job IDs and relevant raw-log excerpts, warning/skips and A1/supply-chain disposition, known genuinely unverified aspects, and safe scratch cleanup including disclosure of the **pre-existing 2813 unowned entries**. Use `COMPLETE` only for fully evidenced technical implementation; otherwise `STOPPED` with the precise code/host/contract obstacle. No independent `ACCEPT` claim.
+Overwrite the one `.documents/Reports/execution-report.md` with: order/edition and complete/stop status; exact initial anchor, ACTIVE transition, task branch commits, CI run/job links, substantive main SHA/tree, report-preceding source SHA; per-file diff and authorized ledger reconciliation; platform-specific ownership, root/adoption, lifetime, by-handle `FILE_CREATE`/`FileDispositionInfoEx` flags and safety rationale; actual Btrfs and Windows attacks with positive and negative outcomes; bounded-member and late-fault results; H1–H10/F1–F8 crosswalk with evidence type; exact security/advisory freshness, warnings/skips and remaining unverified cases; task temp cleanup and any previous unknown `.temp/` material untouched; final HEAD/remote verification; `COMPLETE` or `STOPPED`. No report duplication or secret/vulnerability exploit disclosure. Do not embed the report's own commit SHA in its contents; return that SHA only in the chat handoff.
 
-On `COMPLETE`, **leave ACTIVE installed and R02.B in ROADMAP**, because the Chief Architect must independently accept the exact substantive report and the Owner separately authorizes reconciliation and stage advancement. The immediate deliverable is a secure, green, evidence-backed R02.B staging correction ready for independent acceptance—not a release or deployment.
+**`COMPLETE` means this technical order is implemented and proven; it never means the Implementation Agent has independently accepted itself, administratively closed R02.B, authorized release, or started the next stage. The Chief Architect independently returns ACCEPT / REVISE / STOP on the exact published report and source revision.**
 
-**End of SOLO-WO-050 R01.**
+**End of SOLO-WO-051 R01.**
