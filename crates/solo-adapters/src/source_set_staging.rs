@@ -370,6 +370,7 @@ impl StagingRootCapability {
             Ok(SourceSetStagingV1 {
                 root_dir,
                 root_identity: self.identity,
+                root_path: self.root.clone(),
                 shards: Vec::new(),
                 staged_bytes: 0,
                 max_member_bytes: 0,
@@ -438,6 +439,8 @@ pub struct SourceSetStagingV1 {
     /// The retained descriptor of the caller's staging root, on both hosts.
     root_dir: File,
     root_identity: ObjectIdentityV1,
+    /// The adopted root's path, for observation only — never a creation or deletion authority.
+    root_path: PathBuf,
     shards: Vec<StageShardV1>,
     staged_bytes: u64,
     max_member_bytes: u64,
@@ -609,6 +612,34 @@ impl SourceSetStagingV1 {
     ///
     /// It grows with the total staged size, not with the declaration count.
     #[must_use]
+    /// How many staging-owned names in the adopted root a caller could actually open.
+    ///
+    /// Linux links no name at all. On Windows this store's own names may be enumerable as
+    /// delete-pending entries, but a name that cannot be opened is not a reachable plaintext path,
+    /// so only an **openable** staging-owned name is counted. A non-zero answer is a real defect.
+    ///
+    /// # Errors
+    ///
+    /// Returns the classified refusal when the adopted root cannot be listed.
+    pub fn visible_staging_entries(&self) -> Result<usize, SourceReadRefusalV1> {
+        let entries = std::fs::read_dir(&self.root_path).map_err(classify_io)?;
+        let mut reachable = 0_usize;
+        for entry in entries {
+            let entry = entry.map_err(classify_io)?;
+            let name = entry.file_name();
+            let Some(name) = name.to_str() else {
+                continue;
+            };
+            if !name.starts_with("shard-") {
+                continue;
+            }
+            if std::fs::File::open(entry.path()).is_ok() {
+                reachable += 1;
+            }
+        }
+        Ok(reachable)
+    }
+
     pub fn object_count(&self) -> usize {
         self.shards.len()
     }

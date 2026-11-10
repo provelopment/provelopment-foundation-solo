@@ -340,26 +340,16 @@ impl SourceSetCandidateV1 {
         self.staging.object_count()
     }
 
-    /// How many directory entries are visible inside the private staging namespace.
+    /// How many staging-owned names a caller could actually open in the adopted root.
     ///
-    /// A live candidate has none, which is the on-host proof that no plaintext path exists.
+    /// A live candidate has none, which is the on-host proof that no reachable plaintext path
+    /// exists: Linux links no name at all, and a Windows delete-pending name cannot be opened.
     ///
     /// # Errors
     ///
-    /// Returns the staged entries the caller could reach by name.
-    ///
-    /// Linux creates no namespace at all, so a staging-owned entry can never exist there. On
-    /// Windows the namespace path is read for observation only: it is never a creation, deletion or
-    /// confinement authority, and a namespace this store already disposed reports zero.
+    /// Returns the classified refusal when the adopted root cannot be listed.
     pub fn visible_staging_entries(&self) -> Result<usize, SourceReadRefusalV1> {
-        let Some(namespace) = self.staging.namespace_path() else {
-            return Ok(0);
-        };
-        let Ok(entries) = std::fs::read_dir(namespace) else {
-            // Already disposed, or unreadable: either way no staged member is reachable by name.
-            return Ok(0);
-        };
-        Ok(entries.filter(|entry| entry.is_ok()).count())
+        self.staging.visible_staging_entries()
     }
 
     /// Whether this candidate may be published. It never may.
