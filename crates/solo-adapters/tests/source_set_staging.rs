@@ -14,11 +14,11 @@
 //! **Fixture ownership.** Each fixture claims a unique directory with an exclusive `create_dir`,
 //! never adopts an existing one, and removes only the tree it created.
 
-use std::fs;
+use std::fs::{self, OpenOptions};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use solo_adapters::StagingRootCapability;
+use solo_adapters::{StagingFaultV1, StagingFaultsV1, StagingRootCapability};
 
 /// Distinguishes fixtures inside one test process.
 static FIXTURE_SEQUENCE: AtomicUsize = AtomicUsize::new(0);
@@ -250,6 +250,161 @@ fn a_symlinked_staging_root_is_refused_rather_than_followed() {
             .expect_err("a symlinked staging root must be refused")
             .code(),
         "SOURCE_UNSAFE_PATH"
+    );
+}
+
+#[test]
+fn a_staged_object_never_exists_as_a_path_an_adversary_could_open() {
+    let fixture = Fixture::new("no-path");
+    let root = fixture.root();
+    let mut store = root.begin().expect("begin a private staging store");
+    let body = vec![0x44_u8; 1024];
+    store.stage_body(&body).expect("stage the body");
+
+    let namespaces = entries(&fixture.staging());
+    assert_eq!(namespaces.len(), 1, "exactly one private namespace");
+    let namespace = fixture.staging().join(&namespaces[0]);
+
+    // The name the object would have had if it were created by path never exists, on either host:
+    // Linux creates an `O_TMPFILE` inode and Windows detaches the name immediately. There is
+    // therefore no path for a hostile same-principal writer to open, replace, truncate or map.
+    for candidate in ["shard-0.bin", "shard-1.bin"] {
+        let path = namespace.join(candidate);
+        assert!(
+            !path.exists(),
+            "a staging object must have no directory entry at all"
+        );
+        assert_eq!(
+            OpenOptions::new()
+                .write(true)
+                .open(&path)
+                .err()
+                .map(|error| error.kind()),
+            Some(std::io::ErrorKind::NotFound),
+            "no writable alias may be obtainable by name"
+        );
+    }
+
+    // The bytes remain available through the retained handle, unchanged.
+    let second = store.stage_body(&body).expect("stage a second body");
+    let reader = store.reader(second).expect("a reader for the second body");
+    assert!(reader.matches(&body).expect("compare the body"));
+}
+
+#[test]
+fn a_substituted_namespace_is_refused_before_any_body_is_staged() {
+    let fixture = Fixture::new("substitution");
+    let root = fixture.root();
+    let mut store = root.begin().expect("begin a private staging store");
+
+    let namespaces = entries(&fixture.staging());
+    assert_eq!(namespaces.len(), 1);
+    let namespace = fixture.staging().join(&namespaces[0]);
+
+    // Replace the namespace with a different directory that has the same name: the classic
+    // redirection an identity check must catch and a pathname check cannot.
+    fs::remove_dir(&namespace).expect("remove the store's own empty namespace");
+    fs::create_dir(&namespace).expect("create an impostor namespace");
+
+    let refusal = store
+        .stage_body(b"first body")
+        .expect_err("a substituted namespace must be refused");
+    assert_eq!(refusal.code(), "SOURCE_UNSAFE_PATH");
+}
+
+#[test]
+fn injected_write_failures_refuse_through_the_production_path() {
+    // A write failure at the second member, after the first was staged successfully.
+    let fixture = Fixture::new("fault-write");
+    let root = fixture.root();
+    let mut store = root
+        .begin_with_faults(StagingFaultsV1::inject(1, StagingFaultV1::Write))
+        .expect("begin with an injected write fault");
+    assert!(store.stage_body(b"member one").is_ok());
+    let refusal = store
+        .stage_body(b"member two")
+        .expect_err("the injected write failure must refuse");
+    assert_eq!(refusal.code(), "SOURCE_OBSERVATION_IO_ERROR");
+    assert_ne!(refusal.code(), "SOURCE_NONE_EFFECTIVE");
+
+    // A short write must be refused rather than accepted as a shorter member.
+    let fixture = Fixture::new("fault-short");
+    let mut store = fixture
+        .root()
+        .begin_with_faults(StagingFaultsV1::inject(0, StagingFaultV1::ShortWrite))
+        .expect("begin with an injected short write");
+    let refusal = store
+        .stage_body(b"a body that must not be accepted in part")
+        .expect_err("a short write must refuse");
+    assert_eq!(refusal.code(), "SOURCE_OBSERVATION_IO_ERROR");
+
+    // A flush failure after a full write must also refuse.
+    let fixture = Fixture::new("fault-flush");
+    let mut store = fixture
+        .root()
+        .begin_with_faults(StagingFaultsV1::inject(0, StagingFaultV1::Flush))
+        .expect("begin with an injected flush failure");
+    let refusal = store
+        .stage_body(b"a body whose flush fails")
+        .expect_err("a flush failure must refuse");
+    assert_eq!(refusal.code(), "SOURCE_OBSERVATION_IO_ERROR");
+}
+
+#[test]
+fn an_injected_finalization_failure_refuses_the_whole_set() {
+    let fixture = Fixture::new("fault-finalize");
+    let mut store = fixture
+        .root()
+        .begin_with_faults(StagingFaultsV1::inject(0, StagingFaultV1::Finalize))
+        .expect("begin with an injected finalization fault");
+    store.stage_body(b"member one").expect("stage a member");
+
+    let refusal = store
+        .finalize()
+        .expect_err("injected finalization must refuse");
+    assert_eq!(refusal.code(), "SOURCE_OBSERVATION_IO_ERROR");
+    assert!(
+        store.finalize().is_err(),
+        "a refused store must not become acceptable on a second attempt"
+    );
+}
+
+#[test]
+fn repeated_bounded_reads_return_the_same_bytes_after_sealing() {
+    let fixture = Fixture::new("sealed-reads");
+    let root = fixture.root();
+    let mut store = root.begin().expect("begin a private staging store");
+
+    let first = vec![0x77_u8; 4096];
+    let second = vec![0x88_u8; 4096];
+    let first_body = store.stage_body(&first).expect("stage the first body");
+    let second_body = store.stage_body(&second).expect("stage the second body");
+    store.finalize().expect("seal the store");
+
+    for _ in 0..3 {
+        let mut read = Vec::new();
+        store
+            .reader(first_body)
+            .expect("reader")
+            .read_whole(&mut read)
+            .expect("read the first body");
+        assert_eq!(read, first);
+        let mut read = Vec::new();
+        store
+            .reader(second_body)
+            .expect("reader")
+            .read_whole(&mut read)
+            .expect("read the second body");
+        assert_eq!(read, second);
+    }
+
+    // A sealed store refuses further staging rather than accepting a late member.
+    assert_eq!(
+        store
+            .stage_body(b"late")
+            .expect_err("a sealed store must refuse")
+            .code(),
+        "SOURCE_UNSUPPORTED"
     );
 }
 

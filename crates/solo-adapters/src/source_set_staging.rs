@@ -41,6 +41,173 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use solo_application::{SourceReadRefusalKind, SourceReadRefusalV1};
 
+/// `FILE_SHARE_DELETE`. A literal because naming the native crate outside the approved module is
+/// forbidden; the value is the documented Windows constant and nothing else is shared.
+#[cfg(windows)]
+const FILE_SHARE_DELETE_ONLY: u32 = 0x0000_0004;
+
+/// `FILE_FLAG_BACKUP_SEMANTICS`: what lets a directory be opened as a handle at all.
+#[cfg(windows)]
+const FILE_FLAG_BACKUP_SEMANTICS: u32 = 0x0200_0000;
+
+/// A retained operating-system identity: what the handle *is*, never what a path claims.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ObjectIdentityV1 {
+    container: u64,
+    low: u64,
+    high: u64,
+}
+
+/// Reads the retained identity of an already-open handle.
+fn identity_of(file: &File) -> Result<ObjectIdentityV1, SourceReadRefusalV1> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        let metadata = file.metadata().map_err(classify_io)?;
+        Ok(ObjectIdentityV1 {
+            container: metadata.dev(),
+            low: metadata.ino(),
+            high: 0,
+        })
+    }
+    #[cfg(windows)]
+    {
+        // The stable `MetadataExt` identity accessors are still unstable, so the audited
+        // `FILE_ID_INFO` query the source reader already uses is reused through a safe wrapper.
+        let identity = crate::source_read_native::staging_handle_identity(file)
+            .map_err(|_| unsafe_location())?;
+        Ok(ObjectIdentityV1 {
+            container: identity.container(),
+            low: identity.object_low(),
+            high: identity.object_high(),
+        })
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        let _ = file;
+        Err(SourceReadRefusalV1::new(
+            SourceReadRefusalKind::Unsupported,
+            None,
+        ))
+    }
+}
+
+/// Opens a directory as a retained handle.
+///
+/// The handle, not the string, is what later operations depend on, and its identity is what
+/// confinement comparisons use. Windows refuses an ordinary `File::open` on a directory, so the
+/// safe backup-semantics flag is required there.
+fn open_directory(path: &Path) -> Result<File, SourceReadRefusalV1> {
+    let mut options = OpenOptions::new();
+    options.read(true);
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::OpenOptionsExt;
+        options.custom_flags(FILE_FLAG_BACKUP_SEMANTICS);
+    }
+    let file = options.open(path).map_err(classify_io)?;
+    if !file.metadata().map_err(classify_io)?.is_dir() {
+        return Err(unsafe_location());
+    }
+    Ok(file)
+}
+
+/// Creates one staging object that no other handle can read from or write to.
+///
+/// Linux creates an `O_TMPFILE | O_EXCL` inode: it never has a directory entry, so there is no
+/// window in which an alias could be opened. Windows establishes the guarantee atomically in the
+/// create itself by sharing only delete, so no other handle can obtain read or write access; the
+/// unlink that follows then leaves no path to reach it either.
+#[cfg(target_os = "linux")]
+fn open_staging_object(namespace: &Path, _index: usize) -> Result<File, SourceReadRefusalV1> {
+    crate::source_read_native::open_unnamed_staging_object(namespace).map_err(classify_io)
+}
+
+/// The share mode is the guarantee here; the unlink removes the path as well.
+#[cfg(windows)]
+fn open_staging_object(namespace: &Path, index: usize) -> Result<File, SourceReadRefusalV1> {
+    use std::os::windows::fs::OpenOptionsExt;
+    let path = namespace.join(format!("{STAGE_OBJECT_PREFIX}{index}.bin"));
+    let file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create_new(true)
+        .share_mode(FILE_SHARE_DELETE_ONLY)
+        .open(&path)
+        .map_err(classify_io)?;
+    if let Err(error) = std::fs::remove_file(&path) {
+        drop(file);
+        let _ = std::fs::remove_file(&path);
+        return Err(classify_io(error));
+    }
+    Ok(file)
+}
+
+/// Other Unix hosts have no proven unnamed primitive here, so staging refuses rather than guess.
+#[cfg(all(unix, not(target_os = "linux")))]
+fn open_staging_object(_namespace: &Path, _index: usize) -> Result<File, SourceReadRefusalV1> {
+    Err(SourceReadRefusalV1::new(
+        SourceReadRefusalKind::Unsupported,
+        None,
+    ))
+}
+
+/// Hosts with neither primitive refuse for the same reason.
+#[cfg(not(any(unix, windows)))]
+fn open_staging_object(_namespace: &Path, _index: usize) -> Result<File, SourceReadRefusalV1> {
+    Err(SourceReadRefusalV1::new(
+        SourceReadRefusalKind::Unsupported,
+        None,
+    ))
+}
+
+/// The deterministic staging fault a test asks the **production** path to hit.
+///
+/// It exists so a later-member write failure, a short write, a flush failure and a finalization
+/// failure are exercised through the real transaction code rather than a parallel fake. No
+/// production caller sets one.
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StagingFaultV1 {
+    /// Fail before writing the body.
+    Write,
+    /// Write a prefix of the body and then fail.
+    ShortWrite,
+    /// Write the body fully and then fail at the flush.
+    Flush,
+    /// Fail at whole-set finalization.
+    Finalize,
+}
+
+/// Where a [`StagingFaultV1`] applies: the ordinal (zero-based) staging call it hits.
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct StagingFaultsV1 {
+    after: usize,
+    fault: Option<StagingFaultV1>,
+}
+
+impl StagingFaultsV1 {
+    /// No injected fault: the production behaviour.
+    #[must_use]
+    pub const fn none() -> Self {
+        Self {
+            after: usize::MAX,
+            fault: None,
+        }
+    }
+
+    /// Injects `fault` at the staging call whose ordinal is `after`.
+    #[doc(hidden)]
+    #[must_use]
+    pub const fn inject(after: usize, fault: StagingFaultV1) -> Self {
+        Self {
+            after,
+            fault: Some(fault),
+        }
+    }
+}
+
 /// The largest number of bytes one staged object may accumulate before the store starts another.
 ///
 /// It bounds open handles by `ceil(total / this)` instead of by the number of representations. It
@@ -71,19 +238,23 @@ static STAGE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 #[derive(Debug)]
 pub struct StagingRootCapability {
     root: PathBuf,
+    handle: File,
+    identity: ObjectIdentityV1,
 }
 
 impl StagingRootCapability {
     /// Adopts an existing directory as the staging root.
     ///
-    /// The directory must already exist and be a real directory reached without a symbolic link:
-    /// this function never creates the root, never adopts a parent chain and never treats a
-    /// missing root as a reason to fall back to an OS temp directory.
+    /// The directory must already exist and be a real directory. It is opened once, and the
+    /// **handle and the identity of what was actually opened are retained**; every later
+    /// confinement decision compares that identity rather than re-trusting a string. A relative
+    /// path, a symbolic link at the final component, a missing directory and a non-directory are
+    /// all refused, and no system temp location is ever substituted.
     ///
     /// # Errors
     ///
     /// Returns `SOURCE_UNSAFE_PATH` for a relative path, a symbolic link or a non-directory, and
-    /// the classified staging refusal when the directory cannot be inspected.
+    /// the classified staging refusal when the directory cannot be opened.
     pub fn adopt(root: &Path) -> Result<Self, SourceReadRefusalV1> {
         if !root.is_absolute() {
             return Err(unsafe_location());
@@ -100,8 +271,12 @@ impl StagingRootCapability {
         if metadata.file_type().is_symlink() || !metadata.is_dir() {
             return Err(unsafe_location());
         }
+        let handle = open_directory(root)?;
+        let identity = identity_of(&handle)?;
         Ok(Self {
             root: root.to_path_buf(),
+            handle,
+            identity,
         })
     }
 
@@ -122,13 +297,65 @@ impl StagingRootCapability {
     /// Returns `SOURCE_UNSAFE_PATH` when the namespace cannot be created exclusively, and the
     /// classified staging refusal for a permission or capacity failure.
     pub fn begin(&self) -> Result<SourceSetStagingV1, SourceReadRefusalV1> {
+        self.begin_with_faults(StagingFaultsV1::none())
+    }
+
+    /// Creates the private namespace with a deterministic fault plan attached.
+    ///
+    /// This is the seam the acceptance matrix needs: the injected failure is raised by the same
+    /// production code that a real host failure would reach, not by a parallel implementation.
+    #[doc(hidden)]
+    pub fn begin_with_faults(
+        &self,
+        faults: StagingFaultsV1,
+    ) -> Result<SourceSetStagingV1, SourceReadRefusalV1> {
         let namespace = self.root.join(namespace_name());
+        // The retained capability must still be the live directory it was adopted as. This reads
+        // the handle, not the string, so a root that disappeared or stopped being a directory
+        // refuses before anything is created.
+        if !self.handle.metadata().map_err(classify_io)?.is_dir() {
+            return Err(unsafe_location());
+        }
+        if identity_of(&self.handle)? != self.identity {
+            return Err(unsafe_location());
+        }
         create_private_directory(&namespace)?;
+
+        let namespace_handle = match open_directory(&namespace) {
+            Ok(handle) => handle,
+            Err(refusal) => {
+                // Only the empty directory this call just created, and only on this failure path.
+                let _ = std::fs::remove_dir(&namespace);
+                return Err(refusal);
+            }
+        };
+        let namespace_identity = identity_of(&namespace_handle)?;
+
+        // Confinement is decided by identity, not by the string: the parent of the namespace we
+        // just created must be the very directory this capability adopted. A redirected path
+        // component or a root replaced between adoption and now fails here, before any byte is
+        // written or any object created.
+        let parent = match open_directory(&namespace.join("..")) {
+            Ok(handle) => handle,
+            Err(refusal) => {
+                let _ = std::fs::remove_dir(&namespace);
+                return Err(refusal);
+            }
+        };
+        if identity_of(&parent)? != self.identity {
+            let _ = std::fs::remove_dir(&namespace);
+            return Err(unsafe_location());
+        }
+
         Ok(SourceSetStagingV1 {
             namespace,
+            namespace_identity,
             shards: Vec::new(),
             staged_bytes: 0,
             max_member_bytes: 0,
+            staged_members: 0,
+            sealed: false,
+            faults,
         })
     }
 }
@@ -182,9 +409,13 @@ impl StagedBodyV1 {
 /// failure drops it and its [`Drop`] closes every handle and removes the empty namespace.
 pub struct SourceSetStagingV1 {
     namespace: PathBuf,
+    namespace_identity: ObjectIdentityV1,
     shards: Vec<StageShardV1>,
     staged_bytes: u64,
     max_member_bytes: u64,
+    staged_members: usize,
+    sealed: bool,
+    faults: StagingFaultsV1,
 }
 
 impl SourceSetStagingV1 {
@@ -200,6 +431,22 @@ impl SourceSetStagingV1 {
     /// or capacity failure (never absence and never a Markdown fallback), and
     /// `SOURCE_OBSERVATION_PERMISSION_DENIED` when the host denies the write.
     pub fn stage_body(&mut self, bytes: &[u8]) -> Result<StagedBodyV1, SourceReadRefusalV1> {
+        if self.sealed {
+            return Err(SourceReadRefusalV1::new(
+                SourceReadRefusalKind::Unsupported,
+                None,
+            ));
+        }
+
+        let ordinal = self.staged_members;
+        self.staged_members = self.staged_members.saturating_add(1);
+        if let Some(fault) = self.faults.fault
+            && ordinal == self.faults.after
+            && fault == StagingFaultV1::Write
+        {
+            return Err(out_of_capacity());
+        }
+
         let len = bytes.len() as u64;
         let rotate = match self.shards.last() {
             None => true,
@@ -212,7 +459,27 @@ impl SourceSetStagingV1 {
         let index = self.shards.len() - 1;
         let shard = &mut self.shards[index];
         let offset = shard.written;
+
+        // The short-write fault is the only path that writes a prefix; it exists to prove that a
+        // partial object is refused and cleaned rather than accepted as a shorter member.
+        let short_write = self.faults.fault == Some(StagingFaultV1::ShortWrite)
+            && ordinal == self.faults.after
+            && bytes.len() > 1;
+        if short_write {
+            let prefix = bytes.len() / 2;
+            shard
+                .file
+                .write_all(&bytes[..prefix])
+                .map_err(classify_io)?;
+            shard.written = offset.saturating_add(prefix as u64);
+            return Err(out_of_capacity());
+        }
+
         shard.file.write_all(bytes).map_err(classify_io)?;
+
+        if self.faults.fault == Some(StagingFaultV1::Flush) && ordinal == self.faults.after {
+            return Err(out_of_capacity());
+        }
         shard.file.flush().map_err(classify_io)?;
 
         let observed = shard.file.metadata().map_err(classify_io)?.len();
@@ -230,6 +497,47 @@ impl SourceSetStagingV1 {
             offset,
             len,
         })
+    }
+
+    /// Seals the store once every member is staged.
+    ///
+    /// It re-confirms that the namespace is still the directory this store created and that every
+    /// object still reports exactly the length that was written. A last-write, finalization or
+    /// substitution failure is refused here rather than becoming an accepted candidate, and no
+    /// public value exists until this returns `Ok`.
+    ///
+    /// # Errors
+    ///
+    /// Returns `SOURCE_OBSERVATION_IO_ERROR` for an injected or real finalization failure,
+    /// `SOURCE_OBSERVATION_CHANGED_DURING_READ` when an object no longer reports its own length,
+    /// and `SOURCE_UNSAFE_PATH` when the namespace is no longer the one this store created.
+    pub fn finalize(&mut self) -> Result<(), SourceReadRefusalV1> {
+        if self.sealed {
+            return Ok(());
+        }
+        if self.faults.fault == Some(StagingFaultV1::Finalize)
+            && self.faults.after <= self.staged_members
+        {
+            return Err(out_of_capacity());
+        }
+        self.confirm_namespace()?;
+        for shard in &self.shards {
+            let observed = shard.file.metadata().map_err(classify_io)?.len();
+            if observed != shard.written {
+                return Err(changed());
+            }
+        }
+        self.sealed = true;
+        Ok(())
+    }
+
+    /// Confirms, by identity, that the namespace path still names this store's namespace.
+    fn confirm_namespace(&self) -> Result<(), SourceReadRefusalV1> {
+        let handle = open_directory(&self.namespace)?;
+        if identity_of(&handle)? != self.namespace_identity {
+            return Err(unsafe_location());
+        }
+        Ok(())
     }
 
     /// A bounded reader over one staged member.
@@ -287,27 +595,15 @@ impl SourceSetStagingV1 {
         Ok(count)
     }
 
-    /// Creates one object and immediately detaches its name.
+    /// Creates one nameless staging object inside this store's own namespace.
     fn open_object(&mut self) -> Result<(), SourceReadRefusalV1> {
-        let path = self
-            .namespace
-            .join(format!("{STAGE_OBJECT_PREFIX}{}.bin", self.shards.len()));
-        let file = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create_new(true)
-            .open(&path)
-            .map_err(classify_io)?;
-
-        // Detach the directory entry before a single body byte is written. If the host refuses,
-        // the object is closed and removed and the attempt refuses: a named staging object is
-        // never accepted as a substitute for a nameless one.
-        if let Err(error) = std::fs::remove_file(&path) {
-            drop(file);
-            let _ = std::fs::remove_file(&path);
-            return Err(classify_io(error));
-        }
-
+        // Confirmed before creation, and again afterwards: a namespace substituted during the
+        // create is therefore detected before a single byte is written into the object it
+        // produced, so no staged body is ever accepted through a redirected directory.
+        self.confirm_namespace()?;
+        let index = self.shards.len();
+        let file = open_staging_object(&self.namespace, index)?;
+        self.confirm_namespace()?;
         self.shards.push(StageShardV1 { file, written: 0 });
         Ok(())
     }

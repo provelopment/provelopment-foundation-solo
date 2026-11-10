@@ -66,5 +66,5 @@ pub use source_set_candidate::{
 };
 pub use source_set_staging::{
     STAGE_READ_CHUNK_BYTES, STAGE_SHARD_TARGET_BYTES, SourceSetStagingV1, StageReaderV1,
-    StagedBodyV1, StagingRootCapability,
+    StagedBodyV1, StagingFaultV1, StagingFaultsV1, StagingRootCapability,
 };

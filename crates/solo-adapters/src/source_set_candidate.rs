@@ -665,7 +665,16 @@ impl DeclaredSourceSetSinkV1 for CandidateTransaction<'_, '_> {
         Ok(())
     }
 
-    fn finish(self) -> Result<Self::Complete, Self::Refusal> {
+    fn finish(mut self) -> Result<Self::Complete, Self::Refusal> {
+        // Fallible whole-set finalization: the store re-confirms its namespace identity and every
+        // staged length, so a late write or substitution failure refuses here instead of becoming
+        // an accepted candidate.
+        self.staging
+            .finalize()
+            .map_err(|refusal| SourceSetRefusalV1::Staging {
+                declaration: None,
+                refusal,
+            })?;
         Ok(SourceSetCandidateV1 {
             entity: self.entity.to_owned(),
             staging: self.staging,

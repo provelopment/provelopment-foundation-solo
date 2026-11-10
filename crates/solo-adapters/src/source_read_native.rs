@@ -176,6 +176,61 @@ pub(crate) fn recheck(leaf: &OpenLeaf) -> Result<LeafFacts, NativeError> {
     sys::recheck(&leaf.raw)
 }
 
+/// Safe, staging-only: opens one **unnamed** object inside `directory`.
+///
+/// This is `O_TMPFILE | O_EXCL`, the very primitive the accepted source-snapshot path already
+/// uses below — with a staging root instead of a content root. The inode has no directory entry
+/// at any moment of its life, so no pathname can reach it, replace it or map it, and there is no
+/// window between creation and unlinking in which an alias could be acquired. It adds no
+/// `unsafe`, no foreign declaration and no dependency: it is a safe `rustix` call.
+#[cfg(target_os = "linux")]
+pub(crate) fn open_unnamed_staging_object(directory: &Path) -> std::io::Result<std::fs::File> {
+    let dir = rustix::fs::open(
+        directory,
+        rustix::fs::OFlags::DIRECTORY | rustix::fs::OFlags::NOFOLLOW | rustix::fs::OFlags::CLOEXEC,
+        rustix::fs::Mode::empty(),
+    )
+    .map_err(staging_io)?;
+    let fd = rustix::fs::openat(
+        &dir,
+        c".",
+        rustix::fs::OFlags::TMPFILE
+            | rustix::fs::OFlags::EXCL
+            | rustix::fs::OFlags::RDWR
+            | rustix::fs::OFlags::CLOEXEC,
+        rustix::fs::Mode::RUSR | rustix::fs::Mode::WUSR,
+    )
+    .map_err(staging_io)?;
+    Ok(std::fs::File::from(fd))
+}
+
+/// Maps one `rustix` error onto the host's own I/O error, so every staging failure is classified
+/// in exactly one place rather than gaining a second, weaker vocabulary.
+#[cfg(target_os = "linux")]
+fn staging_io(error: rustix::io::Errno) -> std::io::Error {
+    std::io::Error::from_raw_os_error(error.raw_os_error())
+}
+
+/// Safe, staging-only: the retained identity of an already-open handle.
+///
+/// It reuses the audited `FILE_ID_INFO` query the source reader already performs; it adds no
+/// `unsafe` block, no foreign declaration, no feature and no import outside this module. A caller
+/// holding a directory handle can therefore pin *which* directory it owns instead of trusting a
+/// string that a later operation would resolve again.
+///
+/// # Errors
+///
+/// Returns [`NativeError::Unsupported`] when the host cannot report the identity and
+/// [`NativeError::Unsafe`] when the object is a reparse point.
+#[cfg(windows)]
+pub(crate) fn staging_handle_identity(
+    file: &std::fs::File,
+) -> Result<PhysicalIdentityV1, NativeError> {
+    use std::os::windows::io::AsRawHandle;
+    let (facts, _is_directory) = sys::handle_facts(file.as_raw_handle())?;
+    Ok(facts.identity)
+}
+
 #[cfg(target_os = "linux")]
 mod sys {
     //! Linux: safe `rustix` only, with every guarantee delegated to `openat2`.
@@ -515,7 +570,7 @@ mod sys {
     /// A non-zero reparse tag on the object that was actually opened is [`NativeError::Unsafe`]
     /// regardless of how the open was requested: asking the kernel not to follow a reparse
     /// point and *checking* that it did not are deliberately both done.
-    fn handle_facts(handle: HANDLE) -> Result<(LeafFacts, bool), NativeError> {
+    pub(super) fn handle_facts(handle: HANDLE) -> Result<(LeafFacts, bool), NativeError> {
         let mut tag: FILE_ATTRIBUTE_TAG_INFO = zeroed();
         // SAFETY: `handle` is a live handle owned by the caller for this call; `tag` is a
         // correctly sized and aligned `FILE_ATTRIBUTE_TAG_INFO`; the byte count is exactly
