@@ -1,20 +1,24 @@
 //! R02.C real-fixture proof: the checked-in starter seed and the expanded one-Entity
 //! fixture driven through the accepted parser, ownership graph and source-stage candidate.
 //!
-//! Every case reads the **committed** source bytes above and passes them to the accepted
-//! boundaries: [`solo_adapters::parse_manifest_bytes`], the pure domain
+//! Every case reads the **committed** bytes from their fixed repository paths and passes them to
+//! the accepted boundaries: [`solo_adapters::parse_manifest_bytes`], the pure domain
 //! [`solo_domain::EfsOwnershipDraft`] graph and
-//! [`solo_adapters::assemble_declared_source_set_v1`]. The seed is portable *data*: nothing
-//! here installs, publishes, serves or renders it.
+//! [`solo_adapters::assemble_declared_source_set_v1`]. The seed is portable *data*: nothing here
+//! installs, publishes, serves or renders it.
+//!
+//! **Reading strategy.** The architecture gate refuses source-loading include macros, so each
+//! fixture is opened from a fixed path beneath `CARGO_MANIFEST_DIR` at test time. Nothing is
+//! discovered by scanning a directory, and nothing is written to a committed fixture.
 //!
 //! **What the graph construction is.** Tests transform the already parsed declarations into a
 //! pure domain draft using the fixture's known already-canonical full locale keys. That is a
-//! test-owned transformation, not the missing production parse-to-graph bridge and not a
-//! general BCP47 validator.
+//! test-owned transformation, not the missing production parse-to-graph bridge and not a general
+//! BCP47 validator.
 //!
 //! **Fixture ownership.** A scratch root is claimed with an exclusive `create_dir`; an already
 //! taken name is skipped and never adopted, reset or removed, so `Drop` can only remove a tree
-//! this test created. Checked-in fixtures are only ever read.
+//! this test created.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -33,65 +37,59 @@ use solo_domain::{
 
 const TRUSTED: RootProvenanceV1 = RootProvenanceV1::OperatorDesignatedContentRoot;
 
-/// The committed starter seed: one Entity, one Facet, one Site, one Page, one representation.
-const STARTER_MANIFEST: &[u8] =
-    include_bytes!("../../../examples/starter/content/publication.json");
-/// The one real starter body. Its declared JSON alternative is intentionally absent.
-const STARTER_MARKDOWN: &[u8] =
-    include_bytes!("../../../examples/starter/content/pages/main-home.en-001.md");
-
-/// The committed expanded synthetic fixture: two Facets, three Sites, four Pages, six
-/// representations.
-const EXPANDED_MANIFEST: &str = include_str!("fixtures/r02c/expanded/content/publication.json");
-const BALI_HOME_EN: &[u8] =
-    include_bytes!("fixtures/r02c/expanded/content/pages/bali-home.en-001.md");
-const BALI_HOME_ID: &[u8] =
-    include_bytes!("fixtures/r02c/expanded/content/pages/bali-home.id-id.md");
-const BALI_ABOUT_EN: &[u8] =
-    include_bytes!("fixtures/r02c/expanded/content/pages/bali-about.en-001.md");
-const BALI_ABOUT_ID: &[u8] =
-    include_bytes!("fixtures/r02c/expanded/content/pages/bali-about.id-id.json");
-const JAKARTA_HOME_EN: &[u8] =
-    include_bytes!("fixtures/r02c/expanded/content/pages/jakarta-home.en-001.md");
-const COMPANY_HOME_DE: &[u8] =
-    include_bytes!("fixtures/r02c/expanded/content/pages/company-home.de-de.md");
-
-/// The six declared bodies in authored declaration order.
-const EXPANDED_BODIES: [(&str, SourceCandidateKind, &[u8]); 6] = [
-    (
-        "pages/bali-home.en-001.md",
-        SourceCandidateKind::Markdown,
-        BALI_HOME_EN,
-    ),
-    (
-        "pages/bali-home.id-id.md",
-        SourceCandidateKind::Markdown,
-        BALI_HOME_ID,
-    ),
-    (
-        "pages/bali-about.en-001.md",
-        SourceCandidateKind::Markdown,
-        BALI_ABOUT_EN,
-    ),
-    (
-        "pages/bali-about.id-id.json",
-        SourceCandidateKind::Json,
-        BALI_ABOUT_ID,
-    ),
+/// The six declared expanded bodies in authored declaration order.
+const EXPANDED_BODIES: [(&str, SourceCandidateKind); 6] = [
+    ("pages/bali-home.en-001.md", SourceCandidateKind::Markdown),
+    ("pages/bali-home.id-id.md", SourceCandidateKind::Markdown),
+    ("pages/bali-about.en-001.md", SourceCandidateKind::Markdown),
+    ("pages/bali-about.id-id.json", SourceCandidateKind::Json),
     (
         "pages/jakarta-home.en-001.md",
         SourceCandidateKind::Markdown,
-        JAKARTA_HOME_EN,
     ),
-    (
-        "pages/company-home.de-de.md",
-        SourceCandidateKind::Markdown,
-        COMPANY_HOME_DE,
-    ),
+    ("pages/company-home.de-de.md", SourceCandidateKind::Markdown),
 ];
 
 /// How many alternative names a scratch tree may try before failing closed.
 const FIXTURE_ATTEMPTS: usize = 16;
+
+/// The committed starter seed root: one Entity, one Facet, one Site, one Page.
+fn starter_root() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/starter/content")
+}
+
+/// The committed expanded fixture root: two Facets, three Sites, four Pages, six representations.
+fn expanded_root() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/r02c/expanded/content")
+}
+
+fn starter_manifest() -> Vec<u8> {
+    fs::read(starter_root().join("publication.json"))
+        .expect("the committed starter seed manifest is readable")
+}
+
+fn starter_markdown() -> Vec<u8> {
+    fs::read(starter_root().join("pages/main-home.en-001.md"))
+        .expect("the committed starter body is readable")
+}
+
+fn expanded_text() -> String {
+    fs::read_to_string(expanded_root().join("publication.json"))
+        .expect("the committed expanded manifest is readable")
+}
+
+fn expanded_body(relative: &str) -> Vec<u8> {
+    fs::read(expanded_root().join(relative))
+        .expect("the committed expanded fixture body is readable")
+}
+
+/// The six committed expanded bodies, in authored declaration order.
+fn expanded_bodies() -> Vec<(&'static str, SourceCandidateKind, Vec<u8>)> {
+    EXPANDED_BODIES
+        .iter()
+        .map(|(path, kind)| (*path, *kind, expanded_body(path)))
+        .collect()
+}
 
 /// The directory a scratch tree is created in.
 ///
@@ -191,8 +189,8 @@ impl Drop for Scratch {
 /// A scratch tree holding exactly the six committed expanded bodies.
 fn expanded_scratch(tag: &str) -> Scratch {
     let scratch = Scratch::new(tag);
-    for (path, _, bytes) in EXPANDED_BODIES {
-        scratch.write(path, bytes);
+    for (path, _, bytes) in expanded_bodies() {
+        scratch.write(path, &bytes);
     }
     scratch
 }
@@ -265,8 +263,8 @@ fn with_facets(facets: &str) -> String {
 
 /// Builds the pure domain draft from the already parsed declarations.
 ///
-/// The fixture authors canonical full locale keys, so wrapping them here asserts exactly that
-/// and never canonicalises, folds or completes a value.
+/// The fixture authors canonical full locale keys, so wrapping them here asserts exactly that and
+/// never canonicalises, folds or completes a value.
 fn draft_from(parsed: &ParsedManifestCandidateV1) -> EfsOwnershipDraft {
     let entity = EntityIdV1::parse(parsed.entity().id().as_str())
         .expect("the parsed Entity identifier is already canonical");
@@ -318,7 +316,7 @@ fn page_id(value: &str) -> PageIdV1 {
 
 #[test]
 fn the_starter_seed_declares_exactly_one_structure_and_one_full_locale() {
-    let parsed = accepted(STARTER_MANIFEST);
+    let parsed = accepted(&starter_manifest());
 
     assert_eq!(parsed.logical_identity(), MANIFEST_LOGICAL_IDENTITY);
     assert_eq!(parsed.entity().id().as_str(), "example");
@@ -356,7 +354,6 @@ fn the_starter_seed_declares_exactly_one_structure_and_one_full_locale() {
     assert_eq!(parsed.node_count(), 5);
     assert_eq!(parsed.page_count(), 1);
     assert_eq!(parsed.representation_count(), 1);
-
     // The declaration is inert: parsing proves shape only, never publication authority.
     assert!(!parsed.is_publication_authorized());
 
@@ -372,14 +369,16 @@ fn the_starter_seed_declares_exactly_one_structure_and_one_full_locale() {
     assert_eq!(parsed.base().canonical(), "https://example.org/site");
 
     // The selected body really exists in the repository and is readable authored Markdown.
-    assert!(!STARTER_MARKDOWN.is_empty());
-    assert!(STARTER_MARKDOWN.starts_with(b"# "));
+    let markdown = starter_markdown();
+    assert!(!markdown.is_empty());
+    assert!(markdown.starts_with(b"# "));
 }
 
 #[test]
 fn the_starter_seed_stages_exactly_its_declared_markdown_body() {
+    let markdown = starter_markdown();
     let scratch = Scratch::new("starter");
-    scratch.write("pages/main-home.en-001.md", STARTER_MARKDOWN);
+    scratch.write("pages/main-home.en-001.md", &markdown);
     assert!(
         !scratch.path("pages/main-home.en-001.json").exists(),
         "the declared preferred JSON must genuinely be absent in this scratch tree"
@@ -387,7 +386,7 @@ fn the_starter_seed_stages_exactly_its_declared_markdown_body() {
     let capability = scratch.capability();
 
     let candidate =
-        assemble_declared_source_set_v1(STARTER_MANIFEST, &capability, &scratch.staging_root())
+        assemble_declared_source_set_v1(&starter_manifest(), &capability, &scratch.staging_root())
             .expect("a confirmed absent preferred JSON permits the declared Markdown body");
 
     assert_eq!(candidate.entity(), "example");
@@ -405,10 +404,10 @@ fn the_starter_seed_stages_exactly_its_declared_markdown_body() {
         .member_bytes(0)
         .expect("the staged body is readable")
         .expect("the candidate holds this member");
-    assert_eq!(staged.as_slice(), STARTER_MARKDOWN);
+    assert_eq!(staged, markdown);
     assert_eq!(
         member.byte_length(),
-        u64::try_from(STARTER_MARKDOWN.len()).expect("a short authored body")
+        u64::try_from(markdown.len()).expect("a short authored body")
     );
     assert_eq!(member.fingerprint(), fingerprint_of(&staged));
 
@@ -422,20 +421,20 @@ fn the_starter_seed_stages_exactly_its_declared_markdown_body() {
 #[test]
 fn a_present_preferred_json_wins_without_changing_page_identity() {
     let scratch = Scratch::new("starter-json");
-    scratch.write("pages/main-home.en-001.md", STARTER_MARKDOWN);
+    scratch.write("pages/main-home.en-001.md", &starter_markdown());
     let json = br#"{"contentVersion":"1.0.0","title":"Home","blocks":[{}]}"#;
     scratch.write("pages/main-home.en-001.json", json);
     let capability = scratch.capability();
 
     let candidate =
-        assemble_declared_source_set_v1(STARTER_MANIFEST, &capability, &scratch.staging_root())
+        assemble_declared_source_set_v1(&starter_manifest(), &capability, &scratch.staging_root())
             .expect("a valid present preferred JSON is selected");
 
     assert_eq!(candidate.len(), 1);
     let member = candidate.get(0).expect("the single declaration");
     assert_eq!(member.member(), SourceCandidateKind::Json);
     assert_eq!(member.logical_path(), "pages/main-home.en-001.json");
-    // Identity is the declaration, not the chosen format: it is unchanged by the upgrade.
+    // Identity is the declaration, not the chosen format: the upgrade does not re-identify it.
     assert_eq!(member.lineage().entity(), "example");
     assert_eq!(member.lineage().facet(), "main");
     assert_eq!(member.lineage().site(), "main");
@@ -452,7 +451,7 @@ fn a_present_preferred_json_wins_without_changing_page_identity() {
 #[test]
 fn a_present_but_invalid_preferred_json_refuses_the_whole_starter_candidate() {
     let scratch = Scratch::new("starter-json-invalid");
-    scratch.write("pages/main-home.en-001.md", STARTER_MARKDOWN);
+    scratch.write("pages/main-home.en-001.md", &starter_markdown());
     scratch.write(
         "pages/main-home.en-001.json",
         br#"{"contentVersion":"9.9.9","title":"Home","blocks":[{}]}"#,
@@ -460,7 +459,7 @@ fn a_present_but_invalid_preferred_json_refuses_the_whole_starter_candidate() {
     let capability = scratch.capability();
 
     let refusal =
-        assemble_declared_source_set_v1(STARTER_MANIFEST, &capability, &scratch.staging_root())
+        assemble_declared_source_set_v1(&starter_manifest(), &capability, &scratch.staging_root())
             .expect_err("a present-but-invalid preferred JSON must be refused");
 
     assert!(
@@ -472,7 +471,8 @@ fn a_present_but_invalid_preferred_json_refuses_the_whole_starter_candidate() {
 
 #[test]
 fn the_expanded_fixture_declares_two_facets_three_sites_four_pages_and_six_representations() {
-    let parsed = accepted(EXPANDED_MANIFEST.as_bytes());
+    let manifest = expanded_text();
+    let parsed = accepted(manifest.as_bytes());
 
     assert_eq!(parsed.entity().id().as_str(), "example");
     assert_eq!(parsed.node_count(), 16);
@@ -548,7 +548,7 @@ fn the_expanded_fixture_declares_two_facets_three_sites_four_pages_and_six_repre
                 Some("pages/bali-home.en-001.md".to_owned()),
                 None,
                 None,
-                Some(DeclaredCaseMatching::Insensitive),
+                None,
             ),
             (
                 "id-ID".to_owned(),
@@ -556,7 +556,7 @@ fn the_expanded_fixture_declares_two_facets_three_sites_four_pages_and_six_repre
                 Some("pages/bali-home.id-id.md".to_owned()),
                 None,
                 Some(DeclaredVisibility::Unlisted),
-                Some(DeclaredCaseMatching::Insensitive),
+                None,
             ),
             (
                 "en-001".to_owned(),
@@ -564,7 +564,7 @@ fn the_expanded_fixture_declares_two_facets_three_sites_four_pages_and_six_repre
                 Some("pages/bali-about.en-001.md".to_owned()),
                 None,
                 None,
-                Some(DeclaredCaseMatching::Insensitive),
+                None,
             ),
             (
                 "id-ID".to_owned(),
@@ -614,7 +614,7 @@ fn the_expanded_fixture_stages_every_declared_body_byte_identically() {
     let capability = scratch.capability();
 
     let candidate = assemble_declared_source_set_v1(
-        EXPANDED_MANIFEST.as_bytes(),
+        &expanded_text().into_bytes(),
         &capability,
         &scratch.staging_root(),
     )
@@ -623,7 +623,8 @@ fn the_expanded_fixture_stages_every_declared_body_byte_identically() {
     assert_eq!(candidate.entity(), "example");
     assert_eq!(candidate.len(), EXPANDED_BODIES.len());
 
-    for (index, (path, kind, body)) in EXPANDED_BODIES.iter().enumerate() {
+    let bodies = expanded_bodies();
+    for (index, (path, kind, body)) in bodies.iter().enumerate() {
         let member = candidate.get(index).expect("one member per declaration");
         assert_eq!(member.logical_path(), *path);
         assert_eq!(member.member(), *kind);
@@ -633,7 +634,7 @@ fn the_expanded_fixture_stages_every_declared_body_byte_identically() {
             .expect("the candidate holds this member");
         assert_eq!(
             staged.as_slice(),
-            *body,
+            body.as_slice(),
             "member {index} must be byte-identical"
         );
         assert_eq!(member.fingerprint(), fingerprint_of(&staged));
@@ -649,8 +650,7 @@ fn the_expanded_fixture_stages_every_declared_body_byte_identically() {
 
 #[test]
 fn the_expanded_fixture_builds_one_entity_graph_and_resolves_every_lineage() {
-    let parsed = accepted(EXPANDED_MANIFEST.as_bytes());
-    let graph = graph_from(&parsed);
+    let graph = graph_from(&accepted(&expanded_text().into_bytes()));
 
     assert_eq!(graph.entity().as_str(), "example");
     assert_eq!(graph.facets().len(), 2);
@@ -739,8 +739,7 @@ fn the_expanded_fixture_builds_one_entity_graph_and_resolves_every_lineage() {
 
 #[test]
 fn wrong_facet_site_page_or_entity_never_resolves_and_never_borrows_a_sibling() {
-    let parsed = accepted(EXPANDED_MANIFEST.as_bytes());
-    let graph = graph_from(&parsed);
+    let graph = graph_from(&accepted(&expanded_text().into_bytes()));
 
     let visitors = facet_id("visitors");
     let bali = site_id("bali");
@@ -821,7 +820,7 @@ fn a_bare_language_key_is_never_a_representation_membership() {
         assert_eq!(refusal.kind(), LocaleKeyErrorKind::NotFullLocale);
     }
     // The committed fixture stays inside the accepted full-locale contract.
-    let parsed = accepted(EXPANDED_MANIFEST.as_bytes());
+    let parsed = accepted(&expanded_text().into_bytes());
     for facet in parsed.entity().facets() {
         for site in facet.sites() {
             for page in site.pages() {
@@ -840,13 +839,13 @@ fn a_bare_language_key_is_never_a_representation_membership() {
 
 #[test]
 fn structural_negatives_around_the_single_entity_shape_are_refused() {
-    let source = EXPANDED_MANIFEST;
+    let source = expanded_text();
 
     // An invented root-level Entity collection is outside the closed five-key root.
     assert_eq!(
         refused(
             mutated(
-                source,
+                &source,
                 "\"schemaVersion\": \"1.0.0\",",
                 "\"entities\": [],\n  \"schemaVersion\": \"1.0.0\",",
             )
@@ -865,7 +864,7 @@ fn structural_negatives_around_the_single_entity_shape_are_refused() {
     assert_eq!(
         refused(
             mutated(
-                source,
+                &source,
                 "\"label\": \"About\",",
                 "\"label\": \"About\", \"parent\": \"home\",",
             )
@@ -876,19 +875,19 @@ fn structural_negatives_around_the_single_entity_shape_are_refused() {
 
     // Duplicate scoped identifiers, each refused inside its own scope.
     assert_eq!(
-        refused(mutated(source, "\"id\": \"company\"", "\"id\": \"visitors\"").as_bytes()),
+        refused(mutated(&source, "\"id\": \"company\"", "\"id\": \"visitors\"").as_bytes()),
         ManifestErrorKind::DuplicateScopedId
     );
     assert_eq!(
-        refused(mutated(source, "\"id\": \"jakarta\"", "\"id\": \"bali\"").as_bytes()),
+        refused(mutated(&source, "\"id\": \"jakarta\"", "\"id\": \"bali\"").as_bytes()),
         ManifestErrorKind::DuplicateScopedId
     );
     assert_eq!(
-        refused(mutated(source, "\"id\": \"about\"", "\"id\": \"home\"").as_bytes()),
+        refused(mutated(&source, "\"id\": \"about\"", "\"id\": \"home\"").as_bytes()),
         ManifestErrorKind::DuplicateScopedId
     );
     assert_eq!(
-        refused(with_unlisted_locale(source, "en-001").as_bytes()),
+        refused(with_unlisted_locale(&source, "en-001").as_bytes()),
         ManifestErrorKind::DuplicateLocale
     );
 
@@ -917,8 +916,8 @@ fn structural_negatives_around_the_single_entity_shape_are_refused() {
 
 /// A test-owned manifest whose single `entity` member carries two Entities.
 ///
-/// The one-Entity contract cannot be expressed as a collection, so this shape is refused as a
-/// wrong JSON type rather than silently taking the first Entity.
+/// The one-Entity contract cannot be expressed as a collection, so this shape is refused rather
+/// than silently taking the first Entity.
 const TWO_ENTITIES: &str = r#"{
   "schemaVersion": "1.0.0",
   "propertyRegistryVersion": "1.0.0",
@@ -940,7 +939,7 @@ fn an_undeclared_body_is_neither_selected_nor_staged() {
     let capability = scratch.capability();
 
     let candidate = assemble_declared_source_set_v1(
-        EXPANDED_MANIFEST.as_bytes(),
+        &expanded_text().into_bytes(),
         &capability,
         &scratch.staging_root(),
     )
@@ -963,7 +962,7 @@ fn a_duplicate_declared_source_claim_is_refused_before_any_body_is_staged() {
 
     // The Company representation now names the Bali Home body: one logical path, two claims.
     let duplicated = mutated(
-        EXPANDED_MANIFEST,
+        &expanded_text(),
         "\"markdown\": \"pages/company-home.de-de.md\"",
         "\"markdown\": \"pages/bali-home.en-001.md\"",
     );
@@ -985,16 +984,16 @@ fn a_duplicate_declared_source_claim_is_refused_before_any_body_is_staged() {
 #[test]
 fn one_missing_selected_source_refuses_the_whole_expanded_set() {
     let scratch = Scratch::new("missing-body");
-    for (path, _, bytes) in EXPANDED_BODIES {
+    for (path, _, bytes) in expanded_bodies() {
         if path == "pages/company-home.de-de.md" {
             continue;
         }
-        scratch.write(path, bytes);
+        scratch.write(path, &bytes);
     }
     let capability = scratch.capability();
 
     let refusal = assemble_declared_source_set_v1(
-        EXPANDED_MANIFEST.as_bytes(),
+        &expanded_text().into_bytes(),
         &capability,
         &scratch.staging_root(),
     )
@@ -1010,11 +1009,11 @@ fn one_missing_selected_source_refuses_the_whole_expanded_set() {
 
 #[test]
 fn page_identity_is_independent_of_labels_base_routes_and_representation_count() {
-    let baseline = graph_from(&accepted(EXPANDED_MANIFEST.as_bytes()));
+    let baseline = graph_from(&accepted(&expanded_text().into_bytes()));
 
     // Labels, the configured base and authored routes change; nothing else does.
     let mut renamed = mutated(
-        EXPANDED_MANIFEST,
+        &expanded_text(),
         "\"label\": \"Bali Site\"",
         "\"label\": \"Coastal Site\"",
     );
@@ -1108,21 +1107,20 @@ fn staging_budgets_and_evidence_hold_for_the_expanded_fixture() {
     let scratch = expanded_scratch("budgets");
     let capability = scratch.capability();
     let candidate = assemble_declared_source_set_v1(
-        EXPANDED_MANIFEST.as_bytes(),
+        &expanded_text().into_bytes(),
         &capability,
         &scratch.staging_root(),
     )
     .expect("the expanded fixture assembles");
 
-    let total: u64 = EXPANDED_BODIES
-        .iter()
-        .map(|(_, _, body)| u64::try_from(body.len()).expect("a short authored body"))
-        .sum();
-    let largest = EXPANDED_BODIES
-        .iter()
-        .map(|(_, _, body)| u64::try_from(body.len()).expect("a short authored body"))
-        .max()
-        .expect("six declared bodies");
+    let bodies = expanded_bodies();
+    let mut total = 0_u64;
+    let mut largest = 0_u64;
+    for (_, _, body) in &bodies {
+        let length = u64::try_from(body.len()).expect("a short authored body");
+        total += length;
+        largest = largest.max(length);
+    }
 
     assert_eq!(candidate.staged_bytes(), total);
     assert_eq!(candidate.max_staged_body_bytes(), largest);
@@ -1147,77 +1145,47 @@ fn staging_budgets_and_evidence_hold_for_the_expanded_fixture() {
             )
         })
         .collect();
-    assert_eq!(
-        lineages,
-        vec![
-            (
-                "example".to_owned(),
-                "visitors".to_owned(),
-                "bali".to_owned(),
-                "home".to_owned(),
-                "en-001".to_owned()
-            ),
-            (
-                "example".to_owned(),
-                "visitors".to_owned(),
-                "bali".to_owned(),
-                "home".to_owned(),
-                "id-ID".to_owned()
-            ),
-            (
-                "example".to_owned(),
-                "visitors".to_owned(),
-                "bali".to_owned(),
-                "about".to_owned(),
-                "en-001".to_owned()
-            ),
-            (
-                "example".to_owned(),
-                "visitors".to_owned(),
-                "bali".to_owned(),
-                "about".to_owned(),
-                "id-ID".to_owned()
-            ),
-            (
-                "example".to_owned(),
-                "visitors".to_owned(),
-                "jakarta".to_owned(),
-                "home".to_owned(),
-                "en-001".to_owned()
-            ),
-            (
-                "example".to_owned(),
-                "company".to_owned(),
-                "global".to_owned(),
-                "home".to_owned(),
-                "de-DE".to_owned()
-            ),
-        ]
-    );
+    let expected: Vec<(String, String, String, String, String)> = [
+        ("visitors", "bali", "home", "en-001"),
+        ("visitors", "bali", "home", "id-ID"),
+        ("visitors", "bali", "about", "en-001"),
+        ("visitors", "bali", "about", "id-ID"),
+        ("visitors", "jakarta", "home", "en-001"),
+        ("company", "global", "home", "de-DE"),
+    ]
+    .iter()
+    .map(|(facet, site, page, locale)| {
+        (
+            "example".to_owned(),
+            (*facet).to_owned(),
+            (*site).to_owned(),
+            (*page).to_owned(),
+            (*locale).to_owned(),
+        )
+    })
+    .collect();
+    assert_eq!(lineages, expected);
 }
 
 #[test]
 fn checked_in_fixtures_are_never_mutated_and_no_scratch_survives() {
     // Reading the real paths shows the suite only ever read the committed bytes.
-    let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let expanded = manifest_dir.join("tests/fixtures/r02c/expanded/content");
     assert_eq!(
-        fs::read(expanded.join("publication.json")).expect("the committed manifest is readable"),
-        EXPANDED_MANIFEST.as_bytes()
+        fs::read(expanded_root().join("publication.json")).expect("the committed manifest"),
+        expanded_text().into_bytes()
     );
-    for (path, _, body) in EXPANDED_BODIES {
-        let on_disk = fs::read(expanded.join(path)).expect("the committed body is readable");
-        assert_eq!(on_disk.as_slice(), body, "{path} must be unmodified");
+    for (path, _, bytes) in expanded_bodies() {
+        let on_disk = fs::read(expanded_root().join(path)).expect("the committed body");
+        assert_eq!(on_disk, bytes, "{path} must be unmodified");
     }
-    let starter = manifest_dir.join("../../examples/starter/content");
     assert_eq!(
-        fs::read(starter.join("publication.json")).expect("the committed seed is readable"),
-        STARTER_MANIFEST
+        fs::read(starter_root().join("publication.json")).expect("the committed seed"),
+        starter_manifest()
     );
     assert_eq!(
-        fs::read(starter.join("pages/main-home.en-001.md"))
-            .expect("the committed starter body is readable"),
-        STARTER_MARKDOWN
+        fs::read(starter_root().join("pages/main-home.en-001.md"))
+            .expect("the committed starter body"),
+        starter_markdown()
     );
 
     // A scratch tree this test created is gone after drop, and it was never the fixture tree.
