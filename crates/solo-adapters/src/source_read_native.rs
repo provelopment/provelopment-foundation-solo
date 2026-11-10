@@ -353,11 +353,16 @@ pub(crate) fn create_staging_namespace(
 
 /// Safe, staging-only: creates one shard relative to the held namespace and detaches its name.
 ///
-/// The name exists only between the create and the disposition below. The object is created with
-/// `FILE_DELETE_ON_CLOSE` and no sharing at all, so during that interval no other opener can read,
-/// write, delete or map it, and it is removed when its last handle closes even if this process is
-/// terminated. The disposition then removes the name, so a member is admitted only once no name
-/// reaches it.
+/// The name exists only between the create and the disposition below, and the object is created
+/// with **no sharing at all**, so during that interval no other opener can read, write, delete or
+/// map it. The disposition then unlinks the name through the object's own handle *before the caller
+/// writes a single byte*, so:
+///
+/// * no name ever reaches a staged byte;
+/// * an abruptly terminated process can leave only an **empty** named object, never recoverable
+///   plaintext;
+/// * the detach is not deferred to handle closure, so the namespace is empty — and therefore
+///   removable by its own handle — while every staged member is still readable.
 #[cfg(windows)]
 pub(crate) fn create_staging_shard(
     parent: &std::fs::File,
@@ -370,8 +375,9 @@ pub(crate) fn create_staging_shard(
     // SAFETY: a fresh, unowned handle moved exactly once into a `File`.
     let file = unsafe { std::fs::File::from_raw_handle(raw) };
     if let Err(error) = dispose_staging_object(&file) {
-        // Closing the handle removes a failed detach, because the object was created with
-        // `FILE_DELETE_ON_CLOSE`; the name must never survive.
+        // A failed detach refuses the member: the handle is closed at once. The object it leaves is
+        // empty, and the namespace it sits in is then not removable, so the failure is reported
+        // instead of being papered over.
         drop(file);
         return Err(error);
     }
@@ -1144,7 +1150,7 @@ mod sys {
         directory: bool,
     ) -> Result<OwnedHandle, NativeError> {
         use windows_sys::Wdk::Storage::FileSystem::{
-            FILE_CREATE, FILE_DELETE_ON_CLOSE, FILE_DIRECTORY_FILE as CREATE_DIRECTORY_FILE,
+            FILE_CREATE, FILE_DIRECTORY_FILE as CREATE_DIRECTORY_FILE,
             FILE_NON_DIRECTORY_FILE as CREATE_NON_DIRECTORY_FILE, FILE_SYNCHRONOUS_IO_NONALERT,
         };
         use windows_sys::Win32::Storage::FileSystem::{
@@ -1195,7 +1201,11 @@ mod sys {
                 // No sharing at all: while the shard still has its transient name no second
                 // reader, writer, deleter or mapper can open it.
                 0,
-                CREATE_NON_DIRECTORY_FILE | FILE_SYNCHRONOUS_IO_NONALERT | FILE_DELETE_ON_CLOSE,
+                // Deliberately **not** `FILE_DELETE_ON_CLOSE`: such an object keeps its directory
+                // entry pending until the handle closes, so the namespace can never become empty
+                // while a staged member is still readable. The name is unlinked by handle
+                // immediately after creation instead, before a single byte is written.
+                CREATE_NON_DIRECTORY_FILE | FILE_SYNCHRONOUS_IO_NONALERT,
             )
         };
 
