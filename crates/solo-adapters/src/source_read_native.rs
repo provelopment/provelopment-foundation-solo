@@ -1163,8 +1163,8 @@ mod sys {
             FILE_NON_DIRECTORY_FILE as CREATE_NON_DIRECTORY_FILE, FILE_SYNCHRONOUS_IO_NONALERT,
         };
         use windows_sys::Win32::Storage::FileSystem::{
-            DELETE, FILE_APPEND_DATA, FILE_LIST_DIRECTORY, FILE_READ_DATA, FILE_WRITE_ATTRIBUTES,
-            FILE_WRITE_DATA,
+            DELETE, FILE_APPEND_DATA, FILE_LIST_DIRECTORY, FILE_READ_ATTRIBUTES, FILE_READ_DATA,
+            FILE_SHARE_DELETE, FILE_WRITE_ATTRIBUTES, FILE_WRITE_DATA,
         };
 
         const STATUS_OBJECT_NAME_COLLISION: NTSTATUS = 0xC000_0035u32 as NTSTATUS;
@@ -1207,9 +1207,11 @@ mod sys {
         } else {
             (
                 FILE_READ_DATA | FILE_WRITE_DATA | FILE_READ_ATTRIBUTES | DELETE | SYNCHRONIZE,
-                // No sharing at all: while the shard still has its transient name no second
-                // reader, writer, deleter or mapper can open it.
-                0,
+                // Delete sharing only: no other opener may read, write or map this object, while
+                // the delete disposition below is still able to unlink the name immediately. With
+                // any sharing *denied* the host can only mark the entry delete-pending, which
+                // would keep the namespace non-empty for as long as a member stays readable.
+                FILE_SHARE_DELETE,
                 // Deliberately **not** `FILE_DELETE_ON_CLOSE`: such an object keeps its directory
                 // entry pending until the handle closes, so the namespace can never become empty
                 // while a staged member is still readable. The name is unlinked by handle
