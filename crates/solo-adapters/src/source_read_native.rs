@@ -377,9 +377,7 @@ pub(crate) fn create_staging_shard(
 /// `FILE_DISPOSITION_FLAG_POSIX_SEMANTICS` makes the name disappear at once while the handle stays
 /// valid, which is what lets a staged shard remain readable after its name is gone.
 #[cfg(windows)]
-pub(crate) fn dispose_staging_object(
-    object: &std::fs::File,
-) -> Result<(), StagingNativeError> {
+pub(crate) fn dispose_staging_object(object: &std::fs::File) -> Result<(), StagingNativeError> {
     use std::os::windows::io::AsRawHandle;
     sys::dispose_held(object.as_raw_handle()).map_err(StagingNativeError::from_native)
 }
@@ -1054,7 +1052,10 @@ mod sys {
 
         let (access, share, options) = if directory {
             (
-                FILE_LIST_DIRECTORY | FILE_READ_ATTRIBUTES | FILE_WRITE_ATTRIBUTES | DELETE
+                FILE_LIST_DIRECTORY
+                    | FILE_READ_ATTRIBUTES
+                    | FILE_WRITE_ATTRIBUTES
+                    | DELETE
                     | SYNCHRONIZE,
                 SHARE_ALL,
                 CREATE_DIRECTORY_FILE | FILE_OPEN_REPARSE_POINT | FILE_SYNCHRONOUS_IO_NONALERT,
@@ -1117,8 +1118,8 @@ mod sys {
     /// this process owns even if its former name now belongs to somebody else's directory.
     pub(super) fn dispose_held(handle: HANDLE) -> Result<(), NativeError> {
         use windows_sys::Win32::Storage::FileSystem::{
-            FileDispositionInfoEx, SetFileInformationByHandle, FILE_DISPOSITION_FLAG_DELETE,
-            FILE_DISPOSITION_FLAG_POSIX_SEMANTICS, FILE_DISPOSITION_INFO_EX,
+            FILE_DISPOSITION_FLAG_DELETE, FILE_DISPOSITION_FLAG_POSIX_SEMANTICS,
+            FILE_DISPOSITION_INFO_EX, FileDispositionInfoEx, SetFileInformationByHandle,
         };
         let disposition = FILE_DISPOSITION_INFO_EX {
             Flags: FILE_DISPOSITION_FLAG_DELETE | FILE_DISPOSITION_FLAG_POSIX_SEMANTICS,

@@ -49,7 +49,6 @@ use solo_application::{SourceReadRefusalKind, SourceReadRefusalV1};
 #[cfg(windows)]
 use crate::source_read_native::StagingNativeError;
 
-
 /// A retained operating-system identity: what the handle *is*, never what a path claims.
 ///
 /// The three components are deliberately opaque. On Windows they are the container serial and the
@@ -163,7 +162,9 @@ fn classify_adoption(error: std::io::Error) -> SourceReadRefusalV1 {
     /// `EOPNOTSUPP`.
     const OPNOTSUPP: i32 = 95;
     match error.raw_os_error() {
-        Some(ACCESS | PERM) => SourceReadRefusalV1::new(SourceReadRefusalKind::PermissionDenied, None),
+        Some(ACCESS | PERM) => {
+            SourceReadRefusalV1::new(SourceReadRefusalKind::PermissionDenied, None)
+        }
         Some(NOSYS | INVAL | OPNOTSUPP) => unsupported(),
         _ => unsafe_location(),
     }

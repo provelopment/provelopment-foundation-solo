@@ -35,8 +35,10 @@ impl Fixture {
     fn new(tag: &str) -> Self {
         for _ in 0..16 {
             let sequence = FIXTURE_SEQUENCE.fetch_add(1, Ordering::Relaxed);
-            let base = std::env::temp_dir()
-                .join(format!("solo-wo051-{tag}-{}-{sequence}", std::process::id()));
+            let base = std::env::temp_dir().join(format!(
+                "solo-wo051-{tag}-{}-{sequence}",
+                std::process::id()
+            ));
             match fs::create_dir(&base) {
                 Ok(()) => return Self { base },
                 Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
@@ -193,8 +195,11 @@ fn no_staging_owned_entry_ever_appears_in_the_retained_root() {
     let root = fixture.root();
     let staging = fixture.staging();
     fs::create_dir(staging.join("owner-kept")).expect("create an Owner-owned sentinel");
-    fs::write(staging.join("owner-kept").join("note.md"), b"Owner material")
-        .expect("write Owner material");
+    fs::write(
+        staging.join("owner-kept").join("note.md"),
+        b"Owner material",
+    )
+    .expect("write Owner material");
     let before = entries(&staging);
 
     let mut store = root.begin().expect("begin a private staging store");
@@ -670,4 +675,3 @@ fn a_bounded_abort_child_leaves_no_recoverable_stage_plaintext() {
         );
     }
 }
-
