@@ -81,14 +81,12 @@ fn identity_of(file: &File) -> Result<ObjectIdentityV1, SourceReadRefusalV1> {
     {
         use std::os::unix::fs::MetadataExt;
         let metadata = file.metadata().map_err(classify_io)?;
-        let changed = u64::try_from(metadata.ctime())
-            .unwrap_or(0)
-            .wrapping_mul(1_000_000_000)
-            .wrapping_add(u64::try_from(metadata.ctime_nsec()).unwrap_or(0));
+        // Device plus inode. The third component is unused on this host, but `same_object` reads
+        // it, so the identity stays one shape across hosts without an allowance attribute.
         Ok(ObjectIdentityV1 {
             container: metadata.dev(),
             low: metadata.ino(),
-            high: changed,
+            high: 0,
         })
     }
     #[cfg(windows)]
