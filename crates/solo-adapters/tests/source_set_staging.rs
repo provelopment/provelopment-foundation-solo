@@ -451,6 +451,18 @@ fn open_object_count_follows_staged_size_not_member_count() {
             entries(namespace).is_empty(),
             "no staged shard may remain visible by name"
         );
+        // The adopted root gained exactly this store's own temporary namespace and nothing else,
+        // and every foreign or Owner entry is still there.
+        let mut expected = before.clone();
+        if let Some(name) = namespace.file_name() {
+            expected.push(name.to_string_lossy().into_owned());
+        }
+        expected.sort();
+        assert_eq!(
+            entries(&fixture.staging()),
+            expected,
+            "staging added more to the adopted root than its own namespace"
+        );
     }
 
     for staged_body in &staged {
