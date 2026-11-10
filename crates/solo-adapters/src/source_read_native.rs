@@ -381,15 +381,9 @@ pub(crate) fn create_staging_shard(
         drop(file);
         return Err(error);
     }
-    // Temporary diagnosis: does the detached name still resolve? 1 means the name is gone,
-    // 2 means it is delete-pending or refused, 0 means it is still openable.
-    let probe = match sys::open_relative(parent.as_raw_handle(), name, false, false) {
-        Ok(_) => 0_i32,
-        Err(NativeError::Absent) => 1,
-        Err(NativeError::Unsafe) => 2,
-        Err(_) => 3,
-    };
-    sys::report_native_failure("probe_after_unlink", probe);
+    // Proven on Windows Server 2025: the delete disposition above succeeds, yet the detached name
+    // remains DELETE_PENDING until this handle closes, so the entry survives in the namespace. That
+    // is what makes an immediate namespace removal impossible while a member stays readable.
     Ok(file)
 }
 
@@ -738,14 +732,6 @@ mod sys {
         }
     }
 
-    /// Records the raw native code of a failed staging call.
-    ///
-    /// Only a number is emitted: never a path, a name or a staged byte. This exists so a real
-    /// host failure can be identified instead of being reported as a generic path refusal.
-    pub(super) fn report_native_failure(operation: &str, code: i32) {
-        eprintln!("staging_native={operation} raw_error={code}");
-    }
-
     fn last_error() -> NativeError {
         NativeError::OtherIo
     }
@@ -905,7 +891,7 @@ mod sys {
     ///
     /// `OBJ_CASE_INSENSITIVE` is deliberately **not** requested: the lookup is meant to be
     /// exact, so a differently-cased spelling is not silently accepted as the same entry.
-    pub(super) fn open_relative(
+    fn open_relative(
         parent: HANDLE,
         name: &str,
         want_dir: bool,
@@ -1164,7 +1150,7 @@ mod sys {
         };
         use windows_sys::Win32::Storage::FileSystem::{
             DELETE, FILE_APPEND_DATA, FILE_LIST_DIRECTORY, FILE_READ_ATTRIBUTES, FILE_READ_DATA,
-            FILE_SHARE_DELETE, FILE_WRITE_ATTRIBUTES, FILE_WRITE_DATA,
+            FILE_WRITE_ATTRIBUTES, FILE_WRITE_DATA,
         };
 
         const STATUS_OBJECT_NAME_COLLISION: NTSTATUS = 0xC000_0035u32 as NTSTATUS;
@@ -1207,11 +1193,11 @@ mod sys {
         } else {
             (
                 FILE_READ_DATA | FILE_WRITE_DATA | FILE_READ_ATTRIBUTES | DELETE | SYNCHRONIZE,
-                // Delete sharing only: no other opener may read, write or map this object, while
-                // the delete disposition below is still able to unlink the name immediately. With
-                // any sharing *denied* the host can only mark the entry delete-pending, which
-                // would keep the namespace non-empty for as long as a member stays readable.
-                FILE_SHARE_DELETE,
+                // No sharing at all: while the shard still has its transient name no second
+                // reader, writer, mapper or deleter can open it. Proven on the real host: granting
+                // delete sharing does not make the detach unlink immediately, so the strongest
+                // share mode costs nothing.
+                0,
                 // Deliberately **not** `FILE_DELETE_ON_CLOSE`: such an object keeps its directory
                 // entry pending until the handle closes, so the namespace can never become empty
                 // while a staged member is still readable. The name is unlinked by handle
@@ -1246,11 +1232,9 @@ mod sys {
             )
         };
         if status == STATUS_OBJECT_NAME_COLLISION {
-            report_native_failure("create_relative_collision", status);
             return Err(NativeError::Unsafe);
         }
         if status != STATUS_SUCCESS {
-            report_native_failure("create_relative", status);
             return Err(map_status(status));
         }
         if out.is_null() || out == INVALID_HANDLE_VALUE {
@@ -1285,10 +1269,6 @@ mod sys {
             )
         };
         if ok == 0 {
-            let code = std::io::Error::last_os_error()
-                .raw_os_error()
-                .unwrap_or_default();
-            report_native_failure("dispose_held", code);
             return Err(last_error());
         }
         Ok(())
