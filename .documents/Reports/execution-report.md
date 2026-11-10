@@ -1,49 +1,46 @@
 # Execution Report
 
-**Order:** `SOLO-WO-051 R01` (Architect disposition: REVISE, then complete).
-**Disposition: `STOPPED`** - one required guarantee is provably unsatisfiable on Windows Server 2025 with the authorized native boundary. `main` carries **no** product change; the complete implementation is preserved on `solo-wo-051-r01` at `7885dbf0a6d4c344e58248306b7c079b2766f78b`.
+**Order:** `SOLO-WO-052 R01` - Complete R02.B F2/F5: Windows direct-root, handle-only staging lifecycle.
+**Disposition: `COMPLETE`** (technical execution only; not Architect ACCEPT, not R02.C, not release).
+**Substantive revision:** `46b3148d1cca1199f3b9bdcebfff0be6143bbe15` (merge of `1d6faaf0` + `826a1c77`), tree `639a1b59f20e577b47e0cfdd34352d6b44f5607c`.
 
-## 1. Correction of the previous report
+## 1. Owner-selected correction, implemented
 
-The previous report wrongly stated that the Windows adversaries were never reached. Real job `129730310234` (run `42786901491`) executed `--test source_set_staging` with **7 passed, 3 failed**. Passing on Windows today: `an_impostor_at_the_namespace_name_survives_untouched`, `an_intermediate_junction_component_is_refused`, `an_unwind_during_staging_touches_only_its_own_objects`, `injected_write_failures_refuse_through_the_production_path`, `an_injected_finalization_failure_refuses_the_whole_set`, `a_bounded_abort_child_leaves_no_recoverable_stage_plaintext`, `staging_root_adoption_refuses_unsafe_shapes`. Failing: the three tests that require a successful `finalize()` or an empty namespace. `source_set_candidate`: 5 passed, 7 failed.
+The Windows staging namespace is **gone**. Neither host creates a staging-owned directory now; both stage directly beneath the already adopted, retained root handle.
 
-## 2. Root cause, proven on the real host
+- **Linux (preserved):** `openat2` with `BENEATH | NO_SYMLINKS | NO_MAGICLINKS | NO_XDEV` plus `O_TMPFILE | O_EXCL` anonymous inodes through the retained descriptor; zero directory entries at any instant and no pathname delete. Mandatory Btrfs fixture still runs on real CI.
+- **Windows (rewritten):** `NtCreateFile(FILE_CREATE)` relative to `OBJECT_ATTRIBUTES.RootDirectory = held_root` with `OBJ_DONT_REPARSE`, an exact one-component unique name, `FILE_NON_DIRECTORY_FILE | FILE_SYNCHRONOUS_IO_NONALERT | FILE_DELETE_ON_CLOSE`, `DELETE` rights and **share mode zero**; then `FileDispositionInfoEx(DELETE | POSIX_SEMANTICS)` on that same held handle **before the first plaintext byte**; the handle is retained for bounded positional reads after `finalize`. `create_staging_namespace`, `namespace_path`, the namespace identity/disposal path and the finalize-time directory delete were deleted outright, so no cleanup-by-name exists to be misused.
+- **Honest trade-off:** on the tested host a Windows delete-pending name remains *enumerable* while the retained handle is open. It cannot be reopened, read, written, truncated, mapped or renamed into a usable alias, and it disappears when the last handle closes, including at process death. `FILE_DELETE_ON_CLOSE` is retained as the crash net. This is not the Linux zero-entry promise and no test claims it is.
+- `visible_staging_entries()` no longer consults a path: it counts only **openable** `shard-*` names in the adopted root, so a pending name is measured rather than assumed away.
 
-Temporary diagnosis (now removed) recorded the raw code of every failing native call:
+## 2. Previous diagnostic evidence (unchanged facts)
 
-- `dispose_held raw_error=145` (`ERROR_DIR_NOT_EMPTY`) - every namespace disposal.
-- `probe_after_unlink raw_error=2` - immediately after a shard detach, reopening its name fails with a status mapping to `STATUS_DELETE_PENDING`.
+`FileDispositionInfoEx` succeeded on a shard but its entry stayed `DELETE_PENDING` (by-name probe returned `2`), so deleting the containing namespace failed with `ERROR_DIR_NOT_EMPTY` (`145`). Those codes belonged to the removed namespace design; they are not present in the final lifecycle.
 
-So `SetFileInformationByHandle(FileDispositionInfoEx, DELETE | POSIX_SEMANTICS)` **succeeds** on a shard, but the host only marks the entry delete-pending: the name is unopenable (no reader, writer, mapper, no recoverable plaintext) yet still occupies a directory entry until the handle closes. The namespace is therefore never empty while a member stays readable, and its removal fails with 145. Granting `FILE_SHARE_DELETE` on the shard changed nothing (still probe=2), and `FILE_DELETE_ON_CLOSE` produced the same 145.
+## 3. Verification (real hosts, one revision)
 
-The conflict is minimal and exact: *members readable through retained handles after successful finalization* and *the owned namespace removed by its held handle before candidate success* cannot both hold on this host, because the removal requires an empty directory and the entries only vanish when the very handles that keep members readable are closed. The only ways forward are an Architect decision: (a) defer namespace disposal to store release, after shard handles close, accepting that a successful candidate leaves an empty owned namespace until then; or (b) drop the namespace on Windows and stage shards directly in the adopted root as delete-pending objects. Both preserve every F1/F2/F5 security property; neither is adopted here without approval.
+| Evidence | Result |
+| --- | --- |
+| `rust-verify` at `826a1c77` (run `42801231741`) | **success**, ubuntu-24.04 **and** windows-2025 |
+| `rust-verify` at `46b3148d1cca1199f3b9bdcebfff0be6143bbe15` (run `42802621342`) | **success**, both hosts |
+| `source_set_staging` on Windows | **10 passed, 0 failed** - impostor dirs (empty and populated) survive, junction/component refusal, unwind, injected write/finalize, bounded abort child, scaling, pending-name unopenability |
+| `source_set_candidate` on Windows | previously-blocked whole-declaration successes now pass |
+| Linux Btrfs `O_TMPFILE` | executes on real CI; zero created entries; sentinels intact |
+| Mandatory checks | fmt, strict Clippy, architecture 4 packages / 29 cases, locked graph, refreshed RustSec, cargo-deny, release CLI smoke, Linux reproducibility - all green |
 
-## 3. Corrections delivered and preserved on the branch
-
-- Real native-failure classification: `StagingNativeError::NativeFailure` now maps to an I/O refusal instead of being collapsed into `SOURCE_UNSAFE_PATH`, so a host failure is never concealed as a path refusal.
-- The shard name is detached **before any byte is written**, so an abrupt termination can leave only an empty object; `FILE_DELETE_ON_CLOSE` was removed because it guarantees the very pending-entry state that blocks namespace removal.
-- The invalid Windows test expectation was corrected: on Windows the root is asserted to hold exactly the store's own namespace plus the original snapshot, and the namespace must hold no openable shard name; the post-`finalize` snapshot equality remains required on both hosts.
-- Windows adversaries that previously never ran now execute and pass (listed above), including both impostor cases, the junction refusal and the bounded abort child.
+No test was removed, skipped or weakened: the two assertion corrections are a host split (equality after the last handle closes on Windows, unchanged on Linux) plus a real openability measurement.
 
 ## 4. Gates
 
-| Gate | Status | Evidence |
-| --- | --- | --- |
-| H1 | **UNVERIFIED** | Linux M1-M14 green (REAL); Windows candidate suite blocked by the disposition conflict |
-| H2 | **PASS** | REAL: symlink, traversal, junction and unlinked-root refusals on both hosts |
-| H3 | **PASS** | REAL: Btrfs `O_TMPFILE`, zero staging-owned entries, sentinels intact (Ubuntu) |
-| H4 | **PASS (Windows)** | REAL: junction refusal executed; component-relative adoption confirmed |
-| H5 | **PASS (Windows)** | REAL: no second reader/writer/mapper; detach proven delete-pending, not openable |
-| H6 | **UNVERIFIED** | impostors survive (REAL), but success-path namespace disposal is the blocked requirement |
-| H7 | **PASS** | REAL injected write/short/flush/finalize + real EACCES + abort child |
-| H8 | **PASS** | `unsafe` confined to the named Windows helpers; no dependency, feature, workflow or lock change |
-| H9 | **FAIL** | no two-host green at one candidate tree |
-| H10 | **PASS** | ACTIVE transition `b5bf7e7f`, four WIP files, clean `main`, branch preserved |
+H1 **PASS** (full two-host suite) - H2 **PASS** (held-root confinement, both hosts) - H3 **PASS** (Btrfs anonymous lifecycle) - H4 **PASS** (component-relative, reparse-refusing root) - H5 **PASS** (exclusive handle, disposition before first byte, retained reads, crash cleanup via delete-on-close) - H6 **PASS** (no unowned deletion possible: no directory is created or removed; impostors and sentinels byte-identical) - H7 **PASS** (injected faults, real denial, unwind, abort child) - H8 **PASS** (`unsafe` confined to the named native helpers; no dependency, feature, workflow or lock change) - H9 **PASS** (same-revision both-host green plus report-HEAD green) - H10 **PASS** (four WIP files, clean tree, canonical report).
 
-R04: F1, F3, F4, F6, F7, F8 unchanged; **F2 proven on both hosts**, **F5 unaccepted** pending the decision in section 2. R02.B remains OPEN; R02.C not started; no self-ACCEPT.
+R04: F1, F3, F4, F6, F7, F8 unchanged. **F2 and F5 close technically** on the evidence above. Residual risk, stated plainly: a Windows pending name is visible to directory enumeration until the owning handle closes; no plaintext is reachable through it, and no directory of ours can be left behind because none is created. R02.B remains **OPEN** for independent Architect acceptance.
 
-## 5. State
+## 5. Ledger
 
-`main` = `b5bf7e7f` (ACTIVE only) + this report. Branch `solo-wo-051-r01` merged with the published report commit and preserved at the SHA above; it holds the only copy of the implementation. Local Rust `1.99.1` used for `cargo fmt` only; no MSVC toolchain or global package added; the 2813 pre-existing unattributed `.temp/` entries were untouched; task scratch removed.
+Implementation commits: `3100809`, `42ac3a3`, `b1766e5`, `8f30cfe`, `7885dbf`, `a8dc2ba`, `786913d`, `6448f9c`, `826a1c7` on `solo-wo-051-r01`, integrated by merge `46b3148d1cca1199f3b9bdcebfff0be6143bbe15`; ACTIVE installation `1d6faaf0`; earlier STOP report `79de89da`.
+Changed paths: `crates/solo-adapters/src/source_set_staging.rs`, `src/source_read_native.rs`, `src/source_set_candidate.rs`, `tests/source_set_staging.rs`. Untouched: `Cargo.toml`, `Cargo.lock`, `deny.toml`, workflow, checkers, SOPs, `lib.rs`, candidate test expectations.
 
-**Disposition: `STOPPED`** - exact OS errors and the minimal architecture conflict are reported for Owner/Architect decision, not worked around.
+Git state: `main` = `46b3148d1cca1199f3b9bdcebfff0be6143bbe15`, remote `origin` synced, one worktree, one checkout, `git status` empty, `target/` removed, no task scratch retained.
+
+**Disposition: `COMPLETE`** - R02.B technical execution finished; R02.C not started.
