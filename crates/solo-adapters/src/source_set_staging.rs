@@ -209,6 +209,11 @@ pub const STAGE_READ_CHUNK_BYTES: usize = 8 * 1024;
 const STAGE_NAMESPACE_PREFIX: &str = "solo-source-stage-";
 
 /// The prefix of every staging object inside that namespace.
+///
+/// Only the Windows implementation creates an object *by name* and then detaches it; Linux
+/// creates an `O_TMPFILE` inode that never has one, so the constant is compiled there and not
+/// merely unused.
+#[cfg(windows)]
 const STAGE_OBJECT_PREFIX: &str = "shard-";
 
 /// Distinguishes concurrently live stores inside one process.

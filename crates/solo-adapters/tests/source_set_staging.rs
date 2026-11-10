@@ -14,7 +14,8 @@
 //! **Fixture ownership.** Each fixture claims a unique directory with an exclusive `create_dir`,
 //! never adopts an existing one, and removes only the tree it created.
 
-use std::fs::{self, OpenOptions};
+use std::fs;
+use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
