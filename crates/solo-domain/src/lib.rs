@@ -32,6 +32,8 @@
 mod base_candidate;
 mod efs_ownership;
 mod entity_id;
+mod property_registry;
+mod property_resolution;
 mod source_locator;
 mod source_selection;
 
@@ -46,6 +48,23 @@ pub use efs_ownership::{
     MAX_REPRESENTATIONS_PER_PAGE, PageDraft, PageIdV1, PageNode, SiteDraft, SiteIdV1, SiteNode,
 };
 pub use entity_id::{ENTITY_ID_MAX_BYTES, EntityIdError, EntityIdErrorKind, EntityIdV1};
+pub use property_registry::{
+    ACCEPTED_IMAGE_EXTENSIONS, AssetNamespace, AssetReferenceV1, AuthoredPropertyValueV1,
+    CoordinatesV1, CurrentContextV1, DeclaredOwnerPropertiesV1, Exposure, FactIdV1, Inheritance,
+    LOCATION_FIELD_NAMES, LocationExtensionRequestV1, LocationFactV1, LocationFieldsV1,
+    LocationKind, MAX_ADDRESS_LINE_SCALARS, MAX_AREA_SCALARS, MAX_ASSET_REFERENCE_BYTES,
+    MAX_BACKGROUND_LAYERS, MAX_LOCAL_ENTRIES, MAX_LOCATION_FACTS, MAX_MAILBOX_BYTES,
+    MAX_NAMED_PLACE_SCALARS, MAX_POSTAL_CODE_SCALARS, MAX_SEO_DESCRIPTION_SCALARS,
+    MAX_SEO_TITLE_SCALARS, MAX_WORLD_REGION_SCALARS, MailboxV1, PROPERTY_REGISTRY_VERSION,
+    PlainTextV1, PropertyDeclarationRefusalV1, PropertyDeclarationV1, PropertyKey,
+    PropertyRefusalKind, PropertyValueV1, QualifiedOwnerV1,
+};
+pub use property_resolution::{
+    FieldOriginV1, PropertyResolutionRefusalKind, PropertyResolutionRefusalV1, ProvenanceValueV1,
+    PublicPropertyProjectionV1, PublicPropertyV1, ResolutionEventV1, ResolutionOperation,
+    ResolvedPropertiesV1, ResolvedPropertyV1, ValidatedPropertyInputV1,
+    project_public_properties_v1, validate_declared_properties_v1,
+};
 pub use source_locator::{
     FILESYSTEM_IDENTITY_PROVEN, MAX_LOCATOR_BYTES, MAX_LOCATOR_SEGMENTS, MAX_SEGMENT_BYTES,
     RESERVED_WINDOWS_STEMS, SOURCE_NAMESPACE, SourceCandidateDraftV1, SourceCandidateKind,
