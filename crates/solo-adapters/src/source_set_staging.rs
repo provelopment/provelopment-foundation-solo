@@ -39,7 +39,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use solo_application::{PhysicalIdentityV1, SourceReadRefusalKind, SourceReadRefusalV1};
+use solo_application::{SourceReadRefusalKind, SourceReadRefusalV1};
 
 /// `FILE_SHARE_DELETE`. A literal because naming the native crate outside the approved module is
 /// forbidden; the value is the documented Windows constant and nothing else is shared.
@@ -50,24 +50,58 @@ const FILE_SHARE_DELETE_ONLY: u32 = 0x0000_0004;
 #[cfg(windows)]
 const FILE_FLAG_BACKUP_SEMANTICS: u32 = 0x0200_0000;
 
-/// Reads the retained identity of an already-open handle.
+/// A retained operating-system identity: what the handle *is*, never what a path claims.
 ///
-/// The accepted identity type is reused deliberately: it is the same opaque device/object pair
-/// the source reader reports, so confinement and source identity share one vocabulary rather than
-/// growing a second, weaker one.
-fn identity_of(file: &File) -> Result<PhysicalIdentityV1, SourceReadRefusalV1> {
+/// The three components are deliberately opaque. On Windows they are the container serial and the
+/// two halves of the 128-bit `FILE_ID_INFO` object id, which the volume does not reuse. On Unix
+/// they are the device, the inode **and the inode change time**: `(device, inode)` alone is not
+/// sound, because Linux recycles a freed inode number immediately, so a directory deleted and
+/// recreated in the same parent can present the identical pair. The change time is maintained by
+/// the kernel and is not settable by a writer, so a recreated object cannot reproduce it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ObjectIdentityV1 {
+    container: u64,
+    low: u64,
+    high: u64,
+}
+
+impl ObjectIdentityV1 {
+    /// Whether two identities name the same retained object.
+    ///
+    /// Written out rather than derived so every component is genuinely consulted; a derived
+    /// comparison is ignored by dead-code analysis and would hide an unused component.
+    const fn same_object(self, other: Self) -> bool {
+        self.container == other.container && self.low == other.low && self.high == other.high
+    }
+}
+
+/// Reads the retained identity of an already-open handle.
+fn identity_of(file: &File) -> Result<ObjectIdentityV1, SourceReadRefusalV1> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::MetadataExt;
         let metadata = file.metadata().map_err(classify_io)?;
-        // Linux reports a 64-bit inode, so the high half of the object component is zero.
-        Ok(PhysicalIdentityV1::new(metadata.dev(), metadata.ino(), 0))
+        let changed = u64::try_from(metadata.ctime())
+            .unwrap_or(0)
+            .wrapping_mul(1_000_000_000)
+            .wrapping_add(u64::try_from(metadata.ctime_nsec()).unwrap_or(0));
+        Ok(ObjectIdentityV1 {
+            container: metadata.dev(),
+            low: metadata.ino(),
+            high: changed,
+        })
     }
     #[cfg(windows)]
     {
         // The stable `MetadataExt` identity accessors are still unstable, so the audited
         // `FILE_ID_INFO` query the source reader already uses is reused through a safe wrapper.
-        crate::source_read_native::staging_handle_identity(file).map_err(|_| unsafe_location())
+        let identity = crate::source_read_native::staging_handle_identity(file)
+            .map_err(|_| unsafe_location())?;
+        Ok(ObjectIdentityV1 {
+            container: identity.container(),
+            low: identity.object_low(),
+            high: identity.object_high(),
+        })
     }
     #[cfg(not(any(unix, windows)))]
     {
@@ -231,7 +265,7 @@ static STAGE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 pub struct StagingRootCapability {
     root: PathBuf,
     handle: File,
-    identity: PhysicalIdentityV1,
+    identity: ObjectIdentityV1,
 }
 
 impl StagingRootCapability {
@@ -308,7 +342,7 @@ impl StagingRootCapability {
         if !self.handle.metadata().map_err(classify_io)?.is_dir() {
             return Err(unsafe_location());
         }
-        if identity_of(&self.handle)? != self.identity {
+        if !identity_of(&self.handle)?.same_object(self.identity) {
             return Err(unsafe_location());
         }
         create_private_directory(&namespace)?;
@@ -334,7 +368,7 @@ impl StagingRootCapability {
                 return Err(refusal);
             }
         };
-        if identity_of(&parent)? != self.identity {
+        if !identity_of(&parent)?.same_object(self.identity) {
             let _ = std::fs::remove_dir(&namespace);
             return Err(unsafe_location());
         }
@@ -401,7 +435,7 @@ impl StagedBodyV1 {
 /// failure drops it and its [`Drop`] closes every handle and removes the empty namespace.
 pub struct SourceSetStagingV1 {
     namespace: PathBuf,
-    namespace_identity: PhysicalIdentityV1,
+    namespace_identity: ObjectIdentityV1,
     shards: Vec<StageShardV1>,
     staged_bytes: u64,
     max_member_bytes: u64,
@@ -526,7 +560,7 @@ impl SourceSetStagingV1 {
     /// Confirms, by identity, that the namespace path still names this store's namespace.
     fn confirm_namespace(&self) -> Result<(), SourceReadRefusalV1> {
         let handle = open_directory(&self.namespace)?;
-        if identity_of(&handle)? != self.namespace_identity {
+        if !identity_of(&handle)?.same_object(self.namespace_identity) {
             return Err(unsafe_location());
         }
         Ok(())

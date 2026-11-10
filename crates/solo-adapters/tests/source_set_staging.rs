@@ -410,6 +410,102 @@ fn repeated_bounded_reads_return_the_same_bytes_after_sealing() {
 }
 
 #[test]
+fn replacing_the_staging_root_between_adopt_and_begin_is_refused() {
+    let fixture = Fixture::new("root-replacement");
+    let root_path = fixture.staging();
+    let capability = StagingRootCapability::adopt(&root_path).expect("adopt the staging root");
+
+    // Replace the root itself, keeping its name. The retained handle still refers to the deleted
+    // directory, so the only thing that can distinguish them is the identity comparison.
+    fs::remove_dir_all(&root_path).expect("remove the adopted root");
+    fs::create_dir_all(&root_path).expect("create a replacement root");
+
+    let refusal = match capability.begin() {
+        Ok(_) => panic!("a root replaced after adoption must be refused"),
+        Err(refusal) => refusal,
+    };
+    assert_eq!(refusal.code(), "SOURCE_UNSAFE_PATH");
+}
+
+#[test]
+fn an_unwind_during_staging_removes_only_its_own_namespace() {
+    let fixture = Fixture::new("unwind");
+    let root_path = fixture.staging();
+    fs::create_dir(root_path.join("owner-kept")).expect("create an Owner-owned sentinel");
+    let capability = StagingRootCapability::adopt(&root_path).expect("adopt the staging root");
+
+    let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let mut store = capability.begin().expect("begin a private staging store");
+        store.stage_body(b"partial member").expect("stage a member");
+        panic!("simulated abrupt failure inside the staging transaction");
+    }));
+
+    assert!(outcome.is_err(), "the transaction must have unwound");
+    assert_eq!(
+        entries(&root_path),
+        vec!["owner-kept".to_owned()],
+        "an unwound transaction must remove only the namespace it created"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn a_real_permission_denial_refuses_as_permission_denied() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let fixture = Fixture::new("permission");
+    let mut store = fixture
+        .root()
+        .begin()
+        .expect("begin a private staging store");
+    let namespaces = entries(&fixture.staging());
+    let namespace = fixture.staging().join(&namespaces[0]);
+
+    // A real denial from the host, not a classified error code: the namespace is made read-only
+    // for its owner, so creating the staging object fails with EACCES.
+    let mut permissions = fs::metadata(&namespace)
+        .expect("namespace metadata")
+        .permissions();
+    permissions.set_mode(0o500);
+    fs::set_permissions(&namespace, permissions).expect("make the namespace read-only");
+
+    let refusal = store
+        .stage_body(b"denied body")
+        .expect_err("a denied staging write must refuse");
+
+    // Restore first so the fixture can always clean up after itself, even on the failing path.
+    let mut permissions = fs::metadata(&namespace)
+        .expect("namespace metadata")
+        .permissions();
+    permissions.set_mode(0o700);
+    fs::set_permissions(&namespace, permissions).expect("restore the namespace");
+
+    assert_eq!(refusal.code(), "SOURCE_OBSERVATION_PERMISSION_DENIED");
+}
+
+#[cfg(windows)]
+#[test]
+fn a_reparse_point_staging_root_is_refused_when_the_host_permits_the_adversary() {
+    let fixture = Fixture::new("reparse");
+    let target = fixture.staging().join("real-root");
+    fs::create_dir(&target).expect("create the real directory");
+    let link = fixture.staging().join("linked-root");
+
+    match std::os::windows::fs::symlink_dir(&target, &link) {
+        Ok(()) => {
+            let refusal = StagingRootCapability::adopt(&link)
+                .expect_err("a reparse-point root must be refused");
+            assert_eq!(refusal.code(), "SOURCE_UNSAFE_PATH");
+        }
+        // Creating a reparse point needs a privilege this runner may not hold. The adversary is
+        // then genuinely unexercised here and is reported as UNVERIFIED, never as a pass.
+        Err(error) => {
+            eprintln!("reparse-point adversary unavailable on this host: {error}");
+        }
+    }
+}
+
+#[test]
 fn open_object_count_follows_staged_size_not_member_count() {
     let fixture = Fixture::new("scaling");
     let root = fixture.root();
