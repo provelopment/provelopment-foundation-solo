@@ -1,7 +1,7 @@
 # Execution Report
 
 **Order:** `SOLO-WO-048 R04` — correct R02.B protected staging integrity, confinement and transaction refusal.
-**Disposition: `COMPLETE` for the R04 technical scope, with four disclosed `UNVERIFIED` sub-cases and one open confinement limitation.** Implementation HEAD `83b351813c2fe4ff2551e707f3e9ccbe98d51296` is **fully green on both hosts** (run 155). R02.B is **not** closed and R02.C is **not** started; the Chief Architect independently decides `ACCEPT / REVISE / STOP`.
+**Disposition: `STOPPED`.** The implementation is green at `83b35181` (run 155) and Windows is green at the report HEAD, but the report-only HEAD is **red on Ubuntu** (run 156) because the Linux namespace-substitution adversary is flaky: see §5.2 and the §7 addendum. F1, F3 (except ENOSPC), F5, F6 and F7 are proven; **F2 is `UNVERIFIED` on Linux**, the Windows reparse sub-case is `UNVERIFIED`, and **F8 is `FAIL` at the report-only HEAD**. R02.B is **not** closed and R02.C is **not** started; the Chief Architect independently decides `ACCEPT / REVISE / STOP`.
 
 ## 1. Corrective redirection: the two reported CI defects
 
