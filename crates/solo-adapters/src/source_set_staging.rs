@@ -39,7 +39,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use solo_application::{SourceReadRefusalKind, SourceReadRefusalV1};
+use solo_application::{PhysicalIdentityV1, SourceReadRefusalKind, SourceReadRefusalV1};
 
 /// `FILE_SHARE_DELETE`. A literal because naming the native crate outside the approved module is
 /// forbidden; the value is the documented Windows constant and nothing else is shared.
@@ -50,37 +50,24 @@ const FILE_SHARE_DELETE_ONLY: u32 = 0x0000_0004;
 #[cfg(windows)]
 const FILE_FLAG_BACKUP_SEMANTICS: u32 = 0x0200_0000;
 
-/// A retained operating-system identity: what the handle *is*, never what a path claims.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct ObjectIdentityV1 {
-    container: u64,
-    low: u64,
-    high: u64,
-}
-
 /// Reads the retained identity of an already-open handle.
-fn identity_of(file: &File) -> Result<ObjectIdentityV1, SourceReadRefusalV1> {
+///
+/// The accepted identity type is reused deliberately: it is the same opaque device/object pair
+/// the source reader reports, so confinement and source identity share one vocabulary rather than
+/// growing a second, weaker one.
+fn identity_of(file: &File) -> Result<PhysicalIdentityV1, SourceReadRefusalV1> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::MetadataExt;
         let metadata = file.metadata().map_err(classify_io)?;
-        Ok(ObjectIdentityV1 {
-            container: metadata.dev(),
-            low: metadata.ino(),
-            high: 0,
-        })
+        // Linux reports a 64-bit inode, so the high half of the object component is zero.
+        Ok(PhysicalIdentityV1::new(metadata.dev(), metadata.ino(), 0))
     }
     #[cfg(windows)]
     {
         // The stable `MetadataExt` identity accessors are still unstable, so the audited
         // `FILE_ID_INFO` query the source reader already uses is reused through a safe wrapper.
-        let identity = crate::source_read_native::staging_handle_identity(file)
-            .map_err(|_| unsafe_location())?;
-        Ok(ObjectIdentityV1 {
-            container: identity.container(),
-            low: identity.object_low(),
-            high: identity.object_high(),
-        })
+        crate::source_read_native::staging_handle_identity(file).map_err(|_| unsafe_location())
     }
     #[cfg(not(any(unix, windows)))]
     {
@@ -239,7 +226,7 @@ static STAGE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 pub struct StagingRootCapability {
     root: PathBuf,
     handle: File,
-    identity: ObjectIdentityV1,
+    identity: PhysicalIdentityV1,
 }
 
 impl StagingRootCapability {
@@ -409,7 +396,7 @@ impl StagedBodyV1 {
 /// failure drops it and its [`Drop`] closes every handle and removes the empty namespace.
 pub struct SourceSetStagingV1 {
     namespace: PathBuf,
-    namespace_identity: ObjectIdentityV1,
+    namespace_identity: PhysicalIdentityV1,
     shards: Vec<StageShardV1>,
     staged_bytes: u64,
     max_member_bytes: u64,
