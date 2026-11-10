@@ -952,6 +952,120 @@ mod sys {
         Ok(unsafe { OwnedHandle::from_raw_handle(out) })
     }
 
+    /// Opens one relative directory component with the rights staging needs.
+    ///
+    /// Deliberately separate from the reader's opener: the reader must not gain create or delete
+    /// rights, and staging must not depend on rights the reader happens to hold.
+    /// `FILE_WRITE_DATA` and `FILE_APPEND_DATA` are the documented `FILE_ADD_FILE` and
+    /// `FILE_ADD_SUBDIRECTORY` rights on a directory, which is what makes handle-relative creation
+    /// possible at all.
+    pub(super) fn open_staging_component(
+        parent: HANDLE,
+        name: &str,
+    ) -> Result<OwnedHandle, NativeError> {
+        use windows_sys::Win32::Storage::FileSystem::{
+            DELETE, FILE_APPEND_DATA, FILE_LIST_DIRECTORY, FILE_WRITE_ATTRIBUTES, FILE_WRITE_DATA,
+        };
+
+        if name.is_empty() || name.contains('\0') || name.contains(['/', '\\']) {
+            return Err(NativeError::Unsafe);
+        }
+        let wide: Vec<u16> = name.encode_utf16().collect();
+        let Ok(byte_len) = u16::try_from(wide.len().saturating_mul(2)) else {
+            return Err(NativeError::Unsupported);
+        };
+        let unicode = UNICODE_STRING {
+            Length: byte_len,
+            MaximumLength: byte_len,
+            Buffer: wide.as_ptr().cast_mut(),
+        };
+        let mut attributes: OBJECT_ATTRIBUTES = zeroed();
+        attributes.Length = size_u32::<OBJECT_ATTRIBUTES>();
+        attributes.RootDirectory = parent;
+        attributes.ObjectName = ptr::from_ref(&unicode);
+        attributes.Attributes = OBJ_DONT_REPARSE;
+        let mut io_status: IO_STATUS_BLOCK = zeroed();
+        let mut out: HANDLE = ptr::null_mut();
+        let access = FILE_LIST_DIRECTORY
+            | FILE_WRITE_DATA
+            | FILE_APPEND_DATA
+            | FILE_READ_ATTRIBUTES
+            | FILE_WRITE_ATTRIBUTES
+            | DELETE
+            | SYNCHRONIZE;
+        let options = FILE_OPEN_REPARSE_POINT | FILE_SYNCHRONOUS_IO_NONALERT | FILE_DIRECTORY_FILE;
+
+        // SAFETY: `parent` is a live handle owned by the caller for this call; `unicode` names
+        // `wide`, a NUL-free UTF-16 buffer alive across the call whose byte length is exactly
+        // `Length`; `attributes` is initialised in full with `OBJ_DONT_REPARSE`; `io_status` and
+        // `out` are valid, aligned writable outputs; allocation size and EA are the "none" form.
+        let status = unsafe {
+            NtCreateFile(
+                ptr::from_mut(&mut out),
+                access,
+                ptr::from_ref(&attributes),
+                ptr::from_mut(&mut io_status),
+                ptr::null(),
+                0,
+                SHARE_ALL,
+                FILE_OPEN,
+                options,
+                ptr::null(),
+                0,
+            )
+        };
+        if status != STATUS_SUCCESS {
+            return Err(map_status(status));
+        }
+        if out.is_null() || out == INVALID_HANDLE_VALUE {
+            return Err(NativeError::OtherIo);
+        }
+        // SAFETY: a fresh, unowned handle from a successful `NtCreateFile`, moved exactly once
+        // into an `OwnedHandle` that becomes its only owner.
+        Ok(unsafe { OwnedHandle::from_raw_handle(out) })
+    }
+
+    /// Opens a drive root by name with the create rights staging needs.
+    ///
+    /// `C:\` is a fixed bootstrap prefix that carries no component the caller chose.
+    pub(super) fn open_staging_drive_root(letter: u8) -> Result<OwnedHandle, NativeError> {
+        use windows_sys::Win32::Storage::FileSystem::{
+            DELETE, FILE_APPEND_DATA, FILE_LIST_DIRECTORY, FILE_WRITE_ATTRIBUTES, FILE_WRITE_DATA,
+        };
+
+        let root: Vec<u16> = vec![u16::from(letter), u16::from(b':'), u16::from(b'\\'), 0];
+        let access = FILE_LIST_DIRECTORY
+            | FILE_WRITE_DATA
+            | FILE_APPEND_DATA
+            | FILE_READ_ATTRIBUTES
+            | FILE_WRITE_ATTRIBUTES
+            | DELETE
+            | SYNCHRONIZE;
+        // SAFETY: `root` is a NUL-terminated UTF-16 buffer alive for the call; the flags are the
+        // documented directory-open combination with `FILE_FLAG_OPEN_REPARSE_POINT`.
+        let raw = unsafe {
+            CreateFileW(
+                root.as_ptr(),
+                access,
+                SHARE_ALL,
+                ptr::null(),
+                OPEN_EXISTING,
+                FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT,
+                ptr::null_mut(),
+            )
+        };
+        if raw == INVALID_HANDLE_VALUE {
+            return Err(last_error());
+        }
+        // SAFETY: a fresh handle from `CreateFileW`, moved exactly once into its only owner.
+        let handle = unsafe { OwnedHandle::from_raw_handle(raw) };
+        let (_, is_dir) = handle_facts(handle.as_raw_handle())?;
+        if !is_dir {
+            return Err(NativeError::Unsafe);
+        }
+        Ok(handle)
+    }
+
     /// Opens the caller-selected staging root, one verified component at a time.
     ///
     /// Only the drive root is opened by name; every other component is opened relative to the
@@ -990,12 +1104,9 @@ mod sys {
             names.push(text);
         }
 
-        // `C:\` carries no component the caller chose, so it is the only name-resolved open.
-        let drive_root = format!("{}:\\", char::from(letter));
-        let (root, _) = adopt_root(Path::new(&drive_root))?;
-        let mut walked = root.handle;
+        let mut walked = open_staging_drive_root(letter)?;
         for name in names {
-            let child = open_relative(walked.as_raw_handle(), name, true, false)?;
+            let child = open_staging_component(walked.as_raw_handle(), name)?;
             let (_, is_dir) = handle_facts(child.as_raw_handle())?;
             if !is_dir {
                 return Err(NativeError::Unsafe);
@@ -1022,7 +1133,8 @@ mod sys {
             FILE_SYNCHRONOUS_IO_NONALERT,
         };
         use windows_sys::Win32::Storage::FileSystem::{
-            DELETE, FILE_LIST_DIRECTORY, FILE_READ_DATA, FILE_WRITE_ATTRIBUTES, FILE_WRITE_DATA,
+            DELETE, FILE_APPEND_DATA, FILE_LIST_DIRECTORY, FILE_READ_DATA, FILE_WRITE_ATTRIBUTES,
+            FILE_WRITE_DATA,
         };
 
         const STATUS_OBJECT_NAME_COLLISION: NTSTATUS = 0xC000_0035u32 as NTSTATUS;
@@ -1053,6 +1165,8 @@ mod sys {
         let (access, share, options) = if directory {
             (
                 FILE_LIST_DIRECTORY
+                    | FILE_WRITE_DATA
+                    | FILE_APPEND_DATA
                     | FILE_READ_ATTRIBUTES
                     | FILE_WRITE_ATTRIBUTES
                     | DELETE
