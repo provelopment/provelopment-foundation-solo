@@ -416,8 +416,8 @@ fn repeated_bounded_reads_return_the_same_bytes_after_sealing() {
 #[test]
 fn replacing_the_staging_root_between_adopt_and_begin_is_refused() {
     let fixture = Fixture::new("root-replacement");
+    let capability = fixture.root();
     let root_path = fixture.staging();
-    let capability = StagingRootCapability::adopt(&root_path).expect("adopt the staging root");
 
     // Replace the root itself, keeping its name. The retained handle still refers to the deleted
     // directory, so the only thing that can distinguish them is the identity comparison.
