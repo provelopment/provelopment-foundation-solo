@@ -39,6 +39,7 @@ mod source_read;
 #[cfg_attr(windows, allow(unsafe_code))]
 mod source_read_native;
 mod source_set_candidate;
+mod source_set_staging;
 
 pub use bootstrap_cli::{
     CliOutcome, CliRefusal, CliRefusalCode, EXIT_INTERNAL, EXIT_OK, EXIT_REFUSED, FLAG_BASE_URL,
@@ -61,5 +62,9 @@ pub use source_body_preflight::{
 pub use source_read::{ContentRootCapability, RootProvenanceV1, TrustedDirectoryHandle};
 pub use source_set_candidate::{
     QualifiedSourceLineageV1, SourceSetCandidateV1, SourceSetMemberV1, SourceSetRefusalV1,
-    assemble_declared_source_set_v1,
+    StagedSourceEvidenceV1, assemble_declared_source_set_v1,
+};
+pub use source_set_staging::{
+    STAGE_READ_CHUNK_BYTES, STAGE_SHARD_TARGET_BYTES, SourceSetStagingV1, StageReaderV1,
+    StagedBodyV1, StagingRootCapability,
 };

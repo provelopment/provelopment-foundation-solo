@@ -8,9 +8,10 @@
 use std::cell::RefCell;
 
 use solo_application::{
-    CandidateBodyV1, CandidateProbeV1, PhysicalIdentityV1, SourceReadOutcomeV1, SourceReadPort,
+    CandidateBodyV1, CandidateProbeV1, DeclaredSourceSetSinkV1, PhysicalIdentityV1,
+    ReadSourceCandidateV1, SetSourceEntryV1, SourceReadOutcomeV1, SourceReadPort,
     SourceReadRefusalKind, SourceReadRefusalV1, SourceReadSetOutcomeV1,
-    check_physical_reservations_v1, fingerprint_of, read_declared_source_set_v1,
+    check_physical_reservations_v1, drive_declared_source_set_v1, fingerprint_of,
     read_declared_source_v1,
 };
 use solo_domain::SourceCandidateKind::{Json, Markdown};
@@ -748,38 +749,157 @@ impl SourceReadPort for SetPort {
     }
 }
 
-fn complete(outcome: SourceReadSetOutcomeV1) -> solo_application::ReadSourceSetV1 {
+/// What one recording sink accepted, and what it observed about live body bytes.
+///
+/// The sink is the only holder the driver ever hands a body to, so these counters are observed
+/// state rather than an inference from the number of calls: `peak_in_flight_bytes` is the largest
+/// single body the driver ever had live, and `total_body_bytes` is everything it passed through.
+struct RecordedSet {
+    entries: Vec<(usize, ReadSourceCandidateV1)>,
+    peak_in_flight_bytes: usize,
+    total_body_bytes: usize,
+}
+
+impl RecordedSet {
+    fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    fn iter(&self) -> impl Iterator<Item = &(usize, ReadSourceCandidateV1)> {
+        self.entries.iter()
+    }
+
+    fn get(&self, declaration: usize) -> Option<&(usize, ReadSourceCandidateV1)> {
+        self.entries.get(declaration)
+    }
+
+    fn declaration(&self, index: usize) -> Option<usize> {
+        self.get(index).map(|(declaration, _)| *declaration)
+    }
+
+    fn source(&self, index: usize) -> Option<&ReadSourceCandidateV1> {
+        self.get(index).map(|(_, source)| source)
+    }
+}
+
+/// The sink's own typed refusal, so the driver's sink-failure route can be observed.
+#[derive(Debug, PartialEq, Eq)]
+enum SinkRefusal {
+    /// The sink refused the body for this declaration.
+    At(usize),
+    /// The sink refused to commit.
+    Finish,
+}
+
+/// A sink that keeps what it is handed and records the peak it ever held.
+struct RecordingSink {
+    accept_until: usize,
+    refuse_finish: bool,
+    recorded: RecordedSet,
+}
+
+impl RecordingSink {
+    fn new() -> Self {
+        Self {
+            accept_until: usize::MAX,
+            refuse_finish: false,
+            recorded: RecordedSet {
+                entries: Vec::new(),
+                peak_in_flight_bytes: 0,
+                total_body_bytes: 0,
+            },
+        }
+    }
+
+    fn refusing_at(accept_until: usize) -> Self {
+        Self {
+            accept_until,
+            ..Self::new()
+        }
+    }
+
+    fn refusing_finish() -> Self {
+        Self {
+            refuse_finish: true,
+            ..Self::new()
+        }
+    }
+}
+
+impl DeclaredSourceSetSinkV1 for RecordingSink {
+    type Refusal = SinkRefusal;
+    type Complete = RecordedSet;
+
+    fn stage(&mut self, entry: SetSourceEntryV1) -> Result<(), SinkRefusal> {
+        let declaration = entry.declaration();
+        if declaration >= self.accept_until {
+            return Err(SinkRefusal::At(declaration));
+        }
+        let source = entry.into_source();
+        let length = source.bytes().len();
+        self.recorded.peak_in_flight_bytes = self.recorded.peak_in_flight_bytes.max(length);
+        self.recorded.total_body_bytes += length;
+        self.recorded.entries.push((declaration, source));
+        Ok(())
+    }
+
+    fn finish(self) -> Result<RecordedSet, SinkRefusal> {
+        if self.refuse_finish {
+            return Err(SinkRefusal::Finish);
+        }
+        Ok(self.recorded)
+    }
+}
+
+fn drove(
+    fake: &SetPort,
+    declarations: &[SourceCandidateSetV1],
+) -> SourceReadSetOutcomeV1<RecordedSet, SinkRefusal> {
+    drive_declared_source_set_v1(fake, declarations, RecordingSink::new())
+}
+
+fn complete(outcome: SourceReadSetOutcomeV1<RecordedSet, SinkRefusal>) -> RecordedSet {
     match outcome {
         SourceReadSetOutcomeV1::Complete(set) => set,
-        SourceReadSetOutcomeV1::Refused(refusal) => {
+        SourceReadSetOutcomeV1::ReadRefused(refusal) => {
             panic!("expected a complete set, got refusal {refusal}")
+        }
+        SourceReadSetOutcomeV1::SinkRefused(refusal) => {
+            panic!("expected a complete set, got sink refusal {refusal:?}")
         }
     }
 }
 
 fn refused_set(
-    outcome: SourceReadSetOutcomeV1,
+    outcome: SourceReadSetOutcomeV1<RecordedSet, SinkRefusal>,
 ) -> (SourceReadRefusalKind, &'static str, Option<usize>) {
     match outcome {
-        SourceReadSetOutcomeV1::Refused(refusal) => {
+        SourceReadSetOutcomeV1::ReadRefused(refusal) => {
             (refusal.kind(), refusal.code(), refusal.declaration())
         }
         SourceReadSetOutcomeV1::Complete(set) => {
-            panic!("expected a refusal, got {} assembled bodies", set.len())
+            panic!("expected a refusal, got {} accepted bodies", set.len())
+        }
+        SourceReadSetOutcomeV1::SinkRefused(refusal) => {
+            panic!("expected a read refusal, got sink refusal {refusal:?}")
         }
     }
 }
 
-/// The probe and body a healthy JSON leaf answers with.
-fn json_reply(value: u64) -> Reply {
-    let length = u64::try_from(JSON_BODY.len()).expect("a short fixture body");
-    (located(value, length), present(JSON_BODY, value))
-}
-
-/// The probe and body a healthy Markdown leaf answers with.
-fn markdown_reply(value: u64) -> Reply {
-    let length = u64::try_from(MARKDOWN_BODY.len()).expect("a short fixture body");
-    (located(value, length), present(MARKDOWN_BODY, value))
+fn sink_refused(outcome: SourceReadSetOutcomeV1<RecordedSet, SinkRefusal>) -> SinkRefusal {
+    match outcome {
+        SourceReadSetOutcomeV1::SinkRefused(refusal) => refusal,
+        SourceReadSetOutcomeV1::ReadRefused(refusal) => {
+            panic!("expected a sink refusal, got read refusal {refusal}")
+        }
+        SourceReadSetOutcomeV1::Complete(set) => {
+            panic!("expected a sink refusal, got {} accepted bodies", set.len())
+        }
+    }
 }
 
 #[test]
@@ -794,21 +914,31 @@ fn every_declared_representation_is_read_in_declaration_order() {
         declaration(Some("pages/c.id-id.json"), None),
     ];
 
-    let set = complete(read_declared_source_set_v1(&fake, &declarations));
+    let set = complete(drove(&fake, &declarations));
 
     assert_eq!(set.len(), 3);
     assert!(!set.is_empty());
-    for (index, entry) in set.iter().enumerate() {
-        assert_eq!(entry.declaration(), index);
-        assert_eq!(entry.source().bytes(), JSON_BODY);
-        assert_eq!(entry.source().fingerprint(), fingerprint_of(JSON_BODY));
+    for index in 0..3 {
+        assert_eq!(set.declaration(index), Some(index));
+        let source = set.source(index).expect("a recorded source");
+        assert_eq!(source.bytes(), JSON_BODY);
+        assert_eq!(source.fingerprint(), fingerprint_of(JSON_BODY));
         assert_eq!(
-            entry.source().identity(),
+            source.identity(),
             identity(u64::try_from(index).expect("a small index") + 11)
         );
-        assert_eq!(set.get(index).map(|held| held.declaration()), Some(index));
     }
     assert!(set.get(3).is_none());
+
+    // The driver kept no collection of bodies: the largest single body it ever had live is one
+    // body, while six times that many bytes passed through the sink.
+    let single = JSON_BODY.len();
+    assert_eq!(set.peak_in_flight_bytes, single);
+    assert_eq!(set.total_body_bytes, 3 * single);
+    assert!(
+        set.total_body_bytes > 2 * set.peak_in_flight_bytes,
+        "cumulative bytes must exceed the live bound"
+    );
 
     // One reservation probe for every declared candidate, then exactly one probe/read pair per
     // declaration, in declared order.
@@ -832,7 +962,7 @@ fn every_declared_representation_is_read_in_declaration_order() {
 fn an_empty_declaration_list_is_refused_rather_than_returned_empty() {
     let fake = SetPort::new();
 
-    let (kind, code, declaration) = refused_set(read_declared_source_set_v1(&fake, &[]));
+    let (kind, code, declaration) = refused_set(drove(&fake, &[]));
 
     assert_eq!(kind, SourceReadRefusalKind::NoneEffective);
     assert_eq!(code, "SOURCE_NONE_EFFECTIVE");
@@ -863,7 +993,7 @@ fn one_refused_declaration_refuses_the_whole_set_and_the_next_one_is_never_read(
         declaration(Some("pages/c.id-id.json"), None),
     ];
 
-    let (kind, code, declaration) = refused_set(read_declared_source_set_v1(&fake, &declarations));
+    let (kind, code, declaration) = refused_set(drove(&fake, &declarations));
 
     assert_eq!(kind, SourceReadRefusalKind::PermissionDenied);
     assert_eq!(code, "SOURCE_OBSERVATION_PERMISSION_DENIED");
@@ -889,7 +1019,7 @@ fn a_cross_representation_identity_collision_is_refused_before_any_body_is_read(
         declaration(Some("pages/b.de-de.json"), None),
     ];
 
-    let (kind, code, declaration) = refused_set(read_declared_source_set_v1(&fake, &declarations));
+    let (kind, code, declaration) = refused_set(drove(&fake, &declarations));
 
     assert_eq!(kind, SourceReadRefusalKind::IdentityCollision);
     assert_eq!(code, "SOURCE_COLLISION");
@@ -898,6 +1028,18 @@ fn a_cross_representation_identity_collision_is_refused_before_any_body_is_read(
         !fake.calls().iter().any(|call| call.starts_with("read:")),
         "a reserved collision must be refused before any body is read"
     );
+}
+
+/// The probe and body a healthy JSON leaf answers with.
+fn json_reply(value: u64) -> Reply {
+    let length = u64::try_from(JSON_BODY.len()).expect("a short fixture body");
+    (located(value, length), present(JSON_BODY, value))
+}
+
+/// The probe and body a healthy Markdown leaf answers with.
+fn markdown_reply(value: u64) -> Reply {
+    let length = u64::try_from(MARKDOWN_BODY.len()).expect("a short fixture body");
+    (located(value, length), present(MARKDOWN_BODY, value))
 }
 
 #[test]
@@ -911,16 +1053,15 @@ fn a_present_json_body_is_chosen_and_its_declared_markdown_is_never_read() {
         declaration(Some("pages/b.de-de.json"), None),
     ];
 
-    let set = complete(read_declared_source_set_v1(&fake, &declarations));
+    let set = complete(drove(&fake, &declarations));
 
     assert_eq!(set.len(), 2);
     assert_eq!(
-        set.get(0).map(|entry| entry.source().member()),
+        set.source(0).map(|source| source.member()),
         Some(SourceCandidateKind::Json)
     );
     assert_eq!(
-        set.get(0)
-            .map(|entry| entry.source().logical_path().to_owned()),
+        set.source(0).map(|source| source.logical_path().to_owned()),
         Some("pages/a.en-001.json".to_owned())
     );
     assert!(
@@ -942,18 +1083,18 @@ fn a_confirmed_json_absence_selects_markdown_in_that_declaration_only() {
         declaration(Some("pages/b.de-de.json"), None),
     ];
 
-    let set = complete(read_declared_source_set_v1(&fake, &declarations));
+    let set = complete(drove(&fake, &declarations));
 
     assert_eq!(
-        set.get(0).map(|entry| entry.source().member()),
+        set.source(0).map(|source| source.member()),
         Some(SourceCandidateKind::Markdown)
     );
     assert_eq!(
-        set.get(0).map(|entry| entry.source().bytes()),
-        Some(MARKDOWN_BODY)
+        set.source(0).map(|source| source.bytes().to_vec()),
+        Some(MARKDOWN_BODY.to_vec())
     );
     assert_eq!(
-        set.get(1).map(|entry| entry.source().member()),
+        set.source(1).map(|source| source.member()),
         Some(SourceCandidateKind::Json)
     );
 }
@@ -976,7 +1117,7 @@ fn an_unselected_hardlinked_markdown_refuses_the_whole_set_before_any_body_is_re
         Some("pages/a.en-001.md"),
     )];
 
-    let (kind, code, declaration) = refused_set(read_declared_source_set_v1(&fake, &declarations));
+    let (kind, code, declaration) = refused_set(drove(&fake, &declarations));
 
     assert_eq!(kind, SourceReadRefusalKind::IdentityCollision);
     assert_eq!(code, "SOURCE_COLLISION");
@@ -1007,7 +1148,7 @@ fn a_change_observed_in_the_second_declaration_refuses_the_whole_set() {
         declaration(Some("pages/b.de-de.json"), None),
     ];
 
-    let (kind, code, declaration) = refused_set(read_declared_source_set_v1(&fake, &declarations));
+    let (kind, code, declaration) = refused_set(drove(&fake, &declarations));
 
     assert_eq!(kind, SourceReadRefusalKind::ChangedDuringRead);
     assert_eq!(code, "SNAPSHOT_CHANGED");
@@ -1024,13 +1165,12 @@ fn no_complete_set_can_claim_publication_or_snapshot_authority() {
         declaration(Some("pages/b.de-de.json"), None),
     ];
 
-    let set = complete(read_declared_source_set_v1(&fake, &declarations));
+    let set = complete(drove(&fake, &declarations));
 
-    assert!(!set.is_publication_authorized());
-    assert!(!set.is_verified_filesystem_snapshot());
-    for entry in set.iter() {
-        assert!(!entry.source().is_publication_authorized());
-        assert!(!entry.source().is_verified_filesystem_snapshot());
+    assert!(!set.is_empty());
+    for (_, source) in set.iter() {
+        assert!(!source.is_publication_authorized());
+        assert!(!source.is_verified_filesystem_snapshot());
     }
 }
 
@@ -1042,8 +1182,8 @@ fn a_set_refusal_diagnostic_names_only_a_declaration() {
         declaration(Some("pages/b.de-de.json"), None),
     ];
 
-    let outcome = read_declared_source_set_v1(&fake, &declarations);
-    let SourceReadSetOutcomeV1::Refused(refusal) = outcome else {
+    let outcome = drove(&fake, &declarations);
+    let SourceReadSetOutcomeV1::ReadRefused(refusal) = outcome else {
         panic!("an absent second declaration must be refused");
     };
 
@@ -1054,4 +1194,74 @@ fn a_set_refusal_diagnostic_names_only_a_declaration() {
     let rendered = format!("{refusal}");
     assert!(rendered.contains("declaration 1"), "{rendered}");
     assert!(!rendered.contains("pages/"), "{rendered}");
+}
+
+#[test]
+fn the_driver_never_holds_more_than_one_body_while_many_pass_through() {
+    let mut fake = SetPort::new();
+    let mut declarations = Vec::new();
+    for index in 0..6_u64 {
+        let locator = format!("pages/p{index}.en-001.json");
+        fake = fake.with(Json, locator.as_str(), json_reply(100 + index));
+        declarations.push(declaration(Some(locator.as_str()), None));
+    }
+
+    let set = complete(drove(&fake, &declarations));
+
+    assert_eq!(set.len(), 6);
+    // Observed, not inferred: six bodies were accepted, but the largest single body live at any
+    // moment stayed at one body's length while the cumulative total was six times that.
+    let single = JSON_BODY.len();
+    assert_eq!(set.peak_in_flight_bytes, single);
+    assert_eq!(set.total_body_bytes, 6 * single);
+    assert!(
+        set.total_body_bytes > 5 * set.peak_in_flight_bytes,
+        "cumulative body bytes must far exceed the live bound"
+    );
+    for index in 0..6 {
+        assert_eq!(
+            set.source(index).map(|source| source.bytes()),
+            Some(JSON_BODY)
+        );
+    }
+}
+
+#[test]
+fn a_refusing_sink_ends_the_attempt_and_no_later_declaration_is_read() {
+    let fake = SetPort::new()
+        .with(Json, "pages/a.en-001.json", json_reply(91))
+        .with(Json, "pages/b.de-de.json", json_reply(92))
+        .with(Json, "pages/c.id-id.json", json_reply(93));
+    let declarations = vec![
+        declaration(Some("pages/a.en-001.json"), None),
+        declaration(Some("pages/b.de-de.json"), None),
+        declaration(Some("pages/c.id-id.json"), None),
+    ];
+
+    let outcome = drive_declared_source_set_v1(&fake, &declarations, RecordingSink::refusing_at(1));
+
+    assert_eq!(sink_refused(outcome), SinkRefusal::At(1));
+    assert!(
+        !fake
+            .calls()
+            .iter()
+            .any(|call| call == "read:json:pages/c.id-id.json"),
+        "a sink refusal must stop the driver before the next declaration is read"
+    );
+}
+
+#[test]
+fn a_sink_that_refuses_to_commit_returns_no_completed_set() {
+    let fake = SetPort::new()
+        .with(Json, "pages/a.en-001.json", json_reply(101))
+        .with(Json, "pages/b.de-de.json", json_reply(102));
+    let declarations = vec![
+        declaration(Some("pages/a.en-001.json"), None),
+        declaration(Some("pages/b.de-de.json"), None),
+    ];
+
+    let outcome =
+        drive_declared_source_set_v1(&fake, &declarations, RecordingSink::refusing_finish());
+
+    assert_eq!(sink_refused(outcome), SinkRefusal::Finish);
 }

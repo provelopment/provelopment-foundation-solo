@@ -822,81 +822,57 @@ impl fmt::Display for SourceReadSetRefusalV1 {
 
 impl std::error::Error for SourceReadSetRefusalV1 {}
 
-/// The outcome of reading every declared representation.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum SourceReadSetOutcomeV1 {
-    /// Every declared representation was read, in declared order.
-    Complete(ReadSourceSetV1),
-    /// Nothing is returned, for the stated safe reason.
-    Refused(SourceReadSetRefusalV1),
-}
+/// The outcome of driving every declared representation through one sink.
 ///
-/// There is no constructor, accessor or conversion that builds one of these from a partial
-/// attempt, so a caller cannot mistake a returned subset for the declared set: a value of this
-/// type only exists once **every** declaration was read. Holding one still proves nothing about
-/// publication, and nothing about a filesystem-wide or multi-file snapshot; the two constants
-/// below state both limits in a form no caller can mistake.
+/// The outcome names **who** refused. A read refusal uses the accepted per-representation
+/// vocabulary; a sink refusal is whatever the caller's own staging transaction reports, so the
+/// application layer never has to know what a sink is made of.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ReadSourceSetV1 {
-    entries: Vec<SetSourceEntryV1>,
+pub enum SourceReadSetOutcomeV1<C, R> {
+    /// Every declared representation was read, handed to the sink and accepted, in declared
+    /// order.
+    Complete(C),
+    /// A declaration was refused before, during or after its own read.
+    ReadRefused(SourceReadSetRefusalV1),
+    /// The sink refused the body it was handed, or refused to commit.
+    SinkRefused(R),
 }
 
-impl ReadSourceSetV1 {
-    /// How many declared representations the set holds.
-    #[must_use]
-    pub fn len(&self) -> usize {
-        self.entries.len()
-    }
+/// The sink that receives **one** chosen body at a time.
+///
+/// This trait is the bounded replacement for an all-body accumulator. The driver owns no body:
+/// it reads exactly one declaration, moves that one [`ReadSourceCandidateV1`] into
+/// [`Self::stage`] and waits for that call to return before it reads the next declaration.
+///
+/// An implementation that retained every entry, or that exposed a partial set as an accepted
+/// value, would defeat the purpose, so [`Self::finish`] is reachable only after every
+/// declaration was staged and is the only way to obtain [`Self::Complete`].
+pub trait DeclaredSourceSetSinkV1 {
+    /// The typed refusal this sink reports.
+    type Refusal;
+    /// What the sink produces once every declaration was staged.
+    type Complete;
 
-    /// Whether the set holds no representation at all.
+    /// Takes the one body that belongs to `entry`.
     ///
-    /// A complete set never is empty: an empty declaration list is refused rather than
-    /// returned as a successful empty set.
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.entries.is_empty()
-    }
-
-    /// The entries, in declared order.
-    #[must_use]
-    pub fn entries(&self) -> &[SetSourceEntryV1] {
-        &self.entries
-    }
-
-    /// The entry for one declaration, when the set holds it.
-    #[must_use]
-    pub fn get(&self, declaration: usize) -> Option<&SetSourceEntryV1> {
-        self.entries.get(declaration)
-    }
-
-    /// The entries, in declared order.
-    pub fn iter(&self) -> impl Iterator<Item = &SetSourceEntryV1> {
-        self.entries.iter()
-    }
-
-    /// Whether this set may be published. It never may.
-    #[must_use]
-    pub const fn is_publication_authorized(&self) -> bool {
-        SOURCE_READ_GRANTS_PUBLICATION_AUTHORITY
-    }
-
-    /// Whether this set is a verified filesystem-wide snapshot. It never is.
-    #[must_use]
-    pub const fn is_verified_filesystem_snapshot(&self) -> bool {
-        SOURCE_READ_PROVES_GLOBAL_SNAPSHOT
-    }
-
-    /// Takes the entries out of the set, in declared order.
+    /// The entry is moved in, so the sink owns the only copy of those bytes and the driver keeps
+    /// none. Returning `Ok` means the sink has taken what it needs and no longer holds `entry`.
     ///
-    /// Consuming the set is what lets a caller assemble its own owned result without copying the
-    /// bodies a second time.
-    #[must_use]
-    pub fn into_entries(self) -> Vec<SetSourceEntryV1> {
-        self.entries
-    }
+    /// # Errors
+    ///
+    /// Returns the sink's own typed refusal. The attempt ends there: the driver reads no further
+    /// declaration, and the sink must already have released everything it staged.
+    fn stage(&mut self, entry: SetSourceEntryV1) -> Result<(), Self::Refusal>;
+
+    /// Commits the staged set, or refuses.
+    ///
+    /// # Errors
+    ///
+    /// Returns the sink's own typed refusal. No partial result is returned.
+    fn finish(self) -> Result<Self::Complete, Self::Refusal>;
 }
 
-/// Reads **every** declared representation as one all-or-refused set.
+/// Drives **every** declared representation through `sink`, one body at a time.
 ///
 /// The order here is the point of doing this in the application layer rather than in a loop at
 /// the call site:
@@ -907,20 +883,32 @@ impl ReadSourceSetV1 {
 ///    candidate of **every** representation, including a Markdown locator that will never be
 ///    read, before a single body is opened;
 /// 3. each declaration is then read with [`read_declared_source_v1`], so the accepted
-///    JSON-first rule and every per-file guarantee apply unchanged to each representation;
-/// 4. the first refusal ends the attempt. Entries collected so far are dropped, so no partial
-///    candidate is ever observable and a valid subset can never be mistaken for the set.
+///    JSON-first rule and every per-file guarantee apply unchanged to each representation, and
+///    the chosen body is moved straight into the sink and released there before the next
+///    declaration is read;
+/// 4. the first refusal ends the attempt. The driver holds no body of its own, so nothing can be
+///    observed as a partial set: only [`DeclaredSourceSetSinkV1::finish`] can produce a
+///    completed value.
+///
+/// **Bounded live body bytes.** The driver keeps no collection of bodies at all. At most one
+/// [`ReadSourceCandidateV1`] is alive at any moment, bounded by the accepted single-body limit,
+/// and its bookkeeping is O(declarations) metadata. Peak retained body bytes are therefore
+/// independent of how many representations the manifest declares and of their cumulative size.
 ///
 /// What this does **not** establish is a simultaneous cross-file snapshot: every body is read
 /// under its own guarantee, and a writer may still change one source after its own read. It
 /// grants no publication authority either.
-#[must_use]
-pub fn read_declared_source_set_v1<P: SourceReadPort + ?Sized>(
+pub fn drive_declared_source_set_v1<P, S>(
     port: &P,
     declarations: &[SourceCandidateSetV1],
-) -> SourceReadSetOutcomeV1 {
+    mut sink: S,
+) -> SourceReadSetOutcomeV1<S::Complete, S::Refusal>
+where
+    P: SourceReadPort + ?Sized,
+    S: DeclaredSourceSetSinkV1,
+{
     if declarations.is_empty() {
-        return SourceReadSetOutcomeV1::Refused(SourceReadSetRefusalV1::new(
+        return SourceReadSetOutcomeV1::ReadRefused(SourceReadSetRefusalV1::new(
             SourceReadRefusalV1::new(SourceReadRefusalKind::NoneEffective, None),
             None,
         ));
@@ -930,20 +918,23 @@ pub fn read_declared_source_set_v1<P: SourceReadPort + ?Sized>(
     // collision between two representations, or an alias inside one, refuses the entire set
     // and nothing is read.
     if let Err(refusal) = check_physical_reservations_v1(port, declarations) {
-        return SourceReadSetOutcomeV1::Refused(SourceReadSetRefusalV1::new(refusal, None));
+        return SourceReadSetOutcomeV1::ReadRefused(SourceReadSetRefusalV1::new(refusal, None));
     }
 
-    let mut entries = Vec::with_capacity(declarations.len());
     for (declaration, candidates) in declarations.iter().enumerate() {
         match read_declared_source_v1(port, candidates) {
             SourceReadOutcomeV1::Chosen(source) => {
-                entries.push(SetSourceEntryV1 {
+                // The only body in flight in this iteration. Moving it into the sink ends this
+                // scope's ownership of those bytes, so the next read cannot overlap with them.
+                if let Err(refusal) = sink.stage(SetSourceEntryV1 {
                     declaration,
                     source,
-                });
+                }) {
+                    return SourceReadSetOutcomeV1::SinkRefused(refusal);
+                }
             }
             SourceReadOutcomeV1::Refused(refusal) => {
-                return SourceReadSetOutcomeV1::Refused(SourceReadSetRefusalV1::new(
+                return SourceReadSetOutcomeV1::ReadRefused(SourceReadSetRefusalV1::new(
                     refusal,
                     Some(declaration),
                 ));
@@ -951,5 +942,8 @@ pub fn read_declared_source_set_v1<P: SourceReadPort + ?Sized>(
         }
     }
 
-    SourceReadSetOutcomeV1::Complete(ReadSourceSetV1 { entries })
+    match sink.finish() {
+        Ok(complete) => SourceReadSetOutcomeV1::Complete(complete),
+        Err(refusal) => SourceReadSetOutcomeV1::SinkRefused(refusal),
+    }
 }

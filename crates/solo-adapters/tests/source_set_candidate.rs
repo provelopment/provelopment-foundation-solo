@@ -15,7 +15,8 @@ use std::fs;
 use std::path::PathBuf;
 
 use solo_adapters::{
-    ContentRootCapability, RootProvenanceV1, SourceSetRefusalV1, assemble_declared_source_set_v1,
+    ContentRootCapability, RootProvenanceV1, SourceSetRefusalV1, StagingRootCapability,
+    assemble_declared_source_set_v1,
 };
 use solo_application::fingerprint_of;
 use solo_domain::SourceCandidateKind;
@@ -96,7 +97,17 @@ impl Scratch {
     /// Creates the child tree beneath a base this value already owns.
     fn layout(&self) {
         fs::create_dir(self.base.join("content")).expect("create the fixture content directory");
+        fs::create_dir(self.base.join("staging")).expect("create the fixture staging directory");
         fs::create_dir(self.content().join("pages")).expect("create the fixture pages directory");
+    }
+
+    /// The explicit, task-owned staging root this fixture supplies to the stage.
+    ///
+    /// It is never discovered, never a system temp location and never shared: the stage is only
+    /// ever given a directory this guard created and will remove.
+    fn staging_root(&self) -> StagingRootCapability {
+        StagingRootCapability::adopt(&self.base.join("staging"))
+            .expect("adopt the fixture staging root")
     }
 
     fn content(&self) -> PathBuf {
@@ -223,8 +234,12 @@ fn every_declared_representation_is_assembled_with_its_lineage() {
     scratch.write("pages/home.id-id.json", &json_body("Beranda"));
     let capability = scratch.capability();
 
-    let candidate = assemble_declared_source_set_v1(THREE_LOCALES.as_bytes(), &capability)
-        .expect("every declared representation is present and valid");
+    let candidate = assemble_declared_source_set_v1(
+        THREE_LOCALES.as_bytes(),
+        &capability,
+        &scratch.staging_root(),
+    )
+    .expect("every declared representation is present and valid");
 
     assert_eq!(candidate.entity(), "acme");
     assert_eq!(candidate.len(), 3);
@@ -244,9 +259,17 @@ fn every_declared_representation_is_assembled_with_its_lineage() {
         assert_eq!(member.lineage().locale(), *locale);
         assert_eq!(member.member(), SourceCandidateKind::Json);
         assert_eq!(member.logical_path(), *path);
-        assert_eq!(member.bytes(), body.as_slice());
-        assert_eq!(member.fingerprint(), fingerprint_of(member.bytes()));
-        assert_eq!(member.body().kind(), SourceCandidateKind::Json);
+        let staged = candidate
+            .member_bytes(index)
+            .expect("the staged body is readable")
+            .expect("the candidate holds this member");
+        assert_eq!(staged.as_slice(), body.as_slice());
+        assert_eq!(
+            member.byte_length(),
+            u64::try_from(body.len()).expect("a short fixture body")
+        );
+        assert_eq!(member.fingerprint(), fingerprint_of(&staged));
+        assert_eq!(member.member(), SourceCandidateKind::Json);
         assert!(!member.is_publication_authorized());
         assert!(!member.is_verified_filesystem_snapshot());
     }
@@ -270,8 +293,9 @@ fn an_expanded_manifest_assembles_every_representation_exactly_once_in_order() {
     }
     let capability = scratch.capability();
 
-    let candidate = assemble_declared_source_set_v1(EXPANDED.as_bytes(), &capability)
-        .expect("an expanded single-Entity manifest assembles completely");
+    let candidate =
+        assemble_declared_source_set_v1(EXPANDED.as_bytes(), &capability, &scratch.staging_root())
+            .expect("an expanded single-Entity manifest assembles completely");
     assert_eq!(candidate.len(), bodies.len());
 
     // Declared order, one member per declaration, with the qualified lineage that keeps the three
@@ -338,8 +362,9 @@ fn an_expanded_manifest_assembles_every_representation_exactly_once_in_order() {
     assert_eq!(paths, declared);
 
     // Assembling the same inputs again yields the same order and count.
-    let again = assemble_declared_source_set_v1(EXPANDED.as_bytes(), &capability)
-        .expect("a second attempt over unchanged sources must also complete");
+    let again =
+        assemble_declared_source_set_v1(EXPANDED.as_bytes(), &capability, &scratch.staging_root())
+            .expect("a second attempt over unchanged sources must also complete");
     assert_eq!(again.len(), candidate.len());
     let again_paths: Vec<&str> = again.iter().map(|member| member.logical_path()).collect();
     assert_eq!(again_paths, declared);
@@ -356,14 +381,19 @@ fn a_declared_json_body_wins_and_an_invalid_unselected_markdown_is_never_read() 
 
     let manifest =
         one_page(r#"{ "json": "pages/home.en-001.json", "markdown": "pages/home.en-001.md" }"#);
-    let candidate = assemble_declared_source_set_v1(manifest.as_bytes(), &capability)
-        .expect("a present JSON body is chosen and the Markdown body is never read");
+    let candidate =
+        assemble_declared_source_set_v1(manifest.as_bytes(), &capability, &scratch.staging_root())
+            .expect("a present JSON body is chosen and the Markdown body is never read");
 
     assert_eq!(candidate.len(), 1);
     let member = candidate.get(0).expect("the single declaration");
     assert_eq!(member.member(), SourceCandidateKind::Json);
     assert_eq!(member.logical_path(), "pages/home.en-001.json");
-    assert_eq!(member.bytes(), json_body("Home").as_slice());
+    let staged = candidate
+        .member_bytes(0)
+        .expect("the staged body is readable")
+        .expect("the candidate holds the member");
+    assert_eq!(staged.as_slice(), json_body("Home").as_slice());
 }
 
 #[test]
@@ -374,13 +404,18 @@ fn markdown_is_selected_only_when_the_declared_json_is_confirmed_absent() {
 
     let manifest =
         one_page(r#"{ "json": "pages/home.en-001.json", "markdown": "pages/home.en-001.md" }"#);
-    let candidate = assemble_declared_source_set_v1(manifest.as_bytes(), &capability)
-        .expect("confirmed JSON absence permits the declared Markdown body");
+    let candidate =
+        assemble_declared_source_set_v1(manifest.as_bytes(), &capability, &scratch.staging_root())
+            .expect("confirmed JSON absence permits the declared Markdown body");
 
     let member = candidate.get(0).expect("the single declaration");
     assert_eq!(member.member(), SourceCandidateKind::Markdown);
     assert_eq!(member.logical_path(), "pages/home.en-001.md");
-    assert_eq!(member.bytes(), markdown_body("Home").as_slice());
+    let staged = candidate
+        .member_bytes(0)
+        .expect("the staged body is readable")
+        .expect("the candidate holds the member");
+    assert_eq!(staged.as_slice(), markdown_body("Home").as_slice());
 }
 
 #[test]
@@ -395,8 +430,9 @@ fn a_present_but_invalid_json_body_is_refused_with_no_markdown_fallback() {
 
     let manifest =
         one_page(r#"{ "json": "pages/home.en-001.json", "markdown": "pages/home.en-001.md" }"#);
-    let refusal = assemble_declared_source_set_v1(manifest.as_bytes(), &capability)
-        .expect_err("an invalid present JSON body must be refused, never replaced by Markdown");
+    let refusal =
+        assemble_declared_source_set_v1(manifest.as_bytes(), &capability, &scratch.staging_root())
+            .expect_err("an invalid present JSON body must be refused, never replaced by Markdown");
 
     assert!(
         matches!(refusal, SourceSetRefusalV1::Body { declaration: 0, .. }),
@@ -415,8 +451,12 @@ fn one_invalid_representation_refuses_the_whole_set() {
     scratch.write("pages/home.id-id.json", &json_body("Beranda"));
     let capability = scratch.capability();
 
-    let refusal = assemble_declared_source_set_v1(THREE_LOCALES.as_bytes(), &capability)
-        .expect_err("one invalid representation must refuse the entire set");
+    let refusal = assemble_declared_source_set_v1(
+        THREE_LOCALES.as_bytes(),
+        &capability,
+        &scratch.staging_root(),
+    )
+    .expect_err("one invalid representation must refuse the entire set");
 
     assert!(
         matches!(refusal, SourceSetRefusalV1::Body { declaration: 1, .. }),
@@ -435,8 +475,12 @@ fn two_declarations_hardlinked_to_one_object_are_refused_before_any_body_is_read
     scratch.write("pages/home.id-id.json", &json_body("Beranda"));
     let capability = scratch.capability();
 
-    let refusal = assemble_declared_source_set_v1(THREE_LOCALES.as_bytes(), &capability)
-        .expect_err("two representations sharing one physical object must be refused");
+    let refusal = assemble_declared_source_set_v1(
+        THREE_LOCALES.as_bytes(),
+        &capability,
+        &scratch.staging_root(),
+    )
+    .expect_err("two representations sharing one physical object must be refused");
 
     assert!(
         matches!(
@@ -459,8 +503,9 @@ fn an_undeclared_body_is_never_searched_selected_or_included() {
     let capability = scratch.capability();
 
     let manifest = one_page(r#"{ "json": "pages/home.en-001.json" }"#);
-    let candidate = assemble_declared_source_set_v1(manifest.as_bytes(), &capability)
-        .expect("the declared representation assembles");
+    let candidate =
+        assemble_declared_source_set_v1(manifest.as_bytes(), &capability, &scratch.staging_root())
+            .expect("the declared representation assembles");
 
     assert_eq!(candidate.len(), 1);
     assert_eq!(
@@ -483,21 +528,108 @@ fn owned_bytes_and_identity_survive_a_change_to_the_source_after_assembly() {
     let capability = scratch.capability();
 
     let manifest = one_page(r#"{ "json": "pages/home.en-001.json" }"#);
-    let candidate = assemble_declared_source_set_v1(manifest.as_bytes(), &capability)
-        .expect("the declared representation assembles");
+    let candidate =
+        assemble_declared_source_set_v1(manifest.as_bytes(), &capability, &scratch.staging_root())
+            .expect("the declared representation assembles");
     let member = candidate.get(0).expect("the single declaration");
-    let before_bytes = member.bytes().to_vec();
+    let before_bytes = candidate
+        .member_bytes(0)
+        .expect("the staged body is readable")
+        .expect("the candidate holds the member");
     let before_identity = member.identity();
     let before_fingerprint = member.fingerprint();
 
-    // Replace the authored source after assembly. The candidate owns its bytes, so neither the
-    // body nor the identity it reported can change underneath the caller.
+    // Replace the authored source after assembly. The candidate owns its staged bytes, so neither
+    // the body nor the identity it reported can change underneath the caller.
     scratch.write("pages/home.en-001.json", &json_body("Replaced"));
 
-    assert_eq!(member.bytes(), before_bytes.as_slice());
+    let after_bytes = candidate
+        .member_bytes(0)
+        .expect("the staged body is still readable")
+        .expect("the candidate still holds the member");
+    assert_eq!(after_bytes, before_bytes);
     assert_eq!(member.identity(), before_identity);
     assert_eq!(member.fingerprint(), before_fingerprint);
-    assert_eq!(member.fingerprint(), fingerprint_of(member.bytes()));
+    assert_eq!(member.fingerprint(), fingerprint_of(&after_bytes));
+}
+
+/// A manifest of `pages` Pages, each declaring one `en-001` Markdown representation.
+fn many_markdown_pages(pages: usize) -> String {
+    let mut rendered = String::from(
+        r#"{ "schemaVersion": "1.0.0", "propertyRegistryVersion": "1.0.0", "platformAssetLibraryVersion": "1.0.0",
+             "base": { "canonical": "https://example.test" },
+             "entity": { "id": "acme", "label": "Acme", "facets": [
+               { "id": "main", "label": "Main", "sites": [
+                 { "id": "main", "label": "Main site", "defaultLocale": "en-001", "pages": ["#,
+    );
+    for index in 0..pages {
+        if index > 0 {
+            rendered.push(',');
+        }
+        rendered.push_str(&format!(
+            r#"{{ "id": "p{index}", "label": "P{index}", "representations": [
+                 {{ "locale": "en-001", "route": {{ "path": "/p{index}/" }}, "sourceCandidates": {{ "markdown": "pages/p{index}.en-001.md" }} }} ] }}"#
+        ));
+    }
+    rendered.push_str("] } ] } ] } }");
+    rendered
+}
+
+#[test]
+fn cumulative_staged_bytes_exceed_the_live_body_bound() {
+    let scratch = Scratch::new("bounded-memory");
+    let pages = 8_usize;
+    let body_len = 300_000_usize;
+    for index in 0..pages {
+        let mut body = format!("# Page {index}\n\n").into_bytes();
+        body.extend(std::iter::repeat_n(b'y', body_len - body.len()));
+        scratch.write(&format!("pages/p{index}.en-001.md"), &body);
+    }
+    let capability = scratch.capability();
+    let manifest = many_markdown_pages(pages);
+
+    let candidate =
+        assemble_declared_source_set_v1(manifest.as_bytes(), &capability, &scratch.staging_root())
+            .expect("every declared representation is present and valid");
+
+    let cumulative = u64::try_from(pages * body_len).expect("a small fixture total");
+    assert_eq!(candidate.len(), pages);
+    // The interesting property: everything was accepted, the cumulative content is larger than
+    // the accepted single-body bound, and yet the candidate retains no body bytes at all.
+    assert!(
+        cumulative > u64::try_from(2 * 1024 * 1024).expect("2 MiB"),
+        "the fixture must exceed the accepted single-body bound"
+    );
+    assert_eq!(candidate.retained_body_bytes(), 0);
+    assert_eq!(candidate.staged_bytes(), cumulative);
+    assert_eq!(
+        candidate.max_staged_body_bytes(),
+        u64::try_from(body_len).expect("a small fixture body")
+    );
+    assert!(
+        candidate.max_live_body_bytes()
+            <= u64::try_from(2 * 2 * 1024 * 1024).expect("twice the JSON bound"),
+        "peak live body bytes must stay inside twice the accepted single-body bound"
+    );
+    // One nameless object holds every member, and nothing in the namespace is visible.
+    assert_eq!(candidate.staged_object_count(), 1);
+    assert_eq!(candidate.visible_staging_entries().expect("list"), 0);
+
+    for index in 0..pages {
+        let staged = candidate
+            .member_bytes(index)
+            .expect("the staged body is readable")
+            .expect("the candidate holds this member");
+        assert_eq!(staged.len(), body_len);
+        assert!(staged.starts_with(format!("# Page {index}\n\n").as_bytes()));
+        assert_eq!(
+            candidate
+                .get(index)
+                .map(|member| member.byte_length())
+                .expect("the member"),
+            u64::try_from(body_len).expect("a small fixture body")
+        );
+    }
 }
 
 #[test]
@@ -505,8 +637,12 @@ fn a_refused_manifest_is_reported_before_anything_is_read() {
     let scratch = Scratch::new("bad-manifest");
     let capability = scratch.capability();
 
-    let refusal = assemble_declared_source_set_v1(b"{ \"schemaVersion\": ", &capability)
-        .expect_err("invalid manifest bytes must be refused");
+    let refusal = assemble_declared_source_set_v1(
+        b"{ \"schemaVersion\": ",
+        &capability,
+        &scratch.staging_root(),
+    )
+    .expect_err("invalid manifest bytes must be refused");
 
     assert!(
         matches!(refusal, SourceSetRefusalV1::Manifest(_)),
@@ -532,8 +668,9 @@ fn a_manifest_declaring_one_locale_twice_is_refused_before_assembly() {
                 { "locale": "en-001", "route": { "path": "/b/" }, "sourceCandidates": { "json": "pages/home.alt.json" } }
               ] } ] } ] } ] } }"#;
 
-    let refusal = assemble_declared_source_set_v1(manifest.as_bytes(), &capability)
-        .expect_err("a duplicated locale must be refused");
+    let refusal =
+        assemble_declared_source_set_v1(manifest.as_bytes(), &capability, &scratch.staging_root())
+            .expect_err("a duplicated locale must be refused");
 
     assert!(
         matches!(refusal, SourceSetRefusalV1::Manifest(_)),

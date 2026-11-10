@@ -1,0 +1,281 @@
+//! Real-host adversaries for the protected staging store.
+//!
+//! Every case here drives the actual store on the real filesystem of whichever host runs it: no
+//! mock, no in-memory spool and no assertion about intent. What is proved is that
+//!
+//! * a staged member has **no directory entry at all** while it lives, so nothing can reopen,
+//!   replace, truncate or redirect it;
+//! * creating an entry with the object's former name inside the namespace does not change one
+//!   byte of the member that was already staged;
+//! * the store removes only the namespace it created and never touches pre-existing material;
+//! * an unprovable staging location is refused instead of followed;
+//! * the number of open objects follows the staged size, not the number of members.
+//!
+//! **Fixture ownership.** Each fixture claims a unique directory with an exclusive `create_dir`,
+//! never adopts an existing one, and removes only the tree it created.
+
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+use solo_adapters::StagingRootCapability;
+
+/// Distinguishes fixtures inside one test process.
+static FIXTURE_SEQUENCE: AtomicUsize = AtomicUsize::new(0);
+
+/// A task-owned directory tree, removed on drop.
+struct Fixture {
+    base: PathBuf,
+}
+
+impl Fixture {
+    /// Claims a unique fixture directory beneath the host temp directory.
+    fn new(tag: &str) -> Self {
+        for _ in 0..16 {
+            let sequence = FIXTURE_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+            let base = std::env::temp_dir().join(format!(
+                "solo-staging-{tag}-{}-{sequence}",
+                std::process::id()
+            ));
+            match fs::create_dir(&base) {
+                Ok(()) => return Self { base },
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
+                Err(error) => panic!("a staging fixture directory could not be created: {error}"),
+            }
+        }
+        panic!("fixture names were already taken; nothing was removed and nothing was reused")
+    }
+
+    /// The staging root the store is given.
+    fn staging(&self) -> PathBuf {
+        self.base.join("staging")
+    }
+
+    /// Creates the staging root and returns its adopted capability.
+    fn root(&self) -> StagingRootCapability {
+        fs::create_dir_all(self.staging()).expect("create the fixture staging root");
+        StagingRootCapability::adopt(&self.staging()).expect("adopt the fixture staging root")
+    }
+}
+
+impl Drop for Fixture {
+    fn drop(&mut self) {
+        // Only ever removes a tree this fixture created exclusively.
+        let _ = fs::remove_dir_all(&self.base);
+    }
+}
+
+/// The names visible inside one directory, sorted for a stable comparison.
+fn entries(path: &Path) -> Vec<String> {
+    let mut names: Vec<String> = fs::read_dir(path)
+        .expect("list the fixture directory")
+        .map(|entry| {
+            entry
+                .expect("read a fixture directory entry")
+                .file_name()
+                .to_string_lossy()
+                .into_owned()
+        })
+        .collect();
+    names.sort();
+    names
+}
+
+#[test]
+fn a_staged_member_is_nameless_and_reads_back_exactly() {
+    let fixture = Fixture::new("round-trip");
+    let root = fixture.root();
+    let mut store = root.begin().expect("begin a private staging store");
+
+    let first = b"{\"contentVersion\":\"1.0.0\"}".to_vec();
+    let second = vec![0x5a_u8; 4096];
+    let first_body = store.stage_body(&first).expect("stage the first body");
+    let second_body = store.stage_body(&second).expect("stage the second body");
+
+    // Observed state: the namespace exists and holds no directory entry at all.
+    assert_eq!(store.visible_object_entries().expect("list"), 0);
+    assert_eq!(
+        store.staged_bytes(),
+        u64::try_from(first.len() + second.len()).expect("a small fixture total")
+    );
+    assert_eq!(store.max_member_bytes(), 4096);
+
+    let first_reader = store
+        .reader(first_body)
+        .expect("a reader for the first body");
+    let mut read_back = Vec::new();
+    first_reader
+        .read_whole(&mut read_back)
+        .expect("read the first body");
+    assert_eq!(read_back, first);
+    assert!(
+        first_reader
+            .matches(&first)
+            .expect("compare the first body")
+    );
+
+    let second_reader = store
+        .reader(second_body)
+        .expect("a reader for the second body");
+    assert!(
+        second_reader
+            .matches(&second)
+            .expect("compare the second body")
+    );
+
+    // A bounded chunk read starts where it is told to and never past the member's own end.
+    let mut chunk = [0_u8; 16];
+    let read = second_reader
+        .read_chunk(4090, &mut chunk)
+        .expect("a bounded tail read");
+    assert_eq!(read, 6);
+    assert_eq!(&chunk[..6], &[0x5a_u8; 6]);
+    assert!(
+        second_reader.read_chunk(4097, &mut chunk).is_err(),
+        "a read past the member's recorded length must be refused, not clamped"
+    );
+}
+
+#[test]
+fn a_new_entry_with_a_former_object_name_cannot_change_a_staged_member() {
+    let fixture = Fixture::new("tamper");
+    let root = fixture.root();
+    let mut store = root.begin().expect("begin a private staging store");
+
+    let body = vec![0x11_u8; 2048];
+    let staged = store.stage_body(&body).expect("stage the body");
+
+    // The namespace name is not part of the public API, so the test finds it the only way an
+    // adversary could: by listing the staging root.
+    let namespaces = entries(&fixture.staging());
+    assert_eq!(namespaces.len(), 1, "exactly one private namespace");
+    let namespace = fixture.staging().join(&namespaces[0]);
+
+    // Attempt the classic attack: write and replace the object's former path.
+    let former = namespace.join("shard-0.bin");
+    fs::write(&former, b"tampered").expect("an adversary may create a new entry");
+    assert_eq!(entries(&namespace), vec!["shard-0.bin".to_owned()]);
+
+    // The staged member is unaffected: the new entry is an unrelated object, and the member this
+    // store holds was never reachable by that name.
+    let reader = store.reader(staged).expect("a reader for the staged body");
+    assert!(
+        reader.matches(&body).expect("compare the staged body"),
+        "the staged bytes must be unchanged by a same-named new entry"
+    );
+    assert_eq!(
+        fs::read(&former).expect("read the adversary's own file"),
+        b"tampered".to_vec()
+    );
+}
+
+#[test]
+fn dropping_the_store_removes_only_its_own_namespace() {
+    let fixture = Fixture::new("cleanup");
+    let root = fixture.root();
+
+    // Pre-existing material this store must never touch.
+    let kept = fixture.staging().join("owner-kept");
+    fs::create_dir(&kept).expect("create the pre-existing directory");
+    fs::write(kept.join("sentinel.txt"), b"keep me").expect("write the sentinel");
+
+    {
+        let mut store = root.begin().expect("begin a private staging store");
+        store.stage_body(&[0x22_u8; 1024]).expect("stage a body");
+        let namespaces = entries(&fixture.staging());
+        assert_eq!(
+            namespaces.len(),
+            2,
+            "the store's namespace and the sentinel directory"
+        );
+    }
+
+    // The namespace is gone, and the pre-existing material is exactly as it was.
+    assert_eq!(entries(&fixture.staging()), vec!["owner-kept".to_owned()]);
+    assert_eq!(
+        fs::read(kept.join("sentinel.txt")).expect("the sentinel still exists"),
+        b"keep me".to_vec()
+    );
+    // The adopted root itself is never removed: it belongs to the caller.
+    assert!(fixture.staging().is_dir());
+}
+
+#[test]
+fn an_unprovable_staging_root_is_refused_instead_of_followed() {
+    let fixture = Fixture::new("unprovable");
+
+    // A relative path can never be adopted: it does not name a location that was verified.
+    let relative = StagingRootCapability::adopt(Path::new("relative/staging"));
+    assert_eq!(
+        relative
+            .expect_err("a relative staging root must be refused")
+            .code(),
+        "SOURCE_UNSAFE_PATH"
+    );
+
+    // A directory that does not exist is refused, never created and never replaced by a system
+    // temp fallback.
+    let missing = StagingRootCapability::adopt(&fixture.base.join("absent"));
+    assert_eq!(
+        missing
+            .expect_err("a missing staging root must be refused")
+            .code(),
+        "SOURCE_UNSAFE_PATH"
+    );
+
+    // A file is not a staging root.
+    let file = fixture.base.join("not-a-directory");
+    fs::write(&file, b"x").expect("write the fixture file");
+    let not_a_dir = StagingRootCapability::adopt(&file);
+    assert_eq!(
+        not_a_dir
+            .expect_err("a file must not be adopted as a staging root")
+            .code(),
+        "SOURCE_UNSAFE_PATH"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn a_symlinked_staging_root_is_refused_rather_than_followed() {
+    let fixture = Fixture::new("symlink");
+    let real = fixture.base.join("real-staging");
+    fs::create_dir(&real).expect("create the real staging directory");
+    let link = fixture.base.join("linked-staging");
+    std::os::unix::fs::symlink(&real, &link).expect("create the fixture symlink");
+
+    let refused = StagingRootCapability::adopt(&link);
+    assert_eq!(
+        refused
+            .expect_err("a symlinked staging root must be refused")
+            .code(),
+        "SOURCE_UNSAFE_PATH"
+    );
+}
+
+#[test]
+fn open_object_count_follows_staged_size_not_member_count() {
+    let fixture = Fixture::new("scaling");
+    let root = fixture.root();
+    let mut store = root.begin().expect("begin a private staging store");
+
+    let body = vec![0x33_u8; 64];
+    let mut staged = Vec::new();
+    for _ in 0..500 {
+        staged.push(store.stage_body(&body).expect("stage a small body"));
+    }
+
+    // Five hundred members, one open object: the handle count is a function of the staged size,
+    // not of how many representations a manifest declares.
+    assert_eq!(store.object_count(), 1);
+    assert_eq!(store.visible_object_entries().expect("list"), 0);
+    assert_eq!(
+        store.staged_bytes(),
+        u64::try_from(staged.len() * body.len()).expect("a small fixture total")
+    );
+
+    for staged_body in &staged {
+        let reader = store.reader(*staged_body).expect("a reader per member");
+        assert!(reader.matches(&body).expect("compare every member"));
+    }
+}
