@@ -8,12 +8,13 @@
 //! **What makes a staged object safe.** Linux opens every shard as an `O_TMPFILE | O_EXCL` inode
 //! *through the retained descriptor of the caller's own staging root*: the object never acquires a
 //! directory entry, so there is no window in which a second handle could open it, and no
-//! transaction-owned directory or entry is ever created or removed. Windows creates one task-owned
-//! namespace and each shard **relative to a retained parent handle** with
-//! `NtCreateFile(FILE_CREATE)`, without sharing, then removes the shard's transient name **by that
-//! same handle** through `SetFileInformationByHandle(FileDispositionInfoEx)`. From that moment the
-//! bytes are reachable only through the handle this module owns: no path can replace, truncate,
-//! redirect or re-open them, and there is no second writable alias and no memory mapping.
+//! transaction-owned directory or entry is ever created or removed. Windows creates each shard
+//! **directly in that same adopted root, relative to the retained root handle**, with
+//! `NtCreateFile(FILE_CREATE)` and no sharing at all, then marks that exact object for deletion
+//! through `FileDispositionInfoEx(DELETE | POSIX_SEMANTICS)` on its own handle **before the first
+//! plaintext byte**. The host keeps the name `DELETE_PENDING` while the handle stays open, so a
+//! same-user attacker may still *enumerate* it; it can never open, read, write, truncate, rename or
+//! map it, and it disappears when the last handle closes or the process dies.
 
 //!
 //! Objects are grouped into shards of at most [`STAGE_SHARD_TARGET_BYTES`], so the number of
@@ -23,19 +24,19 @@
 //! **What this is not.** It is temporary internal processing: not a source root, not a second
 //! manifest, not generated output and not a publication artefact. It authorizes nothing.
 //!
-//! **Cleanup.** Dropping the store closes every shard handle. On Linux that is the whole of
-//! cleanup: the inodes were never linked, so nothing is left to remove and no pathname is deleted.
-//! On Windows every shard name was already detached by handle, and the one owned namespace is
-//! disposed by its retained handle — before success is exposed in `finalize`, and best-effort in
-//! `Drop` if the transaction failed earlier. An entry that was renamed, removed or replaced by
-//! another process is never the object this store disposes, so an impostor survives untouched.
+//! **Cleanup.** Dropping the store closes every shard handle, and that is the whole of cleanup on
+//! both hosts: Linux's inodes were never linked, and a Windows pending name is removed by the kernel
+//! when its last handle closes, including at process death through `FILE_DELETE_ON_CLOSE`. This
+//! module creates no directory of its own and deletes nothing by name, so an impostor directory, a
+//! foreign file or an Owner sentinel can never be removed or modified by staging.
 
 //!
-//! **Threat boundary, stated honestly.** A same-user process that can reach this namespace may
-//! create *new* entries inside it, but it cannot reach, mutate or replace an object this store
-//! already holds, because that object has no name; it cannot make a sealed member read
-//! differently. This is a claim about these staged bytes, not a claim that a same-user attacker
-//! cannot interfere with the wider process.
+//! **Threat boundary, stated honestly.** A same-user process can *see* a Windows pending name in a
+//! directory listing while the store holds it, and it may create new entries of its own in the
+//! caller's root. It cannot reach, mutate, replace, rename or map an object this store holds: that
+//! object admits no second handle at all, and it carries no plaintext until the disposition above has
+//! succeeded. This is a claim about these staged bytes, not a claim that a same-user attacker cannot
+//! interfere with the wider process.
 
 use std::fs::File;
 use std::io::Write;
@@ -113,7 +114,7 @@ fn identity_of(file: &File) -> Result<ObjectIdentityV1, SourceReadRefusalV1> {
     }
 }
 
-/// Whether a retained directory descriptor is still linked into the namespace tree.
+/// Whether the retained staging-root descriptor is still linked into the directory tree.
 ///
 /// A directory's link count drops to zero when its entry is removed, and the count is read from the
 /// handle this store holds rather than from a name, so the answer cannot be redirected. It is the
@@ -218,6 +219,8 @@ fn unsupported() -> SourceReadRefusalV1 {
 #[doc(hidden)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StagingFaultV1 {
+    /// Fail the pre-write delete disposition, through a real native create without `DELETE` access.
+    Disposition,
     /// Fail before writing the body.
     Write,
     /// Write a prefix of the body and then fail.
@@ -267,13 +270,14 @@ pub const STAGE_SHARD_TARGET_BYTES: u64 = 64 * 1024 * 1024;
 /// The buffer this module uses when it streams one staged member back out.
 pub const STAGE_READ_CHUNK_BYTES: usize = 8 * 1024;
 
-/// The prefix of the one namespace directory Windows creates inside an adopted staging root.
+/// The prefix of the unique staging name this process derives for one task-owned shard.
 ///
-/// Linux creates none at all: its shards are anonymous inodes in the caller's own directory.
+/// It is a name component only. This module creates no directory, so nothing here is a namespace,
+/// and on Linux no staging name is ever linked at all.
 #[cfg(windows)]
-const STAGE_NAMESPACE_PREFIX: &str = "solo-source-stage-";
+const STAGE_NAME_PREFIX: &str = "solo-source-stage-";
 
-/// The prefix of the transient shard name Windows detaches immediately after creation.
+/// The prefix of the task-owned shard name Windows creates in the adopted staging root.
 #[cfg(windows)]
 const STAGE_OBJECT_PREFIX: &str = "shard-";
 
@@ -297,6 +301,21 @@ pub struct StagingRootCapability {
 }
 
 impl StagingRootCapability {
+    /// Test-only: attempts the production native `FILE_CREATE` for one fixed name in this root.
+    ///
+    /// # Errors
+    ///
+    /// Returns the classified refusal the production creator reports when the name already exists,
+    /// which is how a pre-existing foreign object is proved never to be adopted or changed.
+    #[cfg(windows)]
+    #[doc(hidden)]
+    pub fn create_shard_at(&self, name: &str) -> Result<(), SourceReadRefusalV1> {
+        let file = crate::source_read_native::create_staging_shard(&self.handle, name)
+            .map_err(staging_native)?;
+        drop(file);
+        Ok(())
+    }
+
     /// Adopts an existing directory as the staging root.
     ///
     /// The directory must already exist and be a real directory. It is opened once, and the
@@ -668,8 +687,19 @@ impl SourceSetStagingV1 {
                 self.shards.len(),
                 staging_name()
             );
-            let file = crate::source_read_native::create_staging_shard(&self.root_dir, &name)
-                .map_err(staging_native)?;
+            let file = if self.faults.fault == Some(StagingFaultV1::Disposition)
+                && self.faults.after <= self.staged_members
+            {
+                // The seam creates the object without `DELETE`, so the host itself denies the
+                // pre-write disposition; the empty object is then removed by closing its handle.
+                crate::source_read_native::create_staging_shard_without_delete(
+                    &self.root_dir,
+                    &name,
+                )
+            } else {
+                crate::source_read_native::create_staging_shard(&self.root_dir, &name)
+            }
+            .map_err(staging_native)?;
             self.shards.push(StageShardV1 { file, written: 0 });
             Ok(())
         }
@@ -870,7 +900,7 @@ fn staging_name() -> String {
         .map(|elapsed| elapsed.as_nanos())
         .unwrap_or(0);
     format!(
-        "{STAGE_NAMESPACE_PREFIX}{}-{sequence}-{nanos}",
+        "{STAGE_NAME_PREFIX}{}-{sequence}-{nanos}",
         std::process::id()
     )
 }

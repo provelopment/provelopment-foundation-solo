@@ -730,3 +730,204 @@ fn a_bounded_abort_child_leaves_no_recoverable_stage_plaintext() {
         );
     }
 }
+#[cfg(windows)]
+#[test]
+fn a_pending_shard_name_cannot_be_reopened_changed_renamed_or_mapped() {
+    let fixture = Fixture::new("pending-attacker");
+    let root = fixture.root();
+    let staging = fixture.staging();
+    let before = entries(&staging);
+    let mut store = root.begin().expect("begin a private staging store");
+    let body = vec![0x5a_u8; 8192];
+    let staged = store.stage_body(&body).expect("stage a member");
+
+    // The name is not part of the API, so the test derives it the only way an attacker could: by
+    // listing the caller's own directory after the store wrote. It is the actual pending name.
+    let mut observed: Vec<String> = entries(&staging)
+        .into_iter()
+        .filter(|name| !before.contains(name))
+        .collect();
+    observed.sort();
+    assert_eq!(
+        observed.len(),
+        1,
+        "exactly one pending name is expected while the handle is live"
+    );
+    let name = observed.remove(0);
+    assert!(name.starts_with("shard-"), "unexpected staging name {name}");
+    let pending = staging.join(&name);
+    let alias = staging.join("attacker-alias.bin");
+
+    // Every reach an attacker has, attempted for real against the observed name.
+    let read = fs::File::open(&pending).is_ok();
+    let write = fs::OpenOptions::new().write(true).open(&pending).is_ok();
+    // A writable mapped view needs a writable file handle first, so acquiring one IS the attack.
+    let mapping_handle = fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(&pending)
+        .is_ok();
+    let deleted = fs::remove_file(&pending).is_ok();
+    let renamed = fs::rename(&pending, &alias).is_ok();
+    assert!(
+        !read && !write && !mapping_handle && !deleted && !renamed,
+        "a pending shard must be unreachable: read={read} write={write} mapped={mapping_handle} delete={deleted} rename={renamed}"
+    );
+    assert!(
+        !alias.exists(),
+        "a renamed reachable alias must never exist"
+    );
+
+    // The bytes are unchanged and still readable through the legitimate retained handle.
+    let mut read_back = Vec::new();
+    store
+        .reader(staged)
+        .expect("a reader")
+        .read_whole(&mut read_back)
+        .expect("read the member");
+    assert_eq!(
+        read_back, body,
+        "refused attacks must not change a staged byte"
+    );
+
+    store.finalize().expect("seal the store");
+    assert!(
+        store
+            .reader(staged)
+            .expect("a sealed reader")
+            .matches(&body)
+            .expect("compare")
+    );
+
+    drop(store);
+    assert!(
+        !pending.exists(),
+        "the pending name must disappear when its last handle closes"
+    );
+    assert_eq!(
+        entries(&staging),
+        before,
+        "the adopted root must be exactly as it was after release"
+    );
+}
+
+#[cfg(windows)]
+#[test]
+fn a_root_moved_and_replaced_at_its_path_never_receives_a_staged_byte() {
+    let fixture = Fixture::new("root-swap");
+    let root = fixture.root();
+    let staging = fixture.staging();
+    let moved = fixture.base.join("moved-root");
+    let mut store = root.begin().expect("begin a private staging store");
+
+    // Move the adopted directory aside and put a fresh impostor at the same pathname.
+    if fs::rename(&staging, &moved).is_err() {
+        // The host refused to move a directory this store holds: that refusal is itself the
+        // confinement evidence, and the impostor case cannot be constructed on this host.
+        assert!(
+            !moved.exists(),
+            "a refused move must leave the directory where it was"
+        );
+        drop(store);
+        return;
+    }
+    fs::create_dir_all(&staging).expect("create the impostor root");
+    let before_impostor = entries(&staging);
+
+    let body = b"adversary round".to_vec();
+    if let Ok(staged) = store.stage_body(&body) {
+        let mut read = Vec::new();
+        store
+            .reader(staged)
+            .expect("a reader")
+            .read_whole(&mut read)
+            .expect("read the member");
+        assert_eq!(read, body, "a staged member must read back exactly");
+    }
+    assert_eq!(
+        entries(&staging),
+        before_impostor,
+        "an impostor root must never receive a staged member"
+    );
+
+    drop(store);
+    assert_eq!(
+        entries(&staging),
+        before_impostor,
+        "cleanup must not create or remove anything in the impostor root"
+    );
+    assert!(moved.exists(), "the moved directory must never be deleted");
+}
+
+#[cfg(windows)]
+#[test]
+fn a_preexisting_file_at_a_shard_name_is_refused_and_left_byte_identical() {
+    let fixture = Fixture::new("name-collision");
+    let root = fixture.root();
+    let staging = fixture.staging();
+    let foreign = staging.join("shard-0-collision.bin");
+    fs::write(&foreign, b"owner-bytes").expect("write a foreign file at the shard name");
+
+    // The production native `FILE_CREATE` must refuse rather than adopt the existing object.
+    let refusal = root
+        .create_shard_at("shard-0-collision.bin")
+        .expect_err("a pre-existing shard name must be refused");
+    assert!(
+        matches!(
+            refusal.code(),
+            "SOURCE_UNSAFE_PATH"
+                | "SOURCE_OBSERVATION_IO_ERROR"
+                | "SOURCE_OBSERVATION_PERMISSION_DENIED"
+        ),
+        "unexpected refusal {}",
+        refusal.code()
+    );
+    assert_eq!(
+        fs::read(&foreign).expect("read the foreign file"),
+        b"owner-bytes",
+        "a foreign object must remain byte-identical"
+    );
+    assert_eq!(entries(&staging), vec!["shard-0-collision.bin".to_owned()]);
+}
+
+#[cfg(windows)]
+#[test]
+fn a_host_denied_disposition_refuses_before_any_plaintext_is_written() {
+    let fixture = Fixture::new("disposition-denied");
+    let root = fixture.root();
+    let staging = fixture.staging();
+    let before = entries(&staging);
+    let mut store = root
+        .begin_with_faults(StagingFaultsV1::inject(0, StagingFaultV1::Disposition))
+        .expect("begin a store with a denied disposition");
+
+    // The seam creates the object without `DELETE`, so this is the host denying the real
+    // `FileDispositionInfoEx` call, not a simulated value.
+    let refusal = store
+        .stage_body(b"synthetic-body")
+        .expect_err("a denied disposition must refuse the member");
+    assert!(
+        matches!(
+            refusal.code(),
+            "SOURCE_OBSERVATION_IO_ERROR"
+                | "SOURCE_OBSERVATION_PERMISSION_DENIED"
+                | "SOURCE_UNSAFE_PATH"
+        ),
+        "unexpected refusal {}",
+        refusal.code()
+    );
+    // Nothing was staged and no member exists to read.
+    assert_eq!(
+        store.object_count(),
+        0,
+        "a refused shard must not be retained"
+    );
+    assert_eq!(store.staged_bytes(), 0, "no plaintext byte may be counted");
+
+    drop(store);
+    assert_eq!(
+        entries(&staging),
+        before,
+        "the empty owned file must be removed by closing its own handle"
+    );
+}

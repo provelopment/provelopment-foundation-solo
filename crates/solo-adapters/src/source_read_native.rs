@@ -357,7 +357,7 @@ pub(crate) fn create_staging_shard(
     name: &str,
 ) -> Result<std::fs::File, StagingNativeError> {
     use std::os::windows::io::{AsRawHandle, FromRawHandle, IntoRawHandle};
-    let handle = sys::create_relative(parent.as_raw_handle(), name, false)
+    let handle = sys::create_relative(parent.as_raw_handle(), name, true)
         .map_err(StagingNativeError::from_native)?;
     let raw = handle.into_raw_handle();
     // SAFETY: a fresh, unowned handle moved exactly once into a `File`.
@@ -372,6 +372,34 @@ pub(crate) fn create_staging_shard(
     // Proven on Windows Server 2025: the delete disposition above succeeds, yet the detached name
     // remains DELETE_PENDING until this handle closes, so the entry survives in the namespace. That
     // is what makes an immediate namespace removal impossible while a member stays readable.
+    Ok(file)
+}
+
+/// Test-only seam: creates a shard exactly as production does but **without** the `DELETE` access
+/// and `FILE_DELETE_ON_CLOSE` the pre-write disposition needs.
+///
+/// The denial this produces is a real host answer to a real `NtCreateFile` / `NtSetInformationFile`
+/// pair on the real filesystem, not a simulated return value, so the disposition-failure path is
+/// exercised through the same production code that a genuine host denial would reach.
+#[cfg(windows)]
+#[doc(hidden)]
+pub fn create_staging_shard_without_delete(
+    parent: &std::fs::File,
+    name: &str,
+) -> Result<std::fs::File, StagingNativeError> {
+    use std::os::windows::io::{AsRawHandle, FromRawHandle, IntoRawHandle};
+    let handle = sys::create_relative(parent.as_raw_handle(), name, false)
+        .map_err(StagingNativeError::from_native)?;
+    let raw = handle.into_raw_handle();
+    // SAFETY: a fresh, unowned handle moved exactly once into a `File`.
+    let file = unsafe { std::fs::File::from_raw_handle(raw) };
+    if let Err(error) = dispose_staging_object(&file) {
+        // The empty object this call just created is removed by closing its own handle.
+        drop(file);
+        return Err(error);
+    }
+    // Only reachable if the host permitted the disposition without `DELETE`, which would itself be
+    // a finding: report it instead of pretending the seam failed.
     Ok(file)
 }
 
@@ -961,17 +989,16 @@ mod sys {
     ///
     /// Deliberately separate from the reader's opener: the reader must not gain create or delete
     /// rights, and staging must not depend on rights the reader happens to hold.
-    /// `FILE_WRITE_DATA` and `FILE_APPEND_DATA` are the documented `FILE_ADD_FILE` and
-    /// `FILE_ADD_SUBDIRECTORY` rights on a directory, which is what makes handle-relative creation
-    /// possible at all.
+    /// `FILE_WRITE_DATA` is the documented `FILE_ADD_FILE` right on a directory, which is what makes
+    /// handle-relative **file** creation possible. Nothing more is requested on the caller-owned
+    /// root: no `DELETE`, no `FILE_APPEND_DATA` (`FILE_ADD_SUBDIRECTORY`), no attribute-write and no
+    /// directory listing authority, because this store creates files only and removes nothing by name.
     pub(super) fn open_staging_component(
         parent: HANDLE,
         name: &str,
         is_staging_root: bool,
     ) -> Result<OwnedHandle, NativeError> {
-        use windows_sys::Win32::Storage::FileSystem::{
-            DELETE, FILE_APPEND_DATA, FILE_LIST_DIRECTORY, FILE_WRITE_ATTRIBUTES, FILE_WRITE_DATA,
-        };
+        use windows_sys::Win32::Storage::FileSystem::{FILE_READ_ATTRIBUTES, FILE_WRITE_DATA};
 
         if name.is_empty() || name.contains('\0') || name.contains(['/', '\\']) {
             return Err(NativeError::Unsafe);
@@ -992,17 +1019,12 @@ mod sys {
         attributes.Attributes = OBJ_DONT_REPARSE;
         let mut io_status: IO_STATUS_BLOCK = zeroed();
         let mut out: HANDLE = ptr::null_mut();
-        // Only the final component must receive children and be disposable; an intermediate is
-        // only traversed, and requesting create or delete rights on a directory the caller does not
-        // own (for example `C:\Users`) would be denied for a standard user.
+        // The final component receives new files and nothing else; an intermediate is only
+        // traversed. Requesting create, delete or attribute-write rights on a directory the caller
+        // does not own (for example `C:\Users`) would be denied for a standard user, and requesting
+        // them on the owned root would exceed what staging needs.
         let access = if is_staging_root {
-            FILE_LIST_DIRECTORY
-                | FILE_WRITE_DATA
-                | FILE_APPEND_DATA
-                | FILE_READ_ATTRIBUTES
-                | FILE_WRITE_ATTRIBUTES
-                | DELETE
-                | SYNCHRONIZE
+            FILE_READ_ATTRIBUTES | FILE_WRITE_DATA | SYNCHRONIZE
         } else {
             FILE_READ_ATTRIBUTES | SYNCHRONIZE
         };
@@ -1130,15 +1152,14 @@ mod sys {
     pub(super) fn create_relative(
         parent: HANDLE,
         name: &str,
-        directory: bool,
+        grant_delete: bool,
     ) -> Result<OwnedHandle, NativeError> {
         use windows_sys::Wdk::Storage::FileSystem::{
-            FILE_CREATE, FILE_DELETE_ON_CLOSE, FILE_DIRECTORY_FILE as CREATE_DIRECTORY_FILE,
+            FILE_CREATE, FILE_DELETE_ON_CLOSE,
             FILE_NON_DIRECTORY_FILE as CREATE_NON_DIRECTORY_FILE, FILE_SYNCHRONOUS_IO_NONALERT,
         };
         use windows_sys::Win32::Storage::FileSystem::{
-            DELETE, FILE_APPEND_DATA, FILE_LIST_DIRECTORY, FILE_READ_ATTRIBUTES, FILE_READ_DATA,
-            FILE_WRITE_ATTRIBUTES, FILE_WRITE_DATA,
+            DELETE, FILE_READ_ATTRIBUTES, FILE_READ_DATA, FILE_WRITE_DATA,
         };
 
         const STATUS_OBJECT_NAME_COLLISION: NTSTATUS = 0xC000_0035u32 as NTSTATUS;
@@ -1166,33 +1187,18 @@ mod sys {
         attributes.ObjectName = ptr::from_ref(&unicode).cast_mut();
         attributes.Attributes = OBJ_DONT_REPARSE;
 
-        let (access, share, options) = if directory {
-            (
-                FILE_LIST_DIRECTORY
-                    | FILE_WRITE_DATA
-                    | FILE_APPEND_DATA
-                    | FILE_READ_ATTRIBUTES
-                    | FILE_WRITE_ATTRIBUTES
-                    | DELETE
-                    | SYNCHRONIZE,
-                SHARE_ALL,
-                CREATE_DIRECTORY_FILE | FILE_SYNCHRONOUS_IO_NONALERT,
-            )
-        } else {
-            (
-                FILE_READ_DATA | FILE_WRITE_DATA | FILE_READ_ATTRIBUTES | DELETE | SYNCHRONIZE,
-                // No sharing at all: while the shard still has its transient name no second
-                // reader, writer, mapper or deleter can open it. Proven on the real host: granting
-                // delete sharing does not make the detach unlink immediately, so the strongest
-                // share mode costs nothing.
-                0,
-                // `FILE_DELETE_ON_CLOSE` is the crash-safety net for the interval before the name is
-                // detached: if this process dies in that instant the object is still removed when
-                // its handle closes, and in any case it holds no plaintext, because the disposition
-                // below runs before the first byte is written.
-                CREATE_NON_DIRECTORY_FILE | FILE_SYNCHRONOUS_IO_NONALERT | FILE_DELETE_ON_CLOSE,
-            )
-        };
+        // A shard is a plain file opened with **no sharing at all**, so while it still has its
+        // transient name no second reader, writer, mapper or deleter can open it. `DELETE` and
+        // `FILE_DELETE_ON_CLOSE` are granted only on the production path, because the pre-write
+        // disposition needs them; the test seam omits both so the host itself denies the
+        // disposition rather than a simulated return value doing so.
+        let mut access = FILE_READ_DATA | FILE_WRITE_DATA | FILE_READ_ATTRIBUTES | SYNCHRONIZE;
+        let mut options = CREATE_NON_DIRECTORY_FILE | FILE_SYNCHRONOUS_IO_NONALERT;
+        if grant_delete {
+            access |= DELETE;
+            options |= FILE_DELETE_ON_CLOSE;
+        }
+        let share = 0;
 
         let mut io_status: IO_STATUS_BLOCK = zeroed();
         let mut out: HANDLE = ptr::null_mut();
