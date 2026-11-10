@@ -362,10 +362,19 @@ fn repeated_bounded_reads_return_the_same_bytes_after_sealing() {
             .code(),
         "SOURCE_UNSUPPORTED"
     );
+    // Linux never links a name. Windows may still enumerate its own delete-pending shard names
+    // while the readable handles are open, so equality is required there after the last close.
+    #[cfg(target_os = "linux")]
     assert_eq!(
         entries(&fixture.staging()),
         before,
         "the sealed read lifetime must not create a name"
+    );
+    drop(store);
+    assert_eq!(
+        entries(&fixture.staging()),
+        before,
+        "releasing the sealed store must leave the adopted root as it was"
     );
 }
 
