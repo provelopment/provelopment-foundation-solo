@@ -148,12 +148,30 @@ fn open_staging_object(
 ) -> Result<File, SourceReadRefusalV1> {
     match crate::source_read_native::open_unnamed_staging_object(directory) {
         Ok(file) => Ok(file),
-        // Creating an object inside a directory that has been unlinked cannot succeed, so `ENOENT`
-        // here means the namespace this store holds is no longer in the namespace tree. That is a
-        // confinement failure and is refused as an unsafe location, never as an absence.
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Err(unsafe_location()),
-        Err(error) => Err(classify_io(error)),
+        // A genuine denial or a genuine lack of space is reported as what it is.
+        Err(error)
+            if error.kind() == std::io::ErrorKind::PermissionDenied
+                || is_capacity_error(&error) =>
+        {
+            Err(classify_io(error))
+        }
+        // Anything else means this store could not create an object inside the directory it
+        // provably holds — the namespace has been unlinked from the tree, or the host answered
+        // with something this store cannot interpret. Either way confinement is unproven, so it is
+        // refused as an unsafe location and never as an absence or a shorter member.
+        Err(_) => Err(unsafe_location()),
     }
+}
+
+/// Whether the host reported that the file system is out of space rather than a confinement
+/// fault. Read from the raw code so no unstable `ErrorKind` variant is required.
+#[cfg(target_os = "linux")]
+fn is_capacity_error(error: &std::io::Error) -> bool {
+    /// `ENOSPC`.
+    const NO_SPACE: i32 = 28;
+    /// `EDQUOT`.
+    const QUOTA_EXCEEDED: i32 = 122;
+    matches!(error.raw_os_error(), Some(NO_SPACE | QUOTA_EXCEEDED))
 }
 
 /// The share mode is the guarantee here; the unlink removes the path as well.
