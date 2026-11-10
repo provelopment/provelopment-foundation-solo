@@ -870,7 +870,14 @@ fn a_root_moved_and_replaced_at_its_path_never_receives_a_staged_byte() {
                 "a refused move must leave the adopted root exactly as it was"
             );
             drop(store);
-            return;
+            // A green run of this test must mean the substitution executed. A host refusal is a
+            // real protective outcome, but it leaves the attack unproven, so it is raised here
+            // rather than returning quietly and being counted as an executed adversary.
+            panic!(
+                "ROOT_SUBSTITUTION=REFUSED-BY-HOST: the host refused to move the held directory, so \
+                 no impostor was installed; the substitution sub-case is UNVERIFIED and must not be \
+                 reported as executed"
+            );
         }
     }
     fs::create_dir_all(&staging).expect("create the impostor root");
