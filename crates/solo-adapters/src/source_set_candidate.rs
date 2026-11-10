@@ -346,9 +346,20 @@ impl SourceSetCandidateV1 {
     ///
     /// # Errors
     ///
-    /// Returns the typed staging refusal when the namespace cannot be listed.
+    /// Returns the staged entries the caller could reach by name.
+    ///
+    /// Linux creates no namespace at all, so a staging-owned entry can never exist there. On
+    /// Windows the namespace path is read for observation only: it is never a creation, deletion or
+    /// confinement authority, and a namespace this store already disposed reports zero.
     pub fn visible_staging_entries(&self) -> Result<usize, SourceReadRefusalV1> {
-        self.staging.visible_object_entries()
+        let Some(namespace) = self.staging.namespace_path() else {
+            return Ok(0);
+        };
+        let Ok(entries) = std::fs::read_dir(namespace) else {
+            // Already disposed, or unreadable: either way no staged member is reachable by name.
+            return Ok(0);
+        };
+        Ok(entries.filter(|entry| entry.is_ok()).count())
     }
 
     /// Whether this candidate may be published. It never may.

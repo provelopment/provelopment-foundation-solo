@@ -1011,7 +1011,7 @@ mod sys {
     /// object is created inside the directory this process already holds rather than inside
     /// whatever a later path lookup would find. `FILE_DELETE_ON_CLOSE` on a shard is the crash
     /// safety net for the interval before its name is detached.
-    fn create_relative(
+    pub(super) fn create_relative(
         parent: HANDLE,
         name: &str,
         directory: bool,
