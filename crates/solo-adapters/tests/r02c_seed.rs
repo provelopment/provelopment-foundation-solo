@@ -31,8 +31,8 @@ use solo_adapters::{
 use solo_application::fingerprint_of;
 use solo_domain::{
     EfsLineageErrorKind, EfsOwnershipDraft, EfsOwnershipGraph, EfsPageTarget, EntityIdV1,
-    FacetDraft, FacetIdV1, LocaleKeyErrorKind, LocaleKeyV1, PageDraft, PageIdV1, SiteDraft,
-    SiteIdV1, SourceCandidateKind,
+    FacetDraft, FacetIdV1, LocaleKeyErrorKind, LocaleKeyV1, PageDraft, PageIdV1, PageNode,
+    SiteDraft, SiteIdV1, SourceCandidateKind,
 };
 
 const TRUSTED: RootProvenanceV1 = RootProvenanceV1::OperatorDesignatedContentRoot;
@@ -249,6 +249,76 @@ fn with_unlisted_locale(source: &str, locale: &str) -> String {
         patched,
         &source[anchor..]
     )
+}
+
+/// Removes only the Bali Home `id-ID` representation from a test-owned manifest copy.
+///
+/// The authored object is located, bracket-matched and removed together with the separator
+/// that joined it to its array, so the remaining declarations stay untouched and in order.
+fn without_bali_home_unlisted(source: &str) -> String {
+    let marker = source
+        .find("/id-id/Hidden7A")
+        .expect("the unlisted route is present");
+    let locale = source[..marker]
+        .rfind("\"locale\": \"id-ID\"")
+        .expect("the unlisted locale is present");
+    let start = source[..locale]
+        .rfind('{')
+        .expect("the representation object opens");
+
+    let mut depth = 0_usize;
+    let mut end = None;
+    for (offset, byte) in source.as_bytes()[start..].iter().copied().enumerate() {
+        match byte {
+            b'{' => depth += 1,
+            b'}' => {
+                depth -= 1;
+                if depth == 0 {
+                    end = Some(start + offset + 1);
+                    break;
+                }
+            }
+            _ => {}
+        }
+    }
+    let end = end.expect("the representation object closes");
+
+    let mut removal_start = start;
+    while removal_start > 0 && source.as_bytes()[removal_start - 1].is_ascii_whitespace() {
+        removal_start -= 1;
+    }
+    let mut removal_end = end;
+    let tail = &source[end..];
+    let trimmed = tail.trim_start();
+    if trimmed.starts_with(',') {
+        removal_end = end + (tail.len() - trimmed.len()) + 1;
+    } else if removal_start > 0 && source.as_bytes()[removal_start - 1] == b',' {
+        removal_start -= 1;
+    } else {
+        panic!("the removed representation must be comma-separated");
+    }
+
+    format!("{}{}", &source[..removal_start], &source[removal_end..])
+}
+
+/// The full-locale membership keys of one Page, in authored order.
+fn membership(page: &PageNode) -> Vec<&str> {
+    page.representations()
+        .iter()
+        .map(LocaleKeyV1::as_str)
+        .collect()
+}
+
+/// The authored full locale of one committed expanded body path.
+fn locale_of(path: &str) -> &'static str {
+    match path {
+        "pages/bali-home.en-001.md"
+        | "pages/bali-about.en-001.md"
+        | "pages/jakarta-home.en-001.md" => "en-001",
+        "pages/bali-home.id-id.md" | "pages/bali-about.id-id.json" => "id-ID",
+        "pages/company-home.de-de.md" => "de-DE",
+        other => panic!("unexpected fixture body: {other}"),
+    }
 }
 
 /// A compact manifest whose `facets` member is supplied by the caller.
@@ -1100,6 +1170,138 @@ fn page_identity_is_independent_of_labels_base_routes_and_representation_count()
     assert_eq!(baseline_bali.representations().len(), 2);
     assert_eq!(baseline_jakarta.representations().len(), 1);
     assert_eq!(renamed_parsed.representation_count(), 6);
+}
+
+#[test]
+fn removing_one_authored_representation_changes_membership_without_re_identifying_the_page() {
+    let home = page_id("home");
+    let about = page_id("about");
+    let bali = site_id("bali");
+    let jakarta = site_id("jakarta");
+    let global = site_id("global");
+    let visitors = facet_id("visitors");
+    let company = facet_id("company");
+
+    // 1. The committed identity and its original authored membership.
+    let baseline_parsed = accepted(&expanded_text().into_bytes());
+    let baseline = graph_from(&baseline_parsed);
+    let before = baseline
+        .resolve_page(EfsPageTarget {
+            entity: baseline.entity(),
+            facet: &visitors,
+            site: &bali,
+            page: &home,
+        })
+        .expect("the committed Bali Home Page resolves");
+    assert_eq!(membership(before), vec!["en-001", "id-ID"]);
+    assert_eq!(baseline_parsed.representation_count(), 6);
+
+    // 2. A test-owned copy declares one representation fewer: only Bali Home `id-ID` is removed.
+    let reduced_text = without_bali_home_unlisted(&expanded_text());
+    assert!(
+        !reduced_text.contains("/id-id/Hidden7A"),
+        "only the unlisted Bali representation is removed"
+    );
+    assert!(
+        reduced_text.contains("/id-id/TentangKami"),
+        "the case-sensitive Bali About representation stays authored"
+    );
+    let reduced_parsed = accepted(reduced_text.as_bytes());
+    assert_eq!(reduced_parsed.representation_count(), 5);
+    assert_eq!(reduced_parsed.page_count(), 4);
+    let reduced = graph_from(&reduced_parsed);
+
+    // 3. The same complete Page target still resolves with the same authored identifiers.
+    let after = reduced
+        .resolve_page(EfsPageTarget {
+            entity: reduced.entity(),
+            facet: &visitors,
+            site: &bali,
+            page: &home,
+        })
+        .expect("the same qualified Page target still resolves after the edit");
+    assert_eq!(reduced.entity().as_str(), "example");
+
+    // 4. Membership becomes exactly `en-001`; every other Page keeps its own membership.
+    assert_eq!(membership(after), vec!["en-001"]);
+    for (facet, site, page) in [
+        (&visitors, &bali, &about),
+        (&visitors, &jakarta, &home),
+        (&company, &global, &home),
+    ] {
+        let unchanged_before = baseline
+            .resolve_page(EfsPageTarget {
+                entity: baseline.entity(),
+                facet,
+                site,
+                page,
+            })
+            .expect("the baseline Page resolves");
+        let unchanged_after = reduced
+            .resolve_page(EfsPageTarget {
+                entity: reduced.entity(),
+                facet,
+                site,
+                page,
+            })
+            .expect("the reduced Page resolves");
+        assert_eq!(
+            membership(unchanged_before),
+            membership(unchanged_after),
+            "an unrelated Page must keep its authored membership"
+        );
+    }
+
+    // 5. The real source stage selects exactly the five remaining declared bodies, in order.
+    let scratch = expanded_scratch("reduced-membership");
+    assert!(
+        scratch.path("pages/bali-home.id-id.md").exists(),
+        "the formerly declared body must still exist, so its absence cannot explain the result"
+    );
+    let capability = scratch.capability();
+    let candidate = assemble_declared_source_set_v1(
+        reduced_text.as_bytes(),
+        &capability,
+        &scratch.staging_root(),
+    )
+    .expect("the reduced declaration assembles from the committed bodies");
+
+    let expected: Vec<(&str, SourceCandidateKind)> = EXPANDED_BODIES
+        .iter()
+        .filter(|entry| entry.0 != "pages/bali-home.id-id.md")
+        .copied()
+        .collect();
+    assert_eq!(candidate.len(), expected.len());
+    assert_eq!(candidate.len(), 5);
+    for (index, (path, kind)) in expected.iter().enumerate() {
+        let member = candidate.get(index).expect("one member per declaration");
+        assert_eq!(member.logical_path(), *path);
+        assert_eq!(member.member(), *kind);
+        let staged = candidate
+            .member_bytes(index)
+            .expect("the staged body is readable")
+            .expect("the candidate holds this member");
+        assert_eq!(staged, expanded_body(path));
+        assert_eq!(member.lineage().entity(), "example");
+        assert_eq!(member.lineage().locale(), locale_of(path));
+    }
+    for member in candidate.iter() {
+        assert_ne!(
+            member.logical_path(),
+            "pages/bali-home.id-id.md",
+            "the formerly declared body must not be selected merely because it exists"
+        );
+    }
+
+    // 6. No result in this chain claims publication authority or a verified snapshot.
+    assert!(!baseline_parsed.is_publication_authorized());
+    assert!(!reduced_parsed.is_publication_authorized());
+    assert!(!candidate.is_publication_authorized());
+    assert!(!candidate.is_verified_filesystem_snapshot());
+    for member in candidate.iter() {
+        assert!(!member.is_publication_authorized());
+        assert!(!member.is_verified_filesystem_snapshot());
+    }
 }
 
 #[test]
