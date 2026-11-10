@@ -1129,8 +1129,7 @@ mod sys {
     ) -> Result<OwnedHandle, NativeError> {
         use windows_sys::Wdk::Storage::FileSystem::{
             FILE_CREATE, FILE_DELETE_ON_CLOSE, FILE_DIRECTORY_FILE as CREATE_DIRECTORY_FILE,
-            FILE_NON_DIRECTORY_FILE as CREATE_NON_DIRECTORY_FILE, FILE_OPEN_REPARSE_POINT,
-            FILE_SYNCHRONOUS_IO_NONALERT,
+            FILE_NON_DIRECTORY_FILE as CREATE_NON_DIRECTORY_FILE, FILE_SYNCHRONOUS_IO_NONALERT,
         };
         use windows_sys::Win32::Storage::FileSystem::{
             DELETE, FILE_APPEND_DATA, FILE_LIST_DIRECTORY, FILE_READ_DATA, FILE_WRITE_ATTRIBUTES,
@@ -1172,7 +1171,7 @@ mod sys {
                     | DELETE
                     | SYNCHRONIZE,
                 SHARE_ALL,
-                CREATE_DIRECTORY_FILE | FILE_OPEN_REPARSE_POINT | FILE_SYNCHRONOUS_IO_NONALERT,
+                CREATE_DIRECTORY_FILE | FILE_SYNCHRONOUS_IO_NONALERT,
             )
         } else {
             (
@@ -1180,10 +1179,7 @@ mod sys {
                 // No sharing at all: while the shard still has its transient name no second
                 // reader, writer, deleter or mapper can open it.
                 0,
-                CREATE_NON_DIRECTORY_FILE
-                    | FILE_OPEN_REPARSE_POINT
-                    | FILE_SYNCHRONOUS_IO_NONALERT
-                    | FILE_DELETE_ON_CLOSE,
+                CREATE_NON_DIRECTORY_FILE | FILE_SYNCHRONOUS_IO_NONALERT | FILE_DELETE_ON_CLOSE,
             )
         };
 
