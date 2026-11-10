@@ -420,7 +420,7 @@ pub enum SourceSetRefusalV1 {
     /// `SOURCE_OBSERVATION_IO_ERROR`, a denied write or directory is
     /// `SOURCE_OBSERVATION_PERMISSION_DENIED`, an unprovable or colliding location is
     /// `SOURCE_UNSAFE_PATH`, an unprovable guarantee is `SOURCE_UNSUPPORTED`, and an object that
-    /// answered outside its validated range is `SOURCE_OBSERVATION_CHANGED_DURING_READ`. A
+    /// answered outside its validated range is `SNAPSHOT_CHANGED`. A
     /// staging failure is never reported as an absent authored body and never becomes a
     /// Markdown fallback.
     Staging {

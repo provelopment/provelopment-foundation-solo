@@ -345,7 +345,7 @@ impl StageReaderV1<'_> {
     ///
     /// # Errors
     ///
-    /// Returns `SOURCE_OBSERVATION_CHANGED_DURING_READ` for an out-of-range position and the
+    /// Returns `SNAPSHOT_CHANGED` for an out-of-range position and the
     /// classified staging refusal for an I/O failure.
     pub fn read_chunk(&self, position: u64, out: &mut [u8]) -> Result<usize, SourceReadRefusalV1> {
         if position > self.len {
@@ -396,7 +396,7 @@ impl StageReaderV1<'_> {
     /// # Errors
     ///
     /// Returns the classified staging refusal for an I/O failure and
-    /// `SOURCE_OBSERVATION_CHANGED_DURING_READ` when the object stops producing data early.
+    /// `SNAPSHOT_CHANGED` when the object stops producing data early.
     pub fn matches(&self, expected: &[u8]) -> Result<bool, SourceReadRefusalV1> {
         if self.len != expected.len() as u64 {
             return Ok(false);
@@ -480,7 +480,7 @@ fn unsafe_location() -> SourceReadRefusalV1 {
     SourceReadRefusalV1::new(SourceReadRefusalKind::UnsafeLocation, None)
 }
 
-/// `SOURCE_OBSERVATION_CHANGED_DURING_READ`: an object this store owns answered unexpectedly.
+/// `SNAPSHOT_CHANGED`: an object this store owns answered unexpectedly.
 fn changed() -> SourceReadRefusalV1 {
     SourceReadRefusalV1::new(SourceReadRefusalKind::ChangedDuringRead, None)
 }
@@ -565,14 +565,8 @@ mod tests {
             code_for(ErrorKind::PermissionDenied),
             "SOURCE_OBSERVATION_PERMISSION_DENIED"
         );
-        assert_eq!(
-            code_for(ErrorKind::NotFound),
-            "SOURCE_OBSERVATION_CHANGED_DURING_READ"
-        );
-        assert_eq!(
-            code_for(ErrorKind::UnexpectedEof),
-            "SOURCE_OBSERVATION_CHANGED_DURING_READ"
-        );
+        assert_eq!(code_for(ErrorKind::NotFound), "SNAPSHOT_CHANGED");
+        assert_eq!(code_for(ErrorKind::UnexpectedEof), "SNAPSHOT_CHANGED");
         assert_eq!(code_for(ErrorKind::AlreadyExists), "SOURCE_UNSAFE_PATH");
         assert_eq!(code_for(ErrorKind::Unsupported), "SOURCE_UNSUPPORTED");
         assert_eq!(code_for(ErrorKind::Other), "SOURCE_OBSERVATION_IO_ERROR");
