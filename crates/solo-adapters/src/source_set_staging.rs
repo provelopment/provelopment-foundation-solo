@@ -690,9 +690,10 @@ impl SourceSetStagingV1 {
             let file = if self.faults.fault == Some(StagingFaultV1::Disposition)
                 && self.faults.after <= self.staged_members
             {
-                // The seam creates the object without `DELETE`, so the host itself denies the
-                // pre-write disposition; the empty object is then removed by closing its handle.
-                crate::source_read_native::create_staging_shard_without_delete(
+                // The seam creates the object exactly as production does and then has the kernel
+                // refuse the disposition, so no plaintext is written and the empty object is removed
+                // when its handle closes.
+                crate::source_read_native::create_staging_shard_disposition_refused(
                     &self.root_dir,
                     &name,
                 )

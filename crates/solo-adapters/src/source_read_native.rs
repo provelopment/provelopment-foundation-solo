@@ -375,31 +375,32 @@ pub(crate) fn create_staging_shard(
     Ok(file)
 }
 
-/// Test-only seam: creates a shard exactly as production does but **without** the `DELETE` access
-/// and `FILE_DELETE_ON_CLOSE` the pre-write disposition needs.
+/// Test-only seam: creates a shard exactly as production does — including `DELETE` access and
+/// `FILE_DELETE_ON_CLOSE` — and then issues the **same** disposition call with a flag value this host
+/// does not define, so the kernel itself refuses it.
 ///
-/// The denial this produces is a real host answer to a real `NtCreateFile` / `NtSetInformationFile`
-/// pair on the real filesystem, not a simulated return value, so the disposition-failure path is
-/// exercised through the same production code that a genuine host denial would reach.
+/// The refusal is a real host answer to a real `NtCreateFile` / `SetFileInformationByHandle` pair on
+/// the real filesystem, not a simulated return value. Because the object keeps delete-on-close, the
+/// still-empty file is removed when its handle closes, so a refused transaction leaves nothing.
 #[cfg(windows)]
 #[doc(hidden)]
-pub fn create_staging_shard_without_delete(
+pub fn create_staging_shard_disposition_refused(
     parent: &std::fs::File,
     name: &str,
 ) -> Result<std::fs::File, StagingNativeError> {
     use std::os::windows::io::{AsRawHandle, FromRawHandle, IntoRawHandle};
-    let handle = sys::create_relative(parent.as_raw_handle(), name, false)
+    let handle = sys::create_relative(parent.as_raw_handle(), name, true)
         .map_err(StagingNativeError::from_native)?;
     let raw = handle.into_raw_handle();
     // SAFETY: a fresh, unowned handle moved exactly once into a `File`.
     let file = unsafe { std::fs::File::from_raw_handle(raw) };
-    if let Err(error) = dispose_staging_object(&file) {
+    if let Err(error) = dispose_staging_object_refused(&file) {
         // The empty object this call just created is removed by closing its own handle.
         drop(file);
         return Err(error);
     }
-    // Only reachable if the host permitted the disposition without `DELETE`, which would itself be
-    // a finding: report it instead of pretending the seam failed.
+    // Only reachable if the host accepted an undefined disposition flag, which would itself be a
+    // finding: report it instead of pretending the seam failed.
     Ok(file)
 }
 
@@ -412,7 +413,14 @@ pub fn create_staging_shard_without_delete(
 #[cfg(windows)]
 pub(crate) fn dispose_staging_object(object: &std::fs::File) -> Result<(), StagingNativeError> {
     use std::os::windows::io::AsRawHandle;
-    sys::dispose_held(object.as_raw_handle()).map_err(StagingNativeError::from_native)
+    sys::dispose_held(object.as_raw_handle(), false).map_err(StagingNativeError::from_native)
+}
+
+/// Test-only: issues the same disposition call so the kernel refuses it, leaving the object intact.
+#[cfg(windows)]
+fn dispose_staging_object_refused(object: &std::fs::File) -> Result<(), StagingNativeError> {
+    use std::os::windows::io::AsRawHandle;
+    sys::dispose_held(object.as_raw_handle(), true).map_err(StagingNativeError::from_native)
 }
 
 /// Safe, staging-only: the retained identity of an already-open handle.
@@ -1243,13 +1251,20 @@ mod sys {
     ///
     /// `FileDispositionInfoEx` is applied to the handle itself, so the object removed is the one
     /// this process owns even if its former name now belongs to somebody else's directory.
-    pub(super) fn dispose_held(handle: HANDLE) -> Result<(), NativeError> {
+    pub(super) fn dispose_held(handle: HANDLE, force_failure: bool) -> Result<(), NativeError> {
         use windows_sys::Win32::Storage::FileSystem::{
             FILE_DISPOSITION_FLAG_DELETE, FILE_DISPOSITION_FLAG_POSIX_SEMANTICS,
             FILE_DISPOSITION_INFO_EX, FileDispositionInfoEx, SetFileInformationByHandle,
         };
+        // A test seam asks this same call to carry a flag value this host does not define, so the
+        // kernel itself refuses the disposition. The handle keeps the production rights, including
+        // `FILE_DELETE_ON_CLOSE`, so the still-empty object is removed when it closes.
         let disposition = FILE_DISPOSITION_INFO_EX {
-            Flags: FILE_DISPOSITION_FLAG_DELETE | FILE_DISPOSITION_FLAG_POSIX_SEMANTICS,
+            Flags: if force_failure {
+                FILE_DISPOSITION_FLAG_DELETE | 0x0000_0080
+            } else {
+                FILE_DISPOSITION_FLAG_DELETE | FILE_DISPOSITION_FLAG_POSIX_SEMANTICS
+            },
         };
         // SAFETY: `handle` is a live handle the caller owns for this call; `disposition` is a
         // fully initialised `FILE_DISPOSITION_INFO_EX` and the size passed is exactly that
