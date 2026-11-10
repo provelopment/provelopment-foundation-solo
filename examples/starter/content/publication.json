@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "1.0.0",
+  "propertyRegistryVersion": "1.0.0",
+  "platformAssetLibraryVersion": "1.0.0",
+  "base": {
+    "canonical": "https://example.org/site",
+    "landing": {
+      "entity": "example",
+      "facet": "main",
+      "site": "main",
+      "page": "home"
+    }
+  },
+  "entity": {
+    "id": "example",
+    "label": "Example",
+    "facets": [
+      {
+        "id": "main",
+        "label": "Main",
+        "sites": [
+          {
+            "id": "main",
+            "label": "Main site",
+            "defaultLocale": "en-001",
+            "languagePreferences": { "en": "en-001" },
+            "pages": [
+              {
+                "id": "home",
+                "label": "Home",
+                "representations": [
+                  {
+                    "locale": "en-001",
+                    "route": { "path": "/en-001/home" },
+                    "sourceCandidates": {
+                      "json": "pages/main-home.en-001.json",
+                      "markdown": "pages/main-home.en-001.md"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

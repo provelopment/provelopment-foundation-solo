@@ -1,0 +1,124 @@
+{
+  "schemaVersion": "1.0.0",
+  "propertyRegistryVersion": "1.0.0",
+  "platformAssetLibraryVersion": "1.0.0",
+  "base": {
+    "canonical": "https://example.org/visit",
+    "landing": {
+      "entity": "example",
+      "facet": "visitors",
+      "site": "bali",
+      "page": "home"
+    }
+  },
+  "entity": {
+    "id": "example",
+    "label": "Example Entity",
+    "properties": {
+      "location": {
+        "inheritance": "inherit",
+        "currentContext": [
+          {
+            "operation": "add",
+            "factId": "indonesia",
+            "kind": "association",
+            "fields": { "countryCode": "ID" },
+            "exposure": "public"
+          }
+        ]
+      }
+    },
+    "facets": [
+      {
+        "id": "visitors",
+        "label": "Visitors",
+        "sites": [
+          {
+            "id": "bali",
+            "label": "Bali Site",
+            "defaultLocale": "en-001",
+            "languagePreferences": { "en": "en-001", "id": "id-ID" },
+            "pages": [
+              {
+                "id": "home",
+                "label": "Home",
+                "visibilityDefault": "public",
+                "representations": [
+                  {
+                    "locale": "en-001",
+                    "route": { "path": "/en-001/home" },
+                    "sourceCandidates": { "markdown": "pages/bali-home.en-001.md" }
+                  },
+                  {
+                    "locale": "id-ID",
+                    "visibility": "unlisted",
+                    "route": { "path": "/id-id/Hidden7A" },
+                    "sourceCandidates": { "markdown": "pages/bali-home.id-id.md" }
+                  }
+                ]
+              },
+              {
+                "id": "about",
+                "label": "About",
+                "representations": [
+                  {
+                    "locale": "en-001",
+                    "route": { "path": "/en-001/about" },
+                    "sourceCandidates": { "markdown": "pages/bali-about.en-001.md" }
+                  },
+                  {
+                    "locale": "id-ID",
+                    "route": { "path": "/id-id/TentangKami", "caseMatching": "sensitive" },
+                    "sourceCandidates": { "json": "pages/bali-about.id-id.json" }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "jakarta",
+            "label": "Jakarta Site",
+            "defaultLocale": "en-001",
+            "pages": [
+              {
+                "id": "home",
+                "label": "Jakarta Home",
+                "representations": [
+                  {
+                    "locale": "en-001",
+                    "route": { "path": "/en-001/jakarta" },
+                    "sourceCandidates": { "markdown": "pages/jakarta-home.en-001.md" }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "company",
+        "label": "Company",
+        "sites": [
+          {
+            "id": "global",
+            "label": "Global Site",
+            "defaultLocale": "de-DE",
+            "pages": [
+              {
+                "id": "home",
+                "label": "Company Home",
+                "representations": [
+                  {
+                    "locale": "de-DE",
+                    "route": { "path": "/de-de/unternehmen" },
+                    "sourceCandidates": { "markdown": "pages/company-home.de-de.md" }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
