@@ -381,6 +381,15 @@ pub(crate) fn create_staging_shard(
         drop(file);
         return Err(error);
     }
+    // Temporary diagnosis: does the detached name still resolve? 1 means the name is gone,
+    // 2 means it is delete-pending or refused, 0 means it is still openable.
+    let probe = match sys::open_relative(parent.as_raw_handle(), name, false, false) {
+        Ok(_) => 0_i32,
+        Err(NativeError::Absent) => 1,
+        Err(NativeError::Unsafe) => 2,
+        Err(_) => 3,
+    };
+    sys::report_native_failure("probe_after_unlink", probe);
     Ok(file)
 }
 
@@ -733,7 +742,7 @@ mod sys {
     ///
     /// Only a number is emitted: never a path, a name or a staged byte. This exists so a real
     /// host failure can be identified instead of being reported as a generic path refusal.
-    fn report_native_failure(operation: &str, code: i32) {
+    pub(super) fn report_native_failure(operation: &str, code: i32) {
         eprintln!("staging_native={operation} raw_error={code}");
     }
 
@@ -896,7 +905,7 @@ mod sys {
     ///
     /// `OBJ_CASE_INSENSITIVE` is deliberately **not** requested: the lookup is meant to be
     /// exact, so a differently-cased spelling is not silently accepted as the same entry.
-    fn open_relative(
+    pub(super) fn open_relative(
         parent: HANDLE,
         name: &str,
         want_dir: bool,
