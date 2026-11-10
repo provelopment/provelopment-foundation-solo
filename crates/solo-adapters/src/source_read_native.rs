@@ -1044,7 +1044,7 @@ mod sys {
             MaximumLength: byte_len,
             Buffer: wide.as_ptr().cast_mut(),
         };
-        let mut attributes: OBJECT_ATTRIBUTES = unsafe { zeroed() };
+        let mut attributes: OBJECT_ATTRIBUTES = zeroed();
         attributes.Length = u32::try_from(std::mem::size_of::<OBJECT_ATTRIBUTES>()).unwrap_or(0);
         attributes.RootDirectory = parent;
         attributes.ObjectName = ptr::from_ref(&unicode).cast_mut();
@@ -1073,7 +1073,7 @@ mod sys {
             )
         };
 
-        let mut io_status: IO_STATUS_BLOCK = unsafe { zeroed() };
+        let mut io_status: IO_STATUS_BLOCK = zeroed();
         let mut out: HANDLE = ptr::null_mut();
 
         // SAFETY: `parent` is a live handle owned by the caller for this call; `unicode` names

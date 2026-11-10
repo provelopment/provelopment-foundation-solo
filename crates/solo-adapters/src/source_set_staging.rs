@@ -913,9 +913,6 @@ fn namespace_name() -> String {
     )
 }
 
-/// The Windows namespace is created by handle in the native adapter; no directory is created
-/// through a pathname anywhere in this module.
-
 #[cfg(test)]
 mod tests {
     //! Deterministic coverage of the staging refusal matrix.
