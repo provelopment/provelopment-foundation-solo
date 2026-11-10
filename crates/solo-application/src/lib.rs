@@ -13,11 +13,16 @@
 #![forbid(unsafe_code)]
 
 mod bootstrap_preflight;
+mod property_resolution;
 mod source_read;
 
 pub use bootstrap_preflight::{
     BootstrapAcceptedV1, BootstrapInputV1, BootstrapOutcomeV1, BootstrapPreflightService,
     BootstrapPreflightV1, BootstrapRefusalCode, BootstrapRefusedV1,
+};
+pub use property_resolution::{
+    PROPERTY_CANDIDATE_GRANTS_PUBLICATION_AUTHORITY, PropertyResolutionCandidateV1,
+    PropertyResolutionRequestV1, resolve_declared_properties_v1,
 };
 pub use source_read::{
     CandidateBodyV1, CandidateProbeV1, DeclaredSourceSetSinkV1, MAX_JSON_SOURCE_BYTES,
