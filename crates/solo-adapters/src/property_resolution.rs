@@ -68,7 +68,7 @@ impl ManifestPropertyRefusalKind {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ManifestPropertyRefusalV1 {
     kind: ManifestPropertyRefusalKind,
-    owner: Option<QualifiedOwnerV1>,
+    owner: Option<Box<QualifiedOwnerV1>>,
     property: Option<PropertyKey>,
 }
 
@@ -80,7 +80,7 @@ impl ManifestPropertyRefusalV1 {
     ) -> Self {
         Self {
             kind,
-            owner,
+            owner: owner.map(Box::new),
             property,
         }
     }
@@ -93,8 +93,8 @@ impl ManifestPropertyRefusalV1 {
 
     /// The qualified structural owner the refusal applies to, when known.
     #[must_use]
-    pub const fn owner(&self) -> Option<&QualifiedOwnerV1> {
-        self.owner.as_ref()
+    pub fn owner(&self) -> Option<&QualifiedOwnerV1> {
+        self.owner.as_deref()
     }
 
     /// The registered key the refusal applies to, when known.
