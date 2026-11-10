@@ -1,1 +1,11 @@
 # Foundation Solo — plan-next (Next Candidate)
+
+## R02.C — Default one-Entity starter seed and expanded EFS fixtures
+
+**Objective:** Supply a simple starter seed with exactly one Entity and one default Facet/Site, then expanded synthetic source/manifest fixtures with multiple Facets and Sites while preserving that same one-Entity model.
+
+**Prerequisites and readiness:** R02.B was independently accepted and administratively closed; its validated manifest, explicit source declarations and provenance-safe staging are the baseline. Follow the existing ROADMAP R02.C package and Architecture §6.2M.1–§6.2M.2, §6.2N/P13 and the applicable EFS identity contracts. The later R10.A installer/release lifecycle is not part of this candidate.
+
+**Proposed scope and deliverables:** A minimal synthetic/default seed with one Entity, one Facet, one Site, one Page and a declared full-locale representation (`en-001`) using authored source candidates; an expanded one-Entity fixture family exemplifying two Facets, three Sites, four Pages, correctly scoped reused Page IDs, full-locale variants and explicit source selection. Provide positive and negative validation of parentage, cardinality, duplicate/orphan/second-Entity refusals, source-claim isolation and identity stability; preserve JSON-first, present-but-invalid preferred JSON refusal and no filename-based publication. Treat normative Architecture examples as specifications, not as already installed assets or implemented runtime behavior.
+
+**Verifiable exit conditions:** A separate Owner-issued implementation order identifies exact files and proves both starter and expanded structures accepted by the existing applicable contracts; invalid second Entity, duplicate/empty/unknown ownership, undeclared source and cross-parent contamination are refused. Each Page's identity remains independent of labels, locales, routes, addresses and location. Full-locale keys are explicit; no inferred geographic or public-route authority, second Entity, Spoke, provider dependence, publication claim, HTTP/browser proof, installer, release or deployment is introduced. Executed tests and limits are reported honestly; any unimplemented later-stage routing/rendering behavior stays deferred rather than being asserted as delivered.
