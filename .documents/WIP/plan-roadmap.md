@@ -1,15 +1,5 @@
 # Foundation Solo — Implementation Roadmap
 
-## Stage 02 — One-Entity EFS identity and publication authority
-
-**Prerequisite:** skeleton and accepted ID/manifest contracts.
-
-**Remaining packages**
-
-- **R02.C:** implement simple default installation seed and expanded synthetic fixtures for multiple Facets and Sites; preserve one Entity even with complex nesting.
-
-**Exit gate:** creation/reading of valid one-Entity structures; refusal of second Entity, duplicates, orphans, absent representations, undeclared source publication and cross-parent contamination. Identity unaffected by label, locale, route or base URL changes. Core tests use no provider/framework dependencies.
-
 ## Stage 03 — Typed properties, location independence and graphics
 
 **Prerequisite:** stable EFS ancestry and declaration model.
