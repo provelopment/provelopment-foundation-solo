@@ -176,23 +176,25 @@ pub(crate) fn recheck(leaf: &OpenLeaf) -> Result<LeafFacts, NativeError> {
     sys::recheck(&leaf.raw)
 }
 
-/// Safe, staging-only: opens one **unnamed** object inside `directory`.
+/// Safe, staging-only: opens one **unnamed** object inside a *retained* directory handle.
 ///
-/// This is `O_TMPFILE | O_EXCL`, the very primitive the accepted source-snapshot path already
-/// uses below — with a staging root instead of a content root. The inode has no directory entry
-/// at any moment of its life, so no pathname can reach it, replace it or map it, and there is no
-/// window between creation and unlinking in which an alias could be acquired. It adds no
-/// `unsafe`, no foreign declaration and no dependency: it is a safe `rustix` call.
+/// This is `O_TMPFILE | O_EXCL` relative to the caller's own descriptor, so the object is created
+/// in the directory the caller actually holds and never in whatever a pathname may since have been
+/// redirected to. The inode has no directory entry at any moment of its life, so no pathname can
+/// reach it, replace it or map it. It adds no `unsafe`, no foreign declaration and no dependency:
+/// it is a safe `rustix` call.
+///
+/// A namespace that was removed between acquisition and use makes the kernel answer `ENOENT`
+/// here, which the caller must treat as a confinement failure rather than an absence to paper
+/// over. Creating in a deleted directory cannot silently succeed on Linux, so a substituted
+/// pathname can never receive a staged byte.
 #[cfg(target_os = "linux")]
-pub(crate) fn open_unnamed_staging_object(directory: &Path) -> std::io::Result<std::fs::File> {
-    let dir = rustix::fs::open(
-        directory,
-        rustix::fs::OFlags::DIRECTORY | rustix::fs::OFlags::NOFOLLOW | rustix::fs::OFlags::CLOEXEC,
-        rustix::fs::Mode::empty(),
-    )
-    .map_err(staging_io)?;
+pub(crate) fn open_unnamed_staging_object(
+    directory: &std::fs::File,
+) -> std::io::Result<std::fs::File> {
+    use std::os::fd::AsFd;
     let fd = rustix::fs::openat(
-        &dir,
+        directory.as_fd(),
         c".",
         rustix::fs::OFlags::TMPFILE
             | rustix::fs::OFlags::EXCL
@@ -202,6 +204,21 @@ pub(crate) fn open_unnamed_staging_object(directory: &Path) -> std::io::Result<s
     )
     .map_err(staging_io)?;
     Ok(std::fs::File::from(fd))
+}
+
+/// Safe, staging-only: removes one directory entry **relative to a retained parent handle**.
+///
+/// Resolving the entry through the retained parent descriptor avoids re-walking any path
+/// component, so a replaced ancestor cannot redirect the removal. A non-empty directory is
+/// refused by the kernel (`ENOTEMPTY`), which is what keeps an adversary-created directory that
+/// happens to reuse the namespace name from being removed.
+#[cfg(target_os = "linux")]
+pub(crate) fn remove_staging_namespace_entry(
+    parent: &std::fs::File,
+    name: &std::ffi::OsStr,
+) -> std::io::Result<()> {
+    use std::os::fd::AsFd;
+    rustix::fs::unlinkat(parent.as_fd(), name, rustix::fs::AtFlags::REMOVEDIR).map_err(staging_io)
 }
 
 /// Maps one `rustix` error onto the host's own I/O error, so every staging failure is classified

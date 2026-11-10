@@ -294,23 +294,57 @@ fn a_staged_object_never_exists_as_a_path_an_adversary_could_open() {
 
 #[test]
 fn a_substituted_namespace_is_refused_before_any_body_is_staged() {
-    let fixture = Fixture::new("substitution");
-    let root = fixture.root();
-    let mut store = root.begin().expect("begin a private staging store");
+    // Repeated, and with the impostor holding a file of its own, so the outcome cannot depend on
+    // the file system happening to recycle the freed inode number: every round must refuse, and a
+    // populated impostor can never be mistaken for this store's own empty namespace either.
+    for round in 0..16 {
+        let fixture = Fixture::new("substitution");
+        let capability = fixture.root();
+        let mut store = capability.begin().expect("begin a private staging store");
+        let staging = fixture.staging();
+        fs::create_dir(staging.join("owner-kept")).expect("create an Owner-owned sentinel");
 
-    let namespaces = entries(&fixture.staging());
-    assert_eq!(namespaces.len(), 1);
-    let namespace = fixture.staging().join(&namespaces[0]);
+        let namespace = entries(&staging)
+            .into_iter()
+            .find(|name| name.starts_with("solo-source-stage-"))
+            .map(|name| staging.join(name))
+            .expect("the store's namespace");
 
-    // Replace the namespace with a different directory that has the same name: the classic
-    // redirection an identity check must catch and a pathname check cannot.
-    fs::remove_dir(&namespace).expect("remove the store's own empty namespace");
-    fs::create_dir(&namespace).expect("create an impostor namespace");
+        // Replace the namespace with a different directory at the same pathname: the classic
+        // redirection a pathname check cannot catch.
+        fs::remove_dir(&namespace).expect("remove the store's own empty namespace");
+        fs::create_dir(&namespace).expect("create an impostor namespace");
+        fs::write(namespace.join("impostor.txt"), b"not staged")
+            .expect("give the impostor content of its own");
 
-    let refusal = store
-        .stage_body(b"first body")
-        .expect_err("a substituted namespace must be refused");
-    assert_eq!(refusal.code(), "SOURCE_UNSAFE_PATH");
+        let refusal = match store.stage_body(b"first body") {
+            Ok(_) => panic!("round {round}: a substituted namespace must be refused"),
+            Err(refusal) => refusal,
+        };
+        assert_eq!(refusal.code(), "SOURCE_UNSAFE_PATH", "round {round}");
+
+        // Nothing of this store's ever lands in the impostor, and cleanup leaves both the impostor
+        // and the Owner's sentinel exactly as they were.
+        assert_eq!(
+            entries(&namespace),
+            vec!["impostor.txt".to_owned()],
+            "round {round}: no staged object may appear in a substituted directory"
+        );
+        drop(store);
+        assert!(
+            namespace.exists(),
+            "round {round}: an adversary directory must survive cleanup"
+        );
+        assert_eq!(
+            fs::read(namespace.join("impostor.txt")).expect("impostor content"),
+            b"not staged",
+            "round {round}: an adversary's own content must be untouched"
+        );
+        assert!(
+            staging.join("owner-kept").exists(),
+            "round {round}: the Owner sentinel must survive cleanup"
+        );
+    }
 }
 
 #[test]
@@ -485,6 +519,50 @@ fn a_real_permission_denial_refuses_as_permission_denied() {
     fs::set_permissions(&namespace, permissions).expect("restore the namespace");
 
     assert_eq!(refusal.code(), "SOURCE_OBSERVATION_PERMISSION_DENIED");
+}
+
+#[cfg(windows)]
+#[test]
+fn a_reparse_point_staging_root_is_refused_or_its_creation_is_proven_unavailable() {
+    // This case must decide, on a real Windows host, which of three things is true: the adversary
+    // runs and adoption refuses it; the host's privilege model blocks creating a reparse point,
+    // with the specific OS error recorded; or adoption accepts it, which is a security failure and
+    // fails this test.
+    let fixture = Fixture::new("reparse");
+    let staging = fixture.staging();
+    fs::create_dir_all(&staging).expect("create the fixture area");
+    let target = staging.join("real-root");
+    fs::create_dir(&target).expect("create the real directory");
+    let link = staging.join("linked-root");
+
+    match std::os::windows::fs::symlink_dir(&target, &link) {
+        Ok(()) => {
+            let metadata = fs::symlink_metadata(&link).expect("reparse metadata");
+            assert!(
+                metadata.file_type().is_symlink(),
+                "a created directory link must report itself as a reparse point"
+            );
+            let refusal = match StagingRootCapability::adopt(&link) {
+                Ok(_) => panic!("a reparse-point staging root must be refused"),
+                Err(refusal) => refusal,
+            };
+            assert_eq!(refusal.code(), "SOURCE_UNSAFE_PATH");
+            eprintln!("reparse-point adversary executed: adoption refused the link");
+        }
+        Err(error) => {
+            const ERROR_PRIVILEGE_NOT_HELD: i32 = 1314;
+            let raw = error.raw_os_error();
+            eprintln!(
+                "reparse-point adversary unavailable: kind={:?} raw={raw:?} privilege_not_held={}",
+                error.kind(),
+                raw == Some(ERROR_PRIVILEGE_NOT_HELD)
+            );
+            assert!(
+                raw.is_some(),
+                "a refusal to create a reparse point must carry a specific OS error code"
+            );
+        }
+    }
 }
 
 #[test]

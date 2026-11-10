@@ -54,10 +54,13 @@ const FILE_FLAG_BACKUP_SEMANTICS: u32 = 0x0200_0000;
 ///
 /// The three components are deliberately opaque. On Windows they are the container serial and the
 /// two halves of the 128-bit `FILE_ID_INFO` object id, which the volume does not reuse. On Unix
-/// they are the device, the inode **and the inode change time**: `(device, inode)` alone is not
-/// sound, because Linux recycles a freed inode number immediately, so a directory deleted and
-/// recreated in the same parent can present the identical pair. The change time is maintained by
-/// the kernel and is not settable by a writer, so a recreated object cannot reproduce it.
+/// they are the device and the inode, and the third component is unused.
+///
+/// An identity is only ever a *secondary* control here. It cannot establish ownership of a
+/// pathname, because Linux recycles a freed inode number and no mutable timestamp can substitute
+/// for that: a directory's change time moves whenever its contents legitimately change. Staging
+/// confinement therefore rests on retained descriptors, and identity checking is used only where a
+/// descriptor cannot be carried — Windows object creation, where the object id is not recycled.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct ObjectIdentityV1 {
     container: u64,
@@ -138,13 +141,32 @@ fn open_directory(path: &Path) -> Result<File, SourceReadRefusalV1> {
 /// create itself by sharing only delete, so no other handle can obtain read or write access; the
 /// unlink that follows then leaves no path to reach it either.
 #[cfg(target_os = "linux")]
-fn open_staging_object(namespace: &Path, _index: usize) -> Result<File, SourceReadRefusalV1> {
-    crate::source_read_native::open_unnamed_staging_object(namespace).map_err(classify_io)
+fn open_staging_object(
+    _namespace: &Path,
+    directory: &File,
+    _index: usize,
+) -> Result<File, SourceReadRefusalV1> {
+    match crate::source_read_native::open_unnamed_staging_object(directory) {
+        Ok(file) => Ok(file),
+        // Creating an object inside a directory that has been unlinked cannot succeed, so `ENOENT`
+        // here means the namespace this store holds is no longer in the namespace tree. That is a
+        // confinement failure and is refused as an unsafe location, never as an absence.
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Err(unsafe_location()),
+        Err(error) => Err(classify_io(error)),
+    }
 }
 
 /// The share mode is the guarantee here; the unlink removes the path as well.
+///
+/// Windows cannot create a file relative to a retained directory handle through the standard
+/// library, so the object is created by name inside the confirmed namespace. The object id this
+/// host reports is not recycled, so the confirmation either side of the create is sound here.
 #[cfg(windows)]
-fn open_staging_object(namespace: &Path, index: usize) -> Result<File, SourceReadRefusalV1> {
+fn open_staging_object(
+    namespace: &Path,
+    _directory: &File,
+    index: usize,
+) -> Result<File, SourceReadRefusalV1> {
     use std::os::windows::fs::OpenOptionsExt;
     let path = namespace.join(format!("{STAGE_OBJECT_PREFIX}{index}.bin"));
     let file = OpenOptions::new()
@@ -164,7 +186,11 @@ fn open_staging_object(namespace: &Path, index: usize) -> Result<File, SourceRea
 
 /// Other Unix hosts have no proven unnamed primitive here, so staging refuses rather than guess.
 #[cfg(all(unix, not(target_os = "linux")))]
-fn open_staging_object(_namespace: &Path, _index: usize) -> Result<File, SourceReadRefusalV1> {
+fn open_staging_object(
+    _namespace: &Path,
+    _directory: &File,
+    _index: usize,
+) -> Result<File, SourceReadRefusalV1> {
     Err(SourceReadRefusalV1::new(
         SourceReadRefusalKind::Unsupported,
         None,
@@ -173,7 +199,11 @@ fn open_staging_object(_namespace: &Path, _index: usize) -> Result<File, SourceR
 
 /// Hosts with neither primitive refuse for the same reason.
 #[cfg(not(any(unix, windows)))]
-fn open_staging_object(_namespace: &Path, _index: usize) -> Result<File, SourceReadRefusalV1> {
+fn open_staging_object(
+    _namespace: &Path,
+    _directory: &File,
+    _index: usize,
+) -> Result<File, SourceReadRefusalV1> {
     Err(SourceReadRefusalV1::new(
         SourceReadRefusalKind::Unsupported,
         None,
@@ -371,8 +401,13 @@ impl StagingRootCapability {
             return Err(unsafe_location());
         }
 
+        #[cfg(target_os = "linux")]
+        let root_dir = self.handle.try_clone().map_err(classify_io)?;
         Ok(SourceSetStagingV1 {
             namespace,
+            namespace_dir: namespace_handle,
+            #[cfg(target_os = "linux")]
+            root_dir,
             namespace_identity,
             shards: Vec::new(),
             staged_bytes: 0,
@@ -433,6 +468,11 @@ impl StagedBodyV1 {
 /// failure drops it and its [`Drop`] closes every handle and removes the empty namespace.
 pub struct SourceSetStagingV1 {
     namespace: PathBuf,
+    /// The retained namespace descriptor every staging object is created through.
+    namespace_dir: File,
+    /// The adopted root descriptor, used to remove the namespace entry without re-walking a path.
+    #[cfg(target_os = "linux")]
+    root_dir: File,
     namespace_identity: ObjectIdentityV1,
     shards: Vec<StageShardV1>,
     staged_bytes: u64,
@@ -555,13 +595,66 @@ impl SourceSetStagingV1 {
         Ok(())
     }
 
-    /// Confirms, by identity, that the namespace path still names this store's namespace.
+    /// Confirms that the directory staging writes into is still this store's own.
+    ///
+    /// On Linux the control is the descriptor, not a name: objects are created *through* the
+    /// retained namespace handle, so a substituted pathname never receives a byte and re-resolving
+    /// the path here would only add a check-then-use window. Comparing the descriptor with the
+    /// identity recorded when it was created is a cheap sanity check, not the guarantee.
+    ///
+    /// Windows creates objects by name inside the namespace, so the entry must additionally still
+    /// resolve to this store's directory. Its object id is not recycled, which is what makes that
+    /// comparison sound there.
+    ///
+    /// # Errors
+    ///
+    /// Returns `SOURCE_UNSAFE_PATH` when the descriptor is no longer the recorded namespace, and on
+    /// Windows also when the namespace entry no longer resolves to it.
     fn confirm_namespace(&self) -> Result<(), SourceReadRefusalV1> {
-        let handle = open_directory(&self.namespace)?;
-        if !identity_of(&handle)?.same_object(self.namespace_identity) {
+        if !identity_of(&self.namespace_dir)?.same_object(self.namespace_identity) {
             return Err(unsafe_location());
         }
+        #[cfg(not(target_os = "linux"))]
+        {
+            let handle = open_directory(&self.namespace)?;
+            if !identity_of(&handle)?.same_object(self.namespace_identity) {
+                return Err(unsafe_location());
+            }
+        }
         Ok(())
+    }
+
+    /// Removes this store's own, now-empty namespace — and nothing else.
+    ///
+    /// Ownership is decided before anything is removed, and the removal is deliberately not
+    /// recursive. A swap confined to the window between that decision and the removal is not
+    /// excluded by the standard library, so the consequence is bounded instead: only a directory
+    /// inside the adopted root is ever considered, and only an **empty** one can be removed. No
+    /// staged content, no Owner material and no populated adversary directory can be deleted, and
+    /// a directory that is not provably this store's is left in place rather than forced.
+    fn remove_namespace(&self) {
+        let is_ours = match open_directory(&self.namespace) {
+            Ok(handle) => identity_of(&handle)
+                .map(|found| found.same_object(self.namespace_identity))
+                .unwrap_or(false),
+            Err(_) => false,
+        };
+        if !is_ours {
+            return;
+        }
+        #[cfg(target_os = "linux")]
+        {
+            // Resolved through the retained root descriptor, so no path component is re-walked and
+            // a replaced ancestor cannot redirect the removal.
+            if let Some(name) = self.namespace.file_name() {
+                let _ =
+                    crate::source_read_native::remove_staging_namespace_entry(&self.root_dir, name);
+            }
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            let _ = std::fs::remove_dir(&self.namespace);
+        }
     }
 
     /// A bounded reader over one staged member.
@@ -621,12 +714,16 @@ impl SourceSetStagingV1 {
 
     /// Creates one nameless staging object inside this store's own namespace.
     fn open_object(&mut self) -> Result<(), SourceReadRefusalV1> {
-        // Confirmed before creation, and again afterwards: a namespace substituted during the
-        // create is therefore detected before a single byte is written into the object it
-        // produced, so no staged body is ever accepted through a redirected directory.
+        // Linux creates the object through the retained namespace descriptor, so a substituted
+        // pathname cannot receive a byte and there is no check-then-use window to lose. Windows
+        // creates it by name, so the entry is confirmed immediately before and after the create:
+        // a namespace substituted during the create is detected before a byte is written into the
+        // object it produced.
+        #[cfg(not(target_os = "linux"))]
         self.confirm_namespace()?;
         let index = self.shards.len();
-        let file = open_staging_object(&self.namespace, index)?;
+        let file = open_staging_object(&self.namespace, &self.namespace_dir, index)?;
+        #[cfg(not(target_os = "linux"))]
         self.confirm_namespace()?;
         self.shards.push(StageShardV1 { file, written: 0 });
         Ok(())
@@ -764,11 +861,12 @@ fn read_object_at(file: &File, out: &mut [u8], at: u64) -> std::io::Result<usize
 
 impl Drop for SourceSetStagingV1 {
     fn drop(&mut self) {
-        // Close every handle first, so a host that needs the handle gone can remove the name.
+        // Objects are nameless on Linux and already detached on Windows, so closing every handle is
+        // the whole of object cleanup.
         self.shards.clear();
-        // Remove only this run's namespace, and only if it is empty. Never recursive, never a
-        // directory this store did not create, never a shared temp root.
-        let _ = std::fs::remove_dir(&self.namespace);
+        // Then the entry itself, and only when it is provably still this store's own empty
+        // namespace. A namespace an adversary substituted is left where it is.
+        self.remove_namespace();
     }
 }
 
