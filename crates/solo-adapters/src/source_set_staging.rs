@@ -198,6 +198,10 @@ fn staging_native(error: StagingNativeError) -> SourceReadRefusalV1 {
             SourceReadRefusalV1::new(SourceReadRefusalKind::PermissionDenied, None)
         }
         StagingNativeError::Unsupported => unsupported(),
+        // A genuine native failure is an I/O failure, never a claimed path refusal.
+        StagingNativeError::NativeFailure => {
+            SourceReadRefusalV1::new(SourceReadRefusalKind::OtherIo, None)
+        }
     }
 }
 

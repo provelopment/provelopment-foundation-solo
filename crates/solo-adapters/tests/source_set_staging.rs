@@ -432,7 +432,26 @@ fn open_object_count_follows_staged_size_not_member_count() {
         store.staged_bytes(),
         u64::try_from(staged.len() * body.len()).expect("a small fixture total")
     );
-    assert_eq!(entries(&fixture.staging()), before);
+    // Linux creates no namespace at all; Windows owns a temporary one that must already hold no
+    // shard name while the transaction is still open.
+    #[cfg(target_os = "linux")]
+    assert_eq!(
+        entries(&fixture.staging()),
+        before,
+        "no staging-owned entry may appear in the adopted root"
+    );
+
+    #[cfg(windows)]
+    {
+        let namespace = store
+            .namespace_path()
+            .expect("Windows owns a temporary namespace");
+        assert!(namespace.is_dir(), "the owned namespace must still exist");
+        assert!(
+            entries(namespace).is_empty(),
+            "no staged shard may remain visible by name"
+        );
+    }
 
     for staged_body in &staged {
         assert!(

@@ -296,6 +296,11 @@ pub(crate) enum StagingNativeError {
     PermissionDenied,
     /// This host cannot perform the operation at all.
     Unsupported,
+    /// The host answered with an error this boundary cannot interpret.
+    ///
+    /// Deliberately distinct from `Unsafe`: a real native failure must be reported as an I/O
+    /// failure instead of being concealed as a path refusal.
+    NativeFailure,
 }
 
 #[cfg(windows)]
@@ -304,6 +309,9 @@ impl StagingNativeError {
         match error {
             NativeError::PermissionDenied => Self::PermissionDenied,
             NativeError::Unsupported => Self::Unsupported,
+            // A native failure stays an I/O failure; only a proven path or object defect is
+            // reported as an unsafe location.
+            NativeError::OtherIo => Self::NativeFailure,
             _ => Self::Unsafe,
         }
     }
@@ -713,6 +721,14 @@ mod sys {
             STATUS_OBJECT_NAME_INVALID => NativeError::Unsafe,
             _ => NativeError::OtherIo,
         }
+    }
+
+    /// Records the raw native code of a failed staging call.
+    ///
+    /// Only a number is emitted: never a path, a name or a staged byte. This exists so a real
+    /// host failure can be identified instead of being reported as a generic path refusal.
+    fn report_native_failure(operation: &str, code: i32) {
+        eprintln!("staging_native={operation} raw_error={code}");
     }
 
     fn last_error() -> NativeError {
@@ -1209,9 +1225,11 @@ mod sys {
             )
         };
         if status == STATUS_OBJECT_NAME_COLLISION {
+            report_native_failure("create_relative_collision", status);
             return Err(NativeError::Unsafe);
         }
         if status != STATUS_SUCCESS {
+            report_native_failure("create_relative", status);
             return Err(map_status(status));
         }
         if out.is_null() || out == INVALID_HANDLE_VALUE {
@@ -1246,6 +1264,10 @@ mod sys {
             )
         };
         if ok == 0 {
+            let code = std::io::Error::last_os_error()
+                .raw_os_error()
+                .unwrap_or_default();
+            report_native_failure("dispose_held", code);
             return Err(last_error());
         }
         Ok(())
