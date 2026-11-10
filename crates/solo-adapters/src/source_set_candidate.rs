@@ -228,8 +228,8 @@ impl SourceSetMemberV1 {
 /// manifest always yields the same order, and the same qualified lineage appears exactly once.
 ///
 /// It owns the staging store for its whole lifetime. Dropping the candidate closes every staged
-/// object and removes the private namespace it created; reading a member afterwards is
-/// impossible, and reading a member never reopens the original authored source.
+/// object; reading a member afterwards is impossible, and reading a member never reopens the
+/// original authored source.
 pub struct SourceSetCandidateV1 {
     entity: String,
     staging: SourceSetStagingV1,
@@ -667,9 +667,9 @@ impl DeclaredSourceSetSinkV1 for CandidateTransaction<'_, '_> {
     }
 
     fn finish(mut self) -> Result<Self::Complete, Self::Refusal> {
-        // Fallible whole-set finalization: the store re-confirms its namespace identity and every
-        // staged length, so a late write or substitution failure refuses here instead of becoming
-        // an accepted candidate.
+        // Fallible whole-set finalization: the store re-confirms its adopted directory identity and
+        // every staged length, so a late write or substitution failure refuses here instead of
+        // becoming an accepted candidate.
         self.staging
             .finalize()
             .map_err(|refusal| SourceSetRefusalV1::Staging {
@@ -688,8 +688,8 @@ impl DeclaredSourceSetSinkV1 for CandidateTransaction<'_, '_> {
 /// Assembles one complete, inert **source-stage** candidate.
 ///
 /// The steps run in the only order this stage permits: strict parse of the already-supplied
-/// manifest bytes; enumeration of every declared representation; creation of the private staging
-/// namespace; reservation of every declared candidate's physical identity **before** any body
+/// manifest bytes; enumeration of every declared representation; adoption of the caller's staging
+/// root; reservation of every declared candidate's physical identity **before** any body
 /// read; exactly one body per declaration under the accepted JSON-first rule, preflighted and
 /// staged before the next is read; assembly in declaration order. The first failure anywhere
 /// returns one typed refusal and no candidate.

@@ -3,8 +3,9 @@
 //! Every case drives the actual store on the real filesystem of whichever host runs it: no mock, no
 //! in-memory spool and no assertion about intent. What is proved is that
 //!
-//! * a staged member has **no directory entry at all** while it lives, so nothing can reopen,
-//!   replace, truncate or redirect it;
+//! * a staged member cannot be reopened, replaced, truncated, redirected or mapped while it lives:
+//!   Linux keeps no directory entry at all, and Windows keeps an enumerable but unopenable
+//!   `DELETE_PENDING` name that disappears when its last handle closes;
 //! * the caller's own staging directory gains **no staging-owned entry** on any path, and every
 //!   foreign or Owner entry survives byte for byte;
 //! * an adopted root that is replaced, unlinked or reached through a symlink or junction is
@@ -576,13 +577,13 @@ fn the_mandatory_btrfs_fixture_stages_anonymous_objects() {
     assert_eq!(entries(&base), before, "Btrfs cleanup touched a name");
     fs::remove_dir(&base).expect("remove the task-owned Btrfs child");
 }
-/// An impostor installed at the namespace's own former name must survive untouched.
+/// An impostor installed at a former staging name must survive untouched.
 ///
 /// Both the empty and the populated case are exercised: the store may only ever dispose of the
 /// object behind its retained handle, never the entry a name currently resolves to.
 #[cfg(windows)]
 #[test]
-fn an_impostor_at_the_namespace_name_survives_untouched() {
+fn an_impostor_at_a_former_staging_name_survives_untouched() {
     for populated in [false, true] {
         let fixture = Fixture::new(if populated {
             "impostor-full"
@@ -591,7 +592,7 @@ fn an_impostor_at_the_namespace_name_survives_untouched() {
         });
         let capability = fixture.root();
         let mut store = capability.begin().expect("begin a private staging store");
-        // A pre-existing directory at the name a prior namespace mechanism used, plus a foreign
+        // A pre-existing directory at a name a former staging mechanism used, plus a foreign
         // sentinel. This design creates no directory at all, so neither may be touched.
         let namespace = fixture.staging().join("solo-source-stage-impostor");
         fs::create_dir(&namespace).expect("create the impostor directory");
@@ -636,7 +637,12 @@ fn an_impostor_at_the_namespace_name_survives_untouched() {
     }
 }
 
-/// An intermediate junction must be refused, or its creation must be provably denied.
+/// An intermediate junction must be refused, and the redirect must really exist first.
+///
+/// The case is decisive only if the junction was **actually created and proved to redirect**: a
+/// probe written through it must appear in the real tree. Only then does `adopt` refusal mean the
+/// walk refused a live redirect. A host that denies creation yields an explicit `JUNCTION=UNVERIFIED`
+/// outcome with the sanitized host result, never a silent pass.
 #[cfg(windows)]
 #[test]
 fn an_intermediate_junction_component_is_refused() {
@@ -652,28 +658,42 @@ fn an_intermediate_junction_component_is_refused() {
         .output()
         .expect("run mklink for the junction adversary");
 
-    if !created.status.success() {
-        let stderr = String::from_utf8_lossy(&created.stderr);
-        // Only the exact applicable privilege denial is an honest UNVERIFIED; anything else fails.
-        assert!(
-            stderr.contains("1314") || stderr.to_ascii_lowercase().contains("privilege"),
-            "junction creation failed for a non-privilege reason: {stderr}"
-        );
-        eprintln!(
-            "intermediate junction adversary UNVERIFIED: host privilege denied ({})",
-            stderr.trim()
-        );
-        return;
-    }
+    // Only the sanitized host outcome is ever printed: no fixture path reaches the log.
+    let stderr = String::from_utf8_lossy(&created.stderr).to_ascii_lowercase();
+    let host_reason = if stderr.contains("privilege") || stderr.contains("1314") {
+        "privilege-denial"
+    } else {
+        "other-failure"
+    };
+    assert!(
+        created.status.success(),
+        "JUNCTION=UNVERIFIED ({host_reason}, exit {:?}): this host refused to create the redirect, \
+         so no junction existed and this case establishes nothing about H4",
+        created.status.code()
+    );
 
+    // The redirect must be real before the refusal means anything: a file written through the
+    // junction has to land in the real tree.
     assert!(
         fs::metadata(&junction).expect("junction metadata").is_dir(),
-        "the created junction must resolve to a directory for the adversary to be real"
+        "the created junction must resolve to a directory"
     );
+    let probe = junction.join("child").join("redirect-probe.txt");
+    fs::write(&probe, b"probe").expect("write a probe through the junction");
+    assert!(
+        real.join("child").join("redirect-probe.txt").exists(),
+        "the created junction must actually redirect into the real tree"
+    );
+    fs::remove_file(&probe).expect("remove the redirect probe");
+
     let refusal = StagingRootCapability::adopt(&junction.join("child"))
         .expect_err("an intermediate junction component must be refused");
-    assert_eq!(refusal.code(), "SOURCE_UNSAFE_PATH");
-    eprintln!("intermediate junction adversary executed: adoption refused the redirect");
+    assert_eq!(
+        refusal.code(),
+        "SOURCE_UNSAFE_PATH",
+        "a traversed junction must be the registered unsafe-path refusal"
+    );
+    eprintln!("JUNCTION=EXECUTED: redirect created, proved and refused as SOURCE_UNSAFE_PATH");
 }
 
 /// The environment variable that turns this test body into the aborting child.
@@ -820,16 +840,38 @@ fn a_root_moved_and_replaced_at_its_path_never_receives_a_staged_byte() {
     let moved = fixture.base.join("moved-root");
     let mut store = root.begin().expect("begin a private staging store");
 
-    // Move the adopted directory aside and put a fresh impostor at the same pathname.
-    if fs::rename(&staging, &moved).is_err() {
-        // The host refused to move a directory this store holds: that refusal is itself the
-        // confinement evidence, and the impostor case cannot be constructed on this host.
-        assert!(
-            !moved.exists(),
-            "a refused move must leave the directory where it was"
-        );
-        drop(store);
-        return;
+    // Move the adopted directory aside and put a fresh impostor at the same pathname. The
+    // substitution is the attack, so it must actually happen for this case to be decisive.
+    match fs::rename(&staging, &moved) {
+        Ok(()) => eprintln!(
+            "ROOT_SUBSTITUTION=EXECUTED: the adopted directory was moved aside and an impostor \
+             installed at its former path"
+        ),
+        Err(error) => {
+            // A distinct protective outcome, not a substituted root: the host refused to move a
+            // directory this store holds. It is reported as such, and the substitution sub-case
+            // stays unverified rather than being presented as executed.
+            eprintln!(
+                "ROOT_SUBSTITUTION=REFUSED-BY-HOST win32={:?}: the held directory could not be \
+                 moved, so no impostor was installed and substitution is unverified",
+                error.raw_os_error()
+            );
+            assert!(
+                matches!(error.raw_os_error(), Some(5) | Some(32)),
+                "the only accepted refusal of the move is access-denied or a sharing violation"
+            );
+            assert!(
+                !moved.exists(),
+                "a refused move must leave the directory where it was"
+            );
+            assert_eq!(
+                entries(&staging),
+                Vec::<String>::new(),
+                "a refused move must leave the adopted root exactly as it was"
+            );
+            drop(store);
+            return;
+        }
     }
     fs::create_dir_all(&staging).expect("create the impostor root");
     let before_impostor = entries(&staging);
@@ -872,15 +914,10 @@ fn a_preexisting_file_at_a_shard_name_is_refused_and_left_byte_identical() {
     let refusal = root
         .create_shard_at("shard-0-collision.bin")
         .expect_err("a pre-existing shard name must be refused");
-    assert!(
-        matches!(
-            refusal.code(),
-            "SOURCE_UNSAFE_PATH"
-                | "SOURCE_OBSERVATION_IO_ERROR"
-                | "SOURCE_OBSERVATION_PERMISSION_DENIED"
-        ),
-        "unexpected refusal {}",
-        refusal.code()
+    assert_eq!(
+        refusal.code(),
+        "SOURCE_UNSAFE_PATH",
+        "a colliding name must be the registered unsafe-path refusal, not a vaguer classification"
     );
     assert_eq!(
         fs::read(&foreign).expect("read the foreign file"),
@@ -901,20 +938,16 @@ fn a_host_denied_disposition_refuses_before_any_plaintext_is_written() {
         .begin_with_faults(StagingFaultsV1::inject(0, StagingFaultV1::Disposition))
         .expect("begin a store with a denied disposition");
 
-    // The seam creates the object without `DELETE`, so this is the host denying the real
-    // `FileDispositionInfoEx` call, not a simulated value.
+    // The seam creates the object exactly as production does — with `DELETE` and
+    // `FILE_DELETE_ON_CLOSE` — and the kernel refuses the disposition call itself. That is real
+    // host refusal evidence, not a simulated return value.
     let refusal = store
         .stage_body(b"synthetic-body")
         .expect_err("a denied disposition must refuse the member");
-    assert!(
-        matches!(
-            refusal.code(),
-            "SOURCE_OBSERVATION_IO_ERROR"
-                | "SOURCE_OBSERVATION_PERMISSION_DENIED"
-                | "SOURCE_UNSAFE_PATH"
-        ),
-        "unexpected refusal {}",
-        refusal.code()
+    assert_eq!(
+        refusal.code(),
+        "SOURCE_OBSERVATION_IO_ERROR",
+        "a native disposition refusal must be the registered I/O refusal, not a path claim"
     );
     // Nothing was staged and no member exists to read.
     assert_eq!(

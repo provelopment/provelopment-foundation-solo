@@ -118,7 +118,7 @@ fn identity_of(file: &File) -> Result<ObjectIdentityV1, SourceReadRefusalV1> {
 ///
 /// A directory's link count drops to zero when its entry is removed, and the count is read from the
 /// handle this store holds rather than from a name, so the answer cannot be redirected. It is the
-/// deterministic form of "the namespace this store created is still there".
+/// deterministic form of "the directory this store adopted is still linked into the tree".
 #[cfg(unix)]
 fn descriptor_is_linked(directory: &File) -> Result<bool, SourceReadRefusalV1> {
     use std::os::unix::fs::MetadataExt;
@@ -219,7 +219,10 @@ fn unsupported() -> SourceReadRefusalV1 {
 #[doc(hidden)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StagingFaultV1 {
-    /// Fail the pre-write delete disposition, through a real native create without `DELETE` access.
+    /// Fail the pre-write delete disposition by having the kernel refuse the call itself.
+    ///
+    /// The object is created exactly as production does, with `DELETE` and `FILE_DELETE_ON_CLOSE`, so
+    /// the still-empty file is removed by handle closure when the refusal is reported.
     Disposition,
     /// Fail before writing the body.
     Write,
@@ -284,7 +287,7 @@ const STAGE_OBJECT_PREFIX: &str = "shard-";
 /// Distinguishes concurrently live stores inside one process.
 ///
 /// A name counter, never a store of content: it exists so two live stores in one process cannot
-/// choose the same namespace name.
+/// derive the same staging name.
 #[cfg(windows)]
 static STAGE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
@@ -348,21 +351,21 @@ impl StagingRootCapability {
         &self.root
     }
 
-    /// Creates one private namespace inside the adopted root and returns its store.
+    /// Begins one private staging store over the adopted root.
     ///
-    /// The namespace name is unique to this call and is created with exclusive creation, then
-    /// tightened to owner-only permissions on Linux. A name that already exists is an unsafe
-    /// location, never something to adopt or reuse.
+    /// Nothing is created, renamed or deleted at this point: both hosts stage through the retained
+    /// descriptor of the directory the caller already supplied, so a store cannot adopt a name that
+    /// belongs to someone else.
     ///
     /// # Errors
     ///
-    /// Returns `SOURCE_UNSAFE_PATH` when the namespace cannot be created exclusively, and the
-    /// classified staging refusal for a permission or capacity failure.
+    /// Returns `SOURCE_UNSAFE_PATH` when the adopted directory is no longer the one this capability
+    /// adopted, and the classified staging refusal for a permission or capacity failure.
     pub fn begin(&self) -> Result<SourceSetStagingV1, SourceReadRefusalV1> {
         self.begin_with_faults(StagingFaultsV1::none())
     }
 
-    /// Creates the private namespace with a deterministic fault plan attached.
+    /// Begins the store with a deterministic fault plan attached.
     ///
     /// This is the seam the acceptance matrix needs: the injected failure is raised by the same
     /// production code that a real host failure would reach, not by a parallel implementation.
@@ -453,7 +456,8 @@ impl StagedBodyV1 {
 /// The private staging store owned by one assembly attempt.
 ///
 /// It exists only while an attempt is in flight: either the assembled candidate owns it, or a
-/// failure drops it and its [`Drop`] closes every handle and removes the empty namespace.
+/// failure drops it and its [`Drop`] closes every shard handle, which is the whole of cleanup on
+/// both hosts.
 pub struct SourceSetStagingV1 {
     /// The retained descriptor of the caller's staging root, on both hosts.
     root_dir: File,
@@ -552,9 +556,9 @@ impl SourceSetStagingV1 {
     /// Seals the store once every member is staged.
     ///
     /// It re-confirms that the retained root is still the directory this store adopted and that
-    /// every object still reports exactly the length that was written, then disposes the Windows
-    /// namespace by handle. A last-write, finalization or disposal failure is refused here rather
-    /// than becoming an accepted candidate, and no public value exists until this returns `Ok`.
+    /// every object still reports exactly the length that was written. A last-write, finalization or
+    /// seal failure is refused here rather than becoming an accepted candidate, and no public value
+    /// exists until this returns `Ok`.
     ///
     /// # Errors
     ///
@@ -889,10 +893,10 @@ fn out_of_capacity() -> SourceReadRefusalV1 {
     SourceReadRefusalV1::new(SourceReadRefusalKind::OtherIo, None)
 }
 
-/// A namespace name that no other live store in this process can be holding.
+/// A staging name that no other live store in this process can be holding.
 ///
-/// Windows is the only host that creates one: Linux stages into anonymous inodes in the caller's
-/// own directory and never names anything.
+/// It is a name component inside the caller's own directory, never a directory this module creates:
+/// Linux stages into anonymous inodes and names nothing at all.
 #[cfg(windows)]
 fn staging_name() -> String {
     let sequence = STAGE_SEQUENCE.fetch_add(1, Ordering::Relaxed);

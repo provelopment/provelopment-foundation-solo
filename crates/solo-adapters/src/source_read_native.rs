@@ -337,20 +337,18 @@ pub(crate) fn adopt_staging_root(
     Ok(unsafe { std::fs::File::from_raw_handle(raw) })
 }
 
-/// Safe, staging-only: creates the task-owned namespace relative to the held root handle.
-#[cfg(windows)]
 /// Safe, staging-only: creates one shard relative to the retained root and detaches its name.
 ///
-/// The name exists only between the create and the disposition below, and the object is created
-/// with **no sharing at all**, so during that interval no other opener can read, write, delete or
-/// map it. The disposition then unlinks the name through the object's own handle *before the caller
-/// writes a single byte*, so:
+/// The object is created **directly in the adopted root** with **no sharing at all**, so no other
+/// opener can read, write, delete or map it at any point. The disposition then marks that exact
+/// object for deletion through its own handle *before the caller writes a single byte*, so:
 ///
 /// * no name ever reaches a staged byte;
 /// * an abruptly terminated process can leave only an **empty** named object, never recoverable
 ///   plaintext;
-/// * the detach is not deferred to handle closure, so the namespace is empty — and therefore
-///   removable by its own handle — while every staged member is still readable.
+/// * the name stays enumerable as `DELETE_PENDING` while this handle is open and is removed by the
+///   kernel when the last handle closes, so the guarantee is "no plaintext behind a name", not
+///   "no name is ever observable".
 #[cfg(windows)]
 pub(crate) fn create_staging_shard(
     parent: &std::fs::File,
@@ -363,15 +361,14 @@ pub(crate) fn create_staging_shard(
     // SAFETY: a fresh, unowned handle moved exactly once into a `File`.
     let file = unsafe { std::fs::File::from_raw_handle(raw) };
     if let Err(error) = dispose_staging_object(&file) {
-        // A failed detach refuses the member: the handle is closed at once. The object it leaves is
-        // empty, and the namespace it sits in is then not removable, so the failure is reported
-        // instead of being papered over.
+        // A failed detach refuses the member: its handle is closed at once, and because the object
+        // was created with `FILE_DELETE_ON_CLOSE` nothing survives that closure.
         drop(file);
         return Err(error);
     }
-    // Proven on Windows Server 2025: the delete disposition above succeeds, yet the detached name
-    // remains DELETE_PENDING until this handle closes, so the entry survives in the namespace. That
-    // is what makes an immediate namespace removal impossible while a member stays readable.
+    // Proven on Windows Server 2025: the disposition succeeds, yet the name stays
+    // `DELETE_PENDING` — enumerable, unopenable — until this handle closes. That is why this design
+    // promises no plaintext behind a name rather than an immediately absent name.
     Ok(file)
 }
 
