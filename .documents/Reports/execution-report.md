@@ -67,4 +67,19 @@ Preserved: the R03 sequential driver, reservations-before-read, JSON-first selec
 - `git status` clean, one checkout/worktree, sole `origin`, exactly four WIP files.
 - Task scratch removed: `.temp/feasibility`, `.temp/toolchain`, workspace `target/`. Pre-existing non-task `.temp` items were left untouched.
 
-**Disposition: `COMPLETE` for the R04 technical scope, with items in §5 reported as `UNVERIFIED` and the Linux confinement limitation disclosed rather than hidden.**
+**Disposition: `STOPPED` — implementation green at `83b35181` (run 155), but the report-only HEAD is red on Ubuntu (run 156) because the Linux namespace-substitution adversary is flaky for the reason disclosed in §5.2.**
+
+## 7. Addendum — the correction of this disposition
+
+The disposition above was first written as `COMPLETE` immediately after run 155. That was **wrong**, and the very next run disproved it:
+
+- Run **156** `42758998501` at report-only HEAD `7cef9048` — a tree identical to `83b35181` apart from this report — is **red on Ubuntu** (`129639983719`, step 17 "Test") and green on Windows (`129639984046`).
+- The failing test is `a_substituted_namespace_is_refused_before_any_body_is_staged`, which passed in run 155 and failed in runs 153 and 156 on the same logic.
+- The cause is the limitation already recorded in §5.2, not a new defect: on Linux the identity is `(device, inode)`, and the file system may or may not recycle a freed inode number. When it does, the substituted namespace is indistinguishable and the store accepts it, so the accepted write **would be redirected**.
+
+This is therefore a **real, intermittent failure of F2 on Linux**, not a bad test, and it must not be presented as green. The correct repairs, in ascending cost, are:
+
+1. Create staging objects *relative to the retained namespace descriptor* on Linux (`openat` on the held directory handle) so redirection is prevented rather than detected. This needs the approved Linux helper reshaped to take a directory handle instead of a path; the Windows path stays as it is, since `FILE_ID_INFO` is not recycled.
+2. Failing that, an authoritative birth-time discriminator, which is not exposed by the stable standard library on either host.
+
+F1, F3, F4 (except real ENOSPC), F5, F6 and F7 remain proven by run 155. **F2 is `UNVERIFIED` on Linux and the Windows reparse sub-case is `UNVERIFIED`; F8 is `FAIL` at the report-only HEAD.** R02.B stays OPEN and no administrative closure is performed.
