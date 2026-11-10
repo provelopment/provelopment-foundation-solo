@@ -962,6 +962,7 @@ mod sys {
     pub(super) fn open_staging_component(
         parent: HANDLE,
         name: &str,
+        is_staging_root: bool,
     ) -> Result<OwnedHandle, NativeError> {
         use windows_sys::Win32::Storage::FileSystem::{
             DELETE, FILE_APPEND_DATA, FILE_LIST_DIRECTORY, FILE_WRITE_ATTRIBUTES, FILE_WRITE_DATA,
@@ -986,13 +987,20 @@ mod sys {
         attributes.Attributes = OBJ_DONT_REPARSE;
         let mut io_status: IO_STATUS_BLOCK = zeroed();
         let mut out: HANDLE = ptr::null_mut();
-        let access = FILE_LIST_DIRECTORY
-            | FILE_WRITE_DATA
-            | FILE_APPEND_DATA
-            | FILE_READ_ATTRIBUTES
-            | FILE_WRITE_ATTRIBUTES
-            | DELETE
-            | SYNCHRONIZE;
+        // Only the final component must receive children and be disposable; an intermediate is
+        // only traversed, and requesting create or delete rights on a directory the caller does not
+        // own (for example `C:\Users`) would be denied for a standard user.
+        let access = if is_staging_root {
+            FILE_LIST_DIRECTORY
+                | FILE_WRITE_DATA
+                | FILE_APPEND_DATA
+                | FILE_READ_ATTRIBUTES
+                | FILE_WRITE_ATTRIBUTES
+                | DELETE
+                | SYNCHRONIZE
+        } else {
+            FILE_READ_ATTRIBUTES | SYNCHRONIZE
+        };
         let options = FILE_OPEN_REPARSE_POINT | FILE_SYNCHRONOUS_IO_NONALERT | FILE_DIRECTORY_FILE;
 
         // SAFETY: `parent` is a live handle owned by the caller for this call; `unicode` names
@@ -1025,22 +1033,13 @@ mod sys {
         Ok(unsafe { OwnedHandle::from_raw_handle(out) })
     }
 
-    /// Opens a drive root by name with the create rights staging needs.
+    /// Opens a drive root by name as the bootstrap parent for the first component.
     ///
-    /// `C:\` is a fixed bootstrap prefix that carries no component the caller chose.
+    /// `C:\` is a fixed bootstrap prefix that carries no component the caller chose, so it only
+    /// needs traversal and attribute rights: it is never created in or disposed of.
     pub(super) fn open_staging_drive_root(letter: u8) -> Result<OwnedHandle, NativeError> {
-        use windows_sys::Win32::Storage::FileSystem::{
-            DELETE, FILE_APPEND_DATA, FILE_LIST_DIRECTORY, FILE_WRITE_ATTRIBUTES, FILE_WRITE_DATA,
-        };
-
         let root: Vec<u16> = vec![u16::from(letter), u16::from(b':'), u16::from(b'\\'), 0];
-        let access = FILE_LIST_DIRECTORY
-            | FILE_WRITE_DATA
-            | FILE_APPEND_DATA
-            | FILE_READ_ATTRIBUTES
-            | FILE_WRITE_ATTRIBUTES
-            | DELETE
-            | SYNCHRONIZE;
+        let access = FILE_READ_ATTRIBUTES | SYNCHRONIZE;
         // SAFETY: `root` is a NUL-terminated UTF-16 buffer alive for the call; the flags are the
         // documented directory-open combination with `FILE_FLAG_OPEN_REPARSE_POINT`.
         let raw = unsafe {
@@ -1105,8 +1104,9 @@ mod sys {
         }
 
         let mut walked = open_staging_drive_root(letter)?;
-        for name in names {
-            let child = open_staging_component(walked.as_raw_handle(), name)?;
+        let last = names.len().saturating_sub(1);
+        for (index, name) in names.iter().enumerate() {
+            let child = open_staging_component(walked.as_raw_handle(), name, index == last)?;
             let (_, is_dir) = handle_facts(child.as_raw_handle())?;
             if !is_dir {
                 return Err(NativeError::Unsafe);
