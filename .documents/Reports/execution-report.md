@@ -1,125 +1,172 @@
 # Execution Report
 
-**Order:** `SOLO-WO-056 R01` - implement `R03.A` five-level typed property registry, direct-ancestry resolution, provenance and safe public projection.
+**Order:** `SOLO-WO-056 R01` - implement `R03.A` five-level typed property registry, direct-ancestry resolution, provenance and safe public projection; **revised** per the Chief Architect's `REVISE` directive of 2026-11-10 against substantive `5a4a7b2c` and report `768f6beb`.
 **Date:** 2026-11-10.
-**Root:** `C:\Users\Sean\Documents\Provelopment\00.foundation-solo` (verified `git rev-parse --show-toplevel`; single checkout, single worktree, sole `origin` = `https://github.com/provelopment/provelopment-foundation-solo.git`).
-**Disposition: `COMPLETE`** - every in-scope behaviour of this order is implemented and verified. This is **not** a self-acceptance: `R03.A` awaits the Chief Architect's independent `ACCEPT / REVISE / STOP`. `R03.B` and `R03.C` remain unimplemented, Stage 03 remains OPEN, ACTIVE was not cleared and `ROADMAP` was not advanced.
+**Root:** `C:\Users\Sean\Documents\Provelopment\00.foundation-solo` (verified `git rev-parse --show-toplevel`; one checkout, one worktree, sole `origin` = `https://github.com/provelopment/provelopment-foundation-solo.git`).
+**Disposition: `COMPLETE`** for the corrected scope - all three mandatory corrections are implemented and verified on both hosts, and every accepted `R03.A` invariant is preserved. This is **not** a self-acceptance: `R03.A` still awaits the Architect's independent `ACCEPT / REVISE / STOP`. `R03.B` and `R03.C` remain unimplemented, Stage 03 remains OPEN, ACTIVE was not cleared and `ROADMAP` was not advanced.
 
 ## 1. Revision ledger
 
 | Item | Value |
 | --- | --- |
-| Starting `origin/main` | `8a0365ca5b14628448ff698b6b46c67090537f6c` (tree `4dde7d8b2cc815119cd6ffcf4f73610c62b5bf13`) |
-| Authorization transition (`ACTIVE` + cleared `NEXT`) | `c087a4503eee571ec233e262dc5e0d4247445912` (tree `0d05b21ad2c12084e14aa1fdc0270477e0e197a2`) |
-| Implementation branch | `solo-wo-056-r01` (one branch in the existing checkout; no PR, no second checkout) |
-| Branch commit 1 - domain | `246180d459985e8cdb320b96e1ea900075a973f9` |
-| Branch commit 2 - application | `0d224b6c2d5f6e41561036cc631810b8998b7b71` |
-| Branch commit 3 - adapters + end-to-end tests | `efedd199343e360edbb995b0619d7420e1742c7e` |
-| Branch commit 4 - small typed error | `13e1f1f663f81f08f7a3b29bd1e0831ac33d6c13` |
-| Branch commit 5 - test helper naming | `2c780264ea0ef30383cebba7933b8fb4483d6123` |
-| Branch commit 6 - keyed refusals + inheritance events | `5a4a7b2c71b2ede382a1c9e1c4386ab9c47fcf70` |
-| **Substantive `main`** (fast-forward only) | `5a4a7b2c71b2ede382a1c9e1c4386ab9c47fcf70` (tree `7f3510a9cd184766bafb870a353f00a53651c852`) |
+| Starting `origin/main` (reviewed baseline) | `8a0365ca5b14628448ff698b6b46c67090537f6c` (tree `4dde7d8b2cc815119cd6ffcf4f73610c62b5bf13`) |
+| Authorization transition | `c087a4503eee571ec233e262dc5e0d4247445912` (tree `0d05b21ad2c12084e14aa1fdc0270477e0e197a2`) |
+| Branch `solo-wo-056-r01`, first cycle | `246180d` -> `0d224b6` -> `efedd19` -> `13e1f1f` -> `2c78026` -> `5a4a7b2c` (reviewed substantive) |
+| Safe reconciliation before the corrections | branch fast-forwarded to the published main/report `768f6beb22439d38bcc0e1eeef57b8238e2ed3ed`; no history rewrite, no new branch |
+| Correction 1 (domain: whole-graph) | `16e32c592633988e92e9c9e06baaed5284008aa4` |
+| Correction 2 (application: fail-closed use case) | `a2f22030ea598ae27c928d505e1180756279b126` |
+| Correction 3 (adapter: membership binding + extend syntax) | `fa724977f4e7b76493c386da3501f92e1d2206e7` |
+| **Corrected substantive `main`** (fast-forward only) | `fa724977f4e7b76493c386da3501f92e1d2206e7` (tree `6aae1296d8bd9a03d66cb7e04feb1034940c6c58`) |
 | Report-only commit | this file's own commit - SHA returned in chat only, never embedded here |
 
-`git merge --ff-only solo-wo-056-r01` produced `c087a45..5a4a7b2` with no merge commit, no squash and no rebase. `main == origin/main` was verified after the push. The branch is **retained** for separate Owner-authorized later pruning.
+`git merge --ff-only` was used for both the reconciliation (`5a4a7b2..768f6be`, report file only) and the integration (`768f6be..fa72497`): no merge commit, no squash, no rebase, no force. `main == origin/main` was verified after each push. The branch is **retained** for separate Owner-authorized later pruning.
 
-## 2. Changed paths (authorized ledger only)
+## 2. Changed paths
 
-Eleven tracked paths changed, all **pure additions** (`5646` insertions, `0` deletions):
+This correction cycle changed **8 tracked paths**, all authorized code/test paths: `+1039` / `-70`.
 
-| Path | Delta |
+| Path | Delta this cycle |
 | --- | --- |
-| `crates/solo-domain/src/property_registry.rs` | +1604 (new) |
-| `crates/solo-domain/src/property_resolution.rs` | +771 (new) |
-| `crates/solo-domain/src/lib.rs` | +19 (module declarations and re-exports only) |
-| `crates/solo-domain/tests/property_resolution.rs` | +1446 (new) |
-| `crates/solo-application/src/property_resolution.rs` | +142 (new) |
-| `crates/solo-application/src/lib.rs` | +5 (module declaration and exports only) |
-| `crates/solo-application/tests/property_resolution.rs` | +278 (new) |
-| `crates/solo-adapters/src/property_resolution.rs` | +684 (new) |
-| `crates/solo-adapters/src/publication_manifest.rs` | +12 (read-only `InertPropertiesV1::entries()` only) |
-| `crates/solo-adapters/src/lib.rs` | +5 (module declaration and exports only) |
-| `crates/solo-adapters/tests/property_resolution.rs` | +680 (new) |
+| `crates/solo-domain/src/property_resolution.rs` | +175 / -16 |
+| `crates/solo-domain/src/property_registry.rs` | +44 / -10 |
+| `crates/solo-domain/src/lib.rs` | +3 / -2 |
+| `crates/solo-domain/tests/property_resolution.rs` | +208 / -5 |
+| `crates/solo-application/src/property_resolution.rs` | +61 / -11 |
+| `crates/solo-application/tests/property_resolution.rs` | +133 / -3 |
+| `crates/solo-adapters/src/property_resolution.rs` | +100 / -22 |
+| `crates/solo-adapters/tests/property_resolution.rs` | +315 / -1 |
 
-Plus the two WIP files in the authorization commit: `.documents/WIP/workorder-active.md` (the Owner-installed order, blob `413359d7`) and `.documents/WIP/plan-next.md` (cleared back to its neutral title-only content, blob `92fa562b`).
+Cumulative from the reviewed baseline, the same eleven authorized paths as before are involved (the report path aside). **Frozen and verified unchanged across the whole order:** `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml`, `deny.toml`, `.github/` (workflow untouched), `crates/solo-cli/`, every existing R01/R02 source module, test and fixture, the starter seed and expanded fixtures, `README.md`, `AGENTS.md`, `.documents/About/`, `.documents/Architecture/`, both SOPs and `LICENSE`. `ROADMAP` (blob `4c7ef021`), `OUTLOOK` (blob `cb9c7a61`), the issued ACTIVE (blob `413359d7`) and neutral NEXT (blob `92fa562b`) are unchanged from the authorization revision.
 
-**Frozen and verified unchanged:** `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml`, `deny.toml`, `.github/` (including the unchanged `rust-verify` workflow), `crates/solo-cli/`, all existing R01/R02 source modules, tests and fixtures, the starter seed and expanded fixtures, `README.md`, `AGENTS.md`, `.documents/About/`, `.documents/Architecture/`, both SOPs, `LICENSE`, `.documents/WIP/plan-roadmap.md` (blob `4c7ef021`) and `.documents/WIP/plan-outlook.md` (blob `cb9c7a61`). No crate, dependency, schema, asset, server, frontend or route engine was added.
+## 3. The three mandated corrections
 
-## 3. What was implemented
+### 3.1 Whole-graph, fail-closed resolution
 
-**Registry (`solo-domain::property_registry`).** Exactly the nine accepted keys (`location`, the five `graphic.*` roles, `seo.title`, `seo.description`, `contact.email`) at `propertyRegistryVersion == "1.0.0"`, with allowed levels (`seo.*` refuses at Entity and Facet), effective maxima (`location` 16, `graphic.background` 4, all others 1) and closed, explicitly exposed value types: single-line plain text (no control characters, no markup delimiters, scalar bounds 140/300), one safe addr-spec mailbox, a typed asset reference (`entity|platform` namespace, portable relative path, `png/jpg/jpeg/webp/avif`, PNG-only favicon, no remote URL, no path escape, no active SVG/GIF), and section 6.2H location facts (closed `LocationFields`, uppercase ISO alpha-2 `countryCode`, finite in-range WGS84 coordinates, technical-ID `factId`, `association|premises`). Declarations are closed envelopes with exactly `inheritance` and `currentContext`, where the literal `"none"` is modelled separately from an absent declaration, and a refused declaration carries its registered key.
+**Domain.** `ValidatedPropertyInputV1` now has two resolution entry points over the same validated data: `resolve(target)` (one owner, walking that owner's direct chain through the existing parent-reuse helper) and `resolve_all()` (every owner of the one Entity). `resolve_all` traverses the graph's own deterministic parent-first owner order, derives each owner's parent by chain prefix and a prebuilt position index, consumes only that parent's resolved record, and returns `ResolvedPropertyGraphV1` - which exists **only** if every owner resolved. Declarations are indexed once into a `BTreeMap`, so no owner triggers a rescan of the declaration list; nothing is quadratic and each owner sees only its validated immediate parent.
 
-**Resolution (`solo-domain::property_resolution`).** A validated input binds every declaration to a node of the accepted one-Entity `EfsOwnershipGraph` (a wrong Entity, wrong Facet/Site/Page, sibling branch or undeclared locale refuses), then a direct-ancestry resolver runs: absent carries the parent's effective set, explicit `inherit` carries and appends, explicit `suppress` clears and appends, `"none"` adds nothing. The registry maximum and uniqueness rules are enforced at **each effective level before** public filtering; distinct location facts are identified by `(originOwner, factId)`; a repeated background source or repeated original fact identity refuses; a recognized `location` `extend` refuses by name. Provenance is exactly the section 6.2G.6 shape (`values` with `data`, `exposure`, `originOwner`, `originLocalIndex`, optional location `fieldOrigins`; `resolutionEvents` with `owner`, `operation`, `localIndex`, optional `targetFactId`).
+**Manifest ↔ graph membership.** The adapter now builds the parsed manifest's **complete** owner inventory - Entity, every Facet, Site, Page and every declared representation, including owners that declare no `properties` - and binds it to the request with `with_required_membership`. The use case calls `require_matching_owner_membership_v1`, which refuses a graph whose membership differs in size or in any member (`OwnerMembershipMismatch`), so a narrower or wider graph cannot be used even when the differing owners carry no declarations.
 
-**Public projection (`project_public_properties_v1`).** A separate entry point and type that emits only `public` values in effective order, with no owner, exposure, origin, field origin or resolution event, and with no ancestor retry: a filtered-away or suppressed value stays absent.
+**Application.** `resolve_declared_properties_v1` validates declarations, applies the membership binding when supplied, then calls `resolve_all_owners_v1` and only afterwards selects the requested owner (`UnknownOwner` when absent) and projects it publicly. A candidate can therefore no longer exist while an unrelated Site, Page or unlisted representation is invalid. The requested target's result and public-projection API are unchanged; the candidate additionally exposes the whole-graph record (`resolved_graph()`, `resolved_owner_count()`).
 
-**Application (`solo-application::property_resolution`).** One inbound use case over the validated graph and typed declarations returning a candidate that carries the bound input, the full internal record and the projection, plus `PROPERTY_CANDIDATE_GRANTS_PUBLICATION_AUTHORITY = false`. No outbound port, no I/O, no adapter or JSON import.
+**Preserved:** the direct-ancestry semantics (absent carries, `inherit` carries and appends, `suppress` clears and appends, `"none"` adds nothing), effective cardinality and uniqueness **before** filtering, ordering, internal provenance, the separate public projection, and the accepted `EfsOwnershipGraph` as the only ownership source. No independent ownership graph was introduced.
 
-**Adapter (`solo-adapters::property_resolution`).** A read-only `InertPropertiesV1::entries()` accessor and `validate_manifest_property_candidate_v1`, which walks the parsed Entity containment, translates every authored `properties` object for the same owner (Entity, Facet, Site, Page and each declared representation, listed or unlisted) into typed declarations, and drives the application use case. `parse_manifest_bytes` is neither renamed nor promoted and stays inert.
+### 3.2 Typed empty-array bypass closed
 
-### Two design decisions worth review
+`DeclaredOwnerPropertiesV1::new` now refuses `CurrentContextV1::Values(vec![])` with `PropertyRefusalKind::EmptyContextArray` (carrying the key), so the typed API cannot be used to smuggle an explicitly empty array past the JSON adapter. `CurrentContextV1::None` remains valid and remains distinct from an absent declaration; `Values([])` is never coerced into `None`.
 
-1. **`inherited` events are recorded only when a declaration actually carries inherited values.** A root declaration has nothing to inherit, so an Entity-level `inherit` records its own `added` events alone; a descendant that inherits a non-empty set records `inherited` (with `localIndex: null`) before its own `added` events. This keeps the event stream explanatory instead of emitting an `inherited` event with nothing inherited. Absent versus explicit `inherit`/`"none"` remains distinguishable in the typed model itself (declaration present/absent plus the `"none"` literal), which is what the order requires.
-2. **Representations of the same Page share that Page's properties.** A Page-level value reaches every one of its locales; `id-ID` therefore inherits a value authored at the Page, while a Page under a different Site or Facet does not. Isolation is between Sites, Facets and Pages, never between locale *membership keys* of one Page.
+### 3.3 `location.extend` syntax validation completed
 
-## 4. Mandatory acceptance matrix (`R03A-01` - `R03A-12`)
+`translate_location_extend` now validates the whole accepted envelope before producing the recognized unsupported-operation request:
 
-26 new tests at the three authorized paths (domain 12, application 5, adapters 9); every case below names the test that proves it and the assertion it makes. All of them executed green in runs `42853919842` (branch) and `42855602900` (substantive `main`).
+* `target` and `owner` are closed objects; `owner` requires `entity` and accepts only `facet`, `site`, `page`, `locale` in a **contiguous** lineage (`site` needs `facet`, `page` needs `facet` and `site`, `locale` needs the whole chain), each parsed through the accepted identifier or locale-key boundary (`EntityIdV1`, `FacetIdV1`, `SiteIdV1`, `PageIdV1`, `LocaleKeyV1::from_already_canonical`).
+* `set` is validated by the **same** `translate_location_fields` used by `add`: closed field names, plain-text bounds, uppercase ISO alpha-2 country codes, finite in-range WGS84 coordinates, non-empty.
+* Missing, extra, malformed or structurally incomplete members refuse with a typed category.
+* A syntactically valid extension is still recognized as `LocationExtensionRequestV1` (now carrying the validated target owner and `set` fields) and still produces `LOCATION_EXTENSION_NOT_IMPLEMENTED_IN_R03A` when a resolution reaches it. No identified-record mutation, field merge or extension provenance was implemented - that remains `R03.B`.
+
+## 4. Acceptance matrix
+
+**37 tests** at the three authorized paths (domain 16, application 7, adapters 14), all executed green on both hosts in `42941833853` (branch) and `42942318551` (substantive `main`). The previous 26 tests are preserved - two were extended rather than weakened - and 11 are new.
 
 | Case | Evidence |
 | --- | --- |
-| `R03A-01` Registry and closed encoding | domain `r03a_01_registry_declares_exactly_the_nine_accepted_keys` asserts the nine exact names, `PROPERTY_REGISTRY_VERSION == "1.0.0"`, `from_name` exactness (`SEO.Title`, `seo.keywords`, `custom` -> `None`), `location` 16, `graphic.background` 4, every other key 1, and `seo.*` false at Entity/Facet but true at Site/Page/representation. domain `r03a_01_closed_encoding_refuses_wrong_level_and_unsafe_values` asserts `WrongLevel` for Entity-level `seo.title`, `DuplicatePropertyEntry`, `WrongEntryShape`, `FaviconNotPng`, `EmptyPlainText`, `ActiveMarkup`, `ControlCharacter`, `PlainTextTooLong` and nine malformed mailboxes. adapters `r03a_09_closed_envelope_forms_refuse` asserts `InvalidCurrentContext` for `null`, `EmptyContextArray` for `[]`, `InvalidInheritance` for `"maybe"`, `MissingEnvelopeField`, `ExtraEnvelopeField`, and that an explicit `suppress`/`"none"` is still valid. |
-| `R03A-02` Five-level ancestry | domain `r03a_02_five_levels_inherit_only_direct_ancestors` authors `graphic.background` at all five levels, asserts four effective values with origins `[entity, facet, site, page]`, then changes only the Site value and shows the bali branch changes while the jakarta branch stays `[entity, facet]`. application `application_resolves_all_five_levels_without_publication_authority`. adapters `r03a_09_real_manifest_bytes_resolve_all_five_levels` does the same through real JSON bytes. |
-| `R03A-03` Explicit empty and suppression | domain `r03a_03_absent_and_explicit_none_are_distinct_and_suppression_is_final` asserts: absent Page -> `declaration_for` is `None` and events `[Added]`; explicit `inherit`/`"none"` -> declaration present with `is_none_literal()` and events `[Added, Inherited(null)]`; `suppress`/`"none"` -> zero effective values, events `[Added, Suppressed]`, and zero public values; `suppress` + local value -> one value owned by the Page; a downstream `inherit` never restores the suppressed ancestor. |
-| `R03A-04` Ordering and provenance | domain `r03a_04_ordering_provenance_and_field_origins_are_exact` asserts inherited-first ordering, exact `originOwner`/`originLocalIndex` per value, the internal exposure of the second fact, `fieldOrigins` naming the adding Site with its array index for `countryCode` and `locality`, no field origins on a non-location value, the exact event stream `[Added(0), Added(1), Inherited(null), Added(0)]` with owners, and `resolved == resolved` on repetition. adapters `r03a_09_real_manifest_bytes_resolve_all_five_levels` asserts the same origins and field origins from authored JSON. |
-| `R03A-05` Effective cardinality | domain `r03a_05_effective_cardinality_is_enforced_before_public_filtering` asserts `CardinalityExceeded` for inherited title + local `inherit` title, for the same conflict where the ancestor is `internal`, for a fifth `graphic.background` layer, for a seventeenth `location` fact, and `TooManyLocalEntries` for a seventeen-entry local array. adapters `r03a_09_effective_cardinality_and_duplicates_refuse` proves the same through the typed refusal at the adapter boundary. |
-| `R03A-06` Duplicate and typed refusal | domain `r03a_06_duplicate_and_malformed_entries_refuse_without_repair` asserts `DuplicateGraphicSource`, `DuplicateLocationFact`, `InvalidAssetReference` (`../escape.png`, remote URL, drive path, missing extension), `UnsupportedAssetExtension` (`svg`, `gif`, upper-case `PNG`), `InvalidFactId`, `InvalidCountryCode` (`id`, `IDN`), `InvalidLocationField`, `InvalidCoordinates` (91, -181, NaN) and `EmptyLocationFields`. adapters `r03a_09_closed_typed_entries_refuse` repeats thirteen such refusals from authored JSON, including `InvalidExposure`, `ExtraEntryField`, `InvalidAssetNamespace`, `UnknownLocationField` and `InvalidLocationKind`. |
-| `R03A-07` Exposure | domain `r03a_07_public_projection_omits_internal_values_and_cannot_resurrect` asserts one effective internal title with `public_value_count() == 0`, an empty public projection whose debug text contains neither the internal text nor `originLocalIndex`, no resurrection of a suppressed public ancestor, and an explicit `suppress` + public replacement published in its own place with the Page as origin. application `application_public_projection_omits_internal_values`. |
-| `R03A-08` Qualified isolation | domain `r03a_08_identical_page_ids_under_different_sites_and_locales_never_mix` uses three Pages all named `home`; the bali `en-001` representation sees the value, the jakarta Site's `home`, the corporate Facet's `home` and the Site above the Page do not, and the same Page's `id-ID` representation inherits the Page-level value with the Page as origin. domain `r03a_08_wrong_lineage_and_second_entity_refuse` asserts `UnknownOwner` for an undeclared locale and a wrong Page-under-Site lineage, `DeclarationOwnerUnknown` for a second Entity and for a cross-Facet Site, and `DuplicateDeclarationOwner`. application `application_refuses_an_owner_outside_the_graph` and `application_refuses_a_declaration_owner_outside_the_graph`. |
-| `R03A-09` Actual adapter boundary | adapters `r03a_09_real_manifest_bytes_resolve_all_five_levels` starts from real strict JSON with nested inline `properties`, asserts `parsed.is_publication_authorized() == false`, runs `parse_manifest_bytes` -> `validate_manifest_property_candidate_v1` -> application/domain -> public projection, and checks all five owners, `declared_owner_count() == 5`, `candidate.is_publication_authorized() == false` and nine resolved records. It is joined by `r03a_09_unknown_property_refuses_by_category` (`PROPERTY_UNKNOWN_KEY`, owner in the message, authored name never echoed), `r03a_09_wrong_level_declaration_refuses` (`PROPERTY_DECLARATION_REFUSED` with `Some(SeoTitle)` and the Entity owner), `r03a_09_closed_envelope_forms_refuse`, `r03a_09_closed_typed_entries_refuse`, `r03a_09_unlisted_sibling_declaration_fails_closed` and `r03a_09_committed_starter_seed_stays_inert`. The unchanged R02.C fixture suite (`r02c_seed`, 17 cases) stayed green in the same runs. |
-| `R03A-10` Deferred specialists remain honest | domain `r03a_10_recognized_extend_is_refused_by_name_while_add_works` proves the declaration is accepted (`validate_declared_properties_v1` succeeds, `has_recognized_location_extension()` is true) and the resolution returns `LocationExtensionNotImplementedInR03A` with code `LOCATION_EXTENSION_NOT_IMPLEMENTED_IN_R03A`, while an `add`-only input resolves one fact with its `factId`, kind and set fields. application `application_surfaces_the_named_extension_refusal`. adapters `r03a_09_recognized_extend_is_refused_by_name` proves the same from authored JSON and asserts the refusal is *not* a declaration refusal. No asset file, catalogue, fallback, HTTP output or release is claimed. |
-| `R03A-11` Invariants and security | domain `r03a_11_property_resolution_leaves_identity_untouched` asserts the Entity id, facet count, Page id and locale key are unchanged after resolving, that the internal replacement is the only effective value and stays internal, and that neither the internal nor the suppressed ancestor mailbox appears in the public projection. adapters `r03a_09_unlisted_sibling_declaration_fails_closed` proves fail-closed behaviour: one invalid declaration on an **unlisted** representation refuses the whole candidate, and the message names the qualified owner and key without echoing the authored text. |
-| `R03A-12` Existing baseline and CI | All existing R01/R02 suites, the architecture checker with its refusal self-test, the unsafe-boundary and workspace-graph checks, the deliberate tripwire, the Linux Btrfs fixture and its cleanup, the Windows native guards, the locked release build, the release CLI smoke and the two byte-identical builds ran unchanged and green on both designated hosts at the substantive SHA (`42855602900`) and the branch SHA (`42853919842`). |
+| `R03A-01` Registry and closed encoding | domain `r03a_01_registry_declares_exactly_the_nine_accepted_keys` (nine exact names, version `1.0.0`, exact lookup, maxima 16/4/1, `seo.*` refused at Entity and Facet) and `r03a_01_closed_encoding_refuses_wrong_level_and_unsafe_values` (`WrongLevel`, `DuplicatePropertyEntry`, `WrongEntryShape`, `FaviconNotPng`, plain-text and nine mailbox refusals). adapters `r03a_09_closed_envelope_forms_refuse`. |
+| `R03A-02` Five-level ancestry | domain `r03a_02_five_levels_inherit_only_direct_ancestors` (four effective values with `[entity, facet, site, page]` origins, sibling branch unaffected, one changed branch only). application `application_resolves_all_five_levels_without_publication_authority`. adapters `r03a_09_real_manifest_bytes_resolve_all_five_levels`. |
+| `R03A-03` Explicit empty and suppression | domain `r03a_03_absent_and_explicit_none_are_distinct_and_suppression_is_final` and the **new** `r03a_03_explicit_empty_array_refuses_in_the_typed_api` (empty array -> `EmptyContextArray` with the key, `"none"` still valid, absence still distinct). |
+| `R03A-04` Ordering and provenance | domain `r03a_04_ordering_provenance_and_field_origins_are_exact` and the **new** `r03a_04_whole_graph_preserves_each_branch_original_values` (two Sites keep their own values, order, `originOwner`, `originLocalIndex`; whole-graph resolution is deterministic across repetition). |
+| `R03A-05` Effective cardinality | domain `r03a_05_effective_cardinality_is_enforced_before_public_filtering` plus the **new** `r03a_05_whole_graph_refuses_a_conflict_in_an_unrelated_site` (the bali target resolves alone; the jakarta conflict refuses the graph). application `application_refuses_a_conflict_in_an_unrelated_site`. adapters `r03a_09_unrelated_site_conflict_refuses_the_whole_candidate` and `r03a_09_effective_cardinality_and_duplicates_refuse`. |
+| `R03A-06` Duplicate and typed refusal | domain `r03a_06_duplicate_and_malformed_entries_refuse_without_repair`. adapters `r03a_09_closed_typed_entries_refuse` and the **new** `r03a_09_extend_syntax_refusals`. |
+| `R03A-07` Exposure | domain `r03a_07_public_projection_omits_internal_values_and_cannot_resurrect` (internal values never projected, no ancestor resurrection, explicit replacement published). application `application_public_projection_omits_internal_values`. |
+| `R03A-08` Qualified isolation | domain `r03a_08_identical_page_ids_under_different_sites_and_locales_never_mix` (three Pages named `home`; only the bali `en-001` branch sees its value; the same Page's `id-ID` inherits the Page-level value with the Page as origin) and `r03a_08_wrong_lineage_and_second_entity_refuse`. application `application_refuses_an_owner_outside_the_graph` and the **new** `application_refuses_a_manifest_membership_mismatch` (missing and extra owners both refuse; the exact inventory resolves with `resolved_owner_count() == 8`). adapters `r03a_09_graph_membership_mismatch_refuses`. |
+| `R03A-09` Actual adapter boundary | adapters `r03a_09_real_manifest_bytes_resolve_all_five_levels`, `r03a_09_unknown_property_refuses_by_category`, `r03a_09_wrong_level_declaration_refuses`, `r03a_09_closed_envelope_forms_refuse`, `r03a_09_closed_typed_entries_refuse`, `r03a_09_unlisted_sibling_declaration_fails_closed`, `r03a_09_committed_starter_seed_stays_inert`, plus the **new** whole-graph set below. The unchanged R02.C `r02c_seed` suite (17 cases) stayed green in the same runs. |
+| `R03A-10` Deferred specialists remain honest | domain `r03a_10_recognized_extend_is_refused_by_name_while_add_works` and the **new** `r03a_10_whole_graph_refuses_a_recognized_extension_anywhere`. application `application_surfaces_the_named_extension_refusal`. adapters `r03a_09_recognized_extend_is_refused_by_name`, the **new** `r03a_09_extension_anywhere_refuses_the_whole_candidate`, and `r03a_09_extend_syntax_refusals` (which also proves a complete, typed extension is still recognized). |
+| `R03A-11` Invariants and security | domain `r03a_11_property_resolution_leaves_identity_untouched`. adapters `r03a_09_unlisted_sibling_declaration_fails_closed` (one invalid unlisted declaration fails the whole candidate, diagnostics name the owner and key without echoing authored text). |
+| `R03A-12` Existing baseline and CI | All existing R01/R02 suites, the architecture checker with its refusal self-test, the unsafe-boundary and workspace-graph checks, the tripwire, the Linux Btrfs fixture and cleanup, the Windows native guards, the locked release build, the CLI smoke and the byte-identical builds ran unchanged and green at `42941833853` and `42942318551`. |
 
-**Mandated distinction honoured:** the five-level trace uses `contact.email` and `graphic.background`, never `seo.title`; `seo.title` carries the Site -> Page -> representation singular/suppression case, and an Entity-level or Facet-level `seo.title` is a mandatory refusal (`r03a_01_closed_encoding_refuses_wrong_level_and_unsafe_values`, `r03a_09_wrong_level_declaration_refuses`).
+**The directive's five failing-first tests, mapped 1:1**
+
+| Directive test | Test(s) |
+| --- | --- |
+| 1. Valid Site A target + inherited-plus-local singular conflict in Site B rejects the candidate | adapters `r03a_09_unrelated_site_conflict_refuses_the_whole_candidate`; application `application_refuses_a_conflict_in_an_unrelated_site`; domain `r03a_05_whole_graph_refuses_a_conflict_in_an_unrelated_site` |
+| 2. The same conflict on an unlisted representation rejects | adapters `r03a_09_unlisted_representation_conflict_refuses` |
+| 3. A valid target must not succeed against a graph with extra or missing manifest owners | adapters `r03a_09_graph_membership_mismatch_refuses`; application `application_refuses_a_manifest_membership_mismatch` |
+| 4. A valid multi-Site candidate preserves each branch's values, order and provenance | domain `r03a_04_whole_graph_preserves_each_branch_original_values` |
+| 5. A recognized unsupported `extend` anywhere must not produce a false whole-graph success | domain `r03a_10_whole_graph_refuses_a_recognized_extension_anywhere`; adapters `r03a_09_extension_anywhere_refuses_the_whole_candidate` |
+
+**Section 2 test (typed empty array):** domain `r03a_03_explicit_empty_array_refuses_in_the_typed_api` asserts `EmptyContextArray` and the key, and that `"none"` stays valid and distinct.
+
+**Section 3 tests (`extend` syntax):** adapters `r03a_09_extend_syntax_refusals` covers a malformed coordinate set (`InvalidCoordinates`), an unknown field (`UnknownLocationField`), a mistyped field (`WrongEntryShape`), a lower-case country code (`InvalidCountryCode`), an empty `set` (`EmptyLocationFields`), a missing `set` (`MissingEntryField`), an owner with `page` but no `facet`/`site` (`InconsistentOwner`), a non-canonical locale (`InconsistentOwner`), an extra owner member (`ExtraEntryField`), and a genuinely valid extension that is still refused by name at resolution.
 
 ## 5. CI evidence (unchanged `rust-verify` workflow)
 
 | Run | Revision | Result |
 | --- | --- | --- |
-| `42850427568` | `c087a450` authorization transition (`main`) | Ubuntu success, Windows success |
-| `42850442030` | `efedd199` first branch attempt | **failure** - strict lint: `clippy::result_large_err` at four adapter functions (the refusal type embedded a full qualified owner) |
-| `42851850519` | `13e1f1f6` after boxing the refusal owner | **failure** - test compile: `E0618` because the test helper `parsed` was shadowed by `let parsed = ...` |
-| `42852757877` | `2c780264` after renaming the helper | **failure** - four test assertions: `inherited` recorded at a root declaration, a missing key on a wrong-level refusal, and two expectations of mine that wrongly denied Page-level inheritance to the same Page's other locale |
-| `42853919842` | `5a4a7b2c` verified branch head | Ubuntu success, Windows success, **0 failed steps**, 33 steps, skips 9 / 14 |
-| `42855602900` | `5a4a7b2c` substantive `main` | Ubuntu success, Windows success, **0 failed steps**, skips 9 / 14 |
+| `42850427568` | `c087a450` authorization transition | Ubuntu success, Windows success |
+| `42850442030` | `efedd199` first cycle | failure - `clippy::result_large_err` (refusal type carried a full qualified owner) |
+| `42851850519` | `13e1f1f6` | failure - `E0618` (test helper shadowed by a local binding) |
+| `42852757877` | `2c780264` | failure - four test expectations (root `inherited` event, missing key on a wrong-level refusal, two over-strict isolation expectations) |
+| `42853919842` | `5a4a7b2c` branch | Ubuntu success, Windows success |
+| `42855602900` | `5a4a7b2c` substantive main | Ubuntu success, Windows success |
+| `42856849005` | `768f6beb` report HEAD (previous cycle) | Ubuntu success, Windows success |
+| `42941833853` | `fa724977` **corrected branch** | Ubuntu success, Windows success, **0 failed steps**, 33 steps, skips 9 / 14 |
+| `42942318551` | `fa724977` **corrected substantive main** | Ubuntu success, Windows success, **0 failed steps**, skips 9 / 14 |
 | this report's own run | report HEAD | dispatched and verified separately; SHA returned in chat |
 
-At `42855602900` and `42853919842` every host-specific step passed on its designated host: pinned toolchain install and exact version assertions, locked package fetch, the `cargo-deny 0.20.2` component gate with a fresh RustSec refresh, the advisory negative probe (`RUSTSEC-2026-0009`, Ubuntu), the workspace package-set gate, the disposable Linux Btrfs snapshot filesystems with their guaranteed cleanup, format check, strict lint, the full locked all-target workspace test run, the architecture checker on the real checkout with its refusal self-test, the deliberate test-failure tripwire, the locked release build, the release CLI smoke, the forbidden-import/bypass refusal with guaranteed restore, and the two byte-identical clean release builds. Skipped steps are exactly the counterpart host's variants (9 on Ubuntu, 14 on Windows); no applicable check was skipped and no material warning was silenced. The three intermediate failures above are disclosed rather than hidden: each was diagnosed from the run log, fixed in a separate commit, and re-verified.
+At `42941833853` and `42942318551` every host-specific step passed on its designated host with the unchanged workflow: pinned toolchain install and exact version assertions, locked fetch, the `cargo-deny 0.20.2` archive gate with a fresh RustSec refresh, the `RUSTSEC-2026-0009` advisory negative probe, the workspace package-set gate, the disposable Btrfs fixtures with guaranteed cleanup, format, strict lint, the full locked all-target test run, the real-tree architecture checker with its refusal self-test, the tripwire, the locked release build, the CLI smoke, the forbidden-import refusal with restore, and two byte-identical release builds. Skipped steps are exactly the counterpart host's variants (9 on Ubuntu, 14 on Windows); no applicable check was skipped and no material warning was silenced.
 
-All three new binaries actually executed in the green runs: `Running tests/property_resolution.rs` appears three times (domain 12 cases, application 5, adapters 9) alongside the unchanged `r02c_seed` suite.
+All three new test binaries executed in both green runs (`Running tests/property_resolution.rs` three times: domain 16 cases, application 7, adapters 14) alongside the unchanged `r02c_seed` suite. Every intermediate failure above is disclosed and was fixed in a separate commit before re-verification.
 
-## 6. Dependency, security and version-currency findings
+## 6. A1 dependency, security and version-currency evidence
 
-No dependency was added, removed, upgraded or downgraded: `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml` and `deny.toml` are byte-identical to the reviewed baseline, and `git diff` for those paths is empty. The new domain and application code uses the standard library only, so the inward dependency direction and the provider/framework independence of the core are unchanged. The adapter uses only the already-declared `serde`/`serde_json` roots and adds no JSON parsing to the core.
+**Sources and query date.** All package versions were read on **2026-11-10** from the crates.io registry API (`/api/v1/crates/<name>/versions`, newest first) and the Rust release feed (`api.github.com/repos/rust-lang/rust/releases/latest`); the action tag was resolved through the GitHub API for the pinned commit; runner and tool versions come from the workflow definition and the run logs of `42941833853` / `42942318551`; the advisory position comes from the in-run RustSec refresh performed by the pinned `cargo-deny 0.20.2` gate itself.
 
-Pinned and unchanged: Rust `1.99.1` (`rustfmt`/`clippy`), `serde 1.0.229`, `serde_json 1.0.154`, `rustix 1.1.5` (Linux), `windows-sys 0.61.2` (Windows), `cargo-deny 0.20.2`. The security gate and the fresh RustSec refresh in the passing runs reported no advisory against the locked graph, and the deliberate advisory negative probe still fails as designed on Ubuntu, proving the database is live. A1 version-currency was therefore satisfied by *not* changing the graph: upgrading a dependency, toolchain component or pin is outside this order's permission and did not happen.
+**Toolchain and tooling.** `rustc 1.99.1 (58cf8f9c3 2026-10-13)`, `cargo 1.99.1 (5f94df478 2026-08-27)`, `rustup 1.29.3 (edbc831ce 2026-11-02)`, single installed toolchain `1.99.1-x86_64-pc-windows-msvc`. The latest published Rust release is **1.99.1** (2026-10-16), so the pin **is** the current stable release; no newer supported release, LTS branch or security-only update exists to move to. `cargo-deny` pin `0.20.2` is the newest published version (2026-07-09) and its release archive is digest-pinned in the workflow (`9f12ed4c...`).
+
+**Pinned actions and runners.** `actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1` = tag **v7.0.1**; it is the only external action used. Runner images observed: `ubuntu-24.04` and `windows-2025-vs2026` (image version `20261103.298.1`, runner `2.338.2`). Both are current GitHub-hosted images; nothing is deprecated.
+
+**Dependency graph (locked, unchanged by this order).** Normal, direct: `serde 1.0.229`, `serde_json 1.0.154` (adapters), `rustix 1.1.5` (Linux only), `windows-sys 0.61.2` (Windows only). Normal, transitive: `serde_core 1.0.229`, `itoa 1.0.18`, `memchr 2.8.3`, `zmij 1.0.23`, `bitflags 2.13.2`, `linux-raw-sys 0.12.1`, `windows-link 0.2.1`. Build/dev edges: `syn 3.0.9`, `proc-macro2 1.0.107`, `quote 1.0.47`, `unicode-ident 1.0.27`. `solo-domain` and `solo-application` have **no** external dependency at all.
+
+**Currency inventory and dispositions (all 2026-11-10).**
+
+| Package | Pinned | Newest published | Position | Disposition |
+| --- | --- | --- | --- | --- |
+| Rust / rustc / cargo | 1.99.1 | 1.99.1 (2026-10-16) | current stable | none needed |
+| rustup | 1.29.3 | local toolchain manager; not part of the product graph | current installed | none |
+| cargo-deny | 0.20.2 | 0.20.2 (2026-07-09) | current | none |
+| actions/checkout | `3d3c42e5...` | tag v7.0.1 for that commit | pinned tag | none |
+| `serde` | 1.0.229 | 1.0.229 | current | none |
+| `serde_core` | 1.0.229 | 1.0.229 | current | none |
+| `serde_json` | 1.0.154 | 1.0.154 | current | none |
+| `itoa` | 1.0.18 | 1.0.19 (2026-11-09) | one patch behind (transitive via `serde_json`) | **not upgraded** - dependency changes are outside this order; recorded for a future Owner dependency order |
+| `memchr` | 2.8.3 | 2.8.3 | current | none |
+| `zmij` | 1.0.23 | 1.0.23 | current | none |
+| `rustix` | 1.1.5 | 1.1.6 | one patch behind (direct, Linux only) | **not upgraded** - pinned in `Cargo.toml`; out of scope |
+| `bitflags` | 2.13.2 | 2.13.2 | current | none |
+| `linux-raw-sys` | 0.12.1 | 0.12.1 | current | none |
+| `windows-sys` | 0.61.2 | 0.61.2 | current | none |
+| `windows-link` | 0.2.1 | 0.100.0 overall; 0.2.1 is the newest `0.2.x` | major line ahead; `0.100.0` is incompatible with the pinned `windows-sys 0.61.2` | **not applicable**; no action |
+| `syn` | 3.0.9 | 3.0.10 (2026-11-09) | one patch behind (build/dev edge only) | **not upgraded** - out of scope |
+| `proc-macro2` | 1.0.107 | 1.0.107 | current | none |
+| `quote` | 1.0.47 | 1.0.47 | current | none |
+| `unicode-ident` | 1.0.27 | 1.0.27 | current | none |
+
+**Advisory applicability.** The authoritative check is the in-run `cargo-deny 0.20.2` gate over a freshly fetched RustSec database, which reported **no advisory** against the locked graph in both green runs at `fa724977`; the deliberate `RUSTSEC-2026-0009` negative probe still fails as designed, proving the database was live rather than stale. No `yanked` version, no known-vulnerable crate, no licence or ban violation was reported at the substantive SHA. No dependency, lockfile, toolchain or deny-policy change was made in this order, so nothing outside the accepted pins could have been introduced.
 
 ## 7. Verification limits, scratch and final state
 
-**Local, on the pinned `1.99.1-x86_64-pc-windows-msvc` toolchain:** `cargo fmt --all -- --check` clean; `cargo check --locked -p solo-domain --all-targets` and `-p solo-application --all-targets` clean; `cargo clippy --locked -p solo-domain --all-targets -- -D warnings` and the same for `solo-application` clean. **NOT RUN locally:** `cargo clippy --workspace` and `cargo test` - this workstation has no MSVC `link.exe`, so `serde`'s build script cannot be linked and the `solo-adapters` crate plus every test binary can only be compiled and executed in CI. The adapter code and all three test suites are therefore verified by the two-host runs above, not by a local run; nothing is inferred from an unexecuted local command.
+**Local, on the pinned `1.99.1-x86_64-pc-windows-msvc` toolchain:** `cargo fmt --all -- --check` clean; `cargo check --locked -p solo-domain --all-targets` and `-p solo-application --all-targets` clean; `cargo clippy --locked -p solo-domain --all-targets -- -D warnings` and the same for `solo-application` clean, including all 23 of their new and existing tests. **NOT RUN locally:** `cargo clippy --workspace` and `cargo test` - this workstation has no MSVC `link.exe`, so `serde`'s build script cannot link and the `solo-adapters` crate plus every test binary is compiled and executed only in CI. The adapter corrections and all 37 tests are therefore verified by the two green two-host runs above; nothing is inferred from an unexecuted local command.
 
-**Scratch and cleanup.** Solo `.temp/` was not used. The local build cache `target/` (created by the local `cargo` runs, untracked and not covered by this repository's `.gitignore`) was deleted before the final state check; no tracked path was affected. The Cline task temporary area holds only tool-generated command logs from this run; no Solo material was written there, nothing tracked is affected, and no unknown or Owner-owned material was deleted.
+**Scratch and Cline task material.** Solo `.temp/` was not used. The local build cache `target/` (untracked and not covered by this repository's `.gitignore`) was created by the local `cargo` runs and has been deleted again before the final state check; if the IDE's language server recreates it, it remains untracked and is not committed. The Cline task temporary area (`%LOCALAPPDATA%\Temp\cline`) held 20 tool-generated `proceed-while-running-*.log` files from this and the preceding cycle; all 20 were deleted successfully, none remained, and no unknown or Owner-owned material was touched. No retained items and no cleanup limitation remain.
 
-**Final state at the report commit.** `git status --porcelain` empty; one checkout at the Owner's root; one worktree; sole `origin`; local and remote `main` identical; branches `main` plus the retained `solo-wo-056-r01`; the four WIP files unchanged from the authorization revision (ACTIVE still holds the issued order, NEXT is title-only, ROADMAP and OUTLOOK untouched).
+**Final state at the report commit.** `git status --porcelain` empty; one checkout at the Owner's root; one worktree; sole `origin`; local and remote `main` identical at the substantive revision; branches `main` plus the retained `solo-wo-056-r01`; the four WIP files unchanged from the authorization revision (ACTIVE still holds the issued order, NEXT is neutral, ROADMAP and OUTLOOK untouched); `Cargo.lock`, `Cargo.toml`, `rust-toolchain.toml`, `deny.toml`, `.github/` and `crates/solo-cli/` byte-identical to the reviewed baseline.
 
 ## 8. Scope boundaries and honest status
 
-**Implemented and verified:** the `R03.A` typed registry, the five-level direct-ancestry resolver with internal provenance, the separate validated public projection, the application inbound use case and the adapter translation with an end-to-end real-JSON path.
+**Implemented and verified in this cycle:** whole-graph fail-closed validation with deterministic parent-first traversal and indexed declarations, manifest↔graph membership binding including owners without properties, the typed empty-array refusal, complete `extend` syntax validation (closed contiguous owner lineage, typed `set`, retained request data), and 11 new tests with all prior `R03.A` behaviour preserved.
 
-**Deliberately not implemented, and not claimed:** `R03.B` location `extend` (recognized as accepted syntax and refused with `LOCATION_EXTENSION_NOT_IMPLEMENTED_IN_R03A`; no in-place identified-record mutation, no field-level extension provenance); `R03.C` graphics assets, catalogue, fallback and delivery (only the typed *declaration* reference is validated); routing, locale canonicalization, visibility decisions, HTML/browser output, a live site, deployment and release. No whole-product or full `O08`/`O09` conformance is claimed.
+**Deliberately not implemented, and not claimed:** `R03.B` identified-record extension and field mutation (the recognized request is carried and refused by name); `R03.C` graphics assets, catalogue, fallback and delivery (only the typed declaration reference is validated); routing, locale canonicalization, visibility decisions, HTML/browser output, deployment and release. No whole-product or full `O08`/`O09` conformance is claimed.
 
-**WIP authority untouched beyond the authorized transition:** `ROADMAP` still lists Stage 03 with `R03.A` as its first package, Stage 03 remains OPEN, Stage 04-13 are unchanged, `NEXT` remains the neutral title (no candidate selected), and ACTIVE was not cleared. The Implementation Agent did not self-ACCEPT, did not advance any stage and did not issue a next order; the Chief Architect's independent review of exactly `5a4a7b2c` and this report decides what happens next.
+**WIP authority untouched beyond the authorized transition:** `ROADMAP` still lists Stage 03 with `R03.A` as its first package, Stage 03 remains OPEN, Stages 04-13 are unchanged, `NEXT` remains neutral, and ACTIVE was not cleared. The Implementation Agent did not self-ACCEPT, did not advance any stage and did not issue a next order; the Architect's independent review of exactly `fa724977f4e7b76493c386da3501f92e1d2206e7` and this report decides what happens next.
+
 
 
 
