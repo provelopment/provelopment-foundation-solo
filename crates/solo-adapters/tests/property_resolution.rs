@@ -13,11 +13,12 @@ use solo_adapters::{
     ManifestPropertyRefusalKind, ParsedManifestCandidateV1, parse_manifest_bytes,
     validate_manifest_property_candidate_v1,
 };
+use solo_application::collect_graphic_asset_obligations_v1;
 use solo_domain::{
-    EfsOwnershipDraft, EfsOwnershipGraph, EntityIdV1, Exposure, FacetDraft, FacetIdV1, FactIdV1,
-    LocaleKeyV1, LocationExtensionCause, LocationKind, PageDraft, PageIdV1, PropertyKey,
-    PropertyRefusalKind, PropertyResolutionRefusalKind, PropertyValueV1, ProvenanceValueV1,
-    QualifiedOwnerV1, ResolutionOperation, SiteDraft, SiteIdV1,
+    AssetNamespace, EfsOwnershipDraft, EfsOwnershipGraph, EntityIdV1, Exposure, FacetDraft,
+    FacetIdV1, FactIdV1, LocaleKeyV1, LocationExtensionCause, LocationKind, PageDraft, PageIdV1,
+    PropertyKey, PropertyRefusalKind, PropertyResolutionRefusalKind, PropertyValueV1,
+    ProvenanceValueV1, QualifiedOwnerV1, ResolutionOperation, SiteDraft, SiteIdV1,
 };
 
 /// A manifest with no authored properties at any level.
@@ -1553,5 +1554,362 @@ fn r03b_11_unlisted_invalid_extension_fails_the_whole_candidate() {
             .as_str(),
         "page-annex",
         "unlisted visibility changes no property inheritance"
+    );
+}
+
+/// `R03C1-08` — real strict JSON through the unchanged parser, the unchanged manifest
+/// translation, the accepted use case and then the new inventory: all five owning levels are
+/// collected with their exact declaring owner, role, local index, namespace, exposure and
+/// reference, and the result is still nonpublishing.
+#[test]
+fn r03c1_08_real_json_graphic_inventory_covers_all_five_levels() {
+    let document = manifest(
+        r#"{ "graphic.logo": { "inheritance": "inherit", "currentContext": [ { "source": { "namespace": "entity", "reference": "brand/entity-logo.png" }, "exposure": "public" } ] } }"#,
+        r#"{ "graphic.banner": { "inheritance": "inherit", "currentContext": [ { "source": { "namespace": "entity", "reference": "brand/facet-banner.png" }, "exposure": "public" } ] } }"#,
+        r#"{ "graphic.background": { "inheritance": "inherit", "currentContext": [ { "source": { "namespace": "entity", "reference": "bg/site-1.png" }, "exposure": "public" }, { "source": { "namespace": "platform", "reference": "shared/site-2.webp" }, "exposure": "public" } ] } }"#,
+        r#"{ "graphic.social-preview": { "inheritance": "inherit", "currentContext": [ { "source": { "namespace": "entity", "reference": "social/page.jpg" }, "exposure": "internal" } ] } }"#,
+        r#"{ "graphic.favicon": { "inheritance": "inherit", "currentContext": [ { "source": { "namespace": "entity", "reference": "icons/favicon.png" }, "exposure": "public" } ] } }"#,
+    );
+    let parsed = parse_document(&document);
+    let graph = graph_from(&parsed);
+    let candidate =
+        validate_manifest_property_candidate_v1(&parsed, &graph, &representation_owner())
+            .expect("a valid whole-graph property candidate");
+    assert!(!candidate.is_publication_authorized());
+
+    let inventory = collect_graphic_asset_obligations_v1(candidate.candidate())
+        .expect("the authored inventory collects");
+    assert_eq!(inventory.len(), 6);
+    let rows = inventory.obligations();
+    let observed: Vec<(String, &str, usize, AssetNamespace, &str, Exposure)> = rows
+        .iter()
+        .map(|row| {
+            (
+                row.declaring_owner().describe(),
+                row.role().name(),
+                row.local_index(),
+                row.namespace(),
+                row.reference_text(),
+                row.exposure(),
+            )
+        })
+        .collect();
+    let expected: Vec<(String, &str, usize, AssetNamespace, &str, Exposure)> = vec![
+        (
+            entity_owner().describe(),
+            "graphic.logo",
+            0,
+            AssetNamespace::Entity,
+            "brand/entity-logo.png",
+            Exposure::Public,
+        ),
+        (
+            facet_owner().describe(),
+            "graphic.banner",
+            0,
+            AssetNamespace::Entity,
+            "brand/facet-banner.png",
+            Exposure::Public,
+        ),
+        (
+            site_owner().describe(),
+            "graphic.background",
+            0,
+            AssetNamespace::Entity,
+            "bg/site-1.png",
+            Exposure::Public,
+        ),
+        (
+            site_owner().describe(),
+            "graphic.background",
+            1,
+            AssetNamespace::Platform,
+            "shared/site-2.webp",
+            Exposure::Public,
+        ),
+        (
+            page_owner().describe(),
+            "graphic.social-preview",
+            0,
+            AssetNamespace::Entity,
+            "social/page.jpg",
+            Exposure::Internal,
+        ),
+        (
+            representation_owner().describe(),
+            "graphic.favicon",
+            0,
+            AssetNamespace::Entity,
+            "icons/favicon.png",
+            Exposure::Public,
+        ),
+    ];
+    assert_eq!(observed, expected);
+
+    // The internal Page social preview stays inventoried even though nothing public shows it.
+    assert!(
+        candidate
+            .public()
+            .values_of(PropertyKey::GraphicSocialPreview)
+            .is_empty()
+    );
+    assert!(!inventory.grants_publication_authority());
+    assert!(!candidate.candidate().is_publication_authorized());
+}
+
+/// `R03C1-08` — an invalid graphic declaration on an **unlisted, unrequested** representation
+/// refuses the whole candidate before any inventory exists, and the refusal names the true
+/// declaring owner and key without echoing authored content.
+#[test]
+fn r03c1_08_invalid_graphic_on_an_unlisted_representation_refuses_before_inventory() {
+    let document = manifest_with_unlisted_sibling(
+        NO_PROPERTIES,
+        r#"{ "graphic.logo": { "inheritance": "inherit", "currentContext": [ { "source": { "namespace": "entity", "reference": "../escape.png" }, "exposure": "public" } ] } }"#,
+    );
+    let parsed = parse_document(&document);
+    let graph = graph_from(&parsed);
+    let refusal = validate_manifest_property_candidate_v1(&parsed, &graph, &representation_owner())
+        .expect_err("an unsafe graphic reference on the unlisted branch fails closed");
+    assert_eq!(
+        refusal.kind(),
+        ManifestPropertyRefusalKind::DeclarationRefused(PropertyRefusalKind::InvalidAssetReference)
+    );
+    assert_eq!(
+        refusal.owner().map(QualifiedOwnerV1::describe),
+        Some(unlisted_representation_owner().describe()),
+        "the refusal names the declaring unlisted representation"
+    );
+    assert_eq!(refusal.property(), Some(PropertyKey::GraphicLogo));
+    let message = refusal.to_string();
+    assert!(message.contains("graphic.logo"));
+    assert!(
+        !message.contains("escape"),
+        "no authored reference is echoed"
+    );
+
+    // The same manifest without the unsafe declaration yields one inventory per authored source,
+    // and the unlisted declaration is included because unlisted is not invisible to authoring.
+    let control = manifest_with_unlisted_sibling(
+        NO_PROPERTIES,
+        r#"{ "graphic.logo": { "inheritance": "inherit", "currentContext": [ { "source": { "namespace": "entity", "reference": "brand/unlisted-logo.png" }, "exposure": "public" } ] } }"#,
+    );
+    let control = parse_document(&control);
+    let control_graph = graph_from(&control);
+    let requested =
+        validate_manifest_property_candidate_v1(&control, &control_graph, &representation_owner())
+            .expect("the requested branch resolves");
+    let from_public = collect_graphic_asset_obligations_v1(requested.candidate())
+        .expect("the inventory collects");
+    let unlisted = validate_manifest_property_candidate_v1(
+        &control,
+        &control_graph,
+        &unlisted_representation_owner(),
+    )
+    .expect("the unlisted branch resolves");
+    let from_unlisted =
+        collect_graphic_asset_obligations_v1(unlisted.candidate()).expect("the inventory collects");
+
+    assert_eq!(from_public.len(), 1);
+    assert_eq!(from_public, from_unlisted);
+    let only = &from_public.obligations()[0];
+    assert_eq!(
+        only.declaring_owner(),
+        &unlisted_representation_owner(),
+        "the obligation keeps its own unlisted declaring owner"
+    );
+    assert_eq!(only.reference_text(), "brand/unlisted-logo.png");
+    assert_eq!(only.role(), PropertyKey::GraphicLogo);
+}
+
+/// `R03C1-03` — two sibling Sites and two full-locale representations author different graphics;
+/// the inventory is identical for every valid requested owner and never infers geography.
+#[test]
+fn r03c1_03_sibling_sites_and_two_locales_inventory_is_target_independent() {
+    // Two sibling Sites under one Facet, each with its own Page `home` in `en-001`.
+    let two_sites = manifest_two_sites(
+        r#"{ "graphic.banner": { "inheritance": "inherit", "currentContext": [ { "source": { "namespace": "entity", "reference": "bali/banner.png" }, "exposure": "public" } ] } }"#,
+        r#"{ "graphic.logo": { "inheritance": "inherit", "currentContext": [ { "source": { "namespace": "entity", "reference": "bali/logo-en.png" }, "exposure": "public" } ] } }"#,
+        r#"{ "graphic.banner": { "inheritance": "inherit", "currentContext": [ { "source": { "namespace": "entity", "reference": "jakarta/banner.png" }, "exposure": "public" } ] } }"#,
+        r#"{ "graphic.favicon": { "inheritance": "inherit", "currentContext": [ { "source": { "namespace": "entity", "reference": "jakarta/favicon.png" }, "exposure": "internal" } ] } }"#,
+    );
+    let parsed = parse_document(&two_sites);
+    let graph = graph_from(&parsed);
+    let first = validate_manifest_property_candidate_v1(&parsed, &graph, &representation_owner())
+        .expect("the first Site resolves");
+    let second =
+        validate_manifest_property_candidate_v1(&parsed, &graph, &second_representation_owner())
+            .expect("the second Site resolves");
+    let from_first =
+        collect_graphic_asset_obligations_v1(first.candidate()).expect("the inventory collects");
+    let from_second =
+        collect_graphic_asset_obligations_v1(second.candidate()).expect("the inventory collects");
+
+    assert_eq!(from_first, from_second);
+    assert_eq!(from_first.len(), 4);
+    let owners: Vec<String> = from_first
+        .obligations()
+        .iter()
+        .map(|row| row.declaring_owner().describe())
+        .collect();
+    assert_eq!(
+        owners,
+        vec![
+            site_owner().describe(),
+            representation_owner().describe(),
+            QualifiedOwnerV1::site(entity(), facet(), second_site_id()).describe(),
+            second_representation_owner().describe(),
+        ],
+        "each sibling keeps its own declaring owner, in graph order"
+    );
+    // The internal second-Site favicon stays inventoried but is never published.
+    assert!(
+        second
+            .public()
+            .values_of(PropertyKey::GraphicFavicon)
+            .is_empty()
+    );
+
+    // One Site with two full-locale representations, the second being unlisted.
+    let two_locales = manifest_with_unlisted_sibling(
+        r#"{ "graphic.background": { "inheritance": "inherit", "currentContext": [ { "source": { "namespace": "entity", "reference": "bg/page.png" }, "exposure": "public" } ] } }"#,
+        r#"{ "graphic.banner": { "inheritance": "inherit", "currentContext": [ { "source": { "namespace": "entity", "reference": "id/banner.png" }, "exposure": "public" } ] } }"#,
+    );
+    let parsed = parse_document(&two_locales);
+    let graph = graph_from(&parsed);
+    let english = validate_manifest_property_candidate_v1(&parsed, &graph, &representation_owner())
+        .expect("the en-001 branch resolves");
+    let indonesian =
+        validate_manifest_property_candidate_v1(&parsed, &graph, &unlisted_representation_owner())
+            .expect("the unlisted id-ID branch resolves");
+    let from_english = collect_graphic_asset_obligations_v1(english.candidate()).expect("collects");
+    let from_indonesian =
+        collect_graphic_asset_obligations_v1(indonesian.candidate()).expect("collects");
+
+    assert_eq!(from_english, from_indonesian);
+    assert_eq!(from_english.len(), 2);
+    assert_eq!(
+        from_english.obligations()[0].declaring_owner(),
+        &page_owner()
+    );
+    assert_eq!(
+        from_english.obligations()[1].declaring_owner(),
+        &unlisted_representation_owner(),
+        "a locale is membership, and the unlisted representation keeps its own obligation"
+    );
+    assert_eq!(
+        from_english.obligations()[1].reference_text(),
+        "id/banner.png"
+    );
+}
+
+/// One Page-level graphic declaration as strict JSON.
+fn graphic_page_properties(role: &str, reference: &str, exposure: &str) -> String {
+    format!(
+        r#"{{ "{role}": {{ "inheritance": "inherit", "currentContext": [ {{ "source": {{ "namespace": "entity", "reference": "{reference}" }}, "exposure": "{exposure}" }} ] }} }}"#
+    )
+}
+
+/// `R03C1-09` — the closed reference grammar is unchanged: the accepted image extensions still
+/// parse, external/absolute/traversal/backslash/encoded forms still refuse, SVG and GIF still
+/// refuse, a favicon stays PNG-only, and an accepted reference is never attested as existing,
+/// safe or published media.
+#[test]
+fn r03c1_09_reference_grammar_is_unchanged_and_no_media_is_attested() {
+    for extension in ["png", "jpg", "jpeg", "webp", "avif"] {
+        let reference = format!("media/logo.{extension}");
+        let document = manifest(
+            NO_PROPERTIES,
+            NO_PROPERTIES,
+            NO_PROPERTIES,
+            &graphic_page_properties("graphic.logo", &reference, "public"),
+            NO_PROPERTIES,
+        );
+        let parsed = parse_document(&document);
+        let graph = graph_from(&parsed);
+        let candidate =
+            validate_manifest_property_candidate_v1(&parsed, &graph, &representation_owner())
+                .expect("an accepted image reference resolves");
+        let inventory =
+            collect_graphic_asset_obligations_v1(candidate.candidate()).expect("collects");
+        assert_eq!(inventory.len(), 1);
+        assert_eq!(
+            inventory.obligations()[0].reference_text(),
+            reference.as_str()
+        );
+        assert_eq!(
+            inventory.obligations()[0].namespace(),
+            AssetNamespace::Entity
+        );
+        // Existence, confinement, magic bytes, dimensions, licence and catalogue membership are
+        // all still unproven: the inventory never claims them.
+        assert!(!inventory.grants_publication_authority());
+        assert!(!inventory.obligations()[0].grants_publication_authority());
+    }
+
+    let invalid_reference =
+        ManifestPropertyRefusalKind::DeclarationRefused(PropertyRefusalKind::InvalidAssetReference);
+    for reference in [
+        "https://example.org/logo.png",
+        "/media/logo.png",
+        "../escape.png",
+        r"media\\logo.png",
+        "media/logo.png?x=1",
+        "media/%2e%2e/logo.png",
+        "media/logo.png#fragment",
+    ] {
+        assert_eq!(
+            page_level_refusal_kind(&graphic_page_properties(
+                "graphic.logo",
+                reference,
+                "public"
+            )),
+            invalid_reference,
+            "reference `{reference}` must refuse as an invalid asset reference"
+        );
+    }
+
+    let unsupported = ManifestPropertyRefusalKind::DeclarationRefused(
+        PropertyRefusalKind::UnsupportedAssetExtension,
+    );
+    for reference in ["media/logo.svg", "media/logo.gif"] {
+        assert_eq!(
+            page_level_refusal_kind(&graphic_page_properties(
+                "graphic.logo",
+                reference,
+                "public"
+            )),
+            unsupported,
+            "reference `{reference}` must refuse as an unsupported extension"
+        );
+    }
+
+    // A favicon remains PNG-only.
+    assert_eq!(
+        page_level_refusal_kind(&graphic_page_properties(
+            "graphic.favicon",
+            "media/favicon.jpg",
+            "public"
+        )),
+        ManifestPropertyRefusalKind::DeclarationRefused(PropertyRefusalKind::FaviconNotPng)
+    );
+
+    // A PNG favicon is accepted, and its obligation keeps the exact reference.
+    let document = manifest(
+        NO_PROPERTIES,
+        NO_PROPERTIES,
+        NO_PROPERTIES,
+        &graphic_page_properties("graphic.favicon", "media/favicon.png", "public"),
+        NO_PROPERTIES,
+    );
+    let parsed = parse_document(&document);
+    let graph = graph_from(&parsed);
+    let candidate =
+        validate_manifest_property_candidate_v1(&parsed, &graph, &representation_owner())
+            .expect("a PNG favicon resolves");
+    let inventory = collect_graphic_asset_obligations_v1(candidate.candidate()).expect("collects");
+    assert_eq!(inventory.role_count(PropertyKey::GraphicFavicon), 1);
+    assert_eq!(
+        inventory.obligations()[0].reference_text(),
+        "media/favicon.png"
     );
 }

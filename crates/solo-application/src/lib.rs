@@ -13,12 +13,17 @@
 #![forbid(unsafe_code)]
 
 mod bootstrap_preflight;
+mod graphic_asset_inventory;
 mod property_resolution;
 mod source_read;
 
 pub use bootstrap_preflight::{
     BootstrapAcceptedV1, BootstrapInputV1, BootstrapOutcomeV1, BootstrapPreflightService,
     BootstrapPreflightV1, BootstrapRefusalCode, BootstrapRefusedV1,
+};
+pub use graphic_asset_inventory::{
+    GRAPHIC_ASSET_INVENTORY_GRANTS_PUBLICATION_AUTHORITY, GraphicAssetObligationInventoryV1,
+    GraphicAssetObligationV1, collect_graphic_asset_obligations_v1,
 };
 pub use property_resolution::{
     PROPERTY_CANDIDATE_GRANTS_PUBLICATION_AUTHORITY, PropertyResolutionCandidateV1,

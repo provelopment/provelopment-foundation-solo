@@ -2600,3 +2600,358 @@ fn r03b_09_internal_facts_stay_unprojected_after_extension() {
         "no inherited value is echoed"
     );
 }
+
+/// One validated graphic reference value under an explicit namespace.
+fn graphic_ref(namespace: AssetNamespace, reference: &str) -> PropertyValueV1 {
+    PropertyValueV1::graphic(
+        AssetReferenceV1::parse(namespace, reference).expect("a valid asset reference"),
+    )
+}
+
+/// One Entity-namespace logo reference.
+fn logo(reference: &str) -> PropertyValueV1 {
+    graphic_ref(AssetNamespace::Entity, reference)
+}
+
+/// `R03C1-07` — the accepted domain graphic gates are unchanged: singular cardinality, the
+/// four-layer background bound, duplicate exact background sources, `suppress` plus replacement,
+/// explicit suppression and internal filtering all still behave exactly as accepted, and the
+/// cardinality check runs **before** the public filtering so an internal value still conflicts.
+#[test]
+fn r03c1_07_graphic_cardinality_duplicates_and_suppression_are_unchanged() {
+    // A singular role refuses a second effective value inherited from a direct ancestor.
+    let singular = validate_declared_properties_v1(
+        &graph(),
+        vec![
+            declared(
+                site_owner(),
+                vec![(
+                    PropertyKey::GraphicLogo,
+                    inherit(vec![auth(logo("brand/site.png"), Exposure::Public)]),
+                )],
+            ),
+            declared(
+                page_owner(),
+                vec![(
+                    PropertyKey::GraphicLogo,
+                    inherit(vec![auth(logo("brand/page.png"), Exposure::Public)]),
+                )],
+            ),
+        ],
+    )
+    .expect("a valid input");
+    assert_eq!(
+        singular
+            .resolve(&representation_owner())
+            .expect_err("a second effective logo refuses")
+            .kind(),
+        PropertyResolutionRefusalKind::CardinalityExceeded
+    );
+
+    // The same conflict is still refused when the ancestor value is internal: the maximum is
+    // enforced before any public filtering.
+    let hidden = validate_declared_properties_v1(
+        &graph(),
+        vec![
+            declared(
+                site_owner(),
+                vec![(
+                    PropertyKey::GraphicLogo,
+                    inherit(vec![auth(logo("brand/hidden.png"), Exposure::Internal)]),
+                )],
+            ),
+            declared(
+                page_owner(),
+                vec![(
+                    PropertyKey::GraphicLogo,
+                    inherit(vec![auth(logo("brand/shown.png"), Exposure::Public)]),
+                )],
+            ),
+        ],
+    )
+    .expect("a valid input");
+    assert_eq!(
+        hidden
+            .resolve(&representation_owner())
+            .expect_err("a hidden ancestor still conflicts")
+            .kind(),
+        PropertyResolutionRefusalKind::CardinalityExceeded
+    );
+
+    // The background bound is exactly four layers.
+    let mut five_layers = Vec::new();
+    for index in 0..=MAX_BACKGROUND_LAYERS {
+        five_layers.push(auth(
+            background(&format!("bg/layer-{index}.png")),
+            Exposure::Public,
+        ));
+    }
+    assert_eq!(five_layers.len(), MAX_BACKGROUND_LAYERS + 1);
+    let excessive = validate_declared_properties_v1(
+        &graph(),
+        vec![declared(
+            entity_owner(),
+            vec![(PropertyKey::GraphicBackground, inherit(five_layers))],
+        )],
+    )
+    .expect("a valid local bound");
+    assert_eq!(
+        excessive
+            .resolve(&page_owner())
+            .expect_err("five background layers refuse")
+            .kind(),
+        PropertyResolutionRefusalKind::CardinalityExceeded
+    );
+
+    // Two identical background sources are refused by their exact category.
+    let duplicate = validate_declared_properties_v1(
+        &graph(),
+        vec![declared(
+            entity_owner(),
+            vec![(
+                PropertyKey::GraphicBackground,
+                inherit(vec![
+                    auth(background("bg/same.png"), Exposure::Public),
+                    auth(background("bg/same.png"), Exposure::Internal),
+                ]),
+            )],
+        )],
+    )
+    .expect("a valid local bound");
+    assert_eq!(
+        duplicate
+            .resolve(&page_owner())
+            .expect_err("a repeated exact background source refuses")
+            .kind(),
+        PropertyResolutionRefusalKind::DuplicateGraphicSource
+    );
+}
+
+/// `R03C1-07` — `suppress` plus a local graphic replaces a singular inherited selection, `suppress`
+/// alone leaves nothing effective, and an internal value is kept internally while staying out of
+/// the public projection.
+#[test]
+fn r03c1_07_graphic_suppression_and_internal_filtering_are_unchanged() {
+    let replaced = validate_declared_properties_v1(
+        &graph(),
+        vec![
+            declared(
+                entity_owner(),
+                vec![(
+                    PropertyKey::GraphicLogo,
+                    inherit(vec![auth(logo("brand/entity.png"), Exposure::Public)]),
+                )],
+            ),
+            declared(
+                page_owner(),
+                vec![(
+                    PropertyKey::GraphicLogo,
+                    suppress(vec![auth(logo("brand/page.png"), Exposure::Public)]),
+                )],
+            ),
+        ],
+    )
+    .expect("a valid input");
+    let resolved = replaced
+        .resolve(&representation_owner())
+        .expect("suppress plus replacement is legal");
+    let values = resolved.values_of(PropertyKey::GraphicLogo);
+    assert_eq!(values.len(), 1);
+    assert_eq!(values[0].origin_owner(), &page_owner());
+    assert_eq!(values[0].origin_local_index(), 0);
+    assert_eq!(
+        asset_references(values),
+        vec!["brand/page.png".to_owned()],
+        "the inherited entity logo is replaced, never merged"
+    );
+    assert_eq!(
+        project_public_properties_v1(&resolved)
+            .values_of(PropertyKey::GraphicLogo)
+            .len(),
+        1
+    );
+
+    // `suppress` with `"none"` clears the collection at that descendant only.
+    let cleared = validate_declared_properties_v1(
+        &graph(),
+        vec![
+            declared(
+                entity_owner(),
+                vec![(
+                    PropertyKey::GraphicLogo,
+                    inherit(vec![auth(logo("brand/entity.png"), Exposure::Public)]),
+                )],
+            ),
+            declared(
+                page_owner(),
+                vec![(PropertyKey::GraphicLogo, suppress(Vec::new()))],
+            ),
+        ],
+    )
+    .expect("a valid input");
+    let cleared_resolved = cleared
+        .resolve(&representation_owner())
+        .expect("explicit suppression resolves");
+    assert!(
+        cleared_resolved
+            .values_of(PropertyKey::GraphicLogo)
+            .is_empty()
+    );
+    assert!(
+        project_public_properties_v1(&cleared_resolved)
+            .values_of(PropertyKey::GraphicLogo)
+            .is_empty()
+    );
+    // An unrelated sibling branch still sees the inherited value: no global side effect.
+    let sibling = cleared
+        .resolve(&jakarta_representation_owner())
+        .expect("the sibling branch resolves");
+    assert_eq!(sibling.values_of(PropertyKey::GraphicLogo).len(), 1);
+
+    // Internal values stay in the internal record and never reach the public projection.
+    let internal = validate_declared_properties_v1(
+        &graph(),
+        vec![declared(
+            entity_owner(),
+            vec![(
+                PropertyKey::GraphicBackground,
+                inherit(vec![auth(background("bg/hidden.png"), Exposure::Internal)]),
+            )],
+        )],
+    )
+    .expect("a valid input");
+    let internal_resolved = internal
+        .resolve(&representation_owner())
+        .expect("an internal value resolves");
+    assert_eq!(
+        internal_resolved
+            .values_of(PropertyKey::GraphicBackground)
+            .len(),
+        1
+    );
+    assert!(
+        project_public_properties_v1(&internal_resolved)
+            .values_of(PropertyKey::GraphicBackground)
+            .is_empty()
+    );
+}
+
+/// `R03C1-02`/`R03C1-07` — each of the five registered graphic roles keeps its exact original
+/// owner, local index, namespace and reference through resolution, with no renamed role and no
+/// guessed filename.
+#[test]
+fn r03c1_07_five_registered_graphic_roles_keep_exact_origin() {
+    let validated = validate_declared_properties_v1(
+        &graph(),
+        vec![declared(
+            page_owner(),
+            vec![
+                (
+                    PropertyKey::GraphicLogo,
+                    inherit(vec![auth(logo("brand/logo.png"), Exposure::Public)]),
+                ),
+                (
+                    PropertyKey::GraphicFavicon,
+                    inherit(vec![auth(logo("icons/favicon.png"), Exposure::Public)]),
+                ),
+                (
+                    PropertyKey::GraphicBanner,
+                    inherit(vec![auth(logo("brand/banner.png"), Exposure::Internal)]),
+                ),
+                (
+                    PropertyKey::GraphicBackground,
+                    inherit(vec![
+                        auth(
+                            graphic_ref(AssetNamespace::Platform, "shared/bg-1.webp"),
+                            Exposure::Public,
+                        ),
+                        auth(logo("bg/bg-2.jpg"), Exposure::Public),
+                    ]),
+                ),
+                (
+                    PropertyKey::GraphicSocialPreview,
+                    inherit(vec![auth(logo("social/preview.jpeg"), Exposure::Public)]),
+                ),
+            ],
+        )],
+    )
+    .expect("a valid input");
+    let resolved = validated
+        .resolve(&representation_owner())
+        .expect("six authored values resolve");
+    let public = project_public_properties_v1(&resolved);
+
+    let expected: Vec<(PropertyKey, usize, &str, AssetNamespace)> = vec![
+        (
+            PropertyKey::GraphicLogo,
+            0,
+            "brand/logo.png",
+            AssetNamespace::Entity,
+        ),
+        (
+            PropertyKey::GraphicFavicon,
+            0,
+            "icons/favicon.png",
+            AssetNamespace::Entity,
+        ),
+        (
+            PropertyKey::GraphicBanner,
+            0,
+            "brand/banner.png",
+            AssetNamespace::Entity,
+        ),
+        (
+            PropertyKey::GraphicBackground,
+            0,
+            "shared/bg-1.webp",
+            AssetNamespace::Platform,
+        ),
+        (
+            PropertyKey::GraphicBackground,
+            1,
+            "bg/bg-2.jpg",
+            AssetNamespace::Entity,
+        ),
+        (
+            PropertyKey::GraphicSocialPreview,
+            0,
+            "social/preview.jpeg",
+            AssetNamespace::Entity,
+        ),
+    ];
+    for (role, index, reference, namespace) in expected {
+        let values = resolved.values_of(role);
+        let value = values
+            .iter()
+            .find(|value| value.origin_local_index() == index)
+            .unwrap_or_else(|| panic!("{role} local index {index} resolved"));
+        assert_eq!(value.origin_owner(), &page_owner());
+        let reference_value = value.data().asset_reference().expect("a graphic reference");
+        assert_eq!(reference_value.reference(), reference);
+        assert_eq!(reference_value.namespace(), namespace);
+    }
+
+    // The internal banner is the only value withheld from the public projection.
+    assert!(public.values_of(PropertyKey::GraphicBanner).is_empty());
+    assert_eq!(public.values_of(PropertyKey::GraphicLogo).len(), 1);
+    assert_eq!(public.values_of(PropertyKey::GraphicFavicon).len(), 1);
+    assert_eq!(public.values_of(PropertyKey::GraphicBackground).len(), 2);
+    assert_eq!(public.values_of(PropertyKey::GraphicSocialPreview).len(), 1);
+
+    // Exactly the five registered graphic keys are classified as graphic roles.
+    let graphic_keys: Vec<&str> = PropertyKey::ALL
+        .iter()
+        .filter(|key| key.is_graphic())
+        .map(|key| key.name())
+        .collect();
+    assert_eq!(
+        graphic_keys,
+        vec![
+            "graphic.logo",
+            "graphic.favicon",
+            "graphic.banner",
+            "graphic.background",
+            "graphic.social-preview",
+        ]
+    );
+}
