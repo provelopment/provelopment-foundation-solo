@@ -1,1 +1,13 @@
 # Foundation Solo — plan-next (Next Candidate)
+
+## R03.B — Authored location extension and independent geography
+
+**Objective:** Complete the accepted §6.2H `location` property behavior by implementing the presently recognized but unsupported `extend` operation over the R03.A five-level typed registry and direct-ancestry resolver. Preserve location as an authored property, never an owner tier, route selector, locale or geolocation inference.
+
+**Prerequisites/readiness:** R03.A is independently ACCEPTED at substantive `fa724977f4e7b76493c386da3501f92e1d2206e7` and is being administratively closed. The accepted §6.2G/§6.2H contract, `EfsOwnershipGraph`, closed `LocationFields` types, full qualified owner identities, `LocationExtensionRequestV1`, whole-graph fail-closed resolver and public projection exist. The remaining work is the specialized §6.2H extension semantics and full geographic independence evidence.
+
+**Proposed scope:** Resolve only an accessible direct-ancestor, currently inherited unsuppressed `(originOwner, factId)` target; apply `set` members in authored operation order to the existing fact without changing `factId`, `kind`, original owner/index, exposure or output position; update `fieldOrigins` for set fields only and preserve untouched origins. Refuse Entity-root extension, current-node/sibling/cross-Entity targets, missing/ambiguous/suppressed facts, duplicate same-node extensions, malformed or conflicting operations, or any attempt to extend a same-node newly added fact. Preserve `inherit`/`suppress`, effective 16-fact cardinality, origin provenance and public/private isolation. Demonstrate independent Australia → Indonesia → Bali/Jakarta fact cascades and optional Page/representation variations with no routing, locale, URL or visitor-location effects.
+
+**Deliverables:** Pure domain implementation and tests, minimal application/adapter wiring through the existing parsed-manifest candidate, positive and negative typed/provenance/ordering tests on real manifest bytes, preserved R03.A/R01/R02 regressions, exact two-host CI and canonical execution evidence. The eventual R03.B work order must separately specify the authorized file ledger and operations; this candidate authorizes no code edits.
+
+**Exit conditions:** A valid identified extension updates exactly one inherited fact in place with full correct `fieldOrigins` and `resolutionEvents`; all invalid targets, exposure changes, duplicate operations, suppression and sibling-isolation cases refuse deterministically; location never changes EFS identity, routes, base URL, language/locale or inferred user position; no private data leaks; existing tests and both designated CI hosts remain green. Stage 03 remains OPEN for R03.C.
