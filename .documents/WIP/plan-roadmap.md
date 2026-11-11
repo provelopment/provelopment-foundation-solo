@@ -6,7 +6,6 @@
 
 **Remaining packages**
 
-- **R03.B:** complete authored `location` behavior at all five EFS levels by implementing identified inherited-fact `extend` with direct-ancestor targeting, in-place field updates, exact field-level provenance, ordering, duplicate/conflict and suppressed-target refusals; demonstrate independently authored Australia → Indonesia → Bali/Jakarta association/premises facts and optional Page/representation variants, with no effects on Page identity, route, language, URL or visitor geolocation.
 - **R03.C:** implement graphic role declarations, public shared generic library, authored asset ownership, inheritance/override/suppression, and optional role-specific generic fallback strictly beneath authored hierarchy.
 
 **Exit gate:** property resolution and negative isolation tests, no sibling leakage, no private or suppressed values exposed in public output, no fallback after explicit suppression. Changing location never changes Page identity, route, locale or canonical. No cross-Entity generic asset ownership is created.
