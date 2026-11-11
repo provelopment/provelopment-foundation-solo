@@ -14,9 +14,10 @@ use solo_adapters::{
     validate_manifest_property_candidate_v1,
 };
 use solo_domain::{
-    EfsOwnershipDraft, EfsOwnershipGraph, EntityIdV1, FacetDraft, FacetIdV1, LocaleKeyV1,
-    LocationExtensionCause, PageDraft, PageIdV1, PropertyKey, PropertyRefusalKind,
-    PropertyResolutionRefusalKind, PropertyValueV1, QualifiedOwnerV1, SiteDraft, SiteIdV1,
+    EfsOwnershipDraft, EfsOwnershipGraph, EntityIdV1, Exposure, FacetDraft, FacetIdV1, FactIdV1,
+    LocaleKeyV1, LocationExtensionCause, LocationKind, PageDraft, PageIdV1, PropertyKey,
+    PropertyRefusalKind, PropertyResolutionRefusalKind, PropertyValueV1, ProvenanceValueV1,
+    QualifiedOwnerV1, ResolutionOperation, SiteDraft, SiteIdV1,
 };
 
 /// A manifest with no authored properties at any level.
@@ -1030,25 +1031,83 @@ fn r03b_08_extend_syntax_refusals_are_unchanged() {
     );
 }
 
-/// The `id-ID` representation owner of the single-Site test manifest.
-fn indonesian_representation_owner() -> QualifiedOwnerV1 {
-    QualifiedOwnerV1::representation(entity(), facet(), site(), page(), locale("id-ID"))
-}
-
 /// The **unlisted** `id-ID` representation owner of the two-representation test manifest.
 fn unlisted_representation_owner() -> QualifiedOwnerV1 {
     QualifiedOwnerV1::representation(entity(), facet(), site(), page(), locale("id-ID"))
 }
 
-/// The authored five-level geography manifest: Entity Australia, Facet Indonesia, one Site, one
-/// Page and two full-locale representations, each extending the Entity's fact in turn.
+/// The Bali Site owner of the two-Site geography manifest.
+fn bali_site_owner() -> QualifiedOwnerV1 {
+    QualifiedOwnerV1::site(entity(), facet(), bali_site_id())
+}
+
+/// The Jakarta Site owner of the two-Site geography manifest.
+fn jakarta_site_owner() -> QualifiedOwnerV1 {
+    QualifiedOwnerV1::site(entity(), facet(), jakarta_site_id())
+}
+
+fn bali_site_id() -> SiteIdV1 {
+    SiteIdV1::parse("bali").expect("a canonical Site identifier")
+}
+
+fn jakarta_site_id() -> SiteIdV1 {
+    SiteIdV1::parse("jakarta").expect("a canonical Site identifier")
+}
+
+/// The Bali Page owner of the two-Site geography manifest.
+fn bali_page_owner() -> QualifiedOwnerV1 {
+    QualifiedOwnerV1::page(entity(), facet(), bali_site_id(), page())
+}
+
+/// The Jakarta Page owner of the two-Site geography manifest.
+fn jakarta_page_owner() -> QualifiedOwnerV1 {
+    QualifiedOwnerV1::page(entity(), facet(), jakarta_site_id(), page())
+}
+
+/// The Bali representation owner for one authored full-locale key.
+fn bali_representation_owner(language: &str) -> QualifiedOwnerV1 {
+    QualifiedOwnerV1::representation(entity(), facet(), bali_site_id(), page(), locale(language))
+}
+
+/// The Jakarta representation owner for one authored full-locale key.
+fn jakarta_representation_owner(language: &str) -> QualifiedOwnerV1 {
+    QualifiedOwnerV1::representation(
+        entity(),
+        facet(),
+        jakarta_site_id(),
+        page(),
+        locale(language),
+    )
+}
+
+/// Every field origin of one resolved location value as `(field, owner, local index)`.
+fn origins_of(value: &ProvenanceValueV1) -> Vec<(String, String, usize)> {
+    value
+        .field_origins()
+        .expect("field origins")
+        .iter()
+        .map(|(name, origin)| {
+            (
+                name.clone(),
+                origin.owner().describe(),
+                origin.local_index(),
+            )
+        })
+        .collect()
+}
+
+/// The authored five-level geography manifest: one Entity with an Australian association fact,
+/// one Facet with its own Indonesian premises fact, and two sibling Sites — Bali and Jakarta —
+/// each authoring its own fact and extending an inherited one. The Bali Page and both of its
+/// full-locale representations extend as well, and the Jakarta representation extends its own
+/// Site fact. Nothing is inferred from a locale, route, name, identifier or coordinate.
 const GEOGRAPHY_MANIFEST: &str = r#"{
   "schemaVersion": "1.0.0",
   "propertyRegistryVersion": "1.0.0",
   "platformAssetLibraryVersion": "1.0.0",
   "base": {
     "canonical": "https://example.org/site",
-    "landing": { "entity": "example", "facet": "main", "site": "main", "page": "home", "locale": "en-001" }
+    "landing": { "entity": "example", "facet": "main", "site": "bali", "page": "home", "locale": "en-001" }
   },
   "entity": {
     "id": "example",
@@ -1065,54 +1124,91 @@ const GEOGRAPHY_MANIFEST: &str = r#"{
         "label": "Main",
         "properties": {
           "location": { "inheritance": "inherit", "currentContext": [
+            { "operation": "add", "factId": "id-office", "kind": "premises",
+              "fields": { "countryCode": "ID", "locality": "Jakarta" }, "exposure": "internal" },
             { "operation": "extend", "target": { "owner": { "entity": "example" }, "factId": "aus-hq" },
               "set": { "administrativeArea": "Bali" } }
           ] }
         },
         "sites": [
           {
-            "id": "main",
-            "label": "Main site",
+            "id": "bali",
+            "label": "Bali site",
             "defaultLocale": "en-001",
-            "languagePreferences": { "en": "en-001" },
+            "languagePreferences": { "en": "en-001", "id": "id-ID" },
             "properties": {
               "location": { "inheritance": "inherit", "currentContext": [
+                { "operation": "add", "factId": "bali-base", "kind": "association",
+                  "fields": { "countryCode": "ID", "locality": "Denpasar" }, "exposure": "public" },
                 { "operation": "extend", "target": { "owner": { "entity": "example" }, "factId": "aus-hq" },
-                  "set": { "locality": "Denpasar" } }
+                  "set": { "district": "Renon" } }
               ] }
             },
             "pages": [
               {
                 "id": "home",
-                "label": "Home",
+                "label": "Bali home",
                 "properties": {
                   "location": { "inheritance": "inherit", "currentContext": [
                     { "operation": "extend", "target": { "owner": { "entity": "example" }, "factId": "aus-hq" },
-                      "set": { "district": "Renon" } }
+                      "set": { "addressLine1": "Jalan Raya 1" } },
+                    { "operation": "extend", "target": { "owner": { "entity": "example", "facet": "main", "site": "bali" }, "factId": "bali-base" },
+                      "set": { "addressLine2": "Suite 2" } }
                   ] }
                 },
                 "representations": [
                   {
                     "locale": "en-001",
                     "route": { "path": "/en-001/home" },
-                    "sourceCandidates": { "markdown": "pages/main-home.en-001.md" },
+                    "sourceCandidates": { "markdown": "pages/bali-home.en-001.md" },
                     "properties": {
                       "location": { "inheritance": "inherit", "currentContext": [
-                        { "operation": "extend", "target": { "owner": { "entity": "example" }, "factId": "aus-hq" },
-                          "set": { "postalCode": "80226" } }
+                        { "operation": "extend", "target": { "owner": { "entity": "example", "facet": "main", "site": "bali" }, "factId": "bali-base" },
+                          "set": { "coordinates": { "latitude": -8.65, "longitude": 115.22 } } }
                       ] }
                     }
                   },
                   {
                     "locale": "id-ID",
                     "route": { "path": "/id-ID/home" },
-                    "sourceCandidates": { "markdown": "pages/main-home.id-id.md" },
+                    "sourceCandidates": { "markdown": "pages/bali-home.id-id.md" },
                     "properties": {
                       "location": { "inheritance": "inherit", "currentContext": [
-                        { "operation": "extend", "target": { "owner": { "entity": "example" }, "factId": "aus-hq" },
-                          "set": { "namedPlace": "Renon" } },
-                        { "operation": "add", "factId": "jkt-office", "kind": "premises",
-                          "fields": { "countryCode": "ID", "locality": "Jakarta" }, "exposure": "public" }
+                        { "operation": "extend", "target": { "owner": { "entity": "example", "facet": "main", "site": "bali" }, "factId": "bali-base" },
+                          "set": { "namedPlace": "Renon" } }
+                      ] }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "jakarta",
+            "label": "Jakarta site",
+            "defaultLocale": "en-001",
+            "languagePreferences": { "en": "en-001" },
+            "properties": {
+              "location": { "inheritance": "inherit", "currentContext": [
+                { "operation": "add", "factId": "jkt-hq", "kind": "premises",
+                  "fields": { "countryCode": "ID", "locality": "Jakarta", "postalCode": "10110" }, "exposure": "public" },
+                { "operation": "extend", "target": { "owner": { "entity": "example" }, "factId": "aus-hq" },
+                  "set": { "namedPlace": "Monas" } }
+              ] }
+            },
+            "pages": [
+              {
+                "id": "home",
+                "label": "Jakarta home",
+                "representations": [
+                  {
+                    "locale": "en-001",
+                    "route": { "path": "/jakarta/en-001/home" },
+                    "sourceCandidates": { "markdown": "pages/jakarta-home.en-001.md" },
+                    "properties": {
+                      "location": { "inheritance": "inherit", "currentContext": [
+                        { "operation": "extend", "target": { "owner": { "entity": "example", "facet": "main", "site": "jakarta" }, "factId": "jkt-hq" },
+                          "set": { "addressLine1": "Jalan Monas 2" } }
                       ] }
                     }
                   }
@@ -1126,21 +1222,31 @@ const GEOGRAPHY_MANIFEST: &str = r#"{
   }
 }"#;
 
-/// `R03B-10` — real strict JSON bytes: Entity Australia, Facet Indonesia, Site, Page and two
-/// full-locale representations, each extending the same original fact. Identity, base, locale
-/// and authored route text stay exactly as authored, and no geographic value is inferred.
+/// `R03B-10` — real strict JSON bytes with an independently authored Indonesia Facet fact and
+/// sibling Bali/Jakarta Sites. Every extension keeps its original identity, each branch sees only
+/// its own changes, and Page identity, locale, base URL and authored route claims are unchanged.
 #[test]
 fn r03b_10_real_json_geography_extends_without_identity_or_locale_effects() {
     let parsed = parse_document(GEOGRAPHY_MANIFEST);
     let graph = graph_from(&parsed);
 
-    // Identity, base and route text come from containment and the manifest, never the property.
+    // Authored identity, base and route claims, read from containment and the manifest.
     assert_eq!(parsed.entity().id().as_str(), "example");
     assert_eq!(parsed.base().canonical(), "https://example.org/site");
-    let page_declaration = &parsed.entity().facets()[0].sites()[0].pages()[0];
-    assert_eq!(page_declaration.id().as_str(), "home");
+    let facet_declaration = &parsed.entity().facets()[0];
+    assert_eq!(facet_declaration.id().as_str(), "main");
     assert_eq!(
-        page_declaration
+        facet_declaration
+            .sites()
+            .iter()
+            .map(|declaration| declaration.id().as_str())
+            .collect::<Vec<_>>(),
+        vec!["bali", "jakarta"]
+    );
+    let bali_pages = facet_declaration.sites()[0].pages();
+    assert_eq!(bali_pages.len(), 1);
+    assert_eq!(
+        bali_pages[0]
             .representations()
             .iter()
             .map(|representation| representation.locale())
@@ -1148,68 +1254,247 @@ fn r03b_10_real_json_geography_extends_without_identity_or_locale_effects() {
         vec!["en-001", "id-ID"]
     );
     assert_eq!(
-        page_declaration
+        bali_pages[0]
             .representations()
             .iter()
             .map(|representation| representation.route().path())
             .collect::<Vec<_>>(),
         vec!["/en-001/home", "/id-ID/home"]
     );
-
-    let english = validate_manifest_property_candidate_v1(&parsed, &graph, &representation_owner())
-        .expect("the en-001 branch resolves");
-    assert!(!english.is_publication_authorized());
-    let english_facts = english.public().values_of(PropertyKey::Location);
-    assert_eq!(english_facts.len(), 1);
-    let english_fact = english_facts[0].location_fact().expect("a fact");
-    assert_eq!(english_fact.fact_id().as_str(), "aus-hq");
     assert_eq!(
-        english_fact.fields().set_field_names(),
+        facet_declaration.sites()[1].pages()[0]
+            .representations()
+            .iter()
+            .map(|representation| representation.route().path())
+            .collect::<Vec<_>>(),
+        vec!["/jakarta/en-001/home"]
+    );
+
+    // ---- Bali, `en-001` ----
+    let english = validate_manifest_property_candidate_v1(
+        &parsed,
+        &graph,
+        &bali_representation_owner("en-001"),
+    )
+    .expect("the Bali en-001 branch resolves");
+    assert!(!english.is_publication_authorized());
+    assert_eq!(
+        english.public().values_of(PropertyKey::Location).len(),
+        2,
+        "the internal Facet fact is never projected"
+    );
+    let resolved = english.resolved();
+    let facts = resolved.values_of(PropertyKey::Location);
+    assert_eq!(facts.len(), 3, "one fact per author level, inherited first");
+    assert_eq!(
+        facts
+            .iter()
+            .map(|value| value.origin_owner().describe())
+            .collect::<Vec<_>>(),
+        vec![
+            entity_owner().describe(),
+            facet_owner().describe(),
+            bali_site_owner().describe()
+        ]
+    );
+    let australia = facts[0].data().location_fact().expect("a fact");
+    assert_eq!(australia.fact_id().as_str(), "aus-hq");
+    assert_eq!(australia.kind(), LocationKind::Association);
+    assert_eq!(
+        australia.fields().set_field_names(),
         vec![
             "worldRegion",
             "countryCode",
             "administrativeArea",
-            "locality",
             "district",
-            "postalCode"
-        ],
-        "each author level contributed only its own member"
+            "addressLine1"
+        ]
+    );
+    assert_eq!(
+        origins_of(&facts[0]),
+        vec![
+            ("worldRegion".to_owned(), entity_owner().describe(), 0),
+            ("countryCode".to_owned(), entity_owner().describe(), 0),
+            ("administrativeArea".to_owned(), facet_owner().describe(), 1),
+            ("district".to_owned(), bali_site_owner().describe(), 1),
+            ("addressLine1".to_owned(), bali_page_owner().describe(), 0),
+        ]
+    );
+    assert!(facts[0].exposure().is_public());
+    let indonesia = facts[1].data().location_fact().expect("a fact");
+    assert_eq!(indonesia.fact_id().as_str(), "id-office");
+    assert_eq!(indonesia.kind(), LocationKind::Premises);
+    assert_eq!(facts[1].exposure(), Exposure::Internal);
+    assert_eq!(
+        origins_of(&facts[1]),
+        vec![
+            ("countryCode".to_owned(), facet_owner().describe(), 0),
+            ("locality".to_owned(), facet_owner().describe(), 0),
+        ]
+    );
+    let bali = facts[2].data().location_fact().expect("a fact");
+    assert_eq!(bali.fact_id().as_str(), "bali-base");
+    assert!(facts[2].exposure().is_public());
+    assert_eq!(
+        bali.fields().set_field_names(),
+        vec!["countryCode", "locality", "addressLine2", "coordinates"]
+    );
+    assert_eq!(
+        origins_of(&facts[2]),
+        vec![
+            ("countryCode".to_owned(), bali_site_owner().describe(), 0),
+            ("locality".to_owned(), bali_site_owner().describe(), 0),
+            ("addressLine2".to_owned(), bali_page_owner().describe(), 1),
+            (
+                "coordinates".to_owned(),
+                bali_representation_owner("en-001").describe(),
+                0
+            ),
+        ]
+    );
+    assert_eq!(
+        english
+            .public()
+            .values_of(PropertyKey::Location)
+            .iter()
+            .map(|value| value.location_fact().expect("a fact").fact_id().to_string())
+            .collect::<Vec<_>>(),
+        vec!["aus-hq".to_owned(), "bali-base".to_owned()],
+        "the public projection keeps effective order and drops the internal fact"
+    );
+    let events = resolved
+        .property(PropertyKey::Location)
+        .expect("a location record")
+        .resolution_events();
+    assert_eq!(
+        events
+            .iter()
+            .filter(|event| event.operation() == ResolutionOperation::Added)
+            .count(),
+        3,
+        "one `added` event per independently authored fact"
+    );
+    assert_eq!(
+        events
+            .iter()
+            .filter(|event| event.operation() == ResolutionOperation::Extended)
+            .count(),
+        5,
+        "one `extended` event per successful extension on this direct chain"
+    );
+    assert!(
+        events.iter().any(|event| {
+            event.operation() == ResolutionOperation::Extended
+                && event.target_fact_id().map(FactIdV1::as_str) == Some("bali-base")
+        }),
+        "the representation's extension names its inherited Site fact"
     );
 
+    // ---- Bali, `id-ID`: its own extension, never the sibling's coordinate ----
     let indonesian = validate_manifest_property_candidate_v1(
         &parsed,
         &graph,
-        &indonesian_representation_owner(),
+        &bali_representation_owner("id-ID"),
     )
-    .expect("the id-ID branch resolves");
-    let indonesian_facts = indonesian.public().values_of(PropertyKey::Location);
+    .expect("the Bali id-ID branch resolves");
+    let indonesian_facts = indonesian.resolved().values_of(PropertyKey::Location);
+    assert_eq!(indonesian_facts.len(), 3);
+    let indonesian_bali = indonesian_facts[2].data().location_fact().expect("a fact");
+    assert_eq!(indonesian_bali.fact_id().as_str(), "bali-base");
     assert_eq!(
-        indonesian_facts.len(),
-        2,
-        "the id-ID branch adds one independent fact after extending the inherited one"
-    );
-    let inherited = indonesian_facts[0].location_fact().expect("a fact");
-    assert_eq!(inherited.fact_id().as_str(), "aus-hq");
-    assert!(
-        inherited.fields().set_field_names().contains(&"namedPlace"),
-        "the id-ID extension applied to the same original fact"
+        indonesian_bali.fields().set_field_names(),
+        vec!["countryCode", "locality", "namedPlace", "addressLine2"]
     );
     assert!(
-        !inherited.fields().set_field_names().contains(&"postalCode"),
-        "a sibling representation's field never leaks across branches"
+        !indonesian_bali
+            .fields()
+            .set_field_names()
+            .contains(&"coordinates"),
+        "the en-001 coordinate never reaches the id-ID representation"
     );
-    let added = indonesian_facts[1].location_fact().expect("a fact");
-    assert_eq!(added.fact_id().as_str(), "jkt-office");
+    assert_eq!(
+        origins_of(&indonesian_facts[2])[2],
+        (
+            "namedPlace".to_owned(),
+            bali_representation_owner("id-ID").describe(),
+            0
+        )
+    );
 
-    // Both representations are the same Page identity under the same Entity: location and
-    // locale changed nothing about identity, and neither selected the other's route.
+    // ---- Jakarta: its own Site fact, its own extension, no Bali value ----
+    let jakarta = validate_manifest_property_candidate_v1(
+        &parsed,
+        &graph,
+        &jakarta_representation_owner("en-001"),
+    )
+    .expect("the Jakarta branch resolves");
+    let jakarta_facts = jakarta.resolved().values_of(PropertyKey::Location);
+    assert_eq!(jakarta_facts.len(), 3);
     assert_eq!(
-        representation_owner().page_id(),
-        indonesian_representation_owner().page_id()
+        jakarta_facts
+            .iter()
+            .map(|value| value.origin_owner().describe())
+            .collect::<Vec<_>>(),
+        vec![
+            entity_owner().describe(),
+            facet_owner().describe(),
+            jakarta_site_owner().describe()
+        ]
+    );
+    let jakarta_australia = jakarta_facts[0].data().location_fact().expect("a fact");
+    assert_eq!(
+        jakarta_australia.fields().set_field_names(),
+        vec![
+            "worldRegion",
+            "countryCode",
+            "administrativeArea",
+            "namedPlace"
+        ]
+    );
+    assert!(
+        !jakarta_australia
+            .fields()
+            .set_field_names()
+            .contains(&"district"),
+        "the Bali Site extension never reaches Jakarta"
+    );
+    let jakarta_hq = jakarta_facts[2].data().location_fact().expect("a fact");
+    assert_eq!(jakarta_hq.fact_id().as_str(), "jkt-hq");
+    assert_eq!(
+        jakarta_hq.fields().set_field_names(),
+        vec!["countryCode", "locality", "addressLine1", "postalCode"]
     );
     assert_eq!(
-        representation_owner().entity_id(),
-        indonesian_representation_owner().entity_id()
+        origins_of(&jakarta_facts[2])[2],
+        (
+            "addressLine1".to_owned(),
+            jakarta_representation_owner("en-001").describe(),
+            0
+        )
+    );
+    assert_eq!(
+        jakarta.public().values_of(PropertyKey::Location).len(),
+        2,
+        "the internal Facet fact stays unprojected in this branch too"
+    );
+
+    // ---- identity is language-neutral and independent of every property value ----
+    assert_eq!(bali_page_owner().page_id(), jakarta_page_owner().page_id());
+    assert_eq!(
+        bali_page_owner().entity_id(),
+        jakarta_page_owner().entity_id()
+    );
+    assert_eq!(
+        bali_representation_owner("en-001").page_id(),
+        bali_representation_owner("id-ID").page_id()
+    );
+    assert_ne!(
+        bali_representation_owner("en-001").site_id(),
+        jakarta_representation_owner("en-001").site_id()
+    );
+    assert_eq!(
+        bali_representation_owner("en-001").locale(),
+        Some(&locale("en-001"))
     );
 }
 
