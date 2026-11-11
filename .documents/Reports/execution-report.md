@@ -1,111 +1,119 @@
 # Execution Report
 
-**Order:** `OWNER-ISSUED — SOLO-WO-065 R02` — correct the three identified `R03.C2` gaps: repeated-reference byte consistency, and complete asset-route native refusal proofs, preserving the accepted source-reader boundary.
-**Matching Owner handoff:** `SOLO-WO-065 R02`.
+**Order:** `OWNER-ISSUED — SOLO-WO-065 R03` — resolve the final `R03.C2` Windows writable mapped-view asset-route proof, test-only, with no native production change.
+**Matching Owner handoff:** `SOLO-WO-065 R03`.
 **Session date:** 2026-11-11.
 **Root:** the single verified Owner-local checkout of `provelopment/provelopment-foundation-solo`; one worktree, sole `origin`, no second checkout.
-**Disposition:** **COMPLETE** for the three proven corrections only. `SOLO-WO-065 R01` was `REVISE`, not accepted; **`R03.C2` is still not independently ACCEPTED**, **`R03.C` and Stage 03 remain OPEN**, and no release, deployment, publication, catalogue, decoder or platform library exists or is authorized. This report is **not** a self-ACCEPT.
+**Disposition:** **COMPLETE** for this one test-only evidence recovery. The proof was obtained rather than waived: with only a surviving writable mapped view, the actual typed Entity asset port **refused** (`OtherIo` / `ASSET_SOURCE_IO_ERROR`), and after the view was unmapped the same capability and reference returned exactly the rewritten 4,096 bytes. **`R03.C2` is still not independently ACCEPTED**, **`R03.C` and Stage 03 remain OPEN**, and this report is **not** a self-ACCEPT.
 
 ## 1. Starting baseline (verified before any write)
 
 | Anchor | Verified value |
 | --- | --- |
-| `HEAD == main == origin/main` | `e66c3240b9b69d0473dd0cbc64eec5cffd7c9765`, tree `a8d2ca6fa87f83bc50b10eee54c059cb4ff76dfb` |
-| Report blob at baseline | `b05118bac203ec66573d59b5745b247dda2d9f40` (the R01 report) |
-| ACTIVE before Owner install | `7c3797c61eb7eef6700228b224baddf26cf7dc8b` (frozen R01 order) |
+| `HEAD == main == origin/main` | `f78c54306a033815d9dab3cabfd2a7e8b535069c`, tree `e90f12a870c95944531291f20e61ebd3996b3764` |
+| Report blob at baseline | `c91c2fa3dbac038be3ace1768976bb41654c5110` (the R02 `STOP`-era report) |
+| ACTIVE before Owner install | `a40536aec3cc509b9a15613025470257a14195dc` (frozen R02 order) |
 | NEXT / ROADMAP / OUTLOOK | `92fa562b1af0c54391851aa5c79deb1631127069` / `97df81e5cf63443d11a8f4414934d4fd05edd0d8` / `cb9c7a610cf3c537557e060ca9656e44a053e69d` |
-| Branches at preflight | exactly `main`, `solo-wo-061-r01` = `4371af21dce67f33cf1df0384738bf353ca80fc6`, `solo-wo-065-r01` = `7f609320afc0ee6a6bbc6637ef3f3fc68f19ecbb`; no R02 branch existed |
-| Corrective targets | `graphic_asset_read.rs` `cbd51edfc236f8beaab9ed137a877a9e2d2f0954`; its tests `b74d7d28dddbe396808c35684149d30bdc66b241`; adapter tests `301aa18a16dacf0f0b20ffb2ca34994bf5a3d7b2` |
-| Dirty state | only the Owner-installed complete R02 `ACTIVE` (working blob `a40536aec3cc509b9a15613025470257a14195dc`, 28,881 bytes, 136 lines); no untracked or unrelated tracked change; no merge/rebase/cherry-pick/sequencer state |
+| Branches at preflight | exactly `main`, `solo-wo-061-r01` = `4371af21dce67f33cf1df0384738bf353ca80fc6`, `solo-wo-065-r01` = `7f609320afc0ee6a6bbc6637ef3f3fc68f19ecbb`, `solo-wo-065-r02` = `2de75c1e3f96a84b32f8cd21f491d925225d62d1`; no R03 branch existed |
+| Technical target before change | `crates/solo-adapters/src/source_read_native.rs` = `b0ea31dbe6ddb8a7b100da89e53769282d180fea`, 2,026 lines |
+| Dirty state | only the Owner-installed complete R03 `ACTIVE` (working blob `2622aeace2329a91e15cbdced3781a30bb05d2d0`, 23,958 bytes, 119 lines); nothing untracked, no sequencer state |
+
+The existing Windows test-only `mapped_view_proofs` module and the R02 canonical report were read before editing, and the frozen `Section`, `WritableView`, `Fixture`, `handed_off_view` and `BODY_LENGTH` helpers were reused rather than duplicated.
+
 
 ## 2. Issuance on `main` (ACTIVE alone)
 
 | Item | Value |
 | --- | --- |
-| **Issuance commit** | **`373763622cfdf9438da0888943ff799b1be6d992`**, tree `a26518e834cf84bf8151f115b64283ee6ef0ec58`, parent `e66c3240…` |
-| Changed paths | `.documents/WIP/workorder-active.md` only → `a40536ae…` |
+| **Issuance commit** | **`87110df640271fdfad60e4b8e2e3742ad6ed0230`**, tree `8d06419713a85937a3b041e041a7d1a91b486859`, parent `f78c5430…` |
+| Changed paths | `.documents/WIP/workorder-active.md` only → `2622aeace2329a91e15cbdced3781a30bb05d2d0` |
 | NEXT / ROADMAP / OUTLOOK | unchanged (`92fa562b…`, `97df81e5…`, `cb9c7a61…`) |
-| Issuance CI | **`43035364938`** — `success`; `130572654906` (`ubuntu-24.04`, 33 steps, 9 skips) and `130572653756` (`windows-2025`, 33 steps, 14 skips), **400 / 402 passed**, 0 failed, 0 ignored |
+| Issuance CI | **`43044051684`** — `success`; Ubuntu job `130603176244` (33 steps, 9 skips), Windows job `130603176264` (33 steps, 14 skips); **407 / 411 passed**, 0 failed, 0 ignored |
 
-The `NEXT` slot stayed byte-identical to its neutral heading, so no candidate was created or consumed by this correction.
-
-## 3. Three technical paths — exact corrective diff
+## 3. The single technical path — exact diff
 
 | Path | Before | After | Change |
 | --- | --- | --- | --- |
-| `crates/solo-application/src/graphic_asset_read.rs` | `cbd51edf…` | **`6499421d6e718e9d46d64e45fb152f34e2989cc1`** | +21 / −8: repeated-reference comparison now uses **exact bytes** |
-| `crates/solo-application/tests/graphic_asset_read.rs` | `b74d7d28…` | **`e9ea65c53c3ecd554d7fc44846b428b6ff96d801`** | +182 / −0: three `r03c2_04b_*` regressions |
-| `crates/solo-adapters/tests/graphic_asset_read.rs` | `301aa18a…` | **`8d33a6d82c29b1618af282f75d3937d32a0f3953`** | +279 / −2: seven real asset-route OS proofs |
+| `crates/solo-adapters/src/source_read_native.rs` | `b0ea31dbe6ddb8a7b100da89e53769282d180fea` (2,026 lines) | **`5527b2b4f0d4f47acaa86eead74c7106607c789f`** (2,176 lines) | +154 / −3, entirely inside `#[cfg(all(test, windows))] mod mapped_view_proofs` |
 
-**Technical commit:** `2de75c1e3f96a84b32f8cd21f491d925225d62d1`, tree `766f3b690be78c60cf05a472ef8f6769432af5d9`, parent `37376362…`, exactly the three paths above (482 insertions, 10 deletions total).
+**Technical commit:** `bbe4a98f4da464ce189956fea34dd94323499ab8`, tree `36a034bf003dc0c2dc389801da6449dad3aa67a8`, parent `87110df6…`, exactly the one path above.
 
-**Implementation of S065R02-04.** `seen_paths` changed from `BTreeMap<String, (PhysicalIdentityV1, u64, u64)>` to `BTreeMap<String, usize>` holding the index of the **first evidence record**, so a repeated logical reference is compared against the bytes that record already owns — no second 20 MiB copy and no digest substitution. A repeat is refused when identity differs (`IdentityCollision`) or when length, retained fingerprint or **`first.bytes() != bytes.as_slice()`** differ (`ChangedDuringRead`), with fingerprint equality explicitly not accepted as content evidence. Insertion records `evidence.len()` before the push, so the index always names the first occurrence. No accessor, category, bound, ordering, port signature or publication/media flag changed, and the refusing obligation is the second one that detected the inconsistency.
+The three deleted lines are the two pre-existing `use` items in that test module, extended to import `EntityAssetSourceV1`, `GraphicAssetReadPort`, `GraphicAssetReadRefusalKind`, `MAX_GRAPHIC_SOURCE_BYTES`, `PhysicalIdentityV1`, `AssetNamespace` and `AssetReferenceV1`. Everything else is addition:
 
-**Frozen and untouched after this order:** `source_read_native.rs` `b0ea31db…`, adapter `source_read.rs` `fb6f005a…`, application `source_read.rs` `93bc39d4…`, `graphic_asset_inventory.rs` `7de9bc73…`, both `lib.rs` (`b337a3f6…`, `107f3579…`), `Cargo.lock` `2f9e5357…`, `crates/solo-adapters/Cargo.toml` `6109224c…`, `deny.toml` `3063e864…`, `rust-verify.yml` `eb78dad2…`, `rust-toolchain.toml` `9ec55b3b…`, NEXT, ROADMAP and OUTLOOK. No native/OS code, workflow, dependency, manifest, Architecture, artwork or Platform catalogue change exists.
+1. `Fixture::asset_leaf()` and `Fixture::layout_asset_leaf()` — create `content/assets/brand/logo.png` as an ordinary regular file of exactly `BODY_LENGTH` (`4096`) bytes of `b'A'` **under the content root that guard already claimed exclusively**. Only the new test calls them, so the `pages/` tree every legacy case asserts is shaped exactly as before.
+2. The new test itself.
 
-## 4. S065R02-01…12 acceptance matrix
+**Production code is untouched:** no instruction, binding, sharing mode, `unsafe` block, FFI item, import outside the test module, dependency, manifest, lock, toolchain, policy or workflow changed. `crates/solo-adapters/src/source_read.rs` `fb6f005a053ea80cea452fe2d57fb9fc8ea45ad9`, `crates/solo-application/src/graphic_asset_read.rs` `6499421d6e718e9d46d64e45fb152f34e2989cc1`, application `source_read.rs` `93bc39d42b276b03cb2fba1cc5b43ea7a51108c8`, `graphic_asset_inventory.rs` `7de9bc7399854b2059cbec17ee23c1e1ae637159`, both `lib.rs` (`b337a3f67da4b3f76d53bf112a3f8628f85184b8`, `107f3579f01878f7532d66c93e150f8aafc4f42f`), the application asset tests `e9ea65c53c3ecd554d7fc44846b428b6ff96d801`, the adapter asset tests `8d33a6d82c29b1618af282f75d3937d32a0f3953`, `Cargo.lock` `2f9e53576df117f2020ae064d6973304f20833f1`, `crates/solo-adapters/Cargo.toml` `6109224cd3e3e89487884631f2b07c68ad8149c3`, `deny.toml` `3063e864c28be1e77787f43f1b6f561d543c8f4a`, `rust-verify.yml` `eb78dad240bb7adb3e0ef9535870897176c99843` and `rust-toolchain.toml` `9ec55b3b621dbc75fc68817cd51b96e407d3c94c` are all unchanged at the integrated revision.
 
-Every row is **PASS** with direct evidence from the runs below.
 
-| Row | Result | Evidence |
+## 4. The proof, assertion by assertion
+
+`r03c2_10c_transferred_writable_view_refuses_asset_port_until_unmapped`, inside the existing Windows-gated module, deterministic — no sleep, race, retry or skip:
+
+| Step | Assertion |
+| --- | --- |
+| Adversary construction | the asset leaf is opened read+write, a `PAGE_READWRITE` section is created over it, `FILE_MAP_WRITE` maps the whole file, and **both** the section handle and the file handle are dropped, so only the view survives |
+| The view is real | `view.byte(0) == b'A'` and `view.byte(4095) == b'A'` still read the object after both handles closed |
+| The view can still write | `view.fill(b'C')` then the first and last byte are `b'C'`, and `fs::metadata(..).len()` is still exactly `4096`, so the rewrite is in place at unchanged length |
+| Asset route, view alive | `ContentRootCapability::adopt_bootstrap_path(content/, OperatorDesignatedContentRoot)` then `read_entity_asset(&AssetReferenceV1::parse(AssetNamespace::Entity, "brand/logo.png"), MAX_GRAPHIC_SOURCE_BYTES)` must be `Refused` with `GraphicAssetReadRefusalKind::OtherIo` and code `ASSET_SOURCE_IO_ERROR`; a `Present` of any length panics the test |
+| Asset route, view released | the same capability, the same typed reference and the same bound now yield `Present` with `length == 4096`, `bytes.len() == 4096`, every byte `b'C'`, `links == 1`, an identity different from the content root and different from `PhysicalIdentityV1::new(0, 0, 0)` |
+| Stability | one repeat read returns identical bytes and an identical identity |
+
+No Page locator, projection or fallback appears anywhere in the new test: the subject is the real `assets/brand/logo.png` through the real asset trait, and the refusal is the frozen native Windows mapping for a blocked open, asserted as observed rather than widened.
+
+**Actual Windows log evidence** (run `43045427407`, job `130607992837`, tested shas `bbe4a98f…`):
+
+```
+test source_read_native::sys::mapped_view_proofs::a_writable_view_keeps_writing_after_its_originating_handles_close ... ok
+test source_read_native::sys::mapped_view_proofs::a_handed_off_writable_view_still_blocks_the_pinned_body_open ... ok
+test source_read_native::sys::mapped_view_proofs::a_live_writer_handle_over_a_writable_view_makes_the_body_open_refuse ... ok
+test source_read_native::sys::mapped_view_proofs::a_pre_existing_fixture_name_is_preserved_and_never_adopted ... ok
+test source_read_native::sys::mapped_view_proofs::the_product_reader_refuses_a_body_while_a_handed_off_writable_view_is_alive ... ok
+test source_read_native::sys::mapped_view_proofs::the_reader_succeeds_normally_once_the_mapping_is_released ... ok
+test source_read_native::sys::mapped_view_proofs::r03c2_10c_transferred_writable_view_refuses_asset_port_until_unmapped ... ok
+```
+
+Measured totals: Ubuntu **407** on every run (unchanged — the new case is Windows-only by construction), Windows **412** on the branch, substantive `main` and report-head runs (`411` at issuance), 0 failed, 0 ignored, 9 Ubuntu / 14 Windows host skips. The new case was not `#[ignore]`d, not Linux-gated, not skipped and not weakened.
+
+
+## 5. S065R03-01…11 acceptance matrix
+
+| Gate | Result | Evidence |
 | --- | --- | --- |
-| **S065R02-01** | PASS | §1: `e66c3240…`/`a8d2ca6f…`, four WIP slots, three branches at their exact tips, one checkout/worktree/`origin`, only the Owner-installed R02 ACTIVE dirty, no sequencer state. |
-| **S065R02-02** | PASS | §2: ACTIVE alone at `37376362…`, remote readback, run `43035364938` green on both hosts, NEXT/ROADMAP/OUTLOOK unchanged. |
-| **S065R02-03** | PASS | §3: exactly three technical paths on `solo-wo-065-r02`, branch created only at the issued-green main `37376362…`; whole-order diff vs baseline is ACTIVE plus those three paths (four revisions); no published history rewritten, no older branch moved. |
-| **S065R02-04** | PASS | `r03c2_04b_same_reference_with_equal_fingerprint_and_different_bytes_is_refused` — equal length (10), identical identity, **deliberately identical supplied fingerprint 42**, different bytes → `ChangedDuringRead` / `ASSET_SOURCE_CHANGED`, refusal attributed to the **second** obligation (site, `graphic.background`, index 0), both calls observed, no partial set, diagnostic contains no path, filename or bytes. `…_equal_bytes_stays_two_ordered_observations` — two evidence records in order, two calls, both owners preserved. `…_equal_bytes_and_different_fingerprint_is_inconsistent` — fingerprint remains a real check. Identity change (`IdentityCollision`) and distinct-path/one-identity (`IdentityCollision`) remain covered by `r03c2_04` and `r03c2_07`. |
-| **S065R02-05** | PASS | `r03c2_08b_trusted_directory_handle_reads_the_same_assets_with_one_root_identity` (both hosts) — real `OwnedFd`/`OwnedHandle` transfer into `from_trusted_directory`, `OperatorDesignatedContentRoot`, **equal root identity** to the bootstrap capability, exact `assets/brand/logo.png` bytes, length, `links == 1`, equal leaf identity, stable re-read. `…_transferred_regular_file_handle_is_refused` and `…_bootstrap_root_that_is_a_file_or_a_link_is_refused` — `UnsafeLocation` in every case, with no asset opened through a substituted root and no OS path in the typed refusal. |
-| **S065R02-06** | PASS | `r03c2_08b_bootstrap_root_that_is_a_file_or_a_link_is_refused` (real symlink on Linux, real junction on Windows) and `r03c2_08b_transferred_reparse_handle_is_refused` (Windows, `FILE_FLAG_OPEN_REPARSE_POINT` + `FILE_FLAG_BACKUP_SEMANTICS`) → `UnsafeLocation`. Existing namespace-isolation, intermediate symlink/junction and hardlink cases remain green. No silent skip: the junction fixture asserts `FILE_ATTRIBUTE_REPARSE_POINT`. |
-| **S065R02-07** | PASS | `r03c2_10b_asset_read_on_a_non_reflink_filesystem_is_unsupported` (Ubuntu) — a small `assets/logo.png` under the workflow's 16 MiB `tmpfs` (`SOLO_TEST_UNSUPPORTED_FS_ROOT`) drives the **asset port** and refuses `Unsupported` / `ASSET_SOURCE_UNSUPPORTED` with no `Present` bytes and no copying fallback; the same route on the accepted Btrfs fixture returns the exact bytes; a missing variable panics loudly. No workflow or native change. |
-| **S065R02-08** | PASS | `r03c2_10b_asset_read_is_refused_while_a_writer_holds_the_leaf` (Windows) — a pre-existing writable handle makes the asset route refuse with the **actual** frozen mapping category `OtherIo` / `ASSET_SOURCE_IO_ERROR` (never invented as `PermissionDenied`), then succeeds with exact bytes, `links == 1` and stable identity after release. `r03c2_10b_pinned_asset_handle_denies_a_competing_writer_and_delete` records the accepted share-read guarantee. No sleeps, no scheduling dependence; the R02 Windows mapped-view and Page-writer tests remain green. |
-| **S065R02-09** | PASS | Baseline `400 / 402`; measured after correction `407` (Ubuntu: +3 app, +4 adapter) and `411` (Windows: +3 app, +6 adapter), 0 failed, 0 ignored. All original `r03c2_01…10` suites, prior R01/R02/R03.A/B/C1 suites, architecture real-tree (`architecture=legal packages=4 edges=40`) with its refusal self-test, source namespace isolation, 20 MiB exact/oversize, `cargo fmt --check`, strict Clippy, release build, CLI smoke and the Ubuntu byte-reproducible double build all ran green on both hosts. No total was pre-declared. |
-| **S065R02-10** | PASS | §5: `cargo-deny 0.20.2` passed on both hosts with a fresh database (`db_commit=fd6f39814c4d3c359fdbe223d0280dec4933f78f fetched_at=2026-11-11T14:18:33Z`), 18/18 OSV-clean and 18/18 not-yanked third-party packages, unchanged 4 + 18 graph, `rustix = "=1.1.6"` still pinned, no waiver or policy change. The inherited `Unicode-3.0` `license-not-encountered` warning is still emitted and remains **UNVERIFIED**; CI is **not** warning-free. |
-| **S065R02-11** | PASS | Branch tip `2de75c1e…` run `43037123017` green on both hosts (jobs `130578787213` Ubuntu, `130578786648` Windows, 33 steps each, 9/14 skips), then a strictly conditional fast-forward-only move of `main` to that exact tip (`37376362…` → `2de75c1e…`, single parent, no merge commit), pushed, then substantive `main` run `43038273943` green on both hosts (jobs `130582864514` Ubuntu, `130582864002` Windows). R02 branch retained; `solo-wo-061-r01` and `solo-wo-065-r01` tips unchanged. No PR, release or deployment. |
-| **S065R02-12** | PASS | This single canonical report is committed alone, read back from GitHub, and a third both-host run is required at its exact HEAD (run id reported in the chat handoff, never inside this file). ACTIVE remains the frozen R02 document, NEXT neutral, ROADMAP/OUTLOOK unchanged, `R03.C` and Stage 03 OPEN. |
+| **S065R03-01** | PASS | §1: baseline `f78c5430…`/`e90f12a8…`, report and ACTIVE/WIP blobs, three retained branches at exact tips, sole checkout/worktree/origin, only the Owner-installed R03 ACTIVE dirty, module and R02 report inspected, no drift. |
+| **S065R03-02** | PASS | §2: ACTIVE alone at `87110df6…`, blob `2622aeac…` readback, run `43044051684` green on both hosts, NEXT/ROADMAP/OUTLOOK unchanged. |
+| **S065R03-03** | PASS | `solo-wo-065-r03` created only at issued-green `87110df6…`; the technical commit changes exactly `crates/solo-adapters/src/source_read_native.rs` inside the Windows test module; `4371af21…`, `7f609320…` and `2de75c1e…` unchanged; no rewrite, force, rebase or amend. |
+| **S065R03-04** | PASS | §4: real `content/assets/brand/logo.png`, 4,096 `b'A'` bytes, mapped writable, **both** originating handles closed, view still readable and rewriting in place at unchanged length; legacy `pages/` fixture and all six earlier mapped-view tests unchanged and green. |
+| **S065R03-05** | PASS | With the live view, the actual typed `read_entity_asset` over a real `ContentRootCapability` refused `OtherIo` / `ASSET_SOURCE_IO_ERROR`; a `Present` would have panicked. The passing Windows log line is quoted verbatim in §4 at the tested SHA. |
+| **S065R03-06** | PASS | After unmapping, the same capability and reference produced the exact rewritten 4,096 `b'C'` bytes, `links == 1`, a non-root non-zero identity, and a repeat read with matching bytes and identity. |
+| **S065R03-07** | PASS | All prior `r03c2_*`, R01/R02/R03.A/B/C1, old and new mapped-view, Page-native, Linux snapshot and unsupported-filesystem, 20 MiB bound, graph/architecture, refusal self-test and tripwire gates green on both hosts; `architecture=legal packages=4 targets=30 files=53 edges=40`; zero ignored tests; measured totals reported, not guessed. |
+| **S065R03-08** | PASS | §3: no production native instruction or binding changed, no new `unsafe`, FFI, import outside the test module, dependency or OS primitive; frozen blobs verified byte-identical; `cargo fmt --all -- --check` clean; strict Clippy `-D warnings` green on both hosts. |
+| **S065R03-09** | PASS with inherited warning | §6: full locked graph, fresh RustSec (`db_commit=fd6f39814c4d3c359fdbe223d0280dec4933f78f`), fresh OSV 18/18 clean, 18/18 not yanked, unchanged pins and policy; `warning[license-not-encountered]` on `Unicode-3.0` still emitted and remains **UNVERIFIED**; CI is **not** claimed warning-free. |
+| **S065R03-10** | PASS | Four green two-host gates at exact SHAs: issuance `43044051684`, branch `43045427407`, substantive `main` `43046529973`, final report HEAD (run id given in the chat handoff, never inside this file). No red attempt occurred in this order. |
+| **S065R03-11** | PASS | This single canonical report, report-only commit on `main`, remote tree/blob readback, one clean worktree, one origin, retained older and R03 branches, `target/` and the inherited `.temp/` archives preserved; no self-ACCEPT, no R03.C/Stage 03 closure, no catalogue, media, renderer, release or deployment. |
 
-## 5. CI history — every run this order
+
+## 6. CI history, A1 and workspace preservation
 
 | Phase | Run | Revision | Result |
 | --- | --- | --- | --- |
-| Issuance | `43035364938` | `37376362…` | **success** — Ubuntu `130572654906` 400 passed / Windows `130572653756` 402 passed; 0 failed, 0 ignored, 9/14 host skips |
-| Correction branch | `43037123017` | `2de75c1e…` | **success on the first attempt** — Ubuntu `130578787213` **407** passed / Windows `130578786648` **411** passed; 0 failed, 0 ignored, 9/14 skips |
-| Substantive `main` | `43038273943` | `2de75c1e…` | **success** — Ubuntu `130582864514` 407 / Windows `130582864002` 411; 0 failed, 0 ignored, 9/14 skips |
-| Final report HEAD | reported in chat handoff | report commit | required green on both hosts |
+| Issuance | `43044051684` | `87110df6…` | success — Ubuntu `130603176244` 407 / Windows `130603176264` 411 |
+| Correction branch | `43045427407` | `bbe4a98f…` | **success, first attempt** — Ubuntu `130607993306` 407 / Windows `130607992837` **412** |
+| Substantive `main` | `43046529973` | `bbe4a98f…` | success — Ubuntu `130611818760` 407 / Windows `130611818213` 412 |
+| Final report HEAD | given in chat handoff | report commit | required green on both hosts |
 
-**No red run occurred in this order.** The R01 history it corrects is unchanged: branch run `43028102915` (R01) was the earlier disclosed failure and is not part of this order's corrective work.
+0 failed and 0 ignored everywhere; skipped steps are the same host-inapplicable set as before (counterpart-host steps, the Ubuntu-only advisory negative probe and byte-reproducible double build, R03 fixture provisioning). **No red attempt occurred in this order.**
 
-Host skips are the same host-inapplicable set as before: counterpart-host steps, the Ubuntu-only advisory negative probe and byte-reproducible double build, and the R03 snapshot filesystem provisioning. No test was marked `#[ignore]`d or silently skipped in place of a passing assertion, and every new asset-route proof executed on the host where it is meaningful (Ubuntu: 7 new; Windows: 9 new).
+**Fresh A1.** 4 first-party + 18 third-party packages; `Cargo.lock` and the adapter manifest are byte-identical to the baseline and `rustix` is still `"=1.1.6"`; `cargo-deny 0.20.2` passed on both hosts against a fresh database `db_commit=fd6f39814c4d3c359fdbe223d0280dec4933f78f` (`fetched_at=2026-11-11T15:16:02Z` / `15:16:06Z`); a fresh OSV sweep returned **18/18 clean** and crates.io **18/18 not yanked**; toolchain, workflow and runner images are unchanged and no waiver or suppression was added. The added code is test-only, moves only in-memory bytes through the existing RAII wrappers, and introduces no `unsafe`, no FFI, no Win32 import and no network access; its fixture is task-owned, exclusively created and removed by its guard.
 
-## 6. Fresh A1 assessment
+**Inherited warning, unchanged:** `warning[license-not-encountered]` for `Unicode-3.0` at `deny.toml:51` is still emitted on both hosts and remains **UNVERIFIED**. The inherited `itoa` / `syn` patch lags are untouched and outside this order.
 
-| Item | Finding |
-| --- | --- |
-| Locked graph | unchanged **4 first-party + 18 third-party** packages; `Cargo.lock` `2f9e5357…` and `crates/solo-adapters/Cargo.toml` `6109224c…` are byte-identical to the baseline; `rustix` still `"=1.1.6"`. |
-| RustSec | CI `cargo-deny 0.20.2` passed on both hosts with a fresh database: `db_commit=fd6f39814c4d3c359fdbe223d0280dec4933f78f fetched_at=2026-11-11T14:18:33Z`; archive integrity verified by the workflow; no waiver, ignore or policy relaxation. |
-| OSV / GHSA | fresh sweep this session: **18/18** locked third-party versions returned no advisories (`api.osv.dev`, crates.io ecosystem). |
-| Yank / provenance | fresh sweep this session: **18/18** versions report `yanked = false`; CI re-verified the locked fetch and lockfile checksums. |
-| Toolchain / runners | pinned `1.99.1` with `rustfmt` + `clippy`; workflow and hosted runner images unchanged. |
-| New-code security shape | the correction compares in-memory bytes that are already owned; no new syscall, handle, path resolution, allocation strategy, unsafe, FFI, dependency or network access. Test-only code adds handle fixtures and a Windows `OpenOptions` writer, in disposable task-owned directories. |
-| Inherited warning | `warning[license-not-encountered]` for `Unicode-3.0` at `deny.toml:51` still emitted on both hosts. Remains **UNVERIFIED** and untouched; CI is **not** warning-free. Inherited `itoa`/`syn` patch lags unchanged and outside this order. |
+**Workspace.** `main` = `bbe4a98f4da464ce189956fea34dd94323499ab8` (local == `origin/main`), tree `36a034bf003dc0c2dc389801da6449dad3aa67a8`, single parent — a fast-forward-only move from `87110df6…` with no merge commit. Retained and unchanged: `solo-wo-061-r01` = `4371af21dce67f33cf1df0384738bf353ca80fc6`, `solo-wo-065-r01` = `7f609320afc0ee6a6bbc6637ef3f3fc68f19ecbb`, `solo-wo-065-r02` = `2de75c1e3f96a84b32f8cd21f491d925225d62d1`; the new `solo-wo-065-r03` stays at `bbe4a98f4da464ce189956fea34dd94323499ab8` locally and on GitHub. Exactly four WIP files; ACTIVE frozen at the R03 document `2622aeace2329a91e15cbdced3781a30bb05d2d0`; NEXT `92fa562b…` neutral; ROADMAP `97df81e5…` and OUTLOOK `cb9c7a61…` unchanged. One checkout, one worktree, one `origin`, and a clean `git status --porcelain --untracked-files=all` at every published revision; no `git clean`, reset, force, amend, rebase or cherry-pick; the ignored `target/` cache is preserved; Solo `.temp/` is still exactly **2 files / 289,253,806 bytes**; the task-owned Cline CI log created by this run's waits was deleted and none remain; nothing unknown or Owner-owned was deleted, moved or overwritten.
 
-## 7. Branches, checkout and hygiene
+**Local limitation, stated honestly.** This host has no MSVC `link.exe`, so local executable tests are **NOT RUN**; the authoritative functional evidence is the CI runs above. Local `cargo fmt --all -- --check` passes; local `clippy` could not complete because dependency build scripts require a linker, so strict Clippy is evidenced by both CI hosts instead.
 
-| Item | State |
-| --- | --- |
-| `main` | `2de75c1e3f96a84b32f8cd21f491d925225d62d1`, tree `766f3b690be78c60cf05a472ef8f6769432af5d9`; local == `origin/main`; single parent (no merge commit) |
-| New branch | `solo-wo-065-r02` **retained** at `2de75c1e…` locally and on GitHub |
-| `solo-wo-065-r01` | unchanged `7f609320afc0ee6a6bbc6637ef3f3fc68f19ecbb` (local and remote) |
-| `solo-wo-061-r01` | unchanged `4371af21dce67f33cf1df0384738bf353ca80fc6` (local and remote) |
-| Worktree / remote | exactly one checkout, one worktree, sole `origin`; no second clone, no stash left behind |
-| Working tree | clean at every published revision (`git status --porcelain --untracked-files=all` empty); no `git clean`, reset, force, amend, rebase or cherry-pick |
-| Live cache | ignored `target/` preserved throughout |
-| Inherited archives | Solo `.temp/` still **2 files / 289,253,806 bytes**, untouched |
-| Task scratch | only disposable test fixtures under runner/task-owned roots, removed by each `Scratch` drop; the task-owned Cline CI log files created by this run's waits were deleted, none remain |
-| Unknown material | nothing unknown or Owner-owned deleted, moved or overwritten |
+## 7. Remaining scope
 
-## 8. Remaining gates and handoff
+Still unimplemented and outside this order: authoritative media-byte / format / MIME, dimension and pixel-limit verification; an Owner-reviewed lawful Platform asset catalogue with identifiers, hashes, media class, dimensions and licence provenance; whole-candidate validation that includes that pinned library; derived outputs; routes, HTTP surface, renderer, release and deployment. `namespace: "platform"` remains deliberately unverifiable and refuses the whole attempt. Stage 03 and `R03.C` remain OPEN.
 
-Still unimplemented and outside this order: authoritative media-byte/format/MIME, dimension and pixel-limit verification; an Owner-reviewed lawful `platformAssetLibraryVersion: "1.0.0"` catalogue with asset IDs, hashes, media class, dimensions and licence/provenance; whole-candidate validation that includes that pinned Platform library; and privacy-safe public use with immutable derived outputs. `namespace: "platform"` remains deliberately unverifiable and refuses the whole attempt; no catalogue, artwork, route, HTTP surface, renderer, release or deployment exists.
-
-**Remaining limitations, stated honestly.** Local executable tests are **NOT RUN** on this host (no MSVC `link.exe`), so all functional evidence is the CI runs above; local `cargo fmt --check` and strict `clippy -p solo-application` pass. The Linux non-reflink refusal is proven only through the workflow's own `tmpfs` fixture, which is exactly the required environment; a critical mapped-view assertion at the Windows asset path is only reachable through the existing native module, so it remains covered by the accepted R02 native mapped-view proof rather than duplicated here. Media correctness is never asserted. The `Unicode-3.0` warning remains unverified.
-
-**Handoff:** `SOLO-WO-065 R02 — COMPLETE` for the three correction proofs, with every applicable acceptance row directly evidenced. The Implementation Agent does **not** self-ACCEPT: `R03.C2` awaits independent Chief Architect `ACCEPT / REVISE / STOP` against this report's exact remote HEAD, `R03.C` and Stage 03 remain OPEN, ACTIVE stays the frozen Owner-issued R02 document, NEXT stays neutral, and ROADMAP and OUTLOOK are unchanged.
+**Handoff:** `SOLO-WO-065 R03 — COMPLETE` for this one test-only evidence recovery, with every applicable gate directly evidenced. The Implementation Agent does **not** self-ACCEPT: `R03.C2` awaits independent Chief Architect `ACCEPT / REVISE / STOP` against this report's exact remote HEAD, and no closure, waiver, catalogue, media, release or deployment follows from it.
