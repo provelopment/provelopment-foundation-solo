@@ -1,133 +1,146 @@
 # Execution Report
 
-**Order:** `OWNER-ISSUED — SOLO-WO-058 R01` — resolve the accepted `R03.A` closure's outstanding clean-tree gate by narrowly ignoring the live root Rust build cache, verify the gate, reconcile ACTIVE and publish this canonical report.
+**Order:** `OWNER-ISSUED — SOLO-WO-059 R01` — implement R03.B: identified inherited-location extension, exact field-level provenance and independent five-level geography.
 **Session date:** 2026-11-11.
-**Root:** `C:\Users\Sean\Documents\Provelopment\00.foundation-solo` (verified `git rev-parse --show-toplevel` = `C:/Users/Sean/Documents/Provelopment/00.foundation-solo`; one checkout, one worktree, sole `origin` = `https://github.com/provelopment/provelopment-foundation-solo.git`).
-**Disposition: `COMPLETE`.** Both mandatory gates of this order now pass on real evidence: the final working tree is genuinely empty (`git status --porcelain` and the full-untracked view both return zero lines) **without** deleting, moving or interrupting the live cache, and every required two-host `rust-verify` checkpoint is green at its exact revision. The Implementation Agent does **not** self-ACCEPT; the Chief Architect reviews this report independently.
+**Root:** `C:\Users\Sean\Documents\Provelopment\00.foundation-solo` (verified `git rev-parse --show-toplevel`; one checkout, one worktree, sole `origin` = `https://github.com/provelopment/provelopment-foundation-solo.git`).
+**Disposition:** implementation and every in-scope gate are complete and green. The Implementation Agent does **not** self-ACCEPT; the Chief Architect reviews this report independently. **Stage 03 remains OPEN**, `R03.B` remains in ROADMAP until a separate Owner-issued closure, and `R03.C` is untouched.
 
 ## 1. Revision ledger
 
-| Step | Commit | Tree | Published paths | Two-host CI |
+| Step | Commit | Tree | Paths in the commit | Two-host CI |
 | --- | --- | --- | --- | --- |
-| Starting `main` = `origin/main` (reviewed anchor) | `cb9efab41103c8e8aabdb882c453bf43f96c481a` | `96b1cf233eac83e1d1c57365f7adb8baeccf5f43` | — | run `42952425852` green (prior report revision) |
-| 1. Issued order installed | `3942cc7874fcfbc73b08e7478695d64ec0d9809b` | `9e19a1fe0d609a9bd26ec7bc2cd50b970ef510d0` | `.documents/WIP/workorder-active.md` (blob `5a534167aca5c8a285002cc0b137922fa7306d5b`) | run `42955735676` **success** |
-| 2. Hygiene change | `78cef257a1ccbd60aa91c9c0e08ea2b62090736b` | `46e214da05a93ecab65d92c22fbdbc5886f9a52c` | `.gitignore` (blob `f45dd49524748e9b08f6678271edfc22ac39b97f`) | run `42956364811` **success** |
-| 3. ACTIVE neutralized | `e2cce1c7cbeb8fb0ccc9b4ca791a7d9346c548ff` | `282c9ad6acfc6d56e0c9680f0bd2e5d167b49da2` | `.documents/WIP/workorder-active.md` (blob `ea5f20b736483c2e102456be1cea9104059fc81a`) | run `42956948656` **success** |
-| 4. This report | report-only commit on `main` | — | `.documents/Reports/execution-report.md` | fresh run at report HEAD; ID returned in chat |
+| Starting `main` = `origin/main` | `7ae6bedc4f846310af86e2bce6a1904f606f22fc` | `1459944c4e2e73fdcf2c20805a914efdec3ea828` | — | run `42957731037` green (prior report) |
+| 1. Authorization (ACTIVE installed, NEXT cleared) | `742afbc275134050f5ea38f651b68cfd182ffc26` | `daeaa93ed9549ac141e35910c658d39ce0ef0ddf` | `workorder-active.md` (`52d0fda3…`), `plan-next.md` (`92fa562b…`) | run `42967005798` **success** |
+| 2. Branch `solo-wo-059-r01` (first attempt) | `b43b831e971fc029bc00859272c986dd1de936ee` | `fe12d8c392ce44a0b4fdd6c1c509faadb140b320` | the eight authorized code/test paths | run `42970181822` **failure** — three of my own test expectations, corrected below |
+| 3. Branch corrected | `f40cb6f0b5c3a7a86d4edfc952e5d5f275b2ee5c` | `b9c88986ef86c42c1a9ea2670ea04e7f2ed6b8d9` | adapter/domain test files only | run `42970933402` **success** |
+| 4. Substantive `main` (fast-forward) | `f40cb6f0b5c3a7a86d4edfc952e5d5f275b2ee5c` | `b9c88986ef86c42c1a9ea2670ea04e7f2ed6b8d9` | none new (fast-forward) | run `42971561588` **success** (fresh push run) |
+| 5. This report | report-only commit on `main` | — | `.documents/Reports/execution-report.md` | fresh run at report HEAD; ID returned in chat |
 
-Each commit changed exactly one path (`git diff-tree --name-only -r`), each push was an ordinary fast-forward to the existing `main`, and `origin/main` equalled local `HEAD` after every step. No branch, tag, PR, merge, reset, `clean`, stash, force-push or history rewrite occurred; the repository still has exactly one branch (`main`), one worktree and one remote.
+`main` was fast-forwarded to the verified branch (no commit, no squash, no rebase, no force), pushed normally, and `origin/main` equals local `HEAD`. Branch `solo-wo-059-r01` is **retained** for later, separately Owner-authorized pruning. One worktree, one remote, two branches.
 
-## 2. Preflight verification (before any permanent write)
+**Disclosed correction.** The first branch run failed at the workspace test step on both hosts because three *test expectations I wrote* were wrong, not because the implementation was wrong: a portable source path used uppercase (`main-home.id-ID.md`), a per-fact field count was asserted where an overlay value was meant, and the same-node extension case was expected as "not inherited" when the direct-ancestor rule refuses it first. All three were corrected in the authorized test files only, re-verified, and the green runs above are at the final substantive SHA.
 
-- Local HEAD and fetched `origin/main` were both `cb9efab41103c8e8aabdb882c453bf43f96c481a`; tree `96b1cf233…`. The remote had not moved, so no STOP was required.
-- The Owner-installed `workorder-active.md` was verified as the exact `OWNER-ISSUED — SOLO-WO-058 R01` document (local SHA-256 `DA73688E443A24816194A63A8377CA00D974EB1C8E69A7E3F70608764D05AD4A`), and was the only expected tracked modification.
-- Baseline blobs all matched the order's ledger: `.gitignore` `f51cc5306cdc8e4532422809eede68b93c4a7fd7`; neutral ACTIVE `ea5f20b736483c2e102456be1cea9104059fc81a` (read back from GitHub at the reviewed ref); ROADMAP `754ce1b75917d3168457965c3efed1137ff3aa9c`; NEXT `251c5dcc40f52c7c0a214aaee9daa2518b5cd887`; OUTLOOK `cb9c7a610cf3c537557e060ca9656e44a053e69d`; report `a41f72d828f46127883ed2953408da68424ffbce` (also read back from GitHub at `cb9efab`). WIP held exactly four files and no parallel register or archive.
-- Working state before the change contained exactly the two allowed entries: ` M .documents/WIP/workorder-active.md` (the Owner installation) and `?? target/` (the cache). No other unexpected item appeared, so no provenance STOP was triggered.
-- `core.excludesFile` is unset and `.git/info/exclude` contains no active pattern, so neither local nor global ignore configuration contributes to the result; both were left untouched.
+## 2. Exact changed-path ledger (eight authorized paths)
 
-## 3. Exact permanent edits
+| Path | Change |
+| --- | --- |
+| `crates/solo-domain/src/property_registry.rs` | `LocationFieldsV1::overlay` (bounded typed overlay, `coordinates` atomic), `LocationFactV1::with_overlay` (identity/kind/exposure preserved), `LocationExtensionRequestV1::new` now validates a nonempty `set`, `AuthoredPropertyValueV1::new` now refuses a public extension wrapper, `is_supported_in_r03a` replaced by `is_location_extension`, new `PropertyRefusalKind::ExtensionExposureForbidden` |
+| `crates/solo-domain/src/property_resolution.rs` | identified in-place `extend` in the existing direct-parent resolver, per-field origin updates, `Extended` events, typed `LocationExtensionCause` (four causes), `LOCATION_INVALID_EXTEND`, refusal now carrying the offending declaring owner and registered key, boxed to stay small |
+| `crates/solo-domain/src/lib.rs` | one re-export (`LocationExtensionCause`) |
+| `crates/solo-domain/tests/property_resolution.rs` | R03B-01…09 domain matrix; two R03A extension tests converted |
+| `crates/solo-application/src/property_resolution.rs` | documentation truthfulness only (no behavioural change, no new port, no publication authority) |
+| `crates/solo-application/tests/property_resolution.rs` | converted use-case test plus R03B-11 fail-closed test |
+| `crates/solo-adapters/src/property_resolution.rs` | `extend` translation now validates through the typed request; closure mapping to `LOCATION_INVALID_EXTEND`; resolution refusal now reports the **actual** offending owner and key plus the typed cause |
+| `crates/solo-adapters/tests/property_resolution.rs` | three converted boundary tests plus R03B-10 (real JSON geography) and R03B-11 (unlisted fail-closed) |
 
-Only the three authorized permanent paths changed.
+No file was added, renamed or deleted. `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml`, `deny.toml`, `.cargo/config.toml`, `.github/`, `.gitignore`, `README.md`, `AGENTS.md`, `.documents/About/`, `.documents/Architecture/`, both SOPs, `plan-roadmap.md`, `plan-outlook.md`, the parser modules and all R01/R02 fixtures are untouched.
 
-**(a) `.gitignore` — exactly two added lines, nothing else.** Verbatim `git diff`:
+## 3. Implementation summary (what actually changed in behaviour)
 
-```diff
-@@ -20,6 +20,8 @@ Thumbs.db
- .temp/
- .cache/
- coverage/
-+# Rust/Cargo and rust-analyzer generated build cache at the repository root.
-+/target/
+- **In-place extension.** `resolve_key_from` still copies the immediate parent's effective collection, then applies the node's `currentContext` operations in authored order. An `extend` locates exactly one fact in the inherited prefix by `(original owner, original factId)`, overlays only the members named in `set` (`LocationFieldsV1::overlay`, `coordinates` as one atomic field), rewrites only those members' `fieldOrigins` to `(this owner, this local index)`, keeps `factId`, `kind`, original owner/index, whole-record `exposure` and list position, and records one `Extended(owner, localIndex, targetFactId)` event.
+- **Ancestry.** A target must satisfy `target_owner.is_ancestor_of(current)` (strict direct-chain ancestor). The Entity root cannot extend because it has no ancestor; a current-node, sibling, other-Facet, other-Entity, descendant or different-locale target refuses before any identity lookup.
+- **Identity.** Lookup never matches on `factId` alone, a label, a Page ID or a locale: two inherited facts with the same `factId` under different original owners stay two facts and only the fully qualified one changes.
+- **Suppression and same-node rules.** A node's own `suppress` is remembered long enough to refuse a target it removed with the accurate `target-suppressed` cause; a fact removed by an intervening ancestor is refused as `target-not-inherited`; a locally added fact is never an eligible target (the direct-ancestor rule refuses it, and the inherited-prefix guard enforces §6.2H.5 structurally).
+- **Conflicts.** Two extensions of one original fact at one node refuse (`duplicate-extension-target`) even with an identical `set`; nothing is last-wins or idempotently merged.
+- **Codes.** All invalid-operation outcomes return `LOCATION_INVALID_EXTEND` with a stable cause token (`target-not-ancestor`, `target-not-inherited`, `target-suppressed`, `duplicate-extension-target`). The obsolete `LOCATION_EXTENSION_NOT_IMPLEMENTED_IN_R03A` code no longer exists anywhere in the tree. Malformed envelopes remain closed typed **declaration** refusals (`PROPERTY_DECLARATION_REFUSED`), never resolution outcomes.
+- **Typed-API bypasses closed.** `LocationExtensionRequestV1::new` refuses an empty `set` (`EmptyLocationFields`) and `AuthoredPropertyValueV1::new` refuses `(extension, Exposure::Public)` (`ExtensionExposureForbidden`), so neither forbidden state is expressible through the public typed API; the adapter's `Internal` placeholder stays inert and resolution never reads it for exposure.
+- **Diagnostics.** The refusal now carries the offending declaring owner and the registered key, so a diagnostic names the node whose declaration failed; the adapter prefers that owner over the requested target. Only structural identifiers, the registered key and stable tokens appear — no authored field value, place text, coordinate, mailbox or path.
+- **Preserved behaviour.** The other eight registered keys, `propertyRegistryVersion = "1.0.0"`, cardinality, suppression, inheritance, public projection and whole-graph fail-closed validation are unchanged.
 
- # Common JavaScript/build outputs (adapt after toolchain is chosen)
- node_modules/
-```
+## 4. `R03B-01`–`R03B-12` evidence matrix
 
-`git diff --stat` reports `1 file changed, 2 insertions(+)`; `git diff --check` is clean (exit 0). The rule is root-anchored `/target/`, not `target/` or `**/target/`, and no other line, order or content of the file changed. `.gitignore` remains a repository-standard non-architectural file, so no About/Architecture/SOP edit was required or made. Nothing was changed in `.gitattributes`, Git config, `.git/info/exclude`, `CARGO_TARGET_DIR`, `RUSTFLAGS`, the toolchain, any script or the CI workflow.
-
-**(b) `workorder-active.md` — issued, then neutralized.** Issued blob `5a534167…` was verified identical on GitHub at the issued commit; the final file was written as exactly the single title line plus LF (40 bytes, UTF-8 without BOM) and hashes to the required neutral blob `ea5f20b736483c2e102456be1cea9104059fc81a`, re-verified on GitHub at the neutralization commit. ACTIVE is now neutral and holds no order.
-
-**(c) This report** replaces the previous single canonical report. No report archive, dated copy, WIP file or helper file exists.
-
-## 4. Behavioural proof of the clean-tree fix
-
-All checks below were run locally at the neutralization revision; the first three were also run immediately after the hygiene commit with identical results.
-
-| Check | Command | Result | Status |
+| ID | Test(s) | Direct evidence | Result |
 | --- | --- | --- | --- |
-| Anchored rule resolves | `git check-ignore -v --no-index -- target/` | `.gitignore:24:/target/	target/` | **PASS** |
-| Nothing tracked under the cache | `git ls-files -- target/` | 0 paths | **PASS** |
-| Nothing staged under the cache | `git diff --cached --name-only -- target/` | 0 paths | **PASS** |
-| Clean tree | `git status --porcelain` | **0 lines** | **PASS** |
-| Clean tree, full untracked view | `git status --porcelain --untracked-files=all` | **0 lines** | **PASS** |
-| Rule is not generic | `git check-ignore -v --no-index -- crates/solo-cli/target/` and `docs/target/` | exit 1, no match — nested `target` directories are **not** ignored | **PASS** |
-| `.temp/` ignore unchanged | `git check-ignore -v --no-index -- .temp/` | `.gitignore:20:.temp/` (pre-existing rule) | **PASS** |
-| Tracked authorities present | `git ls-files --error-unmatch` on `README.md`, `AGENTS.md`, `.documents/WIP/plan-next.md`, crate manifest | all tracked | **PASS** |
+| **R03B-01** | `r03b_01_page_extension_updates_the_inherited_fact_in_place` | one fact in its original slot; `factId`, `kind`, origin owner+index and exposure unchanged; `set` overwrote `locality` and added `district`; public original fact, with the internal case in `r03b_09` | PASS |
+| **R03B-02** | `r03b_02_consecutive_extensions_overlay_all_ten_fields_across_five_levels`, `application_executes_an_identified_extension_without_publication_authority` | Entity→Facet→Site→Page→representation; all ten members present in canonical order; untouched fields keep earlier origins; four `extended` and one `added` event; the use case publishes nothing and its projection carries overlaid data with no provenance | PASS |
+| **R03B-03** | `r03b_03_mixed_add_extend_add_keeps_order_and_records_the_real_sequence` | inherited first, adds at local `0` and `2`, extension at local `1`; sequence `added/inherited/added/extended/added` with `Extended(…, 1, bali-base)` and no phantom `added`; repeated resolution value-identical; explicit `none` vs absent declared-distinct and effective-identical | PASS |
+| **R03B-04** | `r03b_04_invalid_extension_targets_refuse_with_typed_causes`, `r03b_04_sibling_extension_refuses_the_whole_graph`, `r03b_04_extend_without_an_inherited_target_refuses`, `r03b_04_extension_in_another_site_fails_the_whole_candidate` | Entity root, current node, sibling Site, other Facet, other Entity, descendant, wrong full locale → `target-not-ancestor`; missing fact, right id under the wrong original owner, fact removed by an intervening `suppress` → `target-not-inherited`; every case `LOCATION_INVALID_EXTEND`, no fallback | PASS |
+| **R03B-05** | `r03b_05_suppression_is_final_for_extensions` | `suppress`+`extend` at one node → `target-suppressed`; descendant of a suppressed ancestor → `target-not-inherited`; `suppress`+`add` valid and records `suppressed`; a same-node `add` is not targetable | PASS |
+| **R03B-06** | `r03b_06_duplicate_extensions_refuse_and_same_ids_stay_distinguishable` | two identical extensions → `duplicate-extension-target`; two facts sharing `factId` under Entity and Facet remain two, only the named Facet fact changes, the other keeps its fields | PASS |
+| **R03B-07** | `r03b_07_effective_maximum_and_duplicate_add_refusals_are_unchanged` | 16 effective facts stay 16 through a valid extension; a 17th `internal` add refuses with `CardinalityExceeded` before projection; duplicate independent `add` identity refuses with `DuplicateLocationFact` | PASS |
+| **R03B-08** | `r03b_08_typed_boundary_refuses_empty_set_and_public_wrapper`, `r03b_08_extend_syntax_refusals_are_unchanged` | typed: empty `set` → `EmptyLocationFields`, public wrapper → `ExtensionExposureForbidden`, internal placeholder accepted; JSON: empty/unknown `set`, `null`, wrong type, invalid coordinates/country code/locale/lineage, extra member, authored `exposure`, missing `set` all refuse as declarations | PASS |
+| **R03B-09** | `r03b_09_internal_facts_stay_unprojected_after_extension` | internal fact extended at Page and representation stays `internal`; projection empty and carrying no origin/event; the public sibling branch projects only its own fact; refusal text contains no authored or inherited place text | PASS |
+| **R03B-10** | `r03b_10_real_json_geography_extends_without_identity_or_locale_effects` | real strict JSON: Entity Australia fact extended by Facet (administrative area), Site (locality), Page (district), `en-001` (postal code), `id-ID` (named place), plus an independent Jakarta premises fact; `en-001` has six fields and no `namedPlace`, `id-ID` has the extension and two facts and no sibling `postalCode`; Entity ID, Page ID, base URL and both authored route strings unchanged; no geographic inference and no locale-driven selection | PASS |
+| **R03B-11** | `r03b_11_unlisted_invalid_extension_fails_the_whole_candidate`, `application_fails_closed_on_an_invalid_sibling_extension` | an invalid `extend` on an **unlisted** `id-ID` representation refuses the whole candidate for a valid `en-001` request, names that unlisted declaration rather than the requested target, and echoes no content; the control manifest resolves and the unlisted branch keeps its own inherited copy | PASS |
+| **R03B-12** | whole workspace CI | every pre-existing R03A/R01/R02 test, the real-tree architecture checker with its 23-fixture refusal self-test, the failure tripwire, the locked release build and the CLI accepted/refused smoke pass on both hosts; converted tests replaced 1:1 below | PASS |
 
-Before the change the same commands showed `?? target/` plus 180 individual untracked lines in the full view; after it, zero. Cleanliness therefore comes from the committed root-anchored rule alone — not from deletion, `git clean`, `reset`, force-add, a local/global exclude, or hidden paths.
+## 5. Legacy-test adaptation ledger (no coverage silently deleted)
 
-## 5. The `SOLO-WO-057` outstanding gate and how it is now resolved
-
-`SOLO-WO-057 R01` ended with one explicitly `UNMET` gate: the local IDE's actively generated, untracked root `target/` Rust build cache produced `?? target/`, so the order's required empty `git status --porcelain` could not be satisfied without destroying a live cache. Its report recorded the gate as unmet and requested the smallest Owner decision.
-
-This order resolves that gate **without deleting the cache** by making the repository state honest about a genuine, reproducible, non-product build artefact at a single root-anchored location. The mechanism, verified end to end: the tracked rule ignores only `<root>/target/`; `git check-ignore` names the exact rule and file line; nothing under that path was ever tracked or staged; and the working tree is now empty while the physical directory and its bytes remain present (§6). A fresh checkout or reinstall reproduces the same state, so the fix is durable rather than a one-off cleanup.
-
-## 6. Cache, retained temporary material and preserved state
-
-- **Live root cache, preserved:** `target/` exists with attribute set `Directory, NotContentIndexed` (no reparse point), measured at **29,639,791 bytes, 198 files, 107 directories**, marked by a real `CACHEDIR.TAG`, with top-level entries `debug`, `flycheck0`, `tmp`, `.rustc_info.json`, `CACHEDIR.TAG`. It contains **0** reparse-point directories, **0** nested `.git`, and **0** tracked or staged files. Its bytes were neither deleted nor moved; `rust-analyzer` was neither terminated nor interrupted. Its size is unchanged from preflight to final state because the IDE was idle during the run; a size change would have reflected IDE activity, never task deletion.
-- **Retained `.temp/` contents, preserved:** `.temp/` holds `architecture-fixtures/` and `toolchain-installer/`, totalling **289,253,806 bytes** across 2 files — identical to the previous report's measurement, so nothing was removed, added or altered. Those mingw-w64/rustup archives remain a **possible future Windows-GNU/offline setup resource only**; the currently passing CI runs `ubuntu-24.04` (GNU/Linux) and `windows-2025` (MSVC) and does not use them. Their cleanup trigger is unchanged: delete after the next successful GNU deterministic-build verification, or when the Owner confirms an offline reinstall copy is no longer needed.
-- **Earlier cleanup totals attributed to that prior run:** the `SOLO-WO-057` `.temp` cleanup reclaimed **669,778,642 bytes (2,521 files, 282 directories)**, including the then-obsolete `.temp/target`, `rt`, `w032` and `w033` scratch. Nothing was reclaimed, deleted or measured as new reclamation in this run.
-- **WIP unchanged/neutral:** ROADMAP `754ce1b7…`, NEXT `251c5dcc…` and OUTLOOK `cb9c7a61…` are byte-identical to the preflight baseline at the final revision; the four-file inventory is unchanged; `plan-next.md` still holds `R03.B` as the single candidate and is not authorization. ACTIVE is the neutral title line only.
-- **Completed branch already pruned:** `solo-wo-056-r01` was pruned locally and on `origin` during `SOLO-WO-057` after ancestry verification; it was **not** pruned again, and no ref was deleted in this run.
-- **Task-owned scratch:** this run created no permanent helper file. One transient Cline terminal-progress log appeared in the Cline temporary capture area during a long CI wait and was deleted at cleanup; the capture area was re-verified empty. No Solo `.temp` scratch survives.
-
-## 7. CI evidence (unchanged `rust-verify` workflow)
-
-| Run | Revision | `verify (ubuntu-24.04)` | `verify (windows-2025)` | Steps each | Skips (ubuntu / windows) |
-| --- | --- | --- | --- | --- | --- |
-| `42955735676` | `3942cc78` issued order | success, 0 failed | success, 0 failed | 33 | 9 / 14 |
-| `42956364811` | `78cef257` hygiene change | success, 0 failed | success, 0 failed | 33 | 9 / 14 |
-| `42956948656` | `e2cce1c7` neutralized ACTIVE | success, 0 failed | success, 0 failed | 33 | 9 / 14 |
-| report HEAD run | report commit | verified separately; run ID returned in chat | verified separately | — | — |
-
-Every run executed the full unchanged matrix on both hosts: pinned-toolchain install and version assertions, the locked dependency fetch, the `cargo-deny 0.20.2` gate with a fresh RustSec refresh and the `RUSTSEC-2026-0009` negative probe, workspace package-set gate, disposable Btrfs fixtures with guaranteed cleanup, format, strict lint, the complete locked all-target test suite, the real-tree architecture checker with its refusal self-test, the failure tripwire, the locked release build, the CLI accepted/refused smoke, and the byte-identical double release build.
-
-Skip inventory is genuinely host-specific and nothing applicable was skipped: the Ubuntu job skips exactly the 9 Windows-variant steps, and the Windows job skips the 9 Linux-variant steps plus the 5 Ubuntu-only steps (RustSec negative probe, disposable snapshot filesystems and their cleanup, forbidden-import restoration proof, and the double release-build comparison). The workflow file, the toolchain pin and `deny.toml` are unchanged by this order.
-
-## 8. Warnings and security posture (recorded, not suppressed)
-
-`cargo-deny 0.20.2` emits exactly **one** `warning[license-not-encountered]` per host in every run above (2 matched log lines per run: 1 Ubuntu, 1 Windows), at `deny.toml:51:6` for `"Unicode-3.0"`, with the class result `licenses ok: 0 errors, 1 warnings, 17 notes` and `bans ok: 0 errors, 0 warnings, 0 notes`; the advisory class passed after a fresh RustSec refresh.
-
-- **Status:** pre-existing, inherited, non-vulnerability licence-policy hygiene. It is an unused-allowance lint (the allow entry matched no licence requirement in the checked graph), not an advisory, yank, unmaintained, unsound, ban or source finding, and it fails nothing.
-- **Origin:** `deny.toml` is untouched by this order and byte-identical to the previously accepted baseline; the warning was already present in runs `42942318551`, `42943083597`, `42946275834`, `42946725123`, `42948801184` and `42952425852`, i.e. before this order existed.
-- **Unresolved:** the lockfile pins `unicode-ident 1.0.27`, whose manifest declares `(MIT OR Apache-2.0) AND Unicode-3.0`, reachable only through `proc-macro2 → quote → syn → solo-cli [dev-dependencies]`; why cargo-deny reports the allowance as unmatched remains **`UNVERIFIED`** until a separately Owner-issued dependency-policy investigation.
-- **Not done, deliberately:** no `deny.toml`, manifest, lockfile, workflow or toolchain edit was made to silence or fix it. Remediation (remove the unused allowance or document an accurate rationale) belongs to that separate order, and the Unicode attribution/NOTICE obligation stays tracked as a release prerequisite.
-- **No new or material warning** was introduced by this order; no security outcome changed and no finding was suppressed.
-
-## 9. Applicability and outstanding work
-
-- **A1 version-currency campaign: `NOT APPLICABLE`.** No manifest, lockfile, toolchain pin, action pin, `deny.toml` or workflow changed; the only content change is a root `.gitignore` rule, so the previously accepted `R03.A` A1 assessment remains the current dependency and advisory position. Actual CI advisories and warnings were still reviewed and recorded (§8).
-- **`R03.B` and `R03.C`: still unimplemented.** No product source, test, fixture, schema or contract changed. `R03.B` (authored `location.extend` with field-level provenance) remains the sole NEXT candidate and is **not authorized**; Stage 03 remains open; routing, localization, publication and all later stages are untouched.
-- **Retained GNU archives:** still present in `.temp/toolchain-installer/` (289,253,806 bytes) with the cleanup trigger recorded in §6; they are not required by the passing MSVC-hosted Windows CI or the GNU/Linux host.
-- **Scratch:** this report was drafted as disposable parts in the permitted Solo `.temp/` area and composed into the single report path; those draft parts are deleted, so no helper file, inventory or archive remains.
-
-## 10. Honest status
-
-`COMPLETE` for `SOLO-WO-058 R01`, because both mandatory gates genuinely pass: the clean-tree gate is empty on real commands at the final revision with the live cache preserved, and every required two-host CI checkpoint is green at its exact SHA.
-
-| Requirement | Result | Evidence |
+| File | Original test (R03A expectation) | Replacement |
 | --- | --- | --- |
-| Anchored `/target/` rule added, nothing broader | **PASS** | §3(a) diff; nested `target` dirs not ignored (§4) |
-| Live cache preserved, not deleted or interrupted | **PASS** | §6 measurement; `CACHEDIR.TAG`; unchanged bytes |
-| Empty `git status --porcelain` (and full-untracked view) | **PASS** | 0 / 0 lines at final revision (§4) |
-| No local/global exclude, force-add or `git clean` used | **PASS** | `core.excludesFile` unset; `.git/info/exclude` unchanged; commands listed §4 |
-| ROADMAP / NEXT / OUTLOOK byte-identical | **PASS** | blobs `754ce1b7` / `251c5dcc` / `cb9c7a61` |
-| ACTIVE reconciled to the exact neutral blob | **PASS** | `ea5f20b7…`, read back from GitHub |
-| Retained `.temp` material unchanged | **PASS** | 289,253,806 bytes, 2 files |
-| Two-host CI at every required checkpoint | **PASS** | runs `42955735676`, `42956364811`, `42956948656` |
-| Inherited `Unicode-3.0` warning recorded, not fixed | **PASS** | §8 (mechanism `UNVERIFIED`) |
-| New component/version A1 campaign | **NOT APPLICABLE** | no dependency/pin/workflow change (§9) |
-| Local `cargo build` / `cargo test` | **NOT RUN** | no product code changed; full regression ran in CI on both hosts |
-| R03.B / R03.C implementation | **NOT RUN** | not authorized by this order |
+| domain | `r03a_10_recognized_extend_is_refused_by_name_while_add_works` | `r03b_01_page_extension_updates_the_inherited_fact_in_place` (positive in-place assertions; the original add-only assertions retained) |
+| domain | `r03a_10_whole_graph_refuses_a_recognized_extension_anywhere` | `r03b_04_sibling_extension_refuses_the_whole_graph` (still refuses the whole graph, now with the R03.B code, cause and offending owner) |
+| application | `application_surfaces_the_named_extension_refusal` | `application_executes_an_identified_extension_without_publication_authority` (positive) plus `application_fails_closed_on_an_invalid_sibling_extension` (negative) |
+| adapters | `r03a_09_recognized_extend_is_refused_by_name` | `r03b_04_extend_without_an_inherited_target_refuses` (same JSON bytes, new code and cause) |
+| adapters | `r03a_09_extension_anywhere_refuses_the_whole_candidate` | `r03b_04_extension_in_another_site_fails_the_whole_candidate` (same JSON bytes, names the offending owner) |
+| adapters | `r03a_09_extend_syntax_refusals` | `r03b_08_extend_syntax_refusals_are_unchanged` (all original syntax cases kept; two closed-JSON cases added) |
 
-**Absence of unauthorized actions:** no product source, test, fixture, manifest, lockfile, toolchain pin, `deny.toml`, `.cargo/config.toml`, CI workflow or `.github/` change; no About/Architecture/SOP edit; no ROADMAP/NEXT/OUTLOOK edit; no `.gitattributes`, Git config or `.git/info/exclude` edit; no cache deletion, move or process termination; no `.temp` content removal; no second Entity, Spoke, route/locale/location inference or publication change; no branch, tag, PR, merge, release, deployment, provider, DNS, secret or other-repository action; no additional checkout or worktree. The Implementation Agent does not self-ACCEPT: the Chief Architect reviews this report at its published revision.
+`#[test]` counts: domain `property_resolution` 16 → 24, application 7 → 8, adapters 14 → 16. Eleven tests added, six converted in place, none removed; repository-wide `#[test]` count is now 386.
+
+## 6. Two-host CI evidence (unchanged `rust-verify` workflow)
+
+| Run | Revision | Event | `verify (ubuntu-24.04)` | `verify (windows-2025)` |
+| --- | --- | --- | --- | --- |
+| `42967005798` | `742afbc2` authorization | push | success | success |
+| `42970181822` | `b43b831e` first branch attempt | workflow_dispatch | **failure** (workspace tests, my three wrong expectations) | **failure** (same) |
+| `42970933402` | `f40cb6f0` corrected branch | workflow_dispatch | success | success |
+| `42971561588` | `f40cb6f0` substantive `main` | push | success, 33 steps, 0 failed, 9 skipped | success, 33 steps, 0 failed, 14 skipped |
+| report HEAD | report commit | push | verified separately; run ID in chat | verified separately |
+
+Skips at substantive `main` are exactly the counterpart-host variants: the Ubuntu job skips the nine Windows steps; the Windows job skips the nine Linux steps plus the five Ubuntu-only steps (RustSec negative probe, disposable snapshot filesystems and cleanup, forbidden-import restoration proof, byte-identical double release build). Every applicable mandatory gate ran on both hosts: pinned toolchain install and version assertion, locked dependency fetch, `cargo-deny 0.20.2` with a fresh RustSec refresh, workspace package-set gate, format, strict Clippy, the full locked all-target test suite, the real-tree architecture checker with its 23-fixture refusal self-test, the failure tripwire, the locked release build, and the CLI accepted/refused smoke. No warning was introduced and no gate was skipped on its own host.
+
+## 7. A1 — current-source and version-currency review (code-bearing order)
+
+**Applicable inventory** (installed and locked, verified locally against the actual tree):
+
+| Component | Locked / pinned | Current upstream | Assessment |
+| --- | --- | --- | --- |
+| `serde` | 1.0.229 | latest release `v1.0.229` | current |
+| `serde_json` | 1.0.154 | crates.io `max_stable_version` 1.0.154 | current |
+| `windows-sys` | 0.61.2 | crates.io `max_stable_version` 0.61.2 | current |
+| `syn` (dev, `solo-cli` tests) | 3.0.9 | latest release `3.0.10` | one patch behind, dev-only, reachable only in test builds; no advisory, yank or unsoundness implied |
+| Rust toolchain | 1.99.1 (pinned, rustfmt+clippy) | latest release `1.99.1` | current |
+| `actions/checkout` | `3d3c42e5aac5ba805825da76410c181273ba90b1` | that SHA **is** tag `v7.0.1`, the current release | current, SHA-pinned |
+| `cargo-deny` | 0.20.2 (SHA-256 verified archive) | latest release `0.20.2` | current |
+| Runners | `ubuntu-24.04`, `windows-2025` | supported hosted images | current |
+
+The lockfile holds 22 packages across four first-party crates; the workspace declares no runtime dependency of its own beyond `serde`/`serde_json`/`windows-sys` and the two dev-only crates. **Advisories:** the authoritative signal is the CI gate that resolves the current RustSec database at run time — it passed on both hosts at the substantive revision, and the Ubuntu `RUSTSEC-2026-0009` negative probe proved the gate still fails closed. **No upgrade, pin change or manifest edit was made**; `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml` and the workflow are byte-identical to the authorization revision. The `syn` patch lag is recorded for a separately Owner-issued dependency order, not actioned here.
+
+**Warnings.** `cargo-deny 0.20.2` still emits exactly one `warning[license-not-encountered]` per host for `"Unicode-3.0"` at `deny.toml:51` (2 log lines in the substantive run: 1 Ubuntu, 1 Windows), with `licenses ok: 0 errors, 1 warnings` and `bans ok: 0 errors`. It is the same pre-existing, inherited, non-vulnerability unused-allowance lint reported by the two previous orders, byte-identical `deny.toml`, and its graph/allowance mismatch remains **`UNVERIFIED`** pending that separate dependency-policy investigation. It was neither silenced nor fixed; the Unicode attribution/NOTICE duty stays a release prerequisite.
+
+## 8. Security and privacy evidence
+
+- **No exposure elevation.** An extension cannot carry or change exposure: the typed wrapper forbids `public`, the resolver copies the fact's own exposure, and `r03b_09` proves an internal fact stays internal through two descendant extensions and is absent from the projection with all provenance.
+- **No content leakage.** Refusals carry only the code, the stable cause token, the structural owner description and the registered key; `r03b_09` and `r03b_11` assert the rendered refusal contains no authored or inherited locality text.
+- **Fail-closed.** One invalid declaration anywhere — including on an unlisted representation the request never visits — prevents any candidate and any public projection (`r03b_11`, `application_fails_closed_on_an_invalid_sibling_extension`), and whole-graph membership is still required.
+- **No new surface.** No port, adapter, HTTP, filesystem, routing, locale-selection, geocoding or publication authority was added; `PROPERTY_CANDIDATE_GRANTS_PUBLICATION_AUTHORITY` remains `false` and is asserted.
+- **Hexagonal boundary held.** Only `solo-domain` (pure) gained behaviour; the application and adapter changes are translation and diagnostics. The architecture checker passed on the real tree on both hosts.
+
+## 9. Local verification status (honest, per check)
+
+| Check | Result | Note |
+| --- | --- | --- |
+| `cargo fmt --all -- --check` | **PASS** | exit 0, no diff |
+| `cargo clippy --locked -p solo-domain -p solo-application --all-targets --all-features -- -D warnings` | **PASS** | no lints |
+| `cargo check --locked -p solo-domain --tests -p solo-application` | **PASS** | type-check of the new domain and application tests |
+| `cargo clippy` / `cargo check` including `solo-adapters` | **NOT RUN locally** | this workstation has the pinned MSVC toolchain but **no linker** (`link.exe` absent, no GNU target installed), so dependency build scripts cannot link; `solo-adapters` was compiled, linted and tested on both CI hosts |
+| `cargo test` (any target) | **NOT RUN locally** | same linker limitation; the complete locked all-target suite ran on `ubuntu-24.04` and `windows-2025` at the substantive revision with 0 failures |
+| `cargo-deny` gate | **NOT RUN locally** | executed by CI on both hosts with a fresh RustSec refresh; passed |
+| A1 registry/version queries | **PASS** | crates.io and GitHub release metadata recorded in §7 |
+| `syn` patch-lag reachability | **VERIFIED** | dev-dependency of `solo-cli` tests only |
+| Inherited `Unicode-3.0` allowance cause | **UNVERIFIED** | unchanged and unexplained by the matched graph; needs its own Owner order |
+
+No local check is reported as passing that was not actually executed, and no CI step is described as a local run.
+
+## 10. Repository state, temporary material and cleanup
+
+- `main` = `origin/main` = `f40cb6f0b5c3a7a86d4edfc952e5d5f275b2ee5c` (tree `b9c88986ef86c42c1a9ea2670ea04e7f2ed6b8d9`) before this report commit; `git status --porcelain` and `--untracked-files=all` are empty.
+- Four WIP files only. ACTIVE holds the **frozen issued order** (blob `52d0fda32ac082101782875070d0f0ceb5961337`) and was deliberately **not** neutralized — this order grants no disposition edit. NEXT is the neutral heading (`92fa562b1af0c54391851aa5c79deb1631127069`). ROADMAP (`754ce1b7…`) and OUTLOOK (`cb9c7a61…`) are byte-identical to the authorization revision, so `R03.B` is still listed and Stage 03 is still open.
+- Branch `solo-wo-059-r01` retained at `f40cb6f0` for later Owner-authorized pruning; one worktree, one remote, no tag, no PR, no merge commit.
+- Root `target/` remains ignored by the accepted `/target/` rule and was neither deleted nor altered.
+- `.temp/` is unchanged at **289,253,806 bytes** across 2 files (`architecture-fixtures/`, `toolchain-installer/`), byte-for-byte the state reported by the previous order. The mingw/rustup archives stay a possible future Windows-GNU/offline setup resource; the cleanup trigger is unchanged — delete after the next successful GNU deterministic-build verification, or when the Owner confirms an offline copy is no longer needed.
+- Task-owned scratch: two transient Cline terminal-progress logs appeared in the Cline task temp area during long CI waits and both were deleted; that area is empty. The report draft used disposable `.temp` parts and was consumed into the single report path; those parts are deleted, so no helper file, archive or duplicate report exists.
+
+## 11. Explicit restrictions observed
+
+No dependency, lockfile, toolchain, `deny.toml`, `.cargo/config.toml`, workflow, `.github/`, `.gitignore` or other-repository change; no new crate, build script, port, framework, renderer, route, locale rule, geocoder or graphics catalogue; no `R03.C` implementation; no Stage 03 closure; no ROADMAP or OUTLOOK edit and no NEXT edit beyond the authorized issuance clearing; no ACTIVE disposition change; no force-push, reset, clean, rebase, squash, history rewrite, branch deletion, tag, PR, merge commit, release or deployment; no secrets, provider, DNS or billing action; no second checkout or worktree. The Implementation Agent does **not** self-ACCEPT. Disposition now rests with the Chief Architect's independent review of this report at its published revision.
