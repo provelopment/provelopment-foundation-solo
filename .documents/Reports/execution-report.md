@@ -100,7 +100,7 @@ Final state at the report revision: `main == origin/main`; one checkout, one wor
 
 ## 7. Task-owned scratch and Cline capture
 
-The only run scratch created outside the audited `.temp` contents was one temporary extraction file used to reproduce the order's `plan-next` text byte-exactly; it was written inside `.temp/` as `next-candidate.txt` (2,763 bytes), then deleted, and its entry was confirmed absent. The Cline task capture area held **0** files at the end of this run (the 20 obsolete `proceed-while-running-*.log` files from the earlier cycle were already removed during that cycle), so nothing needed deletion here and no unknown or unrelated Cline material was touched.
+The only run scratch created outside the audited `.temp` contents was one temporary extraction file used to reproduce the order's `plan-next` text byte-exactly; it was written inside `.temp/` as `next-candidate.txt` (2,763 bytes), then deleted, and its entry was confirmed absent. The Cline task capture area held **0** files when audited: the 20 obsolete `proceed-while-running-*.log` files from the earlier cycle had already been removed in that cycle. One further `proceed-while-running-*.log` was then created locally by a slow verification command, deleted immediately, and the area was re-checked empty. No unknown or unrelated Cline material was touched.
 
 ## 8. CI evidence (unchanged `rust-verify` workflow)
 
