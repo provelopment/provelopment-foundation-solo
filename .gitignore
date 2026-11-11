@@ -20,6 +20,8 @@ Thumbs.db
 .temp/
 .cache/
 coverage/
+# Rust/Cargo and rust-analyzer generated build cache at the repository root.
+/target/
 
 # Common JavaScript/build outputs (adapt after toolchain is chosen)
 node_modules/
