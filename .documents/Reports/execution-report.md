@@ -1,159 +1,133 @@
 # Execution Report
 
-**Order:** `SOLO-WO-057 R01` - administrative closure of independently accepted `R03.A`, selection of `R03.B` as the single next candidate, audited safe cleanup of the Solo `.temp/` workspace, and bounded pruning of the completed implementation branch.
-**Date:** 2026-11-11.
-**Root:** `C:\Users\Sean\Documents\Provelopment\00.foundation-solo` (verified `git rev-parse --show-toplevel`; one checkout, one worktree, sole `origin` = `https://github.com/provelopment/provelopment-foundation-solo.git`).
-**Disposition: `COMPLETE` for the authorized administrative and temporary-workspace scope, with one mandated verification gate reported `UNMET`.** The order's final clean-tree gate (`git status --porcelain` empty) is **not** satisfied: the untracked, IDE-generated `target/` cache disclosed in §4 leaves one entry, and the Chief Architect's REVISE disposition directs that the live cache be preserved. That gate is therefore reported as unmet in §6A and is nowhere claimed as passed. No product code, dependency, pin, workflow, contract or architecture document was changed; `R03.B` and `R03.C` remain unimplemented and `R03.B` remains a planning candidate only. The Implementation Agent does **not** self-ACCEPT; the Chief Architect independently reviews this closure.
+**Order:** `OWNER-ISSUED — SOLO-WO-058 R01` — resolve the accepted `R03.A` closure's outstanding clean-tree gate by narrowly ignoring the live root Rust build cache, verify the gate, reconcile ACTIVE and publish this canonical report.
+**Session date:** 2026-11-11.
+**Root:** `C:\Users\Sean\Documents\Provelopment\00.foundation-solo` (verified `git rev-parse --show-toplevel` = `C:/Users/Sean/Documents/Provelopment/00.foundation-solo`; one checkout, one worktree, sole `origin` = `https://github.com/provelopment/provelopment-foundation-solo.git`).
+**Disposition: `COMPLETE`.** Both mandatory gates of this order now pass on real evidence: the final working tree is genuinely empty (`git status --porcelain` and the full-untracked view both return zero lines) **without** deleting, moving or interrupting the live cache, and every required two-host `rust-verify` checkpoint is green at its exact revision. The Implementation Agent does **not** self-ACCEPT; the Chief Architect reviews this report independently.
 
 ## 1. Revision ledger
 
-| Item | Value |
-| --- | --- |
-| Starting baseline (`main` = `origin/main`) | `e45324484e49cb77c406a6c18c7d86cdb7492ce9` (tree `bf95f37a0fcdce776d3d44b1462e1ee1a5dfc6fc`; report blob `17e8518e861ba96d34068b46c15d38384304ae8a`) |
-| Baseline WIP blobs verified | ACTIVE `413359d7`, NEXT `92fa562b`, ROADMAP `4c7ef021`, OUTLOOK `cb9c7a61` - exactly as the order states |
-| Owner handoff | `SOLO-WO-057 R01`; installed `workorder-active.md` blob `fbfaec03` (the only expected tracked worktree edit at preflight) |
-| **Issued-order commit** (ACTIVE only) | `f27f3f10341f688c707031014af93ed1aaeb73ef` (tree `64e95d4156ce020500aba1cb44bb2b665cfd731b`) |
-| **Closure commit** (ROADMAP + NEXT + ACTIVE only, ACTIVE neutral) | `4626ef8de0fa3168e6aeb98a53dd8cf95fbc2f8f` (tree `1cdd574de03141fb3a11eaa8ceb8ba4034d2e0e2`) |
-| Closure WIP blobs | ROADMAP `754ce1b75917d3168457965c3efed1137ff3aa9c`, NEXT `251c5dcc40f52c7c0a214aaee9daa2518b5cd887`, ACTIVE `ea5f20b736483c2e102456be1cea9104059fc81a`, OUTLOOK `cb9c7a61` (byte-identical to baseline) |
-| Report-only commit | this file's own commit - SHA returned in chat only, never embedded here |
+| Step | Commit | Tree | Published paths | Two-host CI |
+| --- | --- | --- | --- | --- |
+| Starting `main` = `origin/main` (reviewed anchor) | `cb9efab41103c8e8aabdb882c453bf43f96c481a` | `96b1cf233eac83e1d1c57365f7adb8baeccf5f43` | — | run `42952425852` green (prior report revision) |
+| 1. Issued order installed | `3942cc7874fcfbc73b08e7478695d64ec0d9809b` | `9e19a1fe0d609a9bd26ec7bc2cd50b970ef510d0` | `.documents/WIP/workorder-active.md` (blob `5a534167aca5c8a285002cc0b137922fa7306d5b`) | run `42955735676` **success** |
+| 2. Hygiene change | `78cef257a1ccbd60aa91c9c0e08ea2b62090736b` | `46e214da05a93ecab65d92c22fbdbc5886f9a52c` | `.gitignore` (blob `f45dd49524748e9b08f6678271edfc22ac39b97f`) | run `42956364811` **success** |
+| 3. ACTIVE neutralized | `e2cce1c7cbeb8fb0ccc9b4ca791a7d9346c548ff` | `282c9ad6acfc6d56e0c9680f0bd2e5d167b49da2` | `.documents/WIP/workorder-active.md` (blob `ea5f20b736483c2e102456be1cea9104059fc81a`) | run `42956948656` **success** |
+| 4. This report | report-only commit on `main` | — | `.documents/Reports/execution-report.md` | fresh run at report HEAD; ID returned in chat |
 
-**Reporting revision.** This revision answers the Chief Architect's `REVISE` disposition on final-state and evidence reconciliation only. It (a) reports the final clean-tree gate explicitly as `UNMET` instead of leaving it implicit (§6A), (b) records the inherited `license-not-encountered` warning for `Unicode-3.0` in full (§8A), and (c) separates the retained `.temp/toolchain-installer/` archives' potential future GNU/offline use from any requirement of the currently passing two-host CI (§4). No WIP file, source file, `.gitignore`, Git exclusion, dependency, workflow, retained archive or other tracked path was touched: the diff for this revision is this report only.
+Each commit changed exactly one path (`git diff-tree --name-only -r`), each push was an ordinary fast-forward to the existing `main`, and `origin/main` equalled local `HEAD` after every step. No branch, tag, PR, merge, reset, `clean`, stash, force-push or history rewrite occurred; the repository still has exactly one branch (`main`), one worktree and one remote.
 
-Sequence on the existing `main`: issued-order commit -> local `.temp` cleanup and branch prune (no commit) -> closure transition commit -> this report-only commit. No new branch, checkout, worktree, PR, tag, release or history rewrite; all pushes were ordinary non-force pushes and `main == origin/main` was verified after each.
+## 2. Preflight verification (before any permanent write)
 
-## 2. Basis of the accepted closure
-
-`R03.A` (five-level typed property registry, direct-ancestry resolution with provenance, safe public projection) was independently disposed **ACCEPT** by the Chief Architect against substantive commit `fa724977f4e7b76493c386da3501f92e1d2206e7` (tree `6aae1296d8bd9a03d66cb7e04feb1034940c6c58`) and canonical report `e45324484e49cb77c406a6c18c7d86cdb7492ce9` (report blob `17e8518e`). This run closed only that package. The accepted `R03.A` source and tests are byte-identical to the reviewed substantive commit: the entire diff from the baseline to this closure touches **only** the four authorized documentation paths (order, ROADMAP, NEXT, report plus the closure of ACTIVE).
+- Local HEAD and fetched `origin/main` were both `cb9efab41103c8e8aabdb882c453bf43f96c481a`; tree `96b1cf233…`. The remote had not moved, so no STOP was required.
+- The Owner-installed `workorder-active.md` was verified as the exact `OWNER-ISSUED — SOLO-WO-058 R01` document (local SHA-256 `DA73688E443A24816194A63A8377CA00D974EB1C8E69A7E3F70608764D05AD4A`), and was the only expected tracked modification.
+- Baseline blobs all matched the order's ledger: `.gitignore` `f51cc5306cdc8e4532422809eede68b93c4a7fd7`; neutral ACTIVE `ea5f20b736483c2e102456be1cea9104059fc81a` (read back from GitHub at the reviewed ref); ROADMAP `754ce1b75917d3168457965c3efed1137ff3aa9c`; NEXT `251c5dcc40f52c7c0a214aaee9daa2518b5cd887`; OUTLOOK `cb9c7a610cf3c537557e060ca9656e44a053e69d`; report `a41f72d828f46127883ed2953408da68424ffbce` (also read back from GitHub at `cb9efab`). WIP held exactly four files and no parallel register or archive.
+- Working state before the change contained exactly the two allowed entries: ` M .documents/WIP/workorder-active.md` (the Owner installation) and `?? target/` (the cache). No other unexpected item appeared, so no provenance STOP was triggered.
+- `core.excludesFile` is unset and `.git/info/exclude` contains no active pattern, so neither local nor global ignore configuration contributes to the result; both were left untouched.
 
 ## 3. Exact permanent edits
 
-**`.documents/WIP/workorder-active.md`** - first published as the full Owner-issued `SOLO-WO-057 R01` (`f27f3f1`), then replaced in the closure commit by exactly one line, with a single trailing newline, no disposition paragraph, no acceptance diary and no status essay:
+Only the three authorized permanent paths changed.
 
-```text
-# Foundation Solo — Active Work Order
+**(a) `.gitignore` — exactly two added lines, nothing else.** Verbatim `git diff`:
+
+```diff
+@@ -20,6 +20,8 @@ Thumbs.db
+ .temp/
+ .cache/
+ coverage/
++# Rust/Cargo and rust-analyzer generated build cache at the repository root.
++/target/
+
+ # Common JavaScript/build outputs (adapt after toolchain is chosen)
+ node_modules/
 ```
 
-**`.documents/WIP/plan-roadmap.md`** - Stage 03 keeps its heading, prerequisite, status, `R03.C` bullet and exit gate; Stages 04-13 unchanged. The accepted `R03.A` bullet was deleted and the `R03.B` bullet replaced with the order's exact clarification, so the remaining packages now read:
+`git diff --stat` reports `1 file changed, 2 insertions(+)`; `git diff --check` is clean (exit 0). The rule is root-anchored `/target/`, not `target/` or `**/target/`, and no other line, order or content of the file changed. `.gitignore` remains a repository-standard non-architectural file, so no About/Architecture/SOP edit was required or made. Nothing was changed in `.gitattributes`, Git config, `.git/info/exclude`, `CARGO_TARGET_DIR`, `RUSTFLAGS`, the toolchain, any script or the CI workflow.
 
-```markdown
-- **R03.B:** complete authored `location` behavior at all five EFS levels by implementing identified inherited-fact `extend` with direct-ancestor targeting, in-place field updates, exact field-level provenance, ordering, duplicate/conflict and suppressed-target refusals; demonstrate independently authored Australia → Indonesia → Bali/Jakarta association/premises facts and optional Page/representation variants, with no effects on Page identity, route, language, URL or visitor geolocation.
-- **R03.C:** implement graphic role declarations, public shared generic library, authored asset ownership, inheritance/override/suppression, and optional role-specific generic fallback strictly beneath authored hierarchy.
-```
+**(b) `workorder-active.md` — issued, then neutralized.** Issued blob `5a534167…` was verified identical on GitHub at the issued commit; the final file was written as exactly the single title line plus LF (40 bytes, UTF-8 without BOM) and hashes to the required neutral blob `ea5f20b736483c2e102456be1cea9104059fc81a`, re-verified on GitHub at the neutralization commit. ACTIVE is now neutral and holds no order.
 
-**`.documents/WIP/plan-next.md`** - exactly one bounded candidate, `R03.B — Authored location extension and independent geography`, with Objective, Prerequisites/readiness, Proposed scope, Deliverables and Exit conditions as specified by the order; it records that `extend` identified-record semantics remain unimplemented, that `R03.A` is ACCEPTED and being closed, and that the candidate authorizes **no** code edits. It is not an authorization and no `SOLO-WO-058` order was written.
+**(c) This report** replaces the previous single canonical report. No report archive, dated copy, WIP file or helper file exists.
 
-Changed-path ledger for the closure commit: `plan-next.md`, `plan-roadmap.md`, `workorder-active.md` - **only** these three, verified by `git diff-tree`. `git diff --check` was clean before staging (only the repository's normal CRLF working-tree notices).
+## 4. Behavioural proof of the clean-tree fix
 
-## 4. Solo `.temp/` audit and safe targeted cleanup
+All checks below were run locally at the neutralization revision; the first three were also run immediately after the hygiene commit with identical results.
 
-**Method.** The authorized root was canonicalised with `Resolve-Path` and confirmed to be `C:\Users\Sean\Documents\Provelopment\00.foundation-solo\.temp`, a real directory (`PSIsContainer=True`, `ReparsePoint=False`). Every descendant was inspected **as metadata only** (name, size, timestamps, attributes) with `-Force` so hidden files were included; a reparse-point scan found **0** links, junctions or mount points in the whole tree, and **0** nested `.git` entries, so nothing pointed outside the allowed root and nothing was traversed through a link. Provenance was established from file naming and structure, from the repository's own tracked code and configuration (`git grep`), from the installed-toolchain inventory, and from the absence of any live consumer. Byte totals were measured by the same summing function before and after.
-
-**Before (exact).**
-
-| Entry | Bytes | Files | Dirs | Evidence / purpose | Classification |
-| --- | --- | --- | --- | --- | --- |
-| `target/` | 669,777,139 | 2,518 | 278 | Complete cargo target directory: `CACHEDIR.TAG` ("cache directory tag created by cargo"), `.rustc_info.json`, `debug/{fingerprint,build,deps,examples,incremental}`, `debug/solo-cli.exe`, this workspace's own test binaries (`base_candidate`, `bootstrap_cli`, `bootstrap_preflight`, `check_architecture`, `check_architecture_fixtures`, `ci_gate_tripwire`, `cli_smoke`, `source_read`, `workspace_graph`) and `build/*/out` build-script output, last written 2026-11-09 22:16-22:28. No repository file, script, workflow or test references `.temp/target`; `.cargo/config.toml` sets no `target-dir`; no process had it open. | **DELETE** - reproducible build cache from a finished run |
-| `toolchain-installer/` | 289,253,806 | 2 | 0 | `mingw.zip` (276,414,382 B) and `rustup-init.exe` (12,839,424 B), downloaded 2026-11-09 22:15-22:25 | **PRESERVE** (see below) |
-| `rt/` | 501 | 1 | 2 | `tmp/system-commandline-sentinel-files/<dotnet-suggest-registration...>` | **DELETE** - OS tooling residue |
-| `w032/` | 501 | 1 | 2 | identical sentinel from an earlier run | **DELETE** - OS tooling residue |
-| `w033/` | 501 | 1 | 2 | identical sentinel from an earlier run | **DELETE** - OS tooling residue |
-| **Total** | **959,032,448** | **2,523** | **284** | 914.60 MiB | |
-
-Each leaf was positively identified before deletion: the two `.rs` files under `target/` are `build/serde-*/out/private.rs` and `build/serde_core-*/out/private.rs` build-script outputs, not authored source; the three sentinel files are 501-byte `dotnet` command-line registration artefacts with no Solo producer or consumer.
-
-**Deletion.** Only literal, individually re-checked targets were removed: `.temp/target`, `.temp/rt`, `.temp/w032`, `.temp/w033` - each verified immediately beforehand to be a real directory inside the authorized root with no reparse attribute. No wildcard, no `git clean`, no root-level purge, and the `.temp` folder itself was preserved.
-
-**After (exact, same counting method).**
-
-| Remaining entry | Bytes | Purpose | Cleanup event |
+| Check | Command | Result | Status |
 | --- | --- | --- | --- |
-| `toolchain-installer/` | 289,253,806 (275.85 MiB) | A **potential future capability archive, not a component of the currently passing CI**: the mingw-w64 archive plus rustup installer that would let this MSVC-only workstation install the `x86_64-pc-windows-gnu` host variant that the **tracked** `.cargo/config.toml` rustflags target for byte-identical Windows release builds. The two-host `rust-verify` matrix that passes today (`ubuntu-24.04` = `x86_64-unknown-linux-gnu`, `windows-2025` = `x86_64-pc-windows-msvc`) neither uses nor requires these archives. That GNU variant is currently **not** installed (`rustup toolchain list` shows only `1.99.1-x86_64-pc-windows-msvc`), no mingw toolchain exists on the machine and none is on `PATH`, so deleting these archives would force a 276 MB re-download before that verification can run again. | Delete after the next successful GNU deterministic-build verification, or when the Owner confirms offline reinstall is no longer needed |
-| `architecture-fixtures/` | 0 | Empty directory created and emptied by the current architecture-checker refusal self-test (`crates/solo-cli/tests/check_architecture_fixtures.rs`, lines 281 and 1439, which use `<repo>/.temp/architecture-fixtures` as their fixture parent). It holds no bytes and is recreated on demand by that test. | None required - the owning test manages it |
-| **Total** | **289,253,806** | 275.85 MiB, 2 files, 2 dirs | |
+| Anchored rule resolves | `git check-ignore -v --no-index -- target/` | `.gitignore:24:/target/	target/` | **PASS** |
+| Nothing tracked under the cache | `git ls-files -- target/` | 0 paths | **PASS** |
+| Nothing staged under the cache | `git diff --cached --name-only -- target/` | 0 paths | **PASS** |
+| Clean tree | `git status --porcelain` | **0 lines** | **PASS** |
+| Clean tree, full untracked view | `git status --porcelain --untracked-files=all` | **0 lines** | **PASS** |
+| Rule is not generic | `git check-ignore -v --no-index -- crates/solo-cli/target/` and `docs/target/` | exit 1, no match — nested `target` directories are **not** ignored | **PASS** |
+| `.temp/` ignore unchanged | `git check-ignore -v --no-index -- .temp/` | `.gitignore:20:.temp/` (pre-existing rule) | **PASS** |
+| Tracked authorities present | `git ls-files --error-unmatch` on `README.md`, `AGENTS.md`, `.documents/WIP/plan-next.md`, crate manifest | all tracked | **PASS** |
 
-**Result.** Reclaimed **669,778,642 bytes = 638.75 MiB**, removing **2,521 files** and **282 directories**; occupied size fell from 914.60 MiB to 275.85 MiB (69.6 % less), and the only remaining large content is the documented toolchain retention. No permission, lock or access failure occurred and **no unresolved cleanup failure remains**.
+Before the change the same commands showed `?? target/` plus 180 individual untracked lines in the full view; after it, zero. Cleanliness therefore comes from the committed root-anchored rule alone — not from deletion, `git clean`, `reset`, force-add, a local/global exclude, or hidden paths.
 
-**Uncertain material preserved (Owner decision requested, no content disclosed).** The 275.85 MiB `toolchain-installer/` archive pair: its purpose is ascertainable but demonstrably **not** finished on this machine. The Owner may authorise immediate deletion to reclaim that space (accepting a re-download) or confirm the cleanup event above.
+## 5. The `SOLO-WO-057` outstanding gate and how it is now resolved
 
-**Inventory discrepancy recorded honestly.** `architecture-fixtures/` was absent from the first metadata listing yet present - with a 2026-11-08 creation stamp - in the post-deletion listing. It is an empty directory, so no data was lost or deleted; it is now classified from its owning test source. Nothing else appeared, disappeared or changed between the two inventories.
+`SOLO-WO-057 R01` ended with one explicitly `UNMET` gate: the local IDE's actively generated, untracked root `target/` Rust build cache produced `?? target/`, so the order's required empty `git status --porcelain` could not be satisfied without destroying a live cache. Its report recorded the gate as unmet and requested the smallest Owner decision.
 
-**Additional observation outside `.temp`.** The repository root holds an untracked `target/` directory (29,640,743 bytes, 198 files, created 2026-11-11 09:11:11 with a `flycheck0` subdirectory) produced by the `rust-analyzer` process (pid 38704) started before this run. It is a live IDE check cache, not task scratch under the `.temp` authority, and removing it would only trigger regeneration, so it was **preserved** and is disclosed here. It is untracked, unstaged and uncommitted, and it is the only non-empty `git status` entry.
+This order resolves that gate **without deleting the cache** by making the repository state honest about a genuine, reproducible, non-product build artefact at a single root-anchored location. The mechanism, verified end to end: the tracked rule ignores only `<root>/target/`; `git check-ignore` names the exact rule and file line; nothing under that path was ever tracked or staged; and the working tree is now empty while the physical directory and its bytes remain present (§6). A fresh checkout or reinstall reproduces the same state, so the fix is durable rather than a one-off cleanup.
 
-## 5. Completed-branch safety check and prune
+## 6. Cache, retained temporary material and preserved state
 
-All conditions of the order were met before any deletion:
+- **Live root cache, preserved:** `target/` exists with attribute set `Directory, NotContentIndexed` (no reparse point), measured at **29,639,791 bytes, 198 files, 107 directories**, marked by a real `CACHEDIR.TAG`, with top-level entries `debug`, `flycheck0`, `tmp`, `.rustc_info.json`, `CACHEDIR.TAG`. It contains **0** reparse-point directories, **0** nested `.git`, and **0** tracked or staged files. Its bytes were neither deleted nor moved; `rust-analyzer` was neither terminated nor interrupted. Its size is unchanged from preflight to final state because the IDE was idle during the run; a size change would have reflected IDE activity, never task deletion.
+- **Retained `.temp/` contents, preserved:** `.temp/` holds `architecture-fixtures/` and `toolchain-installer/`, totalling **289,253,806 bytes** across 2 files — identical to the previous report's measurement, so nothing was removed, added or altered. Those mingw-w64/rustup archives remain a **possible future Windows-GNU/offline setup resource only**; the currently passing CI runs `ubuntu-24.04` (GNU/Linux) and `windows-2025` (MSVC) and does not use them. Their cleanup trigger is unchanged: delete after the next successful GNU deterministic-build verification, or when the Owner confirms an offline reinstall copy is no longer needed.
+- **Earlier cleanup totals attributed to that prior run:** the `SOLO-WO-057` `.temp` cleanup reclaimed **669,778,642 bytes (2,521 files, 282 directories)**, including the then-obsolete `.temp/target`, `rt`, `w032` and `w033` scratch. Nothing was reclaimed, deleted or measured as new reclamation in this run.
+- **WIP unchanged/neutral:** ROADMAP `754ce1b7…`, NEXT `251c5dcc…` and OUTLOOK `cb9c7a61…` are byte-identical to the preflight baseline at the final revision; the four-file inventory is unchanged; `plan-next.md` still holds `R03.B` as the single candidate and is not authorization. ACTIVE is the neutral title line only.
+- **Completed branch already pruned:** `solo-wo-056-r01` was pruned locally and on `origin` during `SOLO-WO-057` after ancestry verification; it was **not** pruned again, and no ref was deleted in this run.
+- **Task-owned scratch:** this run created no permanent helper file. One transient Cline terminal-progress log appeared in the Cline temporary capture area during a long CI wait and was deleted at cleanup; the capture area was re-verified empty. No Solo `.temp` scratch survives.
 
-| Condition | Evidence |
-| --- | --- |
-| Branch identity | local `solo-wo-056-r01` = `fa724977f4e7b76493c386da3501f92e1d2206e7`, identical to `refs/heads/solo-wo-056-r01` on `origin` at that moment |
-| Accepted commit present in `main` | `git merge-base --is-ancestor fa724977 main` exit `0`; `origin/main` contained it |
-| No unique commits | `git rev-list --count main..solo-wo-056-r01` = **0** |
-| Fully merged | `git merge-base --is-ancestor solo-wo-056-r01 main` exit `0` |
-| Not checked out | the sole worktree entry is the Solo root on `main` |
-| No reference consumer | `gh pr list --head solo-wo-056-r01 --state all` returned an empty list (no PR ever existed); no tag, no other ref |
+## 7. CI evidence (unchanged `rust-verify` workflow)
 
-Actions: `git branch -d solo-wo-056-r01` (safe delete, reported `Deleted branch solo-wo-056-r01 (was fa72497)`) and `git push origin --delete solo-wo-056-r01` (reported `- [deleted] solo-wo-056-r01`). `git ls-remote --heads origin` now lists **only** `refs/heads/main`, local branches list **only** `main`, `git tag` is empty, and `main` was unchanged by the prune. No force operation, no other ref, and no manual `.git/` manipulation.
+| Run | Revision | `verify (ubuntu-24.04)` | `verify (windows-2025)` | Steps each | Skips (ubuntu / windows) |
+| --- | --- | --- | --- | --- | --- |
+| `42955735676` | `3942cc78` issued order | success, 0 failed | success, 0 failed | 33 | 9 / 14 |
+| `42956364811` | `78cef257` hygiene change | success, 0 failed | success, 0 failed | 33 | 9 / 14 |
+| `42956948656` | `e2cce1c7` neutralized ACTIVE | success, 0 failed | success, 0 failed | 33 | 9 / 14 |
+| report HEAD run | report commit | verified separately; run ID returned in chat | verified separately | — | — |
 
-## 6. Repository hygiene and final state
+Every run executed the full unchanged matrix on both hosts: pinned-toolchain install and version assertions, the locked dependency fetch, the `cargo-deny 0.20.2` gate with a fresh RustSec refresh and the `RUSTSEC-2026-0009` negative probe, workspace package-set gate, disposable Btrfs fixtures with guaranteed cleanup, format, strict lint, the complete locked all-target test suite, the real-tree architecture checker with its refusal self-test, the failure tripwire, the locked release build, the CLI accepted/refused smoke, and the byte-identical double release build.
 
-`.temp/` remains excluded by `.gitignore` line 20 (`.temp/`, verified with `git check-ignore -v`); `git ls-files -- .temp` returns **0** tracked paths, the index holds **0** staged `.temp` paths, and `git status --porcelain -- .temp` is empty for the whole audit. No temporary file, inventory, helper script or extra report was staged or committed: the closure commit contains exactly the three WIP paths and the report commit contains exactly `.documents/Reports/execution-report.md`. The `.temp` folder itself is intact with the two documented entries.
+Skip inventory is genuinely host-specific and nothing applicable was skipped: the Ubuntu job skips exactly the 9 Windows-variant steps, and the Windows job skips the 9 Linux-variant steps plus the 5 Ubuntu-only steps (RustSec negative probe, disposable snapshot filesystems and their cleanup, forbidden-import restoration proof, and the double release-build comparison). The workflow file, the toolchain pin and `deny.toml` are unchanged by this order.
 
-Final state at the report revision: `main == origin/main`; one checkout, one worktree, sole `origin`; four WIP files only (`plan-roadmap.md`, `plan-next.md`, `workorder-active.md`, `plan-outlook.md`) with ACTIVE neutral; exactly one report; no tags; no extra branch; `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml`, `deny.toml`, `.github/`, all Rust crates, fixtures, `README.md`, `AGENTS.md`, About, Architecture and both SOPs byte-identical to the baseline. The single untracked `target/` IDE cache disclosed in §4 remains and leaves one non-empty `git status` entry; the mandated final clean-tree expectation is therefore **not** met, and §6A reports that gate result explicitly rather than asserting a clean tree.
+## 8. Warnings and security posture (recorded, not suppressed)
 
-### 6A. Final clean-tree gate: `UNMET`
+`cargo-deny 0.20.2` emits exactly **one** `warning[license-not-encountered]` per host in every run above (2 matched log lines per run: 1 Ubuntu, 1 Windows), at `deny.toml:51:6` for `"Unicode-3.0"`, with the class result `licenses ok: 0 errors, 1 warnings, 17 notes` and `bans ok: 0 errors, 0 warnings, 0 notes`; the advisory class passed after a fresh RustSec refresh.
 
-The order's final verification requires an empty `git status --porcelain`. At the report revision it returns exactly one entry, reproduced verbatim:
+- **Status:** pre-existing, inherited, non-vulnerability licence-policy hygiene. It is an unused-allowance lint (the allow entry matched no licence requirement in the checked graph), not an advisory, yank, unmaintained, unsound, ban or source finding, and it fails nothing.
+- **Origin:** `deny.toml` is untouched by this order and byte-identical to the previously accepted baseline; the warning was already present in runs `42942318551`, `42943083597`, `42946275834`, `42946725123`, `42948801184` and `42952425852`, i.e. before this order existed.
+- **Unresolved:** the lockfile pins `unicode-ident 1.0.27`, whose manifest declares `(MIT OR Apache-2.0) AND Unicode-3.0`, reachable only through `proc-macro2 → quote → syn → solo-cli [dev-dependencies]`; why cargo-deny reports the allowance as unmatched remains **`UNVERIFIED`** until a separately Owner-issued dependency-policy investigation.
+- **Not done, deliberately:** no `deny.toml`, manifest, lockfile, workflow or toolchain edit was made to silence or fix it. Remediation (remove the unused allowance or document an accurate rationale) belongs to that separate order, and the Unicode attribution/NOTICE obligation stays tracked as a release prerequisite.
+- **No new or material warning** was introduced by this order; no security outcome changed and no finding was suppressed.
 
-```text
-?? target/
-```
+## 9. Applicability and outstanding work
 
-That path is the untracked, IDE-generated `rust-analyzer` check cache described in §4 (28.27 MiB at the last measurement, 198 files, created 2026-11-11 09:11:11, owner process `rust-analyzer` pid 38704). It is not tracked, staged, committed or ignored, it holds no Solo source, authored content or repository data, and removing it would be reproducible and harmless in itself. It was nevertheless **left untouched**, because the Chief Architect's `REVISE` disposition expressly preserves the live cache and forbids deleting it, editing `.gitignore`, changing local Git exclusions or terminating the owning process without separate Owner authorization.
+- **A1 version-currency campaign: `NOT APPLICABLE`.** No manifest, lockfile, toolchain pin, action pin, `deny.toml` or workflow changed; the only content change is a root `.gitignore` rule, so the previously accepted `R03.A` A1 assessment remains the current dependency and advisory position. Actual CI advisories and warnings were still reviewed and recorded (§8).
+- **`R03.B` and `R03.C`: still unimplemented.** No product source, test, fixture, schema or contract changed. `R03.B` (authored `location.extend` with field-level provenance) remains the sole NEXT candidate and is **not authorized**; Stage 03 remains open; routing, localization, publication and all later stages are untouched.
+- **Retained GNU archives:** still present in `.temp/toolchain-installer/` (289,253,806 bytes) with the cleanup trigger recorded in §6; they are not required by the passing MSVC-hosted Windows CI or the GNU/Linux host.
+- **Scratch:** this report was drafted as disposable parts in the permitted Solo `.temp/` area and composed into the single report path; those draft parts are deleted, so no helper file, inventory or archive remains.
 
-- **Gate result: `UNMET`.** This report does not claim an empty status and does not treat the gate as passed.
-- **Cause:** an untracked IDE build cache generated on this workstation before this run - not a product, documentation, dependency or configuration change, and not something this order's ledger made writable.
-- **Everything else the order requires of the final state is satisfied:** `main == origin/main`, one checkout, one worktree, sole `origin`, four WIP files with neutral ACTIVE, exactly one report, no tags, no extra branch, and an unchanged product/dependency/CI/contract surface (§6).
-- Smallest Owner decision needed: either authorise deletion of this disposable, reproducible IDE cache so an empty status can be verified, **or** record an explicit permanent exception to the clean-tree requirement for IDE-generated untracked build caches. Until one is issued, the gate remains `UNMET`.
+## 10. Honest status
 
-## 7. Task-owned scratch and Cline capture
+`COMPLETE` for `SOLO-WO-058 R01`, because both mandatory gates genuinely pass: the clean-tree gate is empty on real commands at the final revision with the live cache preserved, and every required two-host CI checkpoint is green at its exact SHA.
 
-The only run scratch created outside the audited `.temp` contents was one temporary extraction file used to reproduce the order's `plan-next` text byte-exactly; it was written inside `.temp/` as `next-candidate.txt` (2,763 bytes), then deleted, and its entry was confirmed absent. The Cline task capture area held **0** files when audited: the 20 obsolete `proceed-while-running-*.log` files from the earlier cycle had already been removed in that cycle. One further `proceed-while-running-*.log` was then created locally by a slow verification command, deleted immediately, and the area was re-checked empty. No unknown or unrelated Cline material was touched.
-
-## 8. CI evidence (unchanged `rust-verify` workflow)
-
-| Run | Revision | Result |
+| Requirement | Result | Evidence |
 | --- | --- | --- |
-| `42946275834` | `f27f3f1` issued-order commit | `verify (ubuntu-24.04)` **success**, `verify (windows-2025)` **success**, 0 failed steps, 33 steps each, skips 9 / 14 |
-| `42946725123` | `4626ef8e` closure commit | `verify (ubuntu-24.04)` **success**, `verify (windows-2025)` **success**, 0 failed steps, 33 steps each, skips 9 / 14 |
-| this report's own run | report HEAD | dispatched and verified separately; run ID returned in chat |
+| Anchored `/target/` rule added, nothing broader | **PASS** | §3(a) diff; nested `target` dirs not ignored (§4) |
+| Live cache preserved, not deleted or interrupted | **PASS** | §6 measurement; `CACHEDIR.TAG`; unchanged bytes |
+| Empty `git status --porcelain` (and full-untracked view) | **PASS** | 0 / 0 lines at final revision (§4) |
+| No local/global exclude, force-add or `git clean` used | **PASS** | `core.excludesFile` unset; `.git/info/exclude` unchanged; commands listed §4 |
+| ROADMAP / NEXT / OUTLOOK byte-identical | **PASS** | blobs `754ce1b7` / `251c5dcc` / `cb9c7a61` |
+| ACTIVE reconciled to the exact neutral blob | **PASS** | `ea5f20b7…`, read back from GitHub |
+| Retained `.temp` material unchanged | **PASS** | 289,253,806 bytes, 2 files |
+| Two-host CI at every required checkpoint | **PASS** | runs `42955735676`, `42956364811`, `42956948656` |
+| Inherited `Unicode-3.0` warning recorded, not fixed | **PASS** | §8 (mechanism `UNVERIFIED`) |
+| New component/version A1 campaign | **NOT APPLICABLE** | no dependency/pin/workflow change (§9) |
+| Local `cargo build` / `cargo test` | **NOT RUN** | no product code changed; full regression ran in CI on both hosts |
+| R03.B / R03.C implementation | **NOT RUN** | not authorized by this order |
 
-Both runs executed the full unchanged matrix: pinned-toolchain install and version assertions, locked fetch, the `cargo-deny 0.20.2` gate with a fresh RustSec refresh and the `RUSTSEC-2026-0009` negative probe, the workspace package-set gate, disposable Btrfs fixtures with guaranteed cleanup, format, strict lint, the complete locked all-target test suite, the real-tree architecture checker with its refusal self-test, the tripwire, the locked release build, the CLI smoke and the byte-identical double build. Skips are exactly the counterpart-host step variants; no applicable check was skipped and no warning was suppressed. As the order states, a new component/version A1 campaign is **NOT APPLICABLE** for this documentation-only closure: no manifest, lockfile, toolchain pin, action pin or workflow changed (the diff from baseline contains documentation paths only), so the accepted `R03.A` A1 assessment remains the current dependency and advisory position. One genuine warning is recorded rather than smoothed over: `cargo-deny` reports an unmatched `Unicode-3.0` licence allowance on **both** hosts (§8A). It changes nothing above - the licence class still reported `0 errors` and the advisory class passed - but it remains an open, non-security hygiene item for a separately authorised dependency-configuration order.
-
-### 8A. Recorded CI warning: `license-not-encountered` for `Unicode-3.0`
-
-Every run of this closure, and every earlier run checked for comparison (`42942318551` at `fa724977`, `42943083597` at `e4532448`), prints exactly **one** such warning **per host** inside the `cargo-deny 0.20.2` component security gate, in the `licenses` class. Verbatim from the Windows job log of run `42948801184`:
-
-```text
-warning[license-not-encountered]: license was not encountered
-   ┌─ ...\deny.toml:51:6
-   │
-51 │     "Unicode-3.0",
-   │      ━━━━━━━━━━━ unmatched license allowance
-licenses ok: 0 errors, 1 warnings, 17 notes
-```
-
-- **Exact meaning.** `license-not-encountered` is cargo-deny's unused-allowance lint: the `licenses.allow` entry on `deny.toml:51` matched no licence requirement in the graph that invocation checked, so cargo-deny marks it an "unmatched license allowance". The class result is `0 errors, 1 warnings` and the step exits successfully. Nothing was relaxed: no crate was admitted *because* of this entry, no finding was suppressed, no severity was lowered and no `continue-on-error` exists.
-- **Inherited origin.** `deny.toml` is byte-identical to the accepted baseline - blob `3063e864c28be1e77787f43f1b6f561d543c8f4a` at both `e4532448` and this revision - and this order never touched it. The entry and its comment were added during the earlier dependency-hardening work, which recorded that `unicode-ident` is `(MIT OR Apache-2.0) AND Unicode-3.0` and kept the Unicode attribution/NOTICE duty as an open release prerequisite. The warning therefore pre-dates `SOLO-WO-057` and is unchanged by it.
-- **Non-vulnerability classification.** This is licence-configuration hygiene, not a security finding: it is not an advisory, yank, unmaintained, unsound, ban or source result; the RustSec database was refreshed fresh inside the same step; and the advisory class reported `0 errors` on both hosts. No dependency, version, feature, target or lockfile entry changed.
-- **An observed inconsistency, recorded rather than explained away.** The lockfile still pins `unicode-ident 1.0.27`, whose registry manifest declares `license = "(MIT OR Apache-2.0) AND Unicode-3.0"`, and `cargo tree -i unicode-ident` shows the only path to it is `proc-macro2` -> `quote` -> `syn` -> a **`[dev-dependencies]`** edge of `solo-cli`. Why cargo-deny nevertheless reports that allowance as unmatched is **UNVERIFIED** from this workstation: no local `cargo-deny` invocation was made, and this order authorises no configuration or dependency work. It is recorded as an open question rather than dressed with a guessed cause.
-- **Proposed later remediation (not executed, needs its own order).** In a separately authorised dependency-configuration task: reproduce the gate with the same pinned `cargo-deny 0.20.2` over the same locked graph, establish whether the `Unicode-3.0` requirement is genuinely absent from the checked graph (for example because its only edge is dev-only), then either remove the now-unused allowance or replace it with an accurate rationale - and in both cases keep the Unicode attribution/NOTICE obligation tracked as the existing release prerequisite. No change to `deny.toml`, `Cargo.toml` or `Cargo.lock` is made, claimed or pre-approved here.
-
-## 9. Honest status
-
-**`COMPLETE` for the authorized closure scope, with one mandated verification gate reported and carried as `UNMET`.** The accepted `R03.A` package is administratively closed, `R03.B` is the single bounded next candidate (candidate only, no authorization and no code), ACTIVE is neutral, Stage 03 and `R03.C` are retained, and OUTLOOK is untouched. The `.temp` workspace is maintained rather than wiped: 638.75 MiB of positively verified obsolete scratch was removed, the folder is intact, and the 275.85 MiB installer archive set is retained as a **potential future GNU/offline capability** - explicitly **not** a component of the currently passing two-host MSVC/GNU-Linux CI - with a named cleanup trigger and an Owner decision request.
-
-Open items carried forward, none of them hidden and none overstated: the final clean-tree gate is **`UNMET`** because of the Owner-preserved live `target/` IDE cache (§6A, with the smallest Owner decision stated and no claim that the gate passed); the `Unicode-3.0` allowance is reported by `cargo-deny` as unmatched (§8A, hygiene only, inherited, remediation proposed for a separately authorized order and the residual inconsistency marked `UNVERIFIED`); and the installer archives await their stated cleanup event.
-
-**Deliberately not done:** no `R03.B` or `R03.C` implementation, no contract or architecture edit, no dependency, pin or workflow change, no release, tag, deployment or PR, no edit to `.gitignore`, Git exclusion or the retained archives, and no attempt to force a clean status by removing Owner-preserved material. Local `cargo build`/`cargo test` were **NOT RUN** in this cycle because no product code changed; every applicable gate ran in CI on both hosts. The Implementation Agent does not self-ACCEPT: the Chief Architect independently reviews this closure report against `4626ef8de0fa3168e6aeb98a53dd8cf95fbc2f8f`.
-
-
+**Absence of unauthorized actions:** no product source, test, fixture, manifest, lockfile, toolchain pin, `deny.toml`, `.cargo/config.toml`, CI workflow or `.github/` change; no About/Architecture/SOP edit; no ROADMAP/NEXT/OUTLOOK edit; no `.gitattributes`, Git config or `.git/info/exclude` edit; no cache deletion, move or process termination; no `.temp` content removal; no second Entity, Spoke, route/locale/location inference or publication change; no branch, tag, PR, merge, release, deployment, provider, DNS, secret or other-repository action; no additional checkout or worktree. The Implementation Agent does not self-ACCEPT: the Chief Architect reviews this report at its published revision.
