@@ -1,10 +1,18 @@
 //! The real, capability-confined source reader.
 //!
 //! This module is safe Rust only. It holds a [`ContentRootCapability`], an operating-system
-//! handle to an explicitly chosen content root, and resolves declared `pages/…` locators
-//! relative to that handle. It performs no confinement check of its own:
-//! [`crate::source_read_native`] does that, and this module never replaces it with a string
-//! comparison, a pre-open `metadata` check or a `canonicalize`.
+//! handle to an explicitly chosen content root, and resolves two distinct namespaces relative to
+//! that handle: declared `pages/…` locators for the accepted Page reader, and authored Entity
+//! `assets/…` references for the `R03.C2` graphic source-byte gate. It performs no confinement
+//! check of its own: [`crate::source_read_native`] does that, and this module never replaces it
+//! with a string comparison, a pre-open `metadata` check or a `canonicalize`.
+//!
+//! **The two namespaces are separate.** A Page locator can only ever name `pages/…`; the asset
+//! reader can only ever name `assets/…` derived from an authored typed reference, and it accepts
+//! no [`solo_domain::SourceCandidatePathV1`] at all. Neither route is a way to reach the other
+//! namespace, and the asset path is re-validated here by
+//! [`solo_application::EntityAssetPathV1`] immediately before a native open, so a caller that
+//! bypassed the use case still cannot pass an unrepaired spelling to the operating system.
 //!
 //! **What a successful read proves here.** On Linux the returned bytes are one instant of the
 //! file, not a mutable read a writer can tear, because they come from an anonymous copy-on-write
@@ -21,10 +29,12 @@
 use std::path::Path;
 
 use solo_application::{
-    CandidateBodyV1, CandidateProbeV1, PhysicalIdentityV1, SourceReadPort, SourceReadRefusalKind,
-    SourceReadRefusalV1, bound_for, fingerprint_of,
+    CandidateBodyV1, CandidateProbeV1, EntityAssetPathV1, EntityAssetSourceV1,
+    GraphicAssetReadPort, GraphicAssetReadRefusalKind, GraphicAssetReadRefusalV1,
+    PhysicalIdentityV1, SourceReadPort, SourceReadRefusalKind, SourceReadRefusalV1, bound_for,
+    fingerprint_of,
 };
-use solo_domain::{SourceCandidateKind, SourceCandidatePathV1};
+use solo_domain::{AssetReferenceV1, SourceCandidateKind, SourceCandidatePathV1};
 
 use crate::source_read_native::{self as native, NativeError};
 
@@ -227,6 +237,95 @@ impl SourceReadPort for ContentRootCapability {
             changed_nanos: before.changed_nanos,
         }
     }
+}
+
+/// Reads one authored Entity asset reference beneath the held content root.
+///
+/// This is the `R03.C2` half of the capability. It re-derives the confined `assets/…` logical
+/// path from the typed reference it was given, checks that length against the caller's bound
+/// **before** any allocation or clone, opens the leaf with the unchanged native no-follow walk,
+/// transfers one immutable instant of it and re-observes the same handle afterwards. A file whose
+/// link count is not exactly one is refused, because a hardlink makes ownership ambiguous here.
+impl GraphicAssetReadPort for ContentRootCapability {
+    fn read_entity_asset(
+        &self,
+        reference: &AssetReferenceV1,
+        max_bytes: u64,
+    ) -> EntityAssetSourceV1 {
+        let path = match EntityAssetPathV1::from_reference(reference) {
+            Ok(path) => path,
+            Err(refusal) => return EntityAssetSourceV1::Refused(refusal),
+        };
+        let components = path.component_slices();
+        let mut leaf = match native::open_leaf(&self.root, &components) {
+            Ok(leaf) => leaf,
+            Err(error) => return EntityAssetSourceV1::Refused(map_asset_native(error)),
+        };
+        let before = leaf.facts();
+        if before.length > max_bytes {
+            return EntityAssetSourceV1::Refused(GraphicAssetReadRefusalV1::of(
+                GraphicAssetReadRefusalKind::OversizeSource,
+            ));
+        }
+        let bytes = match native::read_bounded(&self.root, &mut leaf, max_bytes) {
+            Ok(bytes) => bytes,
+            Err(error) => {
+                // A file that grows past the bound between the open and the transfer is an
+                // oversize source, not an unsafe one, and the distinction is observed on the
+                // handle rather than inferred from the error alone.
+                let grew = native::recheck(&leaf)
+                    .is_ok_and(|after: native::LeafFacts| after.length > max_bytes);
+                let kind = if grew {
+                    GraphicAssetReadRefusalKind::OversizeSource
+                } else {
+                    map_asset_native(error).kind()
+                };
+                return EntityAssetSourceV1::Refused(GraphicAssetReadRefusalV1::of(kind));
+            }
+        };
+        let after = match native::recheck(&leaf) {
+            Ok(after) => after,
+            Err(error) => return EntityAssetSourceV1::Refused(map_asset_native(error)),
+        };
+
+        // Identity, length, link count and both timestamps must agree across the transfer, and
+        // the transferred count must equal the length the same handle reported.
+        let transferred = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
+        if after != before || transferred != before.length {
+            return EntityAssetSourceV1::Refused(GraphicAssetReadRefusalV1::of(
+                GraphicAssetReadRefusalKind::ChangedDuringRead,
+            ));
+        }
+        if before.links != 1 || after.links != 1 {
+            return EntityAssetSourceV1::Refused(GraphicAssetReadRefusalV1::of(
+                GraphicAssetReadRefusalKind::IdentityCollision,
+            ));
+        }
+
+        EntityAssetSourceV1::Present {
+            fingerprint: fingerprint_of(&bytes),
+            bytes,
+            identity: before.identity,
+            length: before.length,
+            links: before.links,
+            changed_nanos: before.changed_nanos,
+        }
+    }
+}
+
+/// Maps a native asset-read refusal onto the typed, path-free category it belongs to.
+fn map_asset_native(error: NativeError) -> GraphicAssetReadRefusalV1 {
+    let kind = match error {
+        // `Absent` is a refusal here, never a benign result: a declared graphic that does not
+        // exist fails the whole candidate.
+        NativeError::Absent => GraphicAssetReadRefusalKind::MissingSource,
+        NativeError::Unsafe => GraphicAssetReadRefusalKind::UnsafeSourceLocation,
+        NativeError::PermissionDenied => GraphicAssetReadRefusalKind::PermissionDenied,
+        NativeError::Changed => GraphicAssetReadRefusalKind::ChangedDuringRead,
+        NativeError::OtherIo => GraphicAssetReadRefusalKind::OtherIo,
+        NativeError::Unsupported => GraphicAssetReadRefusalKind::Unsupported,
+    };
+    GraphicAssetReadRefusalV1::of(kind)
 }
 
 /// Maps a native refusal onto the public one, naming the member it concerns.

@@ -15,9 +15,11 @@
 //! nothing: the one documented in-memory pipeline is a trust boundary, not a publisher.
 //!
 //! The source-read half is the only code in the project that opens a file. It resolves a
-//! declared `pages/…` locator beneath an explicitly adopted content-root handle, refuses
+//! declared `pages/…` locator, and — for the separate `R03.C2` graphic gate — an authored Entity
+//! `assets/…` reference, both beneath an explicitly adopted content-root handle. It refuses
 //! every symlink, reparse point, escape and identity collision, and returns owned bytes with
-//! the physical identity of the object they came from. It publishes nothing.
+//! the physical identity of the object they came from. Neither namespace can reach the other,
+//! and it publishes nothing.
 //!
 //! Dependency direction is strictly inward: this crate may depend on
 //! `solo-application` and `solo-domain`, and neither of those may depend on it. The reviewed
