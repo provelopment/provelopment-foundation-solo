@@ -361,7 +361,7 @@ fn r03c2_01_complete_inventory_yields_ordered_evidence_for_every_authored_value(
         vec![
             (
                 entity_owner().describe(),
-                "graphicLogo".to_owned(),
+                "graphic.logo".to_owned(),
                 0usize,
                 "internal".to_owned(),
                 "entity".to_owned(),
@@ -370,7 +370,7 @@ fn r03c2_01_complete_inventory_yields_ordered_evidence_for_every_authored_value(
             ),
             (
                 facet_owner().describe(),
-                "graphicBanner".to_owned(),
+                "graphic.banner".to_owned(),
                 0,
                 "public".to_owned(),
                 "entity".to_owned(),
@@ -379,7 +379,7 @@ fn r03c2_01_complete_inventory_yields_ordered_evidence_for_every_authored_value(
             ),
             (
                 site_owner().describe(),
-                "graphicBackground".to_owned(),
+                "graphic.background".to_owned(),
                 0,
                 "public".to_owned(),
                 "entity".to_owned(),
@@ -388,7 +388,7 @@ fn r03c2_01_complete_inventory_yields_ordered_evidence_for_every_authored_value(
             ),
             (
                 site_owner().describe(),
-                "graphicBackground".to_owned(),
+                "graphic.background".to_owned(),
                 1,
                 "public".to_owned(),
                 "entity".to_owned(),
@@ -397,7 +397,7 @@ fn r03c2_01_complete_inventory_yields_ordered_evidence_for_every_authored_value(
             ),
             (
                 page_owner().describe(),
-                "graphicSocialPreview".to_owned(),
+                "graphic.social-preview".to_owned(),
                 0,
                 "public".to_owned(),
                 "entity".to_owned(),
@@ -406,7 +406,7 @@ fn r03c2_01_complete_inventory_yields_ordered_evidence_for_every_authored_value(
             ),
             (
                 en_owner().describe(),
-                "graphicFavicon".to_owned(),
+                "graphic.favicon".to_owned(),
                 0,
                 "public".to_owned(),
                 "entity".to_owned(),
