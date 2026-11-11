@@ -1370,11 +1370,13 @@ mod sys {
         use crate::source_read_native::NativeError;
         use crate::{ContentRootCapability, RootProvenanceV1};
         use solo_application::{
-            SourceReadOutcomeV1, SourceReadRefusalKind, read_declared_source_v1,
+            EntityAssetSourceV1, GraphicAssetReadPort, GraphicAssetReadRefusalKind,
+            MAX_GRAPHIC_SOURCE_BYTES, PhysicalIdentityV1, SourceReadOutcomeV1,
+            SourceReadRefusalKind, read_declared_source_v1,
         };
         use solo_domain::{
-            SourceCandidateDraftV1, SourceCandidateKind, SourceCandidatePathV1,
-            SourceCandidateSetV1,
+            AssetNamespace, AssetReferenceV1, SourceCandidateDraftV1, SourceCandidateKind,
+            SourceCandidatePathV1, SourceCandidateSetV1,
         };
         use std::fs;
         use std::os::windows::io::AsRawHandle;
@@ -1548,6 +1550,28 @@ mod sys {
                     RootProvenanceV1::OperatorDesignatedContentRoot,
                 )
                 .expect("adopt the fixture content root")
+            }
+
+            /// The nested Entity asset leaf this module's asset-route proof targets.
+            ///
+            /// It lives under the content root this guard already created **exclusively**, so the
+            /// proof exercises the real `assets/` namespace without touching Owner material and
+            /// without a second fixture or a shared directory.
+            fn asset_leaf(&self) -> PathBuf {
+                self.content().join("assets").join("brand").join("logo.png")
+            }
+
+            /// Creates the asset leaf with exactly `BODY_LENGTH` known bytes.
+            ///
+            /// Only the asset-route proof calls this, so the tree every legacy `pages/` case
+            /// asserts keeps exactly the shape it had before this test existed.
+            fn layout_asset_leaf(&self) {
+                fs::create_dir(self.content().join("assets"))
+                    .expect("create the fixture assets directory");
+                fs::create_dir(self.content().join("assets").join("brand"))
+                    .expect("create the fixture brand directory");
+                fs::write(self.asset_leaf(), vec![b'A'; BODY_LENGTH])
+                    .expect("write the fixture asset body");
             }
         }
 
@@ -1835,6 +1859,133 @@ mod sys {
                 fs::read_dir(&pages).expect("list the fixture").count(),
                 0,
                 "no fixture content may be retained"
+            );
+        }
+
+        /// `S065R03-04`/`S065R03-05`/`S065R03-06` — the R03.C2 **asset** route against a writable
+        /// mapped view whose file handle *and* section handle are already closed.
+        ///
+        /// The accepted Page proofs above establish that a surviving view blocks the native body
+        /// open. This drives the actual typed Entity asset port instead: a real
+        /// `ContentRootCapability` over this fixture's designated `content/` and a real
+        /// `AssetReferenceV1`, so the subject is `assets/brand/logo.png` and never a Page locator.
+        ///
+        /// Deterministic by construction: nothing sleeps, races, retries or infers from a green
+        /// badge, and the only handles released here are this test's own view and fixture guard.
+        #[test]
+        fn r03c2_10c_transferred_writable_view_refuses_asset_port_until_unmapped() {
+            let fixture = Fixture::new("asset-view");
+            fixture.layout_asset_leaf();
+            let asset_leaf = fixture.asset_leaf();
+            let body_length = u64::try_from(BODY_LENGTH).expect("the fixture bound fits a u64");
+            let reference = AssetReferenceV1::parse(AssetNamespace::Entity, "brand/logo.png")
+                .expect("an accepted Entity asset reference");
+
+            // The adversary: a writable section over the asset leaf, mapped writable, with both
+            // originating handles closed immediately. Only the mapped view survives.
+            let writer = File::options()
+                .read(true)
+                .write(true)
+                .open(&asset_leaf)
+                .expect("the adversary opens the asset writable");
+            let section = Section::over(&writer);
+            let view = WritableView::over(&section, BODY_LENGTH);
+            drop(section);
+            drop(writer);
+
+            // The surviving view still maps the object, and it can overwrite it in place.
+            assert_eq!(
+                view.byte(0),
+                b'A',
+                "the surviving view must still map the asset"
+            );
+            assert_eq!(view.byte(BODY_LENGTH - 1), b'A');
+            view.fill(b'C');
+            assert_eq!(
+                view.byte(0),
+                b'C',
+                "the surviving view must rewrite the first byte"
+            );
+            assert_eq!(view.byte(BODY_LENGTH - 1), b'C');
+            assert_eq!(
+                fs::metadata(&asset_leaf)
+                    .expect("stat the fixture asset")
+                    .len(),
+                body_length,
+                "a whole-view rewrite must not change the asset's length"
+            );
+
+            let capability = fixture.capability();
+
+            // While that view can still mutate the bytes, the actual asset port must refuse.
+            match capability.read_entity_asset(&reference, MAX_GRAPHIC_SOURCE_BYTES) {
+                EntityAssetSourceV1::Refused(refusal) => {
+                    assert_eq!(
+                        refusal.kind(),
+                        GraphicAssetReadRefusalKind::OtherIo,
+                        "the frozen native Windows mapping reports the blocked asset open as OtherIo"
+                    );
+                    assert_eq!(refusal.code(), "ASSET_SOURCE_IO_ERROR");
+                }
+                EntityAssetSourceV1::Present { bytes, .. } => panic!(
+                    "the asset port accepted {} bytes that a live writable view can change",
+                    bytes.len()
+                ),
+            }
+
+            drop(view);
+
+            // The same capability, typed reference and bound now acquire exactly the rewritten
+            // bytes, so the refusal cannot have come from the fixture, namespace or bound.
+            let (bytes, identity, length, links) =
+                match capability.read_entity_asset(&reference, MAX_GRAPHIC_SOURCE_BYTES) {
+                    EntityAssetSourceV1::Present {
+                        bytes,
+                        identity,
+                        length,
+                        links,
+                        ..
+                    } => (bytes, identity, length, links),
+                    EntityAssetSourceV1::Refused(refusal) => panic!(
+                        "the asset port refused after the view was unmapped: {}",
+                        refusal.code()
+                    ),
+                };
+            assert_eq!(length, body_length);
+            assert_eq!(bytes.len(), BODY_LENGTH);
+            assert_eq!(
+                links, 1,
+                "the asset must be one unreferenced directory entry"
+            );
+            assert!(
+                bytes.iter().all(|byte| *byte == b'C'),
+                "the flushed rewrite must be the asset's real content"
+            );
+            assert_ne!(
+                identity,
+                capability.identity(),
+                "the asset object is not the content root"
+            );
+            assert_ne!(
+                identity,
+                PhysicalIdentityV1::new(0, 0, 0),
+                "the observed identity must name a real object"
+            );
+
+            let (again, again_identity) =
+                match capability.read_entity_asset(&reference, MAX_GRAPHIC_SOURCE_BYTES) {
+                    EntityAssetSourceV1::Present {
+                        bytes, identity, ..
+                    } => (bytes, identity),
+                    EntityAssetSourceV1::Refused(refusal) => panic!(
+                        "the repeat asset read refused after release: {}",
+                        refusal.code()
+                    ),
+                };
+            assert_eq!(again, bytes, "the repeat read must return the same bytes");
+            assert_eq!(
+                again_identity, identity,
+                "the asset identity must be stable across reads"
             );
         }
     }
