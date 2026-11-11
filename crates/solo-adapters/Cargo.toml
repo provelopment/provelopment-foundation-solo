@@ -24,7 +24,7 @@ serde_json = "=1.0.154"
 # only with `std` enabled; without it the caller path would have to be copied into a
 # `CString`, which would be a second, weaker spelling of the same trust input.
 [target.'cfg(target_os = "linux")'.dependencies]
-rustix = { version = "=1.1.5", default-features = false, features = ["fs", "std"] }
+rustix = { version = "=1.1.6", default-features = false, features = ["fs", "std"] }
 
 # `windows-sys` supplies the raw NT entry point and the handle-metadata query. The
 # features are the minimum that carries `NtCreateFile` with its `OBJECT_ATTRIBUTES` and
