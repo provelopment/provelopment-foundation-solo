@@ -23,6 +23,7 @@
 //! rendering and release) that this package does not provide.
 
 use core::fmt;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::efs_ownership::EfsOwnershipGraph;
 use crate::property_registry::{
@@ -47,6 +48,10 @@ pub enum PropertyResolutionRefusalKind {
     DuplicateLocationFact,
     /// A recognized `extend` operation was reached by a real `R03.A` resolution.
     LocationExtensionNotImplementedInR03A,
+    /// A supplied owner inventory did not match the graph's complete membership.
+    OwnerMembershipMismatch,
+    /// The resolved record described a state the validated graph cannot contain.
+    InconsistentGraph,
     /// A resolved property record did not describe the value it carried.
     InconsistentRecord,
 }
@@ -65,6 +70,8 @@ impl PropertyResolutionRefusalKind {
             Self::LocationExtensionNotImplementedInR03A => {
                 "location-extension-not-implemented-in-r03a"
             }
+            Self::OwnerMembershipMismatch => "owner-membership-mismatch",
+            Self::InconsistentGraph => "inconsistent-graph",
             Self::InconsistentRecord => "inconsistent-record",
         }
     }
@@ -508,6 +515,10 @@ impl ValidatedPropertyInputV1 {
 
     /// Resolves all nine registered keys for one owner of this graph.
     ///
+    /// The walk starts at the Entity and reuses each ancestor's resolved record, so the
+    /// target's own direct chain is the only ancestry consulted. Whole-graph validation is a
+    /// separate entry point ([`Self::resolve_all`]).
+    ///
     /// # Errors
     ///
     /// Returns a [`PropertyResolutionRefusalV1`] for an owner that is not in the graph, an
@@ -522,31 +533,105 @@ impl ValidatedPropertyInputV1 {
                 PropertyResolutionRefusalKind::UnknownOwner,
             ));
         }
-        let chain = target.chain();
+        let index = self.declaration_index();
+        let mut resolved: Option<ResolvedPropertiesV1> = None;
+        for owner in target.chain() {
+            resolved = Some(self.resolve_owner(&index, &owner, resolved.as_ref())?);
+        }
+        resolved.ok_or_else(|| {
+            PropertyResolutionRefusalV1::of(PropertyResolutionRefusalKind::InconsistentGraph)
+        })
+    }
+
+    /// Resolves and validates **every** owner of the one Entity, parent first.
+    ///
+    /// The traversal is deterministic - the graph's own authored order, which is already
+    /// parent-before-child - and each owner consumes only its validated immediate parent's
+    /// effective state. Declarations are indexed once and owners are located through that
+    /// index, so no owner triggers a rescan of the declaration list and nothing is quadratic.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`PropertyResolutionRefusalV1`] for **any** failure anywhere in the graph:
+    /// an exceeded effective maximum, a duplicated background source, a duplicated location
+    /// identity or a recognized `extend` request. A single-owner success is impossible while
+    /// an unrelated Site, Page or representation is invalid.
+    pub fn resolve_all(&self) -> Result<ResolvedPropertyGraphV1, PropertyResolutionRefusalV1> {
+        let index = self.declaration_index();
+        let positions: BTreeMap<&QualifiedOwnerV1, usize> = self
+            .owners
+            .iter()
+            .enumerate()
+            .map(|(position, owner)| (owner, position))
+            .collect();
+        let mut resolved: Vec<ResolvedPropertiesV1> = Vec::with_capacity(self.owners.len());
+        for owner in &self.owners {
+            let parent = if owner.level_index() == 0 {
+                None
+            } else {
+                let mut chain = owner.chain();
+                chain.pop();
+                let parent_owner = chain.pop().ok_or_else(|| {
+                    PropertyResolutionRefusalV1::of(
+                        PropertyResolutionRefusalKind::InconsistentGraph,
+                    )
+                })?;
+                let position = positions.get(&parent_owner).copied().ok_or_else(|| {
+                    PropertyResolutionRefusalV1::of(
+                        PropertyResolutionRefusalKind::InconsistentGraph,
+                    )
+                })?;
+                Some(resolved.get(position).ok_or_else(|| {
+                    PropertyResolutionRefusalV1::of(
+                        PropertyResolutionRefusalKind::InconsistentGraph,
+                    )
+                })?)
+            };
+            let record = self.resolve_owner(&index, owner, parent)?;
+            resolved.push(record);
+        }
+        Ok(ResolvedPropertyGraphV1 { resolved })
+    }
+
+    /// One index from owner to its validated declaration set.
+    fn declaration_index(&self) -> BTreeMap<&QualifiedOwnerV1, &DeclaredOwnerPropertiesV1> {
+        self.declarations
+            .iter()
+            .map(|declaration| (declaration.owner(), declaration))
+            .collect()
+    }
+
+    /// Resolves one owner from its validated immediate parent's effective state.
+    fn resolve_owner(
+        &self,
+        index: &BTreeMap<&QualifiedOwnerV1, &DeclaredOwnerPropertiesV1>,
+        owner: &QualifiedOwnerV1,
+        parent: Option<&ResolvedPropertiesV1>,
+    ) -> Result<ResolvedPropertiesV1, PropertyResolutionRefusalV1> {
+        let declaration = index.get(owner).copied();
         let mut properties = Vec::with_capacity(PropertyKey::ALL.len());
         for key in PropertyKey::ALL {
-            properties.push(self.resolve_key(key, &chain)?);
+            properties.push(Self::resolve_key_from(parent, declaration, key, owner)?);
         }
         Ok(ResolvedPropertiesV1 {
-            owner: target.clone(),
+            owner: owner.clone(),
             properties,
         })
     }
 
-    fn resolve_key(
-        &self,
+    /// Applies one owner's local declaration to its parent's effective record.
+    fn resolve_key_from(
+        parent: Option<&ResolvedPropertiesV1>,
+        declaration: Option<&DeclaredOwnerPropertiesV1>,
         key: PropertyKey,
-        chain: &[QualifiedOwnerV1],
+        owner: &QualifiedOwnerV1,
     ) -> Result<ResolvedPropertyV1, PropertyResolutionRefusalV1> {
-        let mut values: Vec<ProvenanceValueV1> = Vec::new();
-        let mut resolution_events: Vec<ResolutionEventV1> = Vec::new();
-        for owner in chain {
-            let declaration = self
-                .declaration_for(owner)
-                .and_then(|declared| declared.declaration(key));
-            let Some(envelope) = declaration else {
-                continue;
-            };
+        let inherited = parent.and_then(|record| record.property(key));
+        let mut values: Vec<ProvenanceValueV1> =
+            inherited.map_or_else(Vec::new, |record| record.values().to_vec());
+        let mut resolution_events: Vec<ResolutionEventV1> =
+            inherited.map_or_else(Vec::new, |record| record.resolution_events().to_vec());
+        if let Some(envelope) = declaration.and_then(|declared| declared.declaration(key)) {
             match envelope.inheritance() {
                 // `inherited` records an explicit declaration that actually carried
                 // inherited values; a root declaration has nothing to inherit and records
@@ -600,11 +685,85 @@ impl ValidatedPropertyInputV1 {
                     None,
                 ));
             }
-            validate_effective(key, &values)?;
         }
         validate_effective(key, &values)?;
         Ok(ResolvedPropertyV1::new(key, values, resolution_events))
     }
+}
+
+/// The whole-graph resolved record of one validated one-Entity input.
+///
+/// Every owner of the graph appears exactly once, in the graph's deterministic parent-first
+/// order, and this record exists only when **every** owner resolved without a refusal.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ResolvedPropertyGraphV1 {
+    resolved: Vec<ResolvedPropertiesV1>,
+}
+
+impl ResolvedPropertyGraphV1 {
+    /// Every resolved owner, in the graph's parent-first authored order.
+    #[must_use]
+    pub fn owners(&self) -> &[ResolvedPropertiesV1] {
+        &self.resolved
+    }
+
+    /// The resolved record of one owner.
+    #[must_use]
+    pub fn for_owner(&self, owner: &QualifiedOwnerV1) -> Option<&ResolvedPropertiesV1> {
+        self.resolved.iter().find(|record| record.owner() == owner)
+    }
+
+    /// How many owners the graph resolved.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.resolved.len()
+    }
+
+    /// Whether the graph resolved no owner at all.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.resolved.is_empty()
+    }
+}
+
+/// Resolves and validates every owner of one validated input.
+///
+/// # Errors
+///
+/// Returns a [`PropertyResolutionRefusalV1`] for any failure anywhere in the graph, so a
+/// caller can never obtain a partial success while an unrelated Site, Page or
+/// representation is invalid.
+pub fn resolve_all_owners_v1(
+    input: &ValidatedPropertyInputV1,
+) -> Result<ResolvedPropertyGraphV1, PropertyResolutionRefusalV1> {
+    input.resolve_all()
+}
+
+/// Requires a caller-supplied owner inventory to be exactly the graph's membership.
+///
+/// This binds a parsed manifest's complete EFS membership - including every owner that
+/// declares no properties - to the supplied validated graph, so a graph that is missing an
+/// owner, or that carries an extra one, can never be used to resolve a property candidate.
+///
+/// # Errors
+///
+/// Returns [`PropertyResolutionRefusalKind::OwnerMembershipMismatch`] when the inventories
+/// differ in size or in any member.
+pub fn require_matching_owner_membership_v1(
+    input: &ValidatedPropertyInputV1,
+    inventory: &[QualifiedOwnerV1],
+) -> Result<(), PropertyResolutionRefusalV1> {
+    let mismatch =
+        || PropertyResolutionRefusalV1::of(PropertyResolutionRefusalKind::OwnerMembershipMismatch);
+    if inventory.len() != input.owners().len() {
+        return Err(mismatch());
+    }
+    let expected: BTreeSet<&QualifiedOwnerV1> = input.owners().iter().collect();
+    let actual: BTreeSet<&QualifiedOwnerV1> = inventory.iter().collect();
+    if expected != actual {
+        return Err(mismatch());
+    }
+    Ok(())
 }
 
 /// Enforces the registry's effective maximum and uniqueness rules on one effective set.

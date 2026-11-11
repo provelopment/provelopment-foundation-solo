@@ -1085,25 +1085,48 @@ impl LocationFactV1 {
 /// A recognized but deliberately unimplemented §6.2H.4 `extend` request.
 ///
 /// `R03.A` implements the ordinary validated `add` cascade. The accepted `extend` syntax
-/// is recognized here so it can be refused **by name** at resolution instead of being
-/// ignored, treated as `add`, merged in place or reported as invalid. `R03.B` owns the
-/// identified-record mutation and field-provenance semantics.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// is recognized here - with its qualified target owner and its typed `set` fields - so it
+/// can be refused **by name** at resolution instead of being ignored, treated as `add`,
+/// merged in place or reported as invalid. `R03.B` owns the identified-record mutation and
+/// field-provenance semantics.
+#[derive(Debug, Clone, PartialEq)]
 pub struct LocationExtensionRequestV1 {
     target_fact_id: FactIdV1,
+    target_owner: QualifiedOwnerV1,
+    set: LocationFieldsV1,
 }
 
 impl LocationExtensionRequestV1 {
-    /// Records one recognized extension target.
+    /// Records one recognized extension request.
     #[must_use]
-    pub fn new(target_fact_id: FactIdV1) -> Self {
-        Self { target_fact_id }
+    pub const fn new(
+        target_fact_id: FactIdV1,
+        target_owner: QualifiedOwnerV1,
+        set: LocationFieldsV1,
+    ) -> Self {
+        Self {
+            target_fact_id,
+            target_owner,
+            set,
+        }
     }
 
     /// The fact the extension names.
     #[must_use]
-    pub fn target_fact_id(&self) -> &FactIdV1 {
+    pub const fn target_fact_id(&self) -> &FactIdV1 {
         &self.target_fact_id
+    }
+
+    /// The qualified owner the extension names.
+    #[must_use]
+    pub const fn target_owner(&self) -> &QualifiedOwnerV1 {
+        &self.target_owner
+    }
+
+    /// The validated partial fields the extension would set.
+    #[must_use]
+    pub const fn set(&self) -> &LocationFieldsV1 {
+        &self.set
     }
 }
 
@@ -1113,7 +1136,7 @@ pub enum PropertyValueV1 {
     /// A §6.2H.2 location `add` fact.
     Location(Box<LocationFactV1>),
     /// A recognized §6.2H.4 `extend` request that `R03.A` cannot execute.
-    LocationExtension(LocationExtensionRequestV1),
+    LocationExtension(Box<LocationExtensionRequestV1>),
     /// A graphic role selection reference.
     Graphic(AssetReferenceV1),
     /// A plain-text value.
@@ -1132,7 +1155,7 @@ impl PropertyValueV1 {
     /// Wraps one recognized extension request.
     #[must_use]
     pub fn location_extension(request: LocationExtensionRequestV1) -> Self {
-        Self::LocationExtension(request)
+        Self::LocationExtension(Box::new(request))
     }
 
     /// Wraps one validated graphic reference.
@@ -1563,6 +1586,17 @@ impl DeclaredOwnerPropertiesV1 {
             if entries[..index].iter().any(|(seen, _)| seen == key) {
                 return Err(PropertyDeclarationRefusalV1::of(
                     PropertyRefusalKind::DuplicatePropertyEntry,
+                )
+                .with_key(*key));
+            }
+            // An explicitly empty array is invalid authored input, never an implicit "none":
+            // the typed model is reachable outside the JSON adapter, so the refusal belongs
+            // here and not only in the translation layer.
+            if let CurrentContextV1::Values(values) = declaration.current_context()
+                && values.is_empty()
+            {
+                return Err(PropertyDeclarationRefusalV1::of(
+                    PropertyRefusalKind::EmptyContextArray,
                 )
                 .with_key(*key));
             }

@@ -13,8 +13,8 @@ use solo_domain::{
     MAX_BACKGROUND_LAYERS, MAX_LOCAL_ENTRIES, MAX_LOCATION_FACTS, MAX_SEO_TITLE_SCALARS, MailboxV1,
     PROPERTY_REGISTRY_VERSION, PageDraft, PageIdV1, PlainTextV1, PropertyDeclarationV1,
     PropertyKey, PropertyRefusalKind, PropertyResolutionRefusalKind, PropertyValueV1,
-    QualifiedOwnerV1, ResolutionOperation, SiteDraft, SiteIdV1, project_public_properties_v1,
-    validate_declared_properties_v1,
+    ProvenanceValueV1, QualifiedOwnerV1, ResolutionOperation, SiteDraft, SiteIdV1,
+    project_public_properties_v1, resolve_all_owners_v1, validate_declared_properties_v1,
 };
 
 fn entity_id() -> EntityIdV1 {
@@ -81,6 +81,18 @@ fn facet_owner() -> QualifiedOwnerV1 {
 
 fn site_owner() -> QualifiedOwnerV1 {
     QualifiedOwnerV1::site(entity_id(), facet("main"), site("bali"))
+}
+
+fn jakarta_site_owner() -> QualifiedOwnerV1 {
+    QualifiedOwnerV1::site(entity_id(), facet("main"), site("jakarta"))
+}
+
+fn asset_references(values: &[ProvenanceValueV1]) -> Vec<String> {
+    values
+        .iter()
+        .filter_map(|value| value.data().asset_reference())
+        .map(|reference| reference.reference().to_owned())
+        .collect()
 }
 
 fn page_owner() -> QualifiedOwnerV1 {
@@ -167,6 +179,16 @@ fn location(fact_id: &str, locality: &str) -> PropertyValueV1 {
         )
         .expect("a non-empty location fact"),
     )
+}
+
+fn extension_request(fact_id: &str, locality: &str) -> PropertyValueV1 {
+    let mut set = LocationFieldsV1::new();
+    set.set_locality(locality).expect("valid locality text");
+    PropertyValueV1::location_extension(LocationExtensionRequestV1::new(
+        FactIdV1::parse(fact_id).expect("a valid fact identifier"),
+        site_owner(),
+        set,
+    ))
 }
 
 /// `R03A-01` — the registry is exactly the nine accepted keys with the accepted spellings,
@@ -1319,9 +1341,7 @@ fn r03a_08_wrong_lineage_and_second_entity_refuse() {
 /// while the ordinary `add` cascade still resolves.
 #[test]
 fn r03a_10_recognized_extend_is_refused_by_name_while_add_works() {
-    let extension = PropertyValueV1::location_extension(LocationExtensionRequestV1::new(
-        FactIdV1::parse("bali-base").expect("a valid fact identifier"),
-    ));
+    let extension = extension_request("bali-base", "Ubud");
     let input = validate_declared_properties_v1(
         &graph(),
         vec![
@@ -1443,4 +1463,187 @@ fn r03a_11_property_resolution_leaves_identity_untouched() {
         !format!("{projection:?}").contains("entity@example.com"),
         "a suppressed ancestor mailbox never reappears"
     );
+}
+
+/// `R03A-05` - whole-graph validation refuses a conflict in a Site the target never visits.
+#[test]
+fn r03a_05_whole_graph_refuses_a_conflict_in_an_unrelated_site() {
+    let declarations = vec![
+        declared(
+            site_owner(),
+            vec![(
+                PropertyKey::SeoTitle,
+                inherit(vec![auth(title("Bali"), Exposure::Public)]),
+            )],
+        ),
+        declared(
+            jakarta_site_owner(),
+            vec![(
+                PropertyKey::SeoTitle,
+                inherit(vec![auth(title("Jakarta"), Exposure::Public)]),
+            )],
+        ),
+        declared(
+            jakarta_representation_owner(),
+            vec![(
+                PropertyKey::SeoTitle,
+                inherit(vec![auth(title("Jakarta EN"), Exposure::Public)]),
+            )],
+        ),
+    ];
+    let input = validate_declared_properties_v1(&graph(), declarations).expect("a valid input");
+
+    // The bali target is valid on its own: one effective title, its own direct chain only.
+    assert_eq!(
+        input
+            .resolve(&representation_owner())
+            .expect("a valid single-owner resolution")
+            .values_of(PropertyKey::SeoTitle)
+            .len(),
+        1
+    );
+
+    // The whole graph is not: the jakarta branch carries two effective titles.
+    assert_eq!(
+        resolve_all_owners_v1(&input)
+            .expect_err("the jakarta conflict refuses the whole graph")
+            .kind(),
+        PropertyResolutionRefusalKind::CardinalityExceeded
+    );
+}
+
+/// `R03A-03` - the typed API itself refuses an explicitly empty `currentContext` array.
+#[test]
+fn r03a_03_explicit_empty_array_refuses_in_the_typed_api() {
+    let declaration =
+        PropertyDeclarationV1::new(Inheritance::Inherit, CurrentContextV1::Values(Vec::new()));
+    let error = DeclaredOwnerPropertiesV1::new(
+        page_owner(),
+        vec![(PropertyKey::ContactEmail, declaration)],
+    )
+    .expect_err("an explicitly empty array refuses");
+    assert_eq!(error.kind(), PropertyRefusalKind::EmptyContextArray);
+    assert_eq!(error.key(), Some(PropertyKey::ContactEmail));
+
+    // The literal "none" stays valid, and stays distinct from an absent declaration.
+    DeclaredOwnerPropertiesV1::new(
+        page_owner(),
+        vec![(PropertyKey::ContactEmail, inherit(Vec::new()))],
+    )
+    .expect("an explicit \"none\" is a valid declaration");
+    let absent = validate_declared_properties_v1(&graph(), Vec::new()).expect("a valid input");
+    assert!(absent.declaration_for(&page_owner()).is_none());
+}
+
+/// `R03A-04` - whole-graph resolution preserves each branch's own values, order and provenance.
+#[test]
+fn r03a_04_whole_graph_preserves_each_branch_original_values() {
+    let declarations = vec![
+        declared(
+            entity_owner(),
+            vec![(
+                PropertyKey::GraphicBackground,
+                inherit(vec![auth(background("bg/entity.png"), Exposure::Public)]),
+            )],
+        ),
+        declared(
+            site_owner(),
+            vec![(
+                PropertyKey::GraphicBackground,
+                inherit(vec![auth(background("bg/bali.png"), Exposure::Public)]),
+            )],
+        ),
+        declared(
+            jakarta_site_owner(),
+            vec![(
+                PropertyKey::GraphicBackground,
+                inherit(vec![auth(background("bg/jakarta.png"), Exposure::Public)]),
+            )],
+        ),
+    ];
+    let input = validate_declared_properties_v1(&graph(), declarations).expect("a valid input");
+    let whole = resolve_all_owners_v1(&input).expect("the whole graph resolves");
+
+    assert_eq!(whole.len(), input.owners().len());
+    assert!(!whole.is_empty());
+
+    let bali = whole
+        .for_owner(&representation_owner())
+        .expect("the bali representation resolved");
+    let jakarta = whole
+        .for_owner(&jakarta_representation_owner())
+        .expect("the jakarta representation resolved");
+    assert_eq!(
+        asset_references(bali.values_of(PropertyKey::GraphicBackground)),
+        vec!["bg/entity.png", "bg/bali.png"]
+    );
+    assert_eq!(
+        asset_references(jakarta.values_of(PropertyKey::GraphicBackground)),
+        vec!["bg/entity.png", "bg/jakarta.png"]
+    );
+    assert_eq!(
+        bali.values_of(PropertyKey::GraphicBackground)[1].origin_owner(),
+        &site_owner()
+    );
+    assert_eq!(
+        jakarta.values_of(PropertyKey::GraphicBackground)[1].origin_owner(),
+        &jakarta_site_owner()
+    );
+    assert_eq!(
+        bali.values_of(PropertyKey::GraphicBackground)[1].origin_local_index(),
+        0
+    );
+
+    // The traversal is deterministic.
+    assert_eq!(
+        whole,
+        resolve_all_owners_v1(&input).expect("a repeated whole-graph resolution")
+    );
+}
+
+/// `R03A-10` - a recognized extension anywhere in the graph refuses the whole candidate.
+#[test]
+fn r03a_10_whole_graph_refuses_a_recognized_extension_anywhere() {
+    let declarations = vec![
+        declared(
+            site_owner(),
+            vec![(
+                PropertyKey::Location,
+                inherit(vec![auth(
+                    location("bali-base", "Denpasar"),
+                    Exposure::Public,
+                )]),
+            )],
+        ),
+        declared(
+            jakarta_site_owner(),
+            vec![(
+                PropertyKey::Location,
+                inherit(vec![auth(
+                    extension_request("jakarta-base", "Ubud"),
+                    Exposure::Internal,
+                )]),
+            )],
+        ),
+    ];
+    let input = validate_declared_properties_v1(&graph(), declarations)
+        .expect("the accepted extend syntax is recognized, not invalid");
+    assert!(input.has_recognized_location_extension());
+
+    // The bali target alone is unaffected by the jakarta request.
+    assert_eq!(
+        input
+            .resolve(&representation_owner())
+            .expect("a valid single-owner resolution")
+            .values_of(PropertyKey::Location)
+            .len(),
+        1
+    );
+
+    let refusal = resolve_all_owners_v1(&input).expect_err("the extension refuses the whole graph");
+    assert_eq!(
+        refusal.kind(),
+        PropertyResolutionRefusalKind::LocationExtensionNotImplementedInR03A
+    );
+    assert_eq!(refusal.code(), "LOCATION_EXTENSION_NOT_IMPLEMENTED_IN_R03A");
 }
