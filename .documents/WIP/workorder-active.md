@@ -1,154 +1,141 @@
 # Foundation Solo — Active Work Order
 
-**OWNER-ISSUED — SOLO-WO-063 R01**  
-**Title:** Recover, validate and conditionally integrate R03.C1's authored graphic-obligation inventory on the accepted patched `rustix 1.1.6` baseline  
+**OWNER-ISSUED — SOLO-WO-064 R01**  
+**Title:** Administratively close independently accepted R03.C1, select R03.C2 as the sole NEXT candidate, and prune only the safely merged recovery branch  
 **Repository:** `provelopment/provelopment-foundation-solo` — `https://github.com/provelopment/provelopment-foundation-solo`  
 **Sole Owner-local checkout:** `C:\Users\Sean\Documents\Provelopment\00.foundation-solo`  
-**Matching Owner handoff ID:** `SOLO-WO-063 R01`  
-**Approved Scope:** The Owner expressly authorizes the **bounded R03.C1 recovery** described in this frozen order: replace accepted maintenance order `SOLO-WO-062 R01` in the one ACTIVE slot; preserve the original, unaccepted `SOLO-WO-061 R01` source branch; reproduce its five-path R03.C1 code on a **new short-lived recovery branch** based on patched `main` by an expressly permitted, history-preserving **cherry-pick** of the one identified source commit; apply only strictly necessary, bounded R03.C1 code/test corrections in those same five paths; execute the full accepted R03.C1 matrix and fresh two-host CI; and, **only if all gates pass**, fast-forward integrate to `main` and publish the sole canonical execution report. This is **not** an authorization to complete or close R03.C, to close Stage 03, to design or deliver artwork/media/catalogue, to change dependencies/policy, to release or deploy. The Chief Architect has **GitHub read-only** authority; only the separately handed-off Implementation Agent may perform the authorized repository writes.
+**Matching Owner handoff ID:** `SOLO-WO-064 R01`  
+**Approved Scope:** The Owner expressly authorized the administrative closure of **accepted R03.C1** and preparation of the next bounded R03.C step. This is one **documentation/Git-lifecycle-only** order. It authorizes the exact issuance, closure, candidate-selection, conditional single-branch pruning, CI and reporting operations below; it does **not** authorize executing R03.C2, altering product code, selecting media artwork or catalogue entries, changing Architecture, or closing the still-incomplete R03.C / Stage 03. The Chief Architect is **GitHub READ ONLY**; only the Implementation Agent performs authorized repository writes in the single verified checkout.
 
-## 1. Accepted authority, precise initial state and intended outcome
+## 1. Accepted authority and exact starting state
 
-**Binding authorities (read before work):** repository root `AGENTS.md`; `.documents/SOP/sop-architect.md` especially §§6, 6A, 6B, 7/7A/7B, 8; `.documents/SOP/sop-implementation.md` especially §§4–5C, 6–11; `.documents/Architecture/ARCHITECTURE.md` §§5A, 6.2G, 6.2I and 6.2K; accepted one-Entity EFS ancestry and R03.A/R03.B property contracts; the **frozen `SOLO-WO-061 R01`** order in Git history at issuance SHA `dcaab733a56b0a95040e5a63fa3b2a0f2aa6d8ae` (especially its §5 named matrix); the stopped R03.C1 execution report at `9ed94120824bccc0b9bcba081544dc7cd8d11b95`; and the accepted security-maintenance report at the present starting `main` SHA. No history or NEXT entry is permission to implement except this newly Owner-issued order and matching handoff.
+**Architect disposition:** `ACCEPT — SOLO-WO-063 R01 / R03.C1` at the independently verified canonical final report HEAD `23ce81ab2747e0556632794e1f79c4c9cbb124e3`, tree `da91fe3e2fa83a3fe66d018898bf78b40b347326`, report blob `34bc84e79c725049f588a9b1ee1f2c00f4762593`. The accepted substantive R03.C1 commit is `42e9588f9e3fb84f4ec15c2f7d02f9ad5ae440d1` (tree `e3ba61cffb24e13451f9b8a732b09282cdd5bf27`), a parent of the report commit. Two-host green CI on the recovery branch, substantive `main`, and report HEAD was independently reviewed. This is acceptance of the **authored graphic asset-obligation inventory** only, not a safe media system.
 
-**Chief Architect's separate dispositions:** `STOP — SOLO-WO-061 R01` for its then-inherited RustSec failure and unrun R03.C1 tests; `ACCEPT — SOLO-WO-062 R01` for the bounded `rustix` remediation. Acceptance of the dependency repair **does not** accept the five R03.C1 files or their unrun tests. The implementation branch is preserved as source material, not as an independently accepted product revision.
+**Read before acting:** `AGENTS.md`; `.documents/SOP/sop-architect.md` (especially §§6A, 6B, 7A, 8); `.documents/SOP/sop-implementation.md` (especially §§4, 5A, 5C, 9); `.documents/Architecture/ARCHITECTURE.md` (especially §§6.2C, 6.2G, 6.2I, 6.2K); the four WIP files; the canonical report at the above exact SHA; and the actual implemented R03.C1 inventory / source-read interfaces. The SOP's one-checkout, WIP purity, approved-path, report, and Git-safety rules remain binding and are not replaced by a conflicting Git procedure here.
 
-**Exact remotely verified baseline, 2026-11-11:**
+**Expected untouched baseline at `main == origin/main`:**
 
-| Item | Required identity before the Owner-installed ACTIVE replacement is committed |
+| Item | Exact anchor |
 | --- | --- |
-| `main == origin/main` | `084161d601577d62e85df831542e83de82628639` |
-| Baseline `main` tree | `9cb58c5fad5f968294c5fcd3519cb62df647715f` |
-| Accepted `rustix` substantive SHA | `65656f111b4d8ef8012fc3d394a316193a54ad59` — tree `87768ff2456ffbeb7fd9e0253d87d7f1f77f8eb9` |
-| Canonical report | `.documents/Reports/execution-report.md`, blob `44d0b11c296262e658208bff1498796a349a0b7c` |
-| ACTIVE | frozen accepted `SOLO-WO-062 R01`, blob `ff903266e18581ffe9c705f36792376fcae2a02a` |
-| NEXT | neutral heading only, blob `92fa562b1af0c54391851aa5c79deb1631127069` |
-| ROADMAP | Stage 03 OPEN, R03.C pending, blob `31a0ba2efb4f780f7248c56ff84683f20d9bc97f` |
-| OUTLOOK | neutral, blob `cb9c7a610cf3c537557e060ca9656e44a053e69d` |
-| Adapter manifest | `crates/solo-adapters/Cargo.toml`, blob `6109224cd3e3e89487884631f2b07c68ad8149c3` — exact `rustix = "=1.1.6"` with `fs`, `std`, no default features |
-| Lockfile | `Cargo.lock`, blob `2f9e53576df117f2020ae064d6973304f20833f1` — 22 packages; `rustix 1.1.6`, checksum `e5e76742e5294153d4dde1207dbec5bdd81eef6fabdc0d2118babadabfd858aa` |
-| Security policy | `deny.toml`, blob `3063e864c28be1e77787f43f1b6f561d543c8f4a`, `unsound = "all"`, no exception |
-| Workflow | `.github/workflows/rust-verify.yml`, blob `eb78dad240bb7adb3e0ef9535870897176c99843` |
-| Ignore | root `.gitignore`, blob `f45dd49524748e9b08f6678271edfc22ac39b97f`; keep anchored `/target/` intact |
-| Original retained branch | local and remote `solo-wo-061-r01` exactly `4371af21dce67f33cf1df0384738bf353ca80fc6`, tree `89c6176a5f159069eccab9eb0d4ed67e88eaba4f`, parent `dcaab733a56b0a95040e5a63fa3b2a0f2aa6d8ae` |
-| Current GitHub branch inventory | exactly `main` and `solo-wo-061-r01`, no existing `solo-wo-063-r01` |
+| `main` / `origin/main` | `23ce81ab2747e0556632794e1f79c4c9cbb124e3` |
+| Final accepted tree | `da91fe3e2fa83a3fe66d018898bf78b40b347326` |
+| `.documents/WIP/workorder-active.md` | `4ec5c24511a9420d7ed782f7316e9d14b0b091da` — frozen `SOLO-WO-063 R01`, to be replaced by Owner-installed `SOLO-WO-064 R01` |
+| `.documents/WIP/plan-next.md` | `92fa562b1af0c54391851aa5c79deb1631127069` — one neutral heading |
+| `.documents/WIP/plan-roadmap.md` | `31a0ba2efb4f780f7248c56ff84683f20d9bc97f` — Stage 03 and remaining R03.C |
+| `.documents/WIP/plan-outlook.md` | `cb9c7a610cf3c537557e060ca9656e44a053e69d` — unchanged neutral heading |
+| `Cargo.lock` | `2f9e53576df117f2020ae064d6973304f20833f1` — 22 packages, patched `rustix 1.1.6` |
+| `crates/solo-adapters/Cargo.toml` | `6109224cd3e3e89487884631f2b07c68ad8149c3` — exact Linux `rustix = "=1.1.6"` |
+| `deny.toml` | `3063e864c28be1e77787f43f1b6f561d543c8f4a` — no advisory waiver |
+| `.github/workflows/rust-verify.yml` | `eb78dad240bb7adb3e0ef9535870897176c99843` — two-host required gate |
+| Original historical branch `solo-wo-061-r01` | `4371af21dce67f33cf1df0384738bf353ca80fc6`, tree `89c6176a5f159069eccab9eb0d4ed67e88eaba4f` |
+| Accepted recovery branch `solo-wo-063-r01` | `42e9588f9e3fb84f4ec15c2f7d02f9ad5ae440d1` — safely contained in `main` before this order |
 
-**Baseline CI evidence:** repaired substantive `main` run `42999372565` and final report run `43000498413` are both green on `ubuntu-24.04` and `windows-2025`; they do **not** include the R03.C1 code. The original R03.C1 branch run `42989368984` failed before running tests under the prior locked `rustix 1.1.5`; the stopped source branch therefore provides authored implementation, **not** passing behavioral evidence.
+**Branch decision based on independently observed Git history:** `solo-wo-063-r01` is an ancestor of accepted `main` and had no GitHub PR as checked for this order; it is eligible for **ordinary conditional pruning** under §3C. `solo-wo-061-r01` is **divergent** from `main` (its original implementation commit was later cherry-picked, not merged as a parent). Its unique historical commit must remain addressable. **Retain the original branch locally and remotely, unchanged**; do not attempt to prune it, force-delete it, rewrite it, or substitute a tag/archival mechanism under this order.
 
-**Expected post-Owner-install preflight:** the only permitted difference from the above HEAD is the Owner-installed replacement of `.documents/WIP/workorder-active.md` with the complete text of **this exact `OWNER-ISSUED — SOLO-WO-063 R01`**. Verify the matching handoff, one checked-out `main`, one genuine checkout/worktree, the sole accepted `origin` URL, no untracked/staged/unknown changes, no pending merge/rebase/cherry-pick, exact four-file WIP inventory and the unchanged source branch. If any anchor diverges or unknown material is present, **STOP**; do not infer that this order approves adapting to an unexpected repository state.
+**Architecture precedence:** the retained ROADMAP line mentions an older optional generic fallback, but binding Architecture §6.2I.1 and §6.2I.6 explicitly prohibit **automatic platform or role fallback**. The exact ROADMAP one-line replacement below reconciles *planning wording* with the already binding rule; it is **not** an Architecture amendment or authorization to invent an alternate asset provider. The initial lawful `platform/assets/` catalogue, its bytes, IDs, hashes and licence/provenance require a later Owner-reviewed delivery package. No catalogue or artwork exists on the currently reviewed tracked tree.
 
-**Required result:** an independently reviewable, **nonpublishing** R03.C1 inventory candidate identical in bounded functionality to the original five-path implementation (plus any independently evidenced, in-scope corrections); fresh actual tests on both hosts at a recovered branch SHA, a fast-forward integrated `main` SHA, and the final report SHA; preserved original branch and clean one-checkout state. R03.C still requires later verified asset reading, media-byte and catalogue work. Stage 03 remains OPEN.
+## 2. Exact permanent-path ledger — no other tracked edits
 
-## 2. Frozen operation, path and branch-permission ledger
+Only these four tracked paths may change across this order:
 
-**Authorized permanent path and operation, and no others:**
+1. **`.documents/WIP/workorder-active.md`** — Owner installs this complete `SOLO-WO-064 R01`; Implementation Agent verifies it is the only tracked pre-issuance difference, commits it **alone** as the issuance revision, then resets this *same path* to the exact neutral content in §3D as part of the accepted-closure revision. No historical summary/status prose remains after clearing.
+2. **`.documents/WIP/plan-roadmap.md`** — in §3D replace **exactly the one R03.C bullet** identified in §3D, removing the accepted R03.C1 obligation from unfinished work and describing only still-unimplemented R03.C delivery. Preserve the Stage 03 heading, prerequisite, exit gate and every other byte/line of Stage 04 onward. **Do not** remove R03.C or Stage 03, and do not add a completed-work ledger.
+3. **`.documents/WIP/plan-next.md`** — replace its one neutral heading with the **exact single R03.C2 candidate** in §4. NEXT remains a proposal, not an executable order. Do not create a parallel plan or issue a code-bearing order.
+4. **`.documents/Reports/execution-report.md`** — overwrite the **sole canonical report** and publish a report-only final commit after the closure revision and required CI. Never create another report or evidence folder.
 
-| Path | Exact permitted operation |
+**Explicitly forbidden:** changes to `.documents/WIP/plan-outlook.md`, `.documents/Architecture/ARCHITECTURE.md`, About, SOP, AGENTS, README, source/tests, fixtures, `platform/`, assets, `Cargo.toml` or `Cargo.lock`, dependency graph, `deny.toml`, workflows, toolchain, `.cargo/`, `.gitignore`, release files, any other repository, remote or worktree. No new tracked file or directory. No changes to third-party licensing, NOTICE, provider, renderer, URL/routing, location, manifest or publication behavior. No code implementation of R03.C2, no generated media and **no deployment or release**.
+
+**Git authorizations:** normal staging/commit/push of only the named paths on existing `main` for issuance, closure and report; read-only compare/PR/branch/CI inspection; **only if §3C conditions pass**, ordinary local and remote deletion of **`solo-wo-063-r01`** after its tip is proven included in current `main`. No new branch or PR, merge, fast-forward operation, rebase, cherry-pick, hard reset, force-push/force-delete, history rewrite, tag, extra worktree/clone, nested Git repository, or deletion of other refs. Follow Architect SOP §6B for the version-control procedure.
+
+## 3. Required execution sequence
+
+### 3A — Mandatory read-only preflight
+
+Confirm the actual Owner-local Solo root, one existing checkout and worktree, sole correct `origin` remote, `main == origin/main` at the exact accepted baseline, clean staging area, exactly the four named WIP files, and **only** the Owner-installed ACTIVE replacement as a permitted initial tracked difference. Confirm no unknown untracked/Owner-owned material, no unsafe Git operation in progress, no unexpected branch/PR drift, and both original/recovery branch tips as anchored. Read back the newly installed complete order; the matching Owner handoff must name `SOLO-WO-064 R01`. If any anchor, branch, order identity, working-tree safety or authorisation fails, STOP without overriding it.
+
+### 3B — Issue this administrative order (ACTIVE only)
+
+Stage and commit **only** the Owner-installed `.documents/WIP/workorder-active.md`, verify exact committed blob and paths, and push normally to `origin/main`. Record issuance commit/tree. Trigger/observe the existing `rust-verify` workflow (ordinary `main` push) on Ubuntu 24.04 and Windows 2025 at that *exact* issuance commit. All applicable 33-step mandatory gates must be green, with only host-inapplicable skips. A newly failing security gate, regression, architecture check, test or build is a STOP, not a reason to alter CI/policy/code. Do not claim the closure is done on an issuance-only revision.
+
+### 3C — Conditional prune of the safely integrated recovery branch ONLY
+
+After the issuance commit has green CI, **while the issued `SOLO-WO-064 R01` is still installed in ACTIVE**, freshly verify that (a) the local and remote `solo-wo-063-r01` tips are **both** precisely `42e9588f9e3fb84f4ec15c2f7d02f9ad5ae440d1`; (b) this tip is a **true ancestor** of the then-current `main`, with its history already reachable through the accepted substantive, report and issuance commits; (c) there is no open or otherwise active PR, branch protection, another worktree, unknown divergent commit or other dependency on that branch; and (d) the worktree is clean on `main`.
+
+Only after those checks, prune **that named branch only** using ordinary non-force deletion locally (`git branch -d`, not `-D`) and remote (`git push origin --delete solo-wo-063-r01`, not a force-push), observing repo permissions and reporting the exact result. The history remains reachable on `main`. Never alter the tip of `main` to prune a branch. **Do not delete `solo-wo-061-r01`**: it is divergent and keeps the historical `4371af21…` commit reachable. If recovery-branch pruning is blocked or cannot be proven safe, do **not** substitute a force operation: preserve the ref, explain why in the canonical report, and mark pruning `UNVERIFIED/BLOCKED` rather than claiming it completed; STOP if this reveals unknown or Owner-owned work at risk. The administrative closure must not be misrepresented as a code acceptance failure solely because a protected branch remains.
+
+### 3D — Accepted R03.C1 closure and selection of sole NEXT candidate
+
+After §3C is completed or its optional pruning safely deferred with the reason recorded, perform **only** these three WIP edits in one closure commit:
+
+**ROADMAP, exact old bullet:**
+
+> - **R03.C:** implement graphic role declarations, public shared generic library, authored asset ownership, inheritance/override/suppression, and optional role-specific generic fallback strictly beneath authored hierarchy.
+
+**ROADMAP, exact replacement bullet (one Markdown paragraph; keep surrounding lines unchanged):**
+
+> - **R03.C:** complete the remaining governed graphic-asset delivery beyond the accepted authored-obligation inventory: confined Entity `content/assets/` and explicitly authored, exactly pinned Platform `platform/assets/` source acquisition; authoritative bounded media-byte, format/magic/MIME, image dimension and pixel-limit verification; an Owner-reviewed lawful `platformAssetLibraryVersion: "1.0.0"` catalogue with complete asset IDs, hashes, media class, dimensions and licence/provenance; whole-candidate validation across all declared owners including internal, suppressed and unlisted declarations; and privacy-safe public use and immutable derived outputs. Preserve the accepted five-level graphic inheritance, provenance, exposure, cardinality, suppression and **no automatic platform or role fallback** under binding Architecture §§6.2G/6.2I.
+
+This is a scoped removal of the **accepted** R03.C1 portion and clarification of *remaining* Stage 03 implementation only. It corrects stale planning wording by reference to **already binding** Architecture §6.2I; it does not create or change the Architecture contract. No other ROADMAP line may change. If the exact old bullet is absent, do not guess a fuzzy replacement; STOP and report.
+
+**NEXT:** replace the neutral file with exactly the Markdown candidate in §4 (from its `# Foundation Solo` title to the end, one final newline). No second candidate or older candidate may be appended.
+
+**ACTIVE:** reset its complete contents to exactly:
+
+```text
+# Foundation Solo — Active Work Order
+```
+
+The three paths `plan-roadmap.md`, `plan-next.md`, `workorder-active.md` are the **only** staged files in the closure commit. Compare each byte/diff before committing; push normally to `origin/main`. Obtain complete green Ubuntu/Windows CI at this exact closure SHA before report publication.
+
+### 3E — Canonical report, final CI, cleanliness
+
+Overwrite **only** `.documents/Reports/execution-report.md` with factual execution evidence: issued-order identity, exact baseline, issuance/closure/report commit+tree anchors (do **not** embed the report's own commit SHA in its contents), all changed paths and before/after WIP blobs, one-line ROADMAP delta, exact NEXT candidate match, immutable OUTLOOK, Stage 03 still OPEN, baseline regression/security proof, both-host CI runs/jobs/steps and warning/skips, original-branch retention and conditional recovery-branch pruning, and any local cleanup limitations. Report `COMPLETE` only for the verified administrative scope; no self-ACCEPT of the closure or of R03.C2.
+
+Commit this **one report path only** and push to `origin/main`; obtain full green Ubuntu/Windows CI at its exact final report HEAD. Read back the canonical report blob at the exact remote HEAD and verify the three-commit linear ancestry (issuance → closure → report), clean local `main == origin/main`, correct remote branch inventory, unchanged product/lock/policy/workflow, and exact WIP file count. Report final SHA/tree in the *chat handoff*, not self-referentially in the report.
+
+**Scratch discipline:** the already ignored live root `target/` cache must remain present and unaltered; retain the inherited Solo `.temp/` archives (reported baseline 2 files / 289,253,806 bytes) until their defined later use/cleanup trigger. Task-owned `.temp/` and Cline-provided temporary logs may be used, but clean identified obsolete task files promptly; never delete unknown material or infer scratch cleanliness from an empty `git status`. Do not alter `.gitignore` or invent an alternate temp root.
+
+## 4. Exact NEXT content — one **unissued** R03.C2 candidate
+
+Use **exactly** the following content as `.documents/WIP/plan-next.md`; it contains one roadmap-derived candidate and no implementation authorization:
+
+```markdown
+# Foundation Solo — plan-next (Next Candidate)
+
+## R03.C2 — Confined Entity graphic asset-byte acquisition
+
+**Objective:** Establish the next narrow, nonpublishing gate after accepted R03.C1: for each explicitly authored `namespace: "entity"` graphic obligation, acquire bounded authoritative source bytes from that Entity's confined `content/assets/` namespace and return typed evidence or an explicit fail-closed refusal. This gate proves **only** source acquisition and confinement, not that the bytes are a safe or correctly decoded image. No inferred source, role fallback, external fetch or publication is permitted.
+
+**Prerequisites/readiness:** R03.A's registry, R03.B's complete five-level resolution/provenance, R03.C1's whole-graph authored graphic inventory and accepted R02 capability-confined `content/pages/` reader are present; locked `rustix 1.1.6` is green on both hosts. Binding Architecture §§6.2C and 6.2I locate Entity asset references relative to `content/assets/`, independent of Page source candidates. Before any code-bearing order, inspect the real native source-reader, bootstrap root trust, application ports, asset reference grammar, physical alias/collision policy, negative host tests and all current interfaces; propose the smallest precise path/operation ledger and any narrowly required safety reviews. Existing Page source reading is `pages/`-specific and **cannot** be assumed to cover assets without an explicitly tested extension. No tracked artwork or lawful platform catalogue is approved by this candidate.
+
+**Proposed scope:** Drive the accepted R03.C1 *entire authored obligation inventory*, not the selected public representation alone, through a typed, explicit Entity-asset byte-acquisition boundary. Resolve only `namespace: "entity"` beneath its operator/trusted-handle-designated `content/assets/` root, with validated single-component traversal and the existing Linux/Windows non-follow, no-escape, identity/recheck and immutable-transfer guarantees; reject absent, unsafe, inaccessible, cross-device, reparse/symlink, hardlink/physical-alias and changed files rather than treating failures as absence or falling back. Bound an image source to **20 MiB maximum** before/during the read, keep exact declaring owner/role/index/exposure/namespace/ref and safe diagnostic categories, and refuse the whole candidate if *any* declared Entity image fails, including an internal, descendant-suppressed or unlisted declaration. Do not scan directories, guess extensions or infer asset ownership. A declared `namespace: "platform"` remains **unverified and ineligible** until a separate Owner-reviewed, exactly pinned `platformAssetLibraryVersion: "1.0.0"` catalogue and reader exist; mixed inventories must not be represented as fully validated by simply skipping platform references.
+
+**Proposed deliverables:** A future separately Owner-issued, exact file/operation ledger; pure inward port/use-case types and narrowly scoped outward confined reader integration if warranted; a typed nonpublishing read-evidence/refusal collection bound to each original authored obligation; realistic Linux/Windows filesystem positive and adversarial cases (including no-follow, traversal, reparse/junction, hardlinks/identity collision, oversize, missing and changed source), whole-graph internal/unlisted/suppressed negative cases, zero-publication/zero-default assertions, unchanged Page source-reader and all earlier R01/R02/R03 regressions, fresh A1 review and full two-host CI. Use disposable test content, not invented product artwork or a platform catalogue. If native boundary changes or safe asset-byte validation are too broad, subdivide in the later exact order without pretending R03.C is complete.
+
+**Exit conditions:** Every declared Entity graphic obligation has exactly its own confined, bounded read evidence or causes deterministic whole-candidate refusal; no unrelated or absent file is discovered; namespace and original owner/provenance remain exact, no sibling Entity/Site/representation leak occurs, no public/internal/suppression fallback appears, and Linux/Windows confinement and regression gates are green. Successful byte acquisition **never** asserts MIME/magic match, safe media decode, image dimensions/pixel bounds, licence rights, catalogue validity, immutable public derivative or publication permission. These remain pending R03.C delivery gates, including the Owner-reviewed pinned Platform library. Stage 03 and R03.C remain OPEN.
+```
+
+## 5. Mandatory acceptance and refusal matrix — administrative only
+
+| ID | Required independently verifiable result |
 | --- | --- |
-| `.documents/WIP/workorder-active.md` | Owner installs this complete issued order, then Agent verifies and commits this file **alone** at issuance; leave its text frozen thereafter. No self-ACCEPT or ACTIVE clearing. |
-| `crates/solo-application/src/graphic_asset_inventory.rs` | Recover the exact source-branch module; only tightly necessary R03.C1 contract/test corrections if evidence requires them. |
-| `crates/solo-application/src/lib.rs` | Recover exactly the R03.C1 module declaration and public exports; change only if required by an in-scope correction. |
-| `crates/solo-application/tests/graphic_asset_inventory.rs` | Recover and run the original meaningful R03C1 application tests; only fix incorrect in-scope tests without loosening requirements. |
-| `crates/solo-adapters/tests/property_resolution.rs` | Recover and run the original four real strict-JSON R03C1 cases; preserve all prior R03.B fixtures/tests. |
-| `crates/solo-domain/tests/property_resolution.rs` | Recover and run the original three R03C1 domain cases; preserve previous assertions. |
-| `.documents/Reports/execution-report.md` | Overwrite the **single canonical factual report** after integration; publish as report-only commit. If STOP, publish a truthful STOPPED report on `main` when safe. |
+| `S064-01` | Exact starting `main`, tree, report, WIP, dependency/policy/workflow, branch tips, one-checkout/remote and installed Owner order match §1. |
+| `S064-02` | Issuance commit changes **only** ACTIVE; clean two-host CI at exact issuance SHA; order's Approved Scope frozen. |
+| `S064-03` | ROADMAP's only diff is the one exact R03.C bullet replacement in §3D; accepted inventory removed from pending work, remaining R03.C and Stage 03 retained, every later stage/exit gate preserved. |
+| `S064-04` | NEXT has **exactly** §4's single R03.C2 candidate and is **not** executed; all five NEXT purity fields present, no second candidate. |
+| `S064-05` | ACTIVE becomes exactly its neutral heading, OUTLOOK remains byte-identical, exactly four WIP files remain. |
+| `S064-06` | ROADMAP wording honors already binding §6.2I no-fallback rule; Architecture itself unchanged, no invented artwork/catalogue/media or new contract decision. |
+| `S064-07` | Closure commit changes exactly ROADMAP/NEXT/ACTIVE; green two-host CI at the closure SHA; no product code/test/manifest/lock/policy/toolchain/workflow change. |
+| `S064-08` | Original divergent `solo-wo-061-r01` remains local and remote at `4371af21…` unchanged; recovery `solo-wo-063-r01` is pruned **only** when containment/branch/PR/local safety checks prove it lossless, otherwise honestly reported retained with blocker; no force/history rewrite. |
+| `S064-09` | Canonical report is the only report; report-only final commit and full green Ubuntu/Windows CI at exact final HEAD; readback SHA/blob/tree/parent and accurate warning/skipped-step ledger. |
+| `S064-10` | No ignored test, security exception, bypass or undeclared dependency; known `Unicode-3.0` warning remains noted `UNVERIFIED`, `itoa`/`syn` patch lags untouched. |
+| `S064-11` | Single checkout and clean worktree; truthful temp archive/cache preservation and identified task scratch cleanup, no unknown-data removal, exact WIP count. |
+| `S064-12` | No implementation of NEXT, new branch/code/asset, Stage 03/R03.C closure, release, deployment, PR, provider or other-repository write; Implementation Agent does not self-ACCEPT. |
 
-**No NEXT transition is necessary or authorized:** `.documents/WIP/plan-next.md` is **already neutral**. `.documents/WIP/plan-roadmap.md` retains R03.C and Stage 03; `.documents/WIP/plan-outlook.md` stays untouched. There must be exactly four files in WIP and no duplicate report or archived work order. There is **no** authorization to edit Architecture, About, SOPs, README, AGENTS, any other code/test path or any other repository.
+## 6. STOP and final handoff
 
-**Forbidden changes:** `Cargo.toml` files (including the patched adapter manifest), `Cargo.lock`, `deny.toml`, `rust-toolchain.toml`, `.cargo/`, `.github/`, `.gitignore`, toolchain/CI/security settings, manifests/config outside this exact ledger, external dependencies, root `LICENSE`, `platform/`, assets, artwork, generated images or media catalogue, graphics contract versions, routes, publication/HTTP/renderer, alternative fallback, contact or other unrelated product functionality. No dependency or RustSec waiver, ignored test, test deletion, masked CI error, fake verified asset, edited security advisory database or invented publication result.
+**STOP**, preserving state and issuing a truthful canonical `STOPPED` report where safe, for an unverified Owner handoff, baseline or branch identity mismatch; unexpected tracked/untracked material; any required edit outside the ledger; inability to preserve unique original-branch history; attempts to remove R03.C/Stage 03; a non-fast-forward or forced Git operation; changes to the frozen issued scope; a mandatory two-host gate failure; accidental publication/asset/fallback claim; unsafe branch deletion; or any unknown Owner-data risk. A merely blocked **optional** recovery-branch prune is reported as such and not bypassed. Never continue by mutating `deny.toml`, altering CI, inventing assets or executing NEXT.
 
-**Authorized Git operations:** within the **one** genuine local Solo checkout, after clean-root preflight, ordinary `fetch`/remote verification; commit and push the Owner-installed issuance file; create **one** new short-lived branch `solo-wo-063-r01` from the exact new issuance `main` SHA; **explicitly cherry-pick only original commit** `4371af21dce67f33cf1df0384738bf353ca80fc6` onto that new branch, preserving the old branch/ref and published history; commit/push bounded five-path corrections if needed; dispatch/read GitHub CI against the **exact recovery branch SHA**; and **only after fully passing gates**, use **fast-forward-only** integration of that new recovery branch into `main` and push it, followed by the one report-only commit/push. No PR, squash, rebase, reset, force-push, amend, merge commit, deletion of either branch, tag, release, deployment, extra remote, nested checkout, shadow clone or Git worktree is authorized. A safe clean-tree `git switch` is allowed; destructive checkout is not. Do not ask the Owner to perform routine Git commands the Agent is authorized to do.
+**Handoff:** report the exact issuance, closure and final report SHAs/trees, WIP blobs and diff proof, branch tip and safe prune outcome, local/remote cleanliness, full CI run/job/log anchors, and remaining R03.C delivery. After the Chief Architect independently returns `ACCEPT / REVISE / STOP` for **this administrative order**, the Owner may separately issue an R03.C2 code order, subject to its own technical ledger and readiness gate. The presence of R03.C2 in NEXT itself confers **no execution authority**.
 
-**Retained original branch is immutable in this order:** `refs/heads/solo-wo-061-r01` **and** `origin/solo-wo-061-r01` must remain exactly `4371af21dce67f33cf1df0384738bf353ca80fc6` at end. Cherry-picking creates a **new** commit on the **new** branch and does not rewrite or fast-forward the original. The new `solo-wo-063-r01` may also remain at its accepted substantive tip pending later Owner-authorized administrative closure/pruning. No branch is pruned here.
-
-**Other permissions:** no provider credentials, account operations, secrets, external hosted tools, purchasing, release or deployment. Read-only authoritative crates.io/RustSec/OSV/vendor/version research and normal network-enabled locked `cargo fetch`/CI operations are authorized where already supported by the accepted workflow. Per SOP §6A, disposable task scratch is permitted in the verified Solo `.temp/` or the actual Cline-provided task temp workspace, with cleanup and evidence; no new repository checkout there.
-
-## 3. Recovery sequence — each gate precedes the next
-
-### 3A. Safety preflight before any permanent change
-
-1. Confirm actual root using repository tooling, branch `main`, remote ownership/URL, `HEAD`/`origin/main` and tree exactly as §1. Enumerate tracked/untracked state and worktrees. The Owner-installed ACTIVE file is the **only** permissible initial modification. Check existing WIP and report blobs, patched manifests/lock, deny/workflow/ignore hashes and both branch tips against §1.
-2. Independently inspect the retained `SOLO-WO-061 R01` code and its original §5 R03C1-01 through R03C1-12 acceptance matrix. Confirm its one substantive commit has **only** the exact five paths in §2, with no added dependency, asset, licence, catalogue or publication path. The source branch is not automatically trusted because the agent previously authored it.
-3. STOP if either branch or `main` has diverged, a second checkout/worktree exists, unknown dirty/Owner-owned files are at risk, the exact `rustix 1.1.6` baseline is absent or the new installed `OWNER-ISSUED` identity/handoff mismatches. No reset, clean, stash or unapproved reconciliation.
-
-### 3B. Publish issuance; require repaired-baseline CI to stay green
-
-1. Stage/commit **only** the Owner-installed `.documents/WIP/workorder-active.md` from `main` and push via the accepted sole `origin`. Verify new remote HEAD, tree and ACTIVE blob, with NEXT, ROADMAP, OUTLOOK and Cargo files unchanged. Record exact issuance commit and tree.
-2. Require the normal `main` push `rust-verify` run at this exact issuance SHA to finish **success on both** `ubuntu-24.04` and `windows-2025`, including a fresh RustSec check and all mandatory steps. Unlike the previous security-remediation order, a newly failed security gate is **not expected or permitted** to be waived. Record the CI run/jobs, warnings and counterpart-host skips before continuing.
-3. Do not cherry-pick while the issuance gate is red or the main/remote state is uncertain. STOP and report accurately instead.
-
-### 3C. History-preserving R03.C1 recovery branch
-
-1. From clean issued `main`, create **new** `solo-wo-063-r01` at that issuance SHA; confirm it is not a second worktree and the original branch still has the exact untouched source tip.
-2. Cherry-pick **only** `4371af21dce67f33cf1df0384738bf353ca80fc6` onto the new branch. Because the original code commit changes only five paths and patched `main` changed only authorization/report/manifest/lock, the expected operation is clean. Record the original SHA, new cherry-pick SHA, the source and destination parents and the exact patch/path comparison. If any conflict, unexpected path, unexplained textual drift or unresolved Git state occurs, **STOP** without inventing conflict choices or discarding data.
-3. The first recovered code commit must have exactly the original five technical paths, with the original content of those paths reproduced. The expected source-branch blob IDs are:
-
-   | Recovered path | Original source branch blob |
-   | --- | --- |
-   | `crates/solo-application/src/graphic_asset_inventory.rs` | `7de9bc7399854b2059cbec17ee23c1e1ae637159` |
-   | `crates/solo-application/tests/graphic_asset_inventory.rs` | `49b0038d49277862329b00d9c8da9fdd172467a3` |
-   | `crates/solo-application/src/lib.rs` | `1f5115569b0c65bef3e9f44abd6a4a022f9fd081` |
-   | `crates/solo-adapters/tests/property_resolution.rs` | `332372ef2f5d9ae290477ea6836f4157d5c84cd6` |
-   | `crates/solo-domain/tests/property_resolution.rs` | `5fea4e4748f493bb43f7f80189081c11bb75e162` |
-
-   Verify complete graph/output semantics against the accepted R03.C1 order rather than assuming byte identity proves correctness. New recovery-branch source must inherit **patched `rustix 1.1.6`** and every immutable §1 dependency/security/WIP baseline blob; the source commit must not restore the former `1.1.5` dependency.
-4. Use the original R03.C1 tests as substantive test input, not as already-passed evidence. If CI reveals a genuinely bounded bug or a faulty expectation, repair **only** the exact five listed source/test paths, commit that correction separately on the **recovery** branch and rerun **all** required gates. Each correction must be linked to a named R03C1 matrix row with precise before/after assertions. No deleting, skipping, XFAILing, trivializing or relaxing tests, no invented media verification, and no adding behavior outside this inventory slice. STOP and seek separate Owner authority if the repair requires any forbidden path, a new dependency, another architecture decision, new production adapter code or a changed security policy.
-
-### 3D. Fresh, complete branch validation — mandatory integration gate
-
-1. Push `solo-wo-063-r01` ordinarily to `origin` (new branch only); verify remote tip/tree agrees. Dispatch the unchanged `rust-verify` workflow **at that exact branch ref/SHA** and confirm jobs actually checked out the intended SHA. Do not treat old green `main` runs as branch-code evidence.
-2. Both Ubuntu and Windows must pass every applicable existing gate: pinned toolchain, locked fetch and exact graph, `cargo-deny 0.20.2` with **fresh RustSec**, licence/source/bans, package-set gate, `cargo fmt --all -- --check`, strict Clippy (`-D warnings`), `cargo test --workspace --all-targets --locked`, architecture checker and refusal/tripwire, locked release build, real CLI accepted/refused smoke, Linux-only RustSec negative probe and **Ubuntu byte-for-byte reproducibility**. Host-inapplicable steps may skip; any other skip, new warning, failure, ignored test or red result must be triaged, not waved through.
-3. Capture exact test results on each host, including execution of named `r03c1_*` tests (not merely their names appearing in the source), and verify **all** R03C1-01…12 requirements in §4. The inherited `warning[license-not-encountered]` for `Unicode-3.0` remains **UNVERIFIED** unless separately repaired; disclose its actual presence and context, and do not suppress or relabel it as a pass. Record fresh component/security review of the exact 22-package locked graph, RustSec/OSV/vendor freshness, source access boundaries, OS-specific variants and any remaining patch lags. Material new/advisory findings stop integration.
-4. No completed green two-host branch run means **no integration**. If STOP, preserve both branches, return to safe clean `main` when possible, publish one truthful STOPPED report via the standing report-only permission if safe, and request the smallest exact additional Owner decision.
-
-### 3E. Conditionally fast-forward integrate and re-verify `main`
-
-**This section is operative only if §3D is fully green and the exact five-path R03.C1 acceptance conditions are evidenced.**
-
-1. Re-fetch and recheck that `origin/main` is still the exact green issuance SHA, the recovered branch is its descendant, no unexpected remote commits or branch drift exist, the original 061 branch is still untouched, and the worktree is clean. STOP on divergence; never force or rewrite history.
-2. Switch safely to `main` and integrate **only** `solo-wo-063-r01` with **fast-forward-only** semantics (no merge commit and no squash). The resulting `main` tree must consist of the original patched dependency baseline plus the five authorized R03.C1 paths, and the frozen issued ACTIVE order. Push `main` ordinarily and independently read back commit, tree and changed-path diff. Neither branch is deleted.
-3. Wait for the normal `main` push CI at that substantive SHA and verify **success on both hosts**, including all actually executed R03C1 tests. A failure, untriaged warning or material difference from the branch verification is a STOP, not permission to publish a COMPLETE claim or silently broaden scope.
-
-### 3F. One canonical final report, verified at its own SHA
-
-1. Only after green branch and substantive `main` runs, overwrite **exactly** `.documents/Reports/execution-report.md` with a factual `COMPLETE` run record: order and Owner approval, exact baseline/issuance/recovery/cherry-pick/substantive main commit+tree identifiers; the five path/blob mapping and any correction commits; test names/total counts and all R03C1-01…12 outcomes; CI run IDs, per-host job conclusions and security timestamps; A1 component ledger and warnings; original and recovery branch tips; root/worktree/remotes; source/asset nonpublication boundaries; `.temp`/Cline scratch cleanup and retained archive triggers; and explicit unimplemented R03.C work. Do not embed the final report's own future SHA in its content.
-2. Commit/push **only the canonical report** from clean `main`. Independently read it back from GitHub at the resulting report SHA, verify its blob/tree and confirm **full two-host `rust-verify` success at the report commit itself**. If report CI fails, correct only within authorized scope and report truthfully; do not claim completed acceptance from an earlier green revision.
-3. Final handoff names exact commit/tree/blobs, GitHub URLs, complete authorized whole-order diff, green job/step evidence, warning/skips, clean local status and retained two branches. The Agent reports `COMPLETE` or `STOPPED` factually but **never self-ACCEPTs**. Chief Architect independently issues `ACCEPT / REVISE / STOP` against the final published report.
-
-## 4. Frozen R03.C1 acceptance matrix — no reinterpretation
-
-The complete **`SOLO-WO-061 R01` §5 `R03C1-01` through `R03C1-12` matrix is incorporated by reference exactly**, and **every row requires fresh evidence now**. The original branch had test files, but its two-host gates never passed; do not promote any of those rows from `NOT VERIFIED` merely because the tests compile. For convenient execution, the following are the observable contracts, subordinate to the exact original matrix:
-
-| ID | Required observation after recovery |
-| --- | --- |
-| R03C1-01 | Five-level original authored graphic obligations: Entity, Facet, Site, Page, representation, ordered graph-parent-first, registry-role-first, local-index-first; full qualified owners. |
-| R03C1-02 | All five graphic role keys (logo, favicon, banner, background, social-preview); original source namespace/reference, exposure, local index, and role retained exactly. |
-| R03C1-03 | At least two sibling Sites and two region-qualified representations; whole-graph inventory independent of requested target; no sibling leakage or inferred locale/geography. |
-| R03C1-04 | Internal, unlisted and later-suppressed authored sources all inventoried; safe public projection still hides internal and suppressed values. |
-| R03C1-05 | Suppress with `currentContext: "none"` produces no local obligation; suppress+local produces exactly one; no invented values from absence/`none`. |
-| R03C1-06 | Same filenames at different owners remain distinct; same filename in `entity` vs `platform` namespaces remains distinct; no fallback or cross-Entity ownership. |
-| R03C1-07 | Existing full-effective (pre-public-filter) singular 0–1, background 0–4 and exact duplicate-background refusals, plus legal suppress+replacement, remain intact. |
-| R03C1-08 | Strict real JSON, complete owner inventory, independent sibling/representation cases; malformed declaration on unlisted/unrequested branch refuses whole candidate with typed safe cause. |
-| R03C1-09 | Closed asset-reference grammar: approved image extensions, favicon PNG only; refuse external/absolute/relative escapes, malformed/encoded/active references; no media-byte attestation. |
-| R03C1-10 | No publication/asset/source/network authority; repeatable nonpublishing inventory; empty and all-internal cases; no default or generated asset. |
-| R03C1-11 | Existing R01/R02/R03.A/R03.B and architecture/security/negative regression suites pass unchanged; domain pure std and application only inward dependencies. |
-| R03C1-12 | Full patched-baseline green issuance, recovered-branch, fast-forward-integrated substantive main, and report-head CI, both hosts, actual non-skipped test/gate evidence and full code-bearing A1 review. |
-
-**Nonpublication and architecture contract:** The graphic inventory enumerates authored obligations, **including** those later suppressed; it never asserts that a referenced file exists, is valid media, licensed, safe, read from a confined source or present in a pinned catalogue. Binding `.documents/Architecture/ARCHITECTURE.md` §6.2I.1 prohibits **automatic platform fallback for any role**; explicit `platform` references do not convey a fallback. The pending ROADMAP wording about optional generic fallback remains unchanged and is not authority to override Architecture. `platformAssetLibraryVersion: "1.0.0"` is a contract pin, **not** proof that an Owner-reviewed `platform/assets/` catalogue/artwork has been delivered. No R03.C or Stage 03 completion is permitted within this slice.
-
-## 5. A1, quality, version currency and test integrity
-
-1. Before acceptance, record the complete current first-party + third-party **normal/build/dev**, host-target and transitive dependency/attack-surface inventory for the exact recovered code SHA and current patched baseline (22 locked packages unless a STOP-worthy mismatch is discovered). Use fresh official RustSec and relevant OSV/GHSA/vendor data with exact versions, dates, advisories, reachability and disposition. In particular confirm the patched `rustix 1.1.6` remains in the exact locked graph with no `RUSTSEC-2026-0486` exposure or hidden waiver; verify the CI actions/toolchains/runners and environment stability. Do not refresh dependencies as a side effect.
-2. Respect `deny.toml`'s `unsound = "all"`, source/licence/bans checks and the existing inherited `Unicode-3.0` nonfatal warning; this order may document but **not** remediate or suppress its unknown cause. Independently record any remaining `itoa`/`syn` version lag as applicable; no maintenance update is authorized.
-3. Validate the Ports-and-Adapters dependency direction with actual architecture checks; the recovered module is an application-level use case over existing validated property inputs, and must not reach filesystem, providers, external APIs or rendering. Test actual behavioral and refusal semantics, not only JSON lexical parsing, compilation, a green workflow badge, a `has_*` predicate or a test name. Host-specific skipped steps are `NOT APPLICABLE` for that host, not an unqualified PASS.
-4. Report actual command results. When local Windows lacks `link.exe`, local test execution is `NOT RUN`; two-host GitHub CI with actual test-step logs is the requirement, not a substitute assumed from local `cargo check`. Never use stale advisory databases, `--offline` for fresh advisory acquisition, disabled security gates, ignored tests or a mock publication pipeline to manufacture success.
-
-## 6. Repository, temporary workspace, branch safety and stop rules
-
-**Single checkout only:** use `C:\Users\Sean\Documents\Provelopment\00.foundation-solo`; no secondary clone, shadow source tree, nested repo, additional worktree or extra remote anywhere. Preserve the live root `target/` cache and anchored `/target/` `.gitignore` rule, including all unrelated Owner material. Only clean identified task-owned scratch in Solo `.temp/` or the actual Cline-provided task temp area, retaining the inherited `architecture-fixtures/` and `toolchain-installer/` material (previous observed **2 files / 289,253,806 bytes**) unless a separately Owner-authorized cleanup trigger has been met. Do not broadly delete `.temp/`, OS temp roots or unfamiliar artifacts; record actual before/after state and any cleanup limitation.
-
-**STOP immediately** on a mismatched Owner order/handoff, unexpected root/HEAD/branch/tree/blobs, untracked or Owner-owned data conflict, nontrivial cherry-pick conflict, extra technical changed path, security advisory or failed mandatory CI, cross-Entity/sibling leakage, internal/unlisted publication, wrong fallback, source/asset verification claim that is not proven, unsafe deployment/publication side effect, hidden use of secrets or another repository, or an R03.C1 defect needing broader design, dependency or code scope. Do not rewrite either published branch, force push, reset or clean unknown data. Preserve the original R03.C1 source and any safely published recovery progress; report exactly which named acceptance rows are still `UNVERIFIED`, the observed blocker and smallest permissible Owner decision.
-
-**Final WIP state even after green runs:** exactly four retained files; ACTIVE still this frozen `OWNER-ISSUED — SOLO-WO-063 R01`; NEXT neutral; ROADMAP retaining the R03.C pending package and Stage 03 exit gate; OUTLOOK unchanged. Green CI is **not** administrative closure, new artwork approval, media safety proof, a release, a deployment or authorization to start R03.C2. Chief Architect may independently `ACCEPT` only this R03.C1 slice; separate Owner closure/reconciliation is required to neutralize ACTIVE, advance NEXT or prune the two retained branches.
-
-**End of OWNER-ISSUED SOLO-WO-063 R01.**
+**End of OWNER-ISSUED SOLO-WO-064 R01.**
