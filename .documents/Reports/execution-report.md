@@ -1,153 +1,174 @@
 # Execution Report
 
-**Order:** `OWNER-ISSUED — SOLO-WO-060 R01` — administratively close independently accepted R03.B and select R03.C as the sole NEXT candidate.
-**Owner handoff:** `SOLO-WO-060 R01` (matching).
+**Order:** `OWNER-ISSUED — SOLO-WO-061 R01` — implement R03.C1, the exhaustive authored-graphic asset-obligation inventory and its fail-closed nonpublishing boundary.
+**Owner handoff:** `SOLO-WO-061 R01` (matching).
 **Session date:** 2026-11-11.
-**Root:** `C:\Users\Sean\Documents\Provelopment\00.foundation-solo` — verified `git rev-parse --show-toplevel`, one worktree, sole `origin` = `https://github.com/provelopment/provelopment-foundation-solo.git` (fetch and push).
-**Disposition:** **COMPLETE** for the authorized administrative scope. No product code, dependency, asset, configuration or Architecture change was made. **Stage 03 remains OPEN**, R03.C is a proposal only, and the Implementation Agent does **not** self-ACCEPT.
+**Root:** `C:\Users\Sean\Documents\Provelopment\00.foundation-solo` — verified single checkout, one worktree, sole `origin` = `https://github.com/provelopment/provelopment-foundation-solo.git`.
+**Disposition:** **STOPPED.** A material, newly published RustSec advisory (`RUSTSEC-2026-0486`, `unsound`, `rustix 1.1.5`) now fails the mandatory component-security gate on **both** hosts for the unchanged locked graph. Remediation requires `rustix >= 1.1.6`, which is a `Cargo.lock` change this order expressly forbids. The branch was therefore **not** integrated, **R03.C and Stage 03 remain OPEN**, and the Implementation Agent does **not** self-ACCEPT.
 
 ## 1. Preflight — verified baseline
 
 | Check | Observed |
 | --- | --- |
-| Checkout / branch | single genuine Solo checkout, branch `main` |
-| `HEAD` before the installed order was committed | `feef7e5ff20f375b2c8e0a4f2aacdd11cb30595a` |
-| `origin/main` | identical: `feef7e5ff20f375b2c8e0a4f2aacdd11cb30595a` |
-| Tree at anchor | `85bf2d330966e75a9e1b7c14d7deed100f9b6d3c` |
-| Remote ledger | exactly one remote `origin`, the accepted URL; no other remote authorized or present |
-| Worktrees | 1 (`git worktree list`); no pending merge, rebase or cherry-pick |
-| Only tracked difference at preflight | ` M .documents/WIP/workorder-active.md` — the Owner-installed `SOLO-WO-060 R01` text replacing the frozen `SOLO-WO-059 R01`; nothing else modified, staged or untracked |
-| `.documents/WIP/workorder-active.md` at `HEAD` | `52d0fda32ac082101782875070d0f0ceb5961337` (prior frozen order) ✔ expected |
-| `.documents/WIP/plan-next.md` | `92fa562b1af0c54391851aa5c79deb1631127069` (neutral heading) ✔ |
-| `.documents/WIP/plan-roadmap.md` | `754ce1b75917d3168457965c3efed1137ff3aa9c` (Stage 03 lists R03.B and R03.C) ✔ |
-| `.documents/WIP/plan-outlook.md` | `cb9c7a610cf3c537557e060ca9656e44a053e69d` (neutral) ✔ |
-| Root `.gitignore` | `f45dd49524748e9b08f6678271edfc22ac39b97f`, root-anchored `/target/` rule at line 24 ✔ |
-| Installed order identity | clearly `OWNER-ISSUED — SOLO-WO-060 R01`, matching scope and handoff, **not** an R03.C implementation order ✔ |
-| Prior canonical report readback at the anchor | blob `28b853dac3e7e517edaab9cc1fc262a96d38f3c6`, 29,875 bytes, fetched first from GitHub ✔ |
-| Newer contrary Architect disposition | none found in the published report; its recorded `REVISE — SOLO-WO-059 R01` history is followed by this order's independent `ACCEPT — SOLO-WO-059 R01 / R03.B` |
-| Accepted substantive baseline | `235050b7fafaeb798b600b51096c0cf1b3ce38ef`, tree `885ef9c8246e1346f21882e4042c2336ae0bc9a2` ✔ |
+| `HEAD` == `origin/main` at start | `2dc75f7e8a91891e8a121ef87ccc3eb028526766` ✔ |
+| Tree at start | `62dac0ad0e5e2334bd10ae13708df4a05b0493a9` ✔ |
+| Branch / worktree / remote | `main`; 1 worktree; 1 remote (`origin`, the accepted URL) |
+| Only tracked pre-authorization difference | ` M .documents/WIP/workorder-active.md` — the Owner-installed `SOLO-WO-061 R01` (blob `5b1658f4…`, 31,882 bytes), nothing else staged/modified/untracked ✔ |
+| WIP blobs at `HEAD` | ACTIVE `ea5f20b7…` (neutral), NEXT `0e5f4342…` (R03.C candidate), ROADMAP `31a0ba2e…`, OUTLOOK `cb9c7a61…` ✔ |
+| `.gitignore` | `f45dd49524748e9b08f6678271edfc22ac39b97f`, `/target/` anchored ✔ |
+| Installed order identity | clearly `OWNER-ISSUED — SOLO-WO-061 R01`, matching scope and handoff, **not** an R03.C-wide order ✔ |
 
-No divergence, unexpected write or unknown dirty data was found, so no reset, clean, stash, rebase or force operation was used at any point.
+Interface confirmation from source (all present, none renamed): `ValidatedPropertyInputV1::owners()`/`declaration_for()`, `PropertyResolutionCandidateV1::input()`, `AuthoredPropertyValueV1::value()`/`exposure()`, `PropertyKey::ALL`/`is_graphic()`, `PropertyValueV1::asset_reference()`, `QualifiedOwnerV1`, `AssetReferenceV1::namespace()`/`reference()`, `Exposure`. No reconciliation or forbidden production edit was needed.
 
-## 2. Authorization step — issued-order commit
+## 2. Authorization revision — published and green on both hosts
 
 | Item | Value |
 | --- | --- |
-| Commit | `006c80aa78de22df849599070407ea70b6f47f8b` |
-| Tree | `e29a61aaa98ad893066cf84b8c6b5909396e16e4` |
-| Paths | `.documents/WIP/workorder-active.md` only |
-| Installed order blob | `afe8a99ea398be332152fb069bb323ebf5627bd4` |
-| GitHub readback at that commit | `afe8a99e…` — identical ✔ |
-| Two-host CI | run `42982329548` — success, 33 steps, 0 failed, 9 (Ubuntu) / 14 (Windows) counterpart-host skips |
+| Commit | `dcaab733a56b0a95040e5a63fa3b2a0f2aa6d8ae` |
+| Tree | `0b194bef13b4d78cbda99fa5ddb2bcc74b5e3021` |
+| Paths | `.documents/WIP/workorder-active.md` (`5b1658f4…`), `.documents/WIP/plan-next.md` (`92fa562b1af0c54391851aa5c79deb1631127069`, exactly the authorized neutral heading) |
+| CI | run **`42987963563`** — success on `ubuntu-24.04` and `windows-2025`; 33 steps, 0 failed, 9 / 14 counterpart-host skips; security gate passed with advisory-DB commit `132f5db7633f57369ba099098285b2cb680b1886` fetched `2026-11-11T08:34:33Z` |
 
-ACTIVE still held the full issued order at this point; NEXT, ROADMAP and OUTLOOK were untouched.
+ROADMAP and OUTLOOK were untouched by this run.
 
-## 3. Closure transition — one commit, three authorized WIP paths
+## 3. Implementation branch — published, gate failed
 
 | Item | Value |
 | --- | --- |
-| Commit | `ce2caf6180d0e754bdce3e650e7b79303aa95834` |
-| Tree | `12bfd8d80dc9445f01c26626bf3d40052e96b65c` (GitHub readback identical ✔) |
-| Paths | `.documents/WIP/plan-roadmap.md`, `.documents/WIP/plan-next.md`, `.documents/WIP/workorder-active.md` — exactly these three |
-| `plan-roadmap.md` | `31a0ba2efb4f780f7248c56ff84683f20d9bc97f`; diffstat `0 added / 1 removed`, single hunk `@@ -9 +8,0 @@` deleting **only** the `- **R03.B:** …` bullet, byte-identical match confirmed before deletion (exactly one occurrence) |
-| `plan-next.md` | `0e5f434213f2686b19df4c8458561f417e099e52`; diffstat `12 added / 0 removed`; the exact §5 candidate text, extracted programmatically from the issued order's fenced block (13 lines, 4,209 bytes, LF, single trailing LF, no extra commentary) |
-| `workorder-active.md` | `ea5f20b736483c2e102456be1cea9104059fc81a` — the order's expected neutral blob, produced as exactly `# Foundation Solo — Active Work Order` + one LF (41 bytes) and hash-verified against the expected value **before** commit |
-| `plan-outlook.md` | `cb9c7a610cf3c537557e060ca9656e44a053e69d` — unchanged ✔ |
-| Two-host CI | run `42982922018` — success, 33 steps, 0 failed, 9 (Ubuntu) / 14 (Windows) skips |
+| Branch | `solo-wo-061-r01`, created from the authorization SHA in the same checkout |
+| Commit | `4371af21dce67f33cf1df0384738bf353ca80fc6` |
+| Tree | `89c6176a5f159069eccab9eb0d4ed67e88eaba4f` |
+| Remote | pushed ordinarily to `origin/solo-wo-061-r01` (same SHA); **no PR created**, no merge, no rebase, no force |
+| Paths | exactly the five authorized: `crates/solo-application/src/graphic_asset_inventory.rs` (new, 237 lines), `crates/solo-application/src/lib.rs` (+5 lines: module decl and re-exports), `crates/solo-application/tests/graphic_asset_inventory.rs` (new, 906 lines), `crates/solo-adapters/tests/property_resolution.rs` (+366/−4: import plus four appended tests), `crates/solo-domain/tests/property_resolution.rs` (+355/−0: three appended tests) |
+| Unchanged | `Cargo.toml`, `Cargo.lock` (`8bd0bb00286a97853624ebbc0fe18da42a733f12`, identical to `main`), `rust-toolchain.toml`, `.cargo/`, `deny.toml`, `.github/`, `.gitignore`, every domain/application/adapter production file except the two authorized, `platform/`, ROADMAP, OUTLOOK |
 
-**ROADMAP result.** The Stage 03 heading, its **Prerequisite**, the `- **R03.C:**` bullet and the **Exit gate** are preserved verbatim in their original order, and Stage 04 onward is byte-for-byte unchanged; no completion narrative, status banner, strike-through or archive was added. The accepted R03.B evidence remains in Git history and in the superseded report revision only.
+Implemented behaviour (`crates/solo-application/src/graphic_asset_inventory.rs`): a pure, nonpublishing `collect_graphic_asset_obligations_v1(&PropertyResolutionCandidateV1) -> Result<GraphicAssetObligationInventoryV1, PropertyResolutionRefusalV1>` over the already whole-graph validated candidate, iterating `input().owners()` (graph/parent-first), then `PropertyKey::ALL` filtered by `is_graphic()`, then each authored `currentContext` index; each immutable obligation exposes declaring owner, role, zero-based local index, authored exposure and the original `AssetReferenceV1` (namespace plus unchanged reference text); `GRAPHIC_ASSET_INVENTORY_GRANTS_PUBLICATION_AUTHORITY = false` with matching accessors; a defensive fail-closed refusal (`InconsistentRecord`, naming only owner and key) for an impossible non-graphic value on a graphic key. No I/O, transport, decoder, catalogue, provider, route, locale or publication path exists in the module.
 
-**NEXT result.** One candidate, `R03.C — Governed graphic roles and explicitly authored shared media`, carrying Objective, Prerequisites/readiness, Proposed scope, Deliverables proposed and Exit conditions. It grants no implementation permission, adds no second candidate, governance section, R03.B narrative or activation prompt.
+## 4. Local verification actually performed — and what could not run
 
-**ACTIVE result.** The single neutral heading with no status diary, exactly as authorized.
+| Gate | Result |
+| --- | --- |
+| `cargo fmt --all` / `--check` | clean; the formatter parsed every changed file, including the adapter test file |
+| `cargo check --locked -p solo-domain -p solo-application --all-targets` | **passed** — the new production module and the new application test file compile with all targets |
+| Focused tests, workspace all-target tests | **NOT RUN locally** — this Windows host has no MSVC linker (`link.exe` absent, no Visual Studio/Build Tools installation), so no test binary can be linked. `cargo check --locked -p solo-adapters --all-targets` fails at `serde_json`'s build script with `linker link.exe not found`, so the adapter test file could not be compiled locally either. |
+| Two-host CI | available only through the workflow, which is where the blocker in §5 was found |
 
-## 4. Conditional branch pruning — proof and result
+No compiler check is presented as a passing test, and no gate is claimed from a badge alone: the branch run below was read step by step.
 
-Performed only **after** the closure-content CI was green, while on `main`.
+## 5. The blocker — `RUSTSEC-2026-0486` against the unchanged locked `rustix 1.1.5`
 
-| Guard | Evidence | Result |
+Branch CI run **`42989368984`** (dispatched at the branch ref, unchanged workflow) **failed on both hosts** at the mandatory component-security gate — step 9 on `ubuntu-24.04`, step 10 on `windows-2025`:
+
+```
+error[unsound]: xattr functions mark unwritten bytes as initialized when given a zero-length buffer
+  ┌─ Cargo.lock:9:1
+  │ rustix 1.1.5 registry+https://github.com/rust-lang/crates.io-index
+  ├ ID: RUSTSEC-2026-0486
+  ├ Solution: Upgrade to >=1.1.6 (try `cargo update -p rustix`)
+  ├ rustix v1.1.5
+  │   └── solo-adapters v0.1.0
+  │       └── solo-cli v0.1.0
+advisories FAILED: 1 errors, 0 warnings, 0 notes
+##[error]cargo-deny check advisories failed for the locked workspace graph
+```
+
+Independently confirmed advisory metadata (fetched from the RustSec advisory database, 2026-11-11): `id = RUSTSEC-2026-0486`, `package = rustix`, `date = 2026-10-27`, `informational = "unsound"`, `keywords = [xattr, uninitialized-memory]`, `aliases = ["GHSA-jh2m-fhpj-3vr7"]`, affected functions `rustix::fs::{getxattr,lgetxattr,fgetxattr,listxattr,llistxattr,flistxattr}` for `>= 1.0.0, < 1.1.6`, patched `>= 1.1.6`. An independent OSV query for `rustix 1.1.5` at `2026-11-11T15:46:56+07:00` returned the same advisory id; the GHSA alias itself is not yet resolvable in OSV's mirror, so the advisory is very fresh.
+
+**This is inherited, not introduced by R03.C1.**
+
+- `Cargo.lock` is byte-identical on the branch and on `main`: both `8bd0bb00286a97853624ebbc0fe18da42a733f12`. No manifest, lock, toolchain, workflow or policy file was touched by this run.
+- The same scanner, the same pinned `cargo-deny 0.20.2` archive (SHA-256 verified) and the same `deny.toml` passed this gate on the authorization revision at `08:34:33Z` (DB commit `132f5db7…`). The branch run fetched the advisory database at `08:44:20Z` and failed. Only the advisory database advanced; the code and the locked graph did not.
+- `deny.toml` line 37 sets `unsound = "all"` — a hard failure for any crate in the graph, with no exception list. Line 33 denies yanked versions and line 36 denies unmaintained crates, so the policy has no bypass path that would be legitimate to use.
+- Because the security gate runs before the build gates, every later branch step was **skipped** on both hosts: package-set gate, format, strict Clippy, the full locked all-target test suite, architecture real-tree/refusal/tripwire, release build, CLI smoke and the Ubuntu byte-comparison. **No two-host evidence exists for the R03.C1 code itself.**
+
+**Reachability triage (reported, not waived).** `rustix` is a normal dependency of `solo-adapters`, target-gated to Linux, used in `source_read_native.rs` only for `openat2`/`open`/`OFlags`/`Mode`/`ResolveFlags` confinement. The advisory concerns only the `rustix::fs` extended-attribute functions; a repository search finds **zero** `xattr` call sites in Solo source or tests, so no Solo code path exercises the affected functions. That mitigates exploitability; it does not change the policy verdict, because `unsound = "all"` denies the version rather than a call site. This is recorded as an honest triage of a real advisory, not as a reason to treat the gate as passed.
+
+## 6. Why this cannot be repaired inside `SOLO-WO-061 R01`
+
+The only remedies are (a) `cargo update -p rustix` to `1.1.6`+ — a `Cargo.lock` change; (b) a `deny.toml` exception or a narrowed policy — a forbidden policy edit; or (c) an unapproved workaround such as disabling the gate. §3 and §7 of this order explicitly reserve dependency, lockfile and policy changes to a separate Owner order, and require a STOP on "a material security concern or two-host gate fails". No gate was weakened, no warning was silenced, and no test was skipped or `#[ignore]`d to manufacture a green result. The branch and its evidence are preserved for a lawful retry.
+
+## 7. A1 component ledger — fresh review dated 2026-11-11
+
+Registry and advisory queries were made on 2026-11-11 between `15:44` and `15:47` local time (`08:44`–`08:47Z`); the RustSec database revision used by CI is the one the workflow fetched at `08:44:20Z`.
+
+**Locked graph: 22 packages — 4 first-party (`solo-domain`, `solo-application`, `solo-adapters`, `solo-cli` 0.1.0) and 18 third-party.**
+
+| Package | Locked | crates.io max stable | Notes |
+| --- | --- | --- | --- |
+| bitflags | 2.13.2 | 2.13.2 | current |
+| errno | 0.3.14 | 0.3.14 | current |
+| itoa | 1.0.18 | 1.0.19 | inherited patch lag |
+| libc | 0.2.191 | 0.2.191 | current |
+| linux-raw-sys | 0.12.1 | 0.12.1 | current |
+| memchr | 2.8.3 | 2.8.3 | current |
+| proc-macro2 | 1.0.107 | 1.0.107 | current |
+| quote | 1.0.47 | 1.0.47 | current |
+| rustix | 1.1.5 | **1.1.6** | **RUSTSEC-2026-0486 (`unsound`); the blocker** |
+| serde / serde_core / serde_derive | 1.0.229 | 1.0.229 | current |
+| serde_json | 1.0.154 | 1.0.154 | current |
+| syn | 3.0.9 | 3.0.10 | inherited patch lag |
+| unicode-ident | 1.0.27 | 1.0.27 | current |
+| windows-link | 0.2.1 | 0.100.0 (new major series) | not a patch lag; required by `windows-sys 0.61`; no advisory |
+| windows-sys | 0.61.2 | 0.61.2 | current |
+| zmij | 1.0.23 | 1.0.23 | current |
+
+**Toolchain, CI and environment (all unchanged):** Rust `1.99.1` (`1.99.1-x86_64-pc-windows-msvc` locally), `rustfmt`/`clippy` from that pinned toolchain, `cargo-deny 0.20.2` from the pinned verified archive (Linux archive SHA-256 `9f12ed4c49936e09b48bf862b595cde2fe64fcbd9d74dfacac6131ca824c8d5f`; the Windows pin is the workflow's own documented digest), `actions/checkout` pinned to one full commit SHA, GitHub-hosted `ubuntu-24.04` and `windows-2025`, no browser environment in scope.
+
+**Findings.** `rustix 1.1.5` carries `RUSTSEC-2026-0486` (`unsound`, patched `>=1.1.6`), confirmed independently by the RustSec database and by an OSV query for that exact version. No other locked third-party package returned any advisory (OSV per-package queries for all 18 returned none). `itoa 1.0.18`, `syn 3.0.9` and `rustix 1.1.5` are one patch behind; `windows-link 0.2.1` is a distinct major line rather than an out-of-date patch. The inherited `cargo-deny` `license-not-encountered` warning for `Unicode-3.0` at `deny.toml:51` remains **`UNVERIFIED`** and is not repaired, silenced or claimed resolved here; this run's security gate stopped at the advisories error, so licence output is not presented as evidence either way.
+
+## 8. Acceptance matrix status — written, but not verified
+
+Every behavioural row below has corresponding implementation and test code on the retained branch. **None of them is verified**: the security gate failed before the test steps, and no local test binary can be linked on this host. They are reported as `NOT VERIFIED`, never as passed.
+
+| ID | Code written | Status |
 | --- | --- | --- |
-| G1 on `main` | `git rev-parse --abbrev-ref HEAD` = `main` | PASS |
-| G2 branch exists locally | `refs/heads/solo-wo-059-r01` = `235050b7fafaeb798b600b51096c0cf1b3ce38ef` | PASS |
-| G3 branch exists remotely | `refs/remotes/origin/solo-wo-059-r01` = `235050b7…` (after `git fetch --prune`) | PASS |
-| G4 local and remote tips agree | both exactly `235050b7…` | PASS |
-| G5 tip is an ancestor of published `origin/main` | `git merge-base --is-ancestor` exit 0 | PASS |
-| G6 zero unique commits | `git rev-list origin/main..solo-wo-059-r01` → 0 | PASS |
-| G7 no tag depends on it | `git tag --points-at 235050b7…` → none; repository has **no** tags at all | PASS |
-| G8 no worktree uses it | the single worktree is on `main` | PASS |
-| G9 no open PR depends on it | `gh pr list --state open` → none for that head (the only PR ever recorded, `#1 docs/solo-wo-018-security-register`, is `CLOSED` and unrelated) | PASS |
-| G10 closure-content CI green | run `42982922018`, both hosts | PASS |
-| G11 identity understood | tip is the accepted R03.B substantive commit; no unique or unclear work | PASS |
+| R03C1-01 | `r03c1_01_inventory_covers_all_five_levels_in_graph_and_registry_order` (owner-order, registry-order and local-index assertions; nine obligations) | NOT VERIFIED |
+| R03C1-02 | `r03c1_02_all_five_roles_…` (application) and `r03c1_07_five_registered_graphic_roles_keep_exact_origin` (domain) | NOT VERIFIED |
+| R03C1-03 | `r03c1_03_inventory_is_identical_for_any_requested_target_…` (application) and `r03c1_03_sibling_sites_and_two_locales_inventory_is_target_independent` (real JSON) | NOT VERIFIED |
+| R03C1-04 | `r03c1_04_internal_and_descendant_suppressed_sources_stay_inventoried_and_unpublished` plus the unlisted coverage in the adapter tests | NOT VERIFIED |
+| R03C1-05 | `r03c1_05_suppress_without_a_local_value_adds_no_obligation` | NOT VERIFIED |
+| R03C1-06 | `r03c1_06_same_filename_at_two_owners_and_two_namespaces_stays_distinct` | NOT VERIFIED |
+| R03C1-07 | `r03c1_07_graphic_cardinality_duplicates_and_suppression_are_unchanged`, `r03c1_07_graphic_suppression_and_internal_filtering_are_unchanged` (exact refusal kinds) | NOT VERIFIED |
+| R03C1-08 | `r03c1_08_real_json_graphic_inventory_covers_all_five_levels`, `r03c1_08_invalid_graphic_on_an_unlisted_representation_refuses_before_inventory` | NOT VERIFIED |
+| R03C1-09 | `r03c1_09_reference_grammar_is_unchanged_and_no_media_is_attested` | NOT VERIFIED |
+| R03C1-10 | `r03c1_10_inventory_is_nonpublishing_repeatable_and_empty_safe` (constant false, repeatability, empty and all-internal sets) | NOT VERIFIED |
+| R03C1-11 | No existing test was deleted, loosened, skipped or XFAILed; production changes are limited to the one new module and its re-exports; domain stays std-only and application imports domain/std only | PARTLY VERIFIED (by diff review and `cargo check`), suites NOT RUN |
+| R03C1-12 | Two-host gates | **FAILED** — authorization revision green (`42987963563`); branch revision failed on both hosts (`42989368984`) |
 
-Actions and verification:
+## 9. Deferred work and unchanged surfaces
 
-- Local deletion by safe form only: `git branch -d solo-wo-059-r01` → `Deleted branch solo-wo-059-r01 (was 235050b)`, exit 0. No `-D`, no force.
-- Remote deletion: `git push origin --delete solo-wo-059-r01` → ` - [deleted] solo-wo-059-r01`, exit 0.
-- Post-delete re-fetch (`git fetch origin --prune`) then verification: local branch **absent**, `refs/remotes/origin/solo-wo-059-r01` **absent**, local branches = `[main]`, GitHub branch list = `[main]` only.
-- No PR, tag, worktree, history rewrite or product file was affected. This was Git ref hygiene over work already contained in `main`, not deletion of product content.
+Not implemented by this order and still unavailable: any confined asset-byte reader or media decoder, MIME/magic/dimension/pixel verification, checksum/licence/provenance catalogue, the pinned `platformAssetLibraryVersion: "1.0.0"` `platform/assets/` catalogue and its artwork, responsive derivatives, public activation, and every publication authority. No `platform/` file, artwork, font, catalogue or media byte was created; the accepted R03.A/R03.B behaviour and the nine-key registry are unchanged.
 
-No pre-existing `refs/cline/checkpoints/*` tooling refs were touched; they are local, pre-existing and outside this order's authority.
+`R03.C` remains the pending Stage 03 package (ROADMAP unchanged, blob `31a0ba2e…`), `plan-outlook.md` is unchanged (`cb9c7a61…`), **R03.C is not complete and Stage 03 remains OPEN**. No automatic platform or role fallback was added, and the binding §6.2I.1 rule was neither reinterpreted nor weakened.
 
-## 5. CI evidence
+## 10. Workspace, temporary material and cache
 
-| Run | Revision | Event | `ubuntu-24.04` | `windows-2025` |
-| --- | --- | --- | --- | --- |
-| `42982329548` | `006c80aa` issued-order commit | push | success, 33 steps, 0 failed, 9 skipped | success, 33 steps, 0 failed, 14 skipped |
-| `42982922018` | `ce2caf61` closure commit | push | success, 33 steps, 0 failed, 9 skipped | success, 33 steps, 0 failed, 14 skipped |
-| report HEAD | final report-only commit | push | verified separately on both hosts; run ID given in chat | verified separately |
-
-Skips are the counterpart-host variants only (Windows steps on Ubuntu; Linux steps plus the Ubuntu-only steps — RustSec negative probe, disposable snapshot filesystems, forbidden-import restoration proof, byte-identical double release build — on Windows). Both hosts executed the mandatory gates: pinned toolchain assertion, locked fetch, `cargo-deny 0.20.2` with a fresh RustSec refresh, package-set gate, format, strict Clippy, the full locked all-target test suite, the real-tree architecture checker with its refusal self-test, the failure tripwire, the locked release build and the CLI accepted/refused smoke. No failing or untriaged gate is reported as PASS.
-
-## 6. Final repository proof
-
-| Check | Observed |
+| Item | Evidence |
 | --- | --- |
-| `HEAD` | `ce2caf6180d0e754bdce3e650e7b79303aa95834` before the report commit |
-| `origin/main` | identical |
-| Tree | `12bfd8d80dc9445f01c26626bf3d40052e96b65c` |
-| `git status --porcelain` | empty |
-| `git status --porcelain --untracked-files=all` | empty |
-| Branches | local `[main]`; GitHub `[main]` — the task branch is gone from both |
-| Worktrees / remotes | 1 worktree, 1 remote (`origin`, the accepted URL) |
-| WIP inventory | exactly four files: `plan-roadmap.md`, `plan-next.md`, `workorder-active.md`, `plan-outlook.md` |
-| ROADMAP | R03.C still open; R03.B bullet absent; Stage 03 heading, prerequisite and Exit gate intact; no stage closure claimed |
-| NEXT | one R03.C candidate only |
-| ACTIVE | `ea5f20b736483c2e102456be1cea9104059fc81a`, neutral heading |
-| OUTLOOK | `cb9c7a610cf3c537557e060ca9656e44a053e69d`, unchanged |
-| Source/dependency/asset/config changes | none — no Rust source, test, `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml`, `.cargo/`, `deny.toml`, `.github/`, `.gitignore`, `README.md`, `AGENTS.md`, `LICENSE`, `.documents/About/`, `.documents/Architecture/`, `.documents/SOP/` or `platform/assets/` path differs from the anchor |
+| Solo `.temp/` before | 2 files, 289,253,806 bytes — the retained `architecture-fixtures/` and `toolchain-installer/` archives |
+| This run's scratch | `.temp/draft-graphic_asset_inventory.rs`, `.temp/draft-app-tests.rs`, `.temp/s1.md`–`.temp/s3.md` (composition parts), all task-owned |
+| Solo `.temp/` after | 2 files, 289,253,806 bytes — identical to the inherited baseline, archives preserved under their existing trigger |
+| Live root `target/` | present, still ignored by `.gitignore:24` `/target/`, untouched; no cleanup, no `.gitignore` or local-exclude edit |
+| Cline task temp area | no file left behind |
+| Secondary checkouts | none; one checkout, one worktree, no nested repository |
 
-Whole-run tracked diff against the anchor therefore contains only `.documents/WIP/workorder-active.md`, `.documents/WIP/plan-roadmap.md`, `.documents/WIP/plan-next.md` and `.documents/Reports/execution-report.md`.
+An empty `git status` is not offered as proof of scratch cleanup; the byte counts above are the evidence.
 
-## 7. A1 applicability and carried-forward notices
+## 11. Final Git state
 
-- **A1 for new code/components: `NOT APPLICABLE`.** No manifest, dependency, lockfile, toolchain, workflow or `deny.toml` change was authorized or made; the locked graph is byte-identical to the accepted `feef7e5f` revision, whose complete 22-package ledger was independently accepted.
-- **Toolchain / actions / runners (unchanged):** Rust `1.99.1`, `cargo-deny 0.20.2`, `actions/checkout` `3d3c42e5aac5ba805825da76410c181273ba90b1` (= tag `v7.0.1`), runners `ubuntu-24.04` and `windows-2025`.
-- **Carried-forward, not repaired and not introduced here:**
-  - The inherited `cargo-deny` `warning[license-not-encountered]` for `"Unicode-3.0"` at `deny.toml:51` still appears, exactly 2 log lines per run (1 Ubuntu, 1 Windows) in both the issued-order run `42982329548` and the closure run `42982922018`, with `licenses ok: 0 errors, 1 warnings`. `deny.toml` is untouched and the warning is not suppressed; its cause remains **`UNVERIFIED`** pending a separate dependency-policy order. A green badge is therefore **not** claimed as warning-free.
-  - Accepted dependency patch lags recorded for a future Owner dependency order: `itoa` 1.0.18 → 1.0.19, `rustix` 1.1.5 → 1.1.6, `syn` 3.0.9 → 3.0.10 (all OSV-clean at their locked versions). Not upgraded here: dependency changes are outside this order.
-  - Unicode attribution/NOTICE duty remains a release prerequisite under Stage 13.
+| Item | Value |
+| --- | --- |
+| `main` | `dcaab733a56b0a95040e5a63fa3b2a0f2aa6d8ae` (authorization commit only) plus this report commit |
+| `origin/main` | matches `main` after the report push |
+| Branch retained | `solo-wo-061-r01` = `4371af21dce67f33cf1df0384738bf353ca80fc6` locally and on `origin`; **not** integrated, **not** pruned (retention is authorized until a separate closure) |
+| Working tree | clean (`git status --porcelain` and `--untracked-files=all` both empty) |
+| WIP slots | exactly four: ACTIVE = frozen issued order `5b1658f4…`, NEXT `92fa562b…` (neutral), ROADMAP `31a0ba2e…`, OUTLOOK `cb9c7a61…` |
+| Product, dependency or asset changes on `main` | none |
 
-## 8. R03.C candidate status and the fallback-authority boundary
+## 12. Disposition
 
-NEXT now names R03.C as the single next implementation candidate. It is a **proposal only**: it grants no permission, authorizes no artwork, catalogue, asset filename, code or manifest change, and this run created no `platform/assets/` content and no R03.C deliverable.
+**STOPPED for `SOLO-WO-061 R01`.** The bounded R03.C1 implementation and its acceptance tests exist and are published on the retained branch, but the mandatory two-host verification cannot pass while the locked `rustix 1.1.5` matches `RUSTSEC-2026-0486`, and every lawful remedy is a dependency, lockfile or policy change that this order forbids.
 
-**Recorded architectural boundary, restated for the next order.** Binding `.documents/Architecture/ARCHITECTURE.md` §6.2I.1 states, verbatim: *"Every graphic role of §6.2G uses D08 additive inheritance and suppression, with the §6.2G cardinalities and **no** automatic platform fallback for any role."* §6.2I.6 likewise distinguishes explicitly authored platform use from automatic fallback. The retained ROADMAP R03.C bullet still contains the older wording *"optional role-specific generic fallback strictly beneath authored hierarchy"*; that wording was deliberately preserved unchanged under this narrowly authorized R03.B closure and was **not** reinterpreted. Any change to that policy requires separate explicit Owner architectural reconciliation before R03.C implementation, and the NEXT candidate already states that no automatic platform or role fallback may be implemented, including after explicit suppression or an internal-only selection.
+**Smallest Owner decision needed (one):** issue a bounded dependency-policy order authorizing `cargo update -p rustix` to `1.1.6` (and, if wanted in the same bounded order, `itoa` → `1.0.19` and `syn` → `3.0.10`), with fresh A1 re-verification and no other change; then re-run this branch's two-host gate. No R03.C1 code change is expected for that retry.
 
-## 9. Temporary workspace, retained archives and live cache
-
-- **Solo `.temp/` before:** 5 files, 289,271,529 bytes — the two retained archives plus this run's three disposable drafts.
-- **This run's scratch (all task-owned, all removed after composition):** `.temp/active-neutral.md`, `.temp/next-candidate.md`, `.temp/roadmap-closure.md`, and the report part files. No helper script, archive, duplicate report or secondary checkout was created.
-- **Solo `.temp/` after (verified):** 2 files, 289,253,806 bytes — `architecture-fixtures/` and `toolchain-installer/`, exactly the inherited baseline, preserved under their existing cleanup trigger (delete only after a successful GNU/offline deterministic-build verification or when the Owner confirms they are no longer needed).
-- **Live root `target/`:** present, ignored by `.gitignore:24` `/target/`, untouched — no mass cleanup and no `.gitignore` or local-exclude edit.
-- **Cline task temp area:** 0 files at session end; nothing left behind, nothing unknown deleted.
-- No cleanup failure and no retained unaccounted material.
-
-## 10. Restrictions observed
-
-No R03.C implementation, artwork, catalogue or asset creation; no change to graphic-role semantics, the fallback contract, manifest/registry versions, ownership, routes, locale, geolocation, rendering, HTTP, publication or source reading; no product code, test, dependency, lockfile, toolchain, CI, `deny.toml`, `.gitignore`, `AGENTS.md`, `README.md`, `LICENSE`, About/Architecture/SOP or other-repository change; no edit to OUTLOOK, Stage 03 closure, another stage or package, or any WIP file beyond the authorized three; no new tracked or WIP file, report archive, branch, clone, worktree, PR, merge, tag or release; no force-push, reset, clean, destructive checkout or history rewrite; no unmerged branch deletion; no secrets, provider, DNS, hosting or billing action. Only ordinary authenticated ref updates were performed by the Implementation Agent.
-
-## 11. Disposition
-
-Every in-scope operation and gate genuinely passed: baseline matched, the issued order was published and green on both hosts, exactly one ROADMAP bullet was removed with R03.C and the Stage 03 exit gate preserved, NEXT holds exactly one bounded R03.C candidate, ACTIVE is neutral, OUTLOOK is untouched, the fully merged task branch was pruned locally and remotely after all guards passed, and the tree is clean with only the four WIP files.
-
-Reported disposition: **COMPLETE** for `SOLO-WO-060 R01`. The Implementation Agent does **not** self-ACCEPT, does not clear the NEXT candidate and does not begin R03.C; independent Architect `ACCEPT / REVISE / STOP` follows publication of this report, and Stage 03 remains open.
+The Implementation Agent does not self-ACCEPT, does not clear the NEXT candidate, does not integrate the branch and does not begin further R03.C work. Stage 03 remains OPEN.
