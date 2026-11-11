@@ -847,8 +847,12 @@ fn r03c1_06_same_filename_at_two_owners_and_two_namespaces_stays_distinct() {
 /// default or claiming that any asset exists or is safe.
 #[test]
 fn r03c1_10_inventory_is_nonpublishing_repeatable_and_empty_safe() {
+    // Bind first, mirroring the accepted `R03A-02` assertion idiom: a direct
+    // `assert!(!CONSTANT)` is rejected by `clippy::assertions_on_constants` under the
+    // repository's `-D warnings` gate, and binding keeps the invariant asserted at runtime.
+    let inventory_grants_publication = GRAPHIC_ASSET_INVENTORY_GRANTS_PUBLICATION_AUTHORITY;
     assert!(
-        !GRAPHIC_ASSET_INVENTORY_GRANTS_PUBLICATION_AUTHORITY,
+        !inventory_grants_publication,
         "an authored inventory is never publication authority"
     );
 
