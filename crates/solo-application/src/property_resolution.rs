@@ -13,9 +13,11 @@
 //! outward translation.
 
 use solo_domain::{
-    DeclaredOwnerPropertiesV1, EfsOwnershipGraph, PropertyResolutionRefusalV1,
-    PublicPropertyProjectionV1, QualifiedOwnerV1, ResolvedPropertiesV1, ValidatedPropertyInputV1,
-    project_public_properties_v1, validate_declared_properties_v1,
+    DeclaredOwnerPropertiesV1, EfsOwnershipGraph, PropertyResolutionRefusalKind,
+    PropertyResolutionRefusalV1, PublicPropertyProjectionV1, QualifiedOwnerV1,
+    ResolvedPropertiesV1, ResolvedPropertyGraphV1, ValidatedPropertyInputV1,
+    project_public_properties_v1, require_matching_owner_membership_v1, resolve_all_owners_v1,
+    validate_declared_properties_v1,
 };
 
 /// Whether a validated property candidate authorizes publication.
@@ -28,12 +30,15 @@ pub const PROPERTY_CANDIDATE_GRANTS_PUBLICATION_AUTHORITY: bool = false;
 ///
 /// The graph is the already validated one-Entity ownership structure, the declarations are
 /// already typed and closed, and the target is one fully qualified owner. Nothing here
-/// accepts a bare Page ID, a route, a filename or a locale-as-geography selector.
+/// accepts a bare Page ID, a route, a filename or a locale-as-geography selector. A caller
+/// that also holds the source manifest may supply its complete owner inventory, which is
+/// then required to match the graph's membership exactly.
 #[derive(Debug, Clone)]
 pub struct PropertyResolutionRequestV1<'a> {
     graph: &'a EfsOwnershipGraph,
     declared: Vec<DeclaredOwnerPropertiesV1>,
     target: QualifiedOwnerV1,
+    required_membership: Option<Vec<QualifiedOwnerV1>>,
 }
 
 impl<'a> PropertyResolutionRequestV1<'a> {
@@ -48,7 +53,18 @@ impl<'a> PropertyResolutionRequestV1<'a> {
             graph,
             declared,
             target,
+            required_membership: None,
         }
+    }
+
+    /// Binds the caller's complete owner inventory to this request.
+    ///
+    /// The use case then refuses any graph whose membership differs, even when the differing
+    /// owners declare no properties at all.
+    #[must_use]
+    pub fn with_required_membership(mut self, inventory: Vec<QualifiedOwnerV1>) -> Self {
+        self.required_membership = Some(inventory);
+        self
     }
 
     /// The validated graph this request resolves against.
@@ -68,16 +84,23 @@ impl<'a> PropertyResolutionRequestV1<'a> {
     pub const fn target(&self) -> &QualifiedOwnerV1 {
         &self.target
     }
+
+    /// The required complete owner inventory, when the caller supplied one.
+    #[must_use]
+    pub fn required_membership(&self) -> Option<&[QualifiedOwnerV1]> {
+        self.required_membership.as_deref()
+    }
 }
 
 /// The validated property candidate of one owner.
 ///
 /// It carries the bound input (so the caller can see whether any recognized-but-unsupported
-/// operation was authored), the complete internal resolved record and the separate validated
-/// public projection.
+/// operation was authored), the **whole-graph** resolved record that had to pass first, the
+/// selected owner's internal record and the separate validated public projection.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PropertyResolutionCandidateV1 {
     input: ValidatedPropertyInputV1,
+    whole: ResolvedPropertyGraphV1,
     resolved: ResolvedPropertiesV1,
     public: PublicPropertyProjectionV1,
 }
@@ -89,13 +112,25 @@ impl PropertyResolutionCandidateV1 {
         &self.input
     }
 
-    /// The complete internal resolved record, provenance included.
+    /// The whole-graph resolved record that had to validate before this candidate existed.
+    #[must_use]
+    pub const fn resolved_graph(&self) -> &ResolvedPropertyGraphV1 {
+        &self.whole
+    }
+
+    /// How many owners of the single Entity were resolved and validated.
+    #[must_use]
+    pub fn resolved_owner_count(&self) -> usize {
+        self.whole.len()
+    }
+
+    /// The complete internal resolved record of the selected owner, provenance included.
     #[must_use]
     pub const fn resolved(&self) -> &ResolvedPropertiesV1 {
         &self.resolved
     }
 
-    /// The validated safe public projection.
+    /// The validated safe public projection of the selected owner.
     #[must_use]
     pub const fn public(&self) -> &PublicPropertyProjectionV1 {
         &self.public
@@ -120,8 +155,9 @@ impl PropertyResolutionCandidateV1 {
 ///
 /// Returns a [`PropertyResolutionRefusalV1`] when a declaration owner is outside the graph,
 /// when one owner is declared twice, when an effective collection exceeds its registry
-/// maximum, when a background source or location identity repeats, or when a recognized
-/// `extend` request is reached (the dedicated
+/// maximum, when a background source or location identity repeats, when a supplied owner
+/// inventory differs from the graph's membership, or when a recognized `extend` request is
+/// reached anywhere in the graph (the dedicated
 /// `LOCATION_EXTENSION_NOT_IMPLEMENTED_IN_R03A` outcome).
 pub fn resolve_declared_properties_v1(
     request: PropertyResolutionRequestV1<'_>,
@@ -130,12 +166,26 @@ pub fn resolve_declared_properties_v1(
         graph,
         declared,
         target,
+        required_membership,
     } = request;
     let input = validate_declared_properties_v1(graph, declared)?;
-    let resolved = input.resolve(&target)?;
+    if let Some(inventory) = &required_membership {
+        require_matching_owner_membership_v1(&input, inventory)?;
+    }
+    // Whole-graph, fail-closed: every owner of the single Entity is resolved and validated
+    // before any successful candidate can exist. A conflict in an unrelated Site, Page or
+    // representation therefore refuses the request even when the target itself is valid.
+    let whole = resolve_all_owners_v1(&input)?;
+    let resolved = whole
+        .for_owner(&target)
+        .ok_or_else(|| {
+            PropertyResolutionRefusalV1::of(PropertyResolutionRefusalKind::UnknownOwner)
+        })?
+        .clone();
     let public = project_public_properties_v1(&resolved);
     Ok(PropertyResolutionCandidateV1 {
         input,
+        whole,
         resolved,
         public,
     })

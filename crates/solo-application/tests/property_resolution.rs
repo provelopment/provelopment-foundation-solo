@@ -28,6 +28,10 @@ fn site() -> SiteIdV1 {
     SiteIdV1::parse("bali").expect("a canonical Site identifier")
 }
 
+fn jakarta_site() -> SiteIdV1 {
+    SiteIdV1::parse("jakarta").expect("a canonical Site identifier")
+}
+
 fn page() -> PageIdV1 {
     PageIdV1::parse("home").expect("a canonical Page identifier")
 }
@@ -37,12 +41,17 @@ fn locale() -> LocaleKeyV1 {
 }
 
 fn graph() -> EfsOwnershipGraph {
-    let mut home = PageDraft::new(page());
-    home.add_representation(locale());
+    let mut bali_home = PageDraft::new(page());
+    bali_home.add_representation(locale());
     let mut bali = SiteDraft::new(site());
-    bali.add_page(home);
+    bali.add_page(bali_home);
+    let mut jakarta_home = PageDraft::new(page());
+    jakarta_home.add_representation(locale());
+    let mut jakarta = SiteDraft::new(jakarta_site());
+    jakarta.add_page(jakarta_home);
     let mut main = FacetDraft::new(facet());
     main.add_site(bali);
+    main.add_site(jakarta);
     let mut draft = EfsOwnershipDraft::new(entity());
     draft.add_facet(main);
     draft.build().expect("a valid one-Entity structure")
@@ -52,12 +61,32 @@ fn entity_owner() -> QualifiedOwnerV1 {
     QualifiedOwnerV1::entity(entity())
 }
 
+fn facet_owner() -> QualifiedOwnerV1 {
+    QualifiedOwnerV1::facet(entity(), facet())
+}
+
 fn site_owner() -> QualifiedOwnerV1 {
     QualifiedOwnerV1::site(entity(), facet(), site())
 }
 
+fn jakarta_site_owner() -> QualifiedOwnerV1 {
+    QualifiedOwnerV1::site(entity(), facet(), jakarta_site())
+}
+
+fn page_owner() -> QualifiedOwnerV1 {
+    QualifiedOwnerV1::page(entity(), facet(), site(), page())
+}
+
+fn jakarta_page_owner() -> QualifiedOwnerV1 {
+    QualifiedOwnerV1::page(entity(), facet(), jakarta_site(), page())
+}
+
 fn representation_owner() -> QualifiedOwnerV1 {
     QualifiedOwnerV1::representation(entity(), facet(), site(), page(), locale())
+}
+
+fn jakarta_representation_owner() -> QualifiedOwnerV1 {
+    QualifiedOwnerV1::representation(entity(), facet(), jakarta_site(), page(), locale())
 }
 
 fn inherit(values: Vec<AuthoredPropertyValueV1>) -> PropertyDeclarationV1 {
@@ -241,8 +270,12 @@ fn application_surfaces_the_named_extension_refusal() {
         fields,
     )
     .expect("a non-empty location fact");
+    let mut set = LocationFieldsV1::new();
+    set.set_locality("Ubud").expect("valid locality text");
     let extension = PropertyValueV1::location_extension(LocationExtensionRequestV1::new(
         FactIdV1::parse("bali-base").expect("a valid fact identifier"),
+        site_owner(),
+        set,
     ));
     let declarations = vec![
         declared(
@@ -275,4 +308,101 @@ fn application_surfaces_the_named_extension_refusal() {
         PropertyResolutionRefusalKind::LocationExtensionNotImplementedInR03A
     );
     assert_eq!(refusal.code(), "LOCATION_EXTENSION_NOT_IMPLEMENTED_IN_R03A");
+}
+
+/// `R03A-05` - the use case refuses a conflict in a Site the requested target never visits.
+#[test]
+fn application_refuses_a_conflict_in_an_unrelated_site() {
+    let declarations = vec![
+        declared(
+            site_owner(),
+            vec![(
+                PropertyKey::ContactEmail,
+                inherit(vec![auth(email("bali@example.com"), Exposure::Public)]),
+            )],
+        ),
+        declared(
+            jakarta_site_owner(),
+            vec![(
+                PropertyKey::ContactEmail,
+                inherit(vec![auth(email("jakarta@example.com"), Exposure::Public)]),
+            )],
+        ),
+        declared(
+            jakarta_representation_owner(),
+            vec![(
+                PropertyKey::ContactEmail,
+                inherit(vec![auth(
+                    email("jakarta-en@example.com"),
+                    Exposure::Public,
+                )]),
+            )],
+        ),
+    ];
+    let graph = graph();
+    let refusal = resolve_declared_properties_v1(PropertyResolutionRequestV1::new(
+        &graph,
+        declarations,
+        representation_owner(),
+    ))
+    .expect_err("the jakarta conflict refuses the whole candidate");
+    assert_eq!(
+        refusal.kind(),
+        PropertyResolutionRefusalKind::CardinalityExceeded
+    );
+}
+
+/// `R03A-08` - the use case binds the caller's complete owner inventory to the graph, so a
+/// graph with extra or missing owners cannot succeed even when nothing is declared there.
+#[test]
+fn application_refuses_a_manifest_membership_mismatch() {
+    let graph = graph();
+    let complete = vec![
+        entity_owner(),
+        facet_owner(),
+        site_owner(),
+        jakarta_site_owner(),
+        page_owner(),
+        jakarta_page_owner(),
+        representation_owner(),
+        jakarta_representation_owner(),
+    ];
+    assert_eq!(complete.len(), 8);
+
+    // A graph missing the jakarta branch.
+    let missing = complete[..5].to_vec();
+    let refusal = resolve_declared_properties_v1(
+        PropertyResolutionRequestV1::new(&graph, Vec::new(), representation_owner())
+            .with_required_membership(missing),
+    )
+    .expect_err("a missing owner refuses");
+    assert_eq!(
+        refusal.kind(),
+        PropertyResolutionRefusalKind::OwnerMembershipMismatch
+    );
+
+    // A graph carrying an owner the inventory does not contain.
+    let mut extra = complete.clone();
+    extra.push(QualifiedOwnerV1::site(
+        entity(),
+        facet(),
+        SiteIdV1::parse("bandung").expect("a canonical Site identifier"),
+    ));
+    let refusal = resolve_declared_properties_v1(
+        PropertyResolutionRequestV1::new(&graph, Vec::new(), representation_owner())
+            .with_required_membership(extra),
+    )
+    .expect_err("an extra owner refuses");
+    assert_eq!(
+        refusal.kind(),
+        PropertyResolutionRefusalKind::OwnerMembershipMismatch
+    );
+
+    // The exact membership resolves, and the candidate reports the whole graph.
+    let candidate = resolve_declared_properties_v1(
+        PropertyResolutionRequestV1::new(&graph, Vec::new(), representation_owner())
+            .with_required_membership(complete),
+    )
+    .expect("a matching inventory resolves");
+    assert_eq!(candidate.resolved_owner_count(), 8);
 }
