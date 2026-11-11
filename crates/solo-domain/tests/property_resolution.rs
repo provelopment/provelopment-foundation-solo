@@ -1927,19 +1927,14 @@ fn r03b_03_mixed_add_extend_add_keeps_order_and_records_the_real_sequence() {
         ("locality".to_owned(), page_owner().describe(), 1),
         "a field origin records the extension's own zero-based local index"
     );
-    let localities = facts
-        .iter()
-        .map(|value| {
-            value
-                .data()
-                .location_fact()
-                .expect("a fact")
-                .fields()
-                .set_field_names()
-                .len()
-        })
-        .collect::<Vec<_>>();
-    assert_eq!(localities, vec![2, 2, 2]);
+    let mut extended_fields = LocationFieldsV1::new();
+    extended_fields.set_country_code("ID").expect("ID");
+    extended_fields.set_locality("Ubud").expect("Ubud");
+    assert_eq!(
+        facts[0].data().location_fact().expect("a fact").fields(),
+        &extended_fields,
+        "the extension updated the inherited fact in place"
+    );
 
     let sequence = resolved
         .property(PropertyKey::Location)
@@ -2227,7 +2222,9 @@ fn r03b_05_suppression_is_final_for_extensions() {
             .any(|event| event.operation() == ResolutionOperation::Suppressed)
     );
 
-    // A fact the same node has just added is not an eligible extension target.
+    // A fact the same node has just added is not an eligible extension target. Naming it means
+    // naming the current node, which the direct-ancestor rule refuses before any identity match;
+    // the resolver's inherited-prefix guard enforces the same §6.2H.5 rule structurally.
     let same_node = validate_declared_properties_v1(
         &graph(),
         vec![declared(
@@ -2249,7 +2246,7 @@ fn r03b_05_suppression_is_final_for_extensions() {
     .expect_err("a same-node add is not extendable");
     assert_eq!(
         same_node.cause(),
-        Some(LocationExtensionCause::TargetNotInherited)
+        Some(LocationExtensionCause::TargetNotAncestor)
     );
 }
 

@@ -1106,7 +1106,7 @@ const GEOGRAPHY_MANIFEST: &str = r#"{
                   {
                     "locale": "id-ID",
                     "route": { "path": "/id-ID/home" },
-                    "sourceCandidates": { "markdown": "pages/main-home.id-ID.md" },
+                    "sourceCandidates": { "markdown": "pages/main-home.id-id.md" },
                     "properties": {
                       "location": { "inheritance": "inherit", "currentContext": [
                         { "operation": "extend", "target": { "owner": { "entity": "example" }, "factId": "aus-hq" },
