@@ -15,8 +15,8 @@ use solo_adapters::{
 };
 use solo_domain::{
     EfsOwnershipDraft, EfsOwnershipGraph, EntityIdV1, FacetDraft, FacetIdV1, LocaleKeyV1,
-    PageDraft, PageIdV1, PropertyKey, PropertyRefusalKind, PropertyResolutionRefusalKind,
-    PropertyValueV1, QualifiedOwnerV1, SiteDraft, SiteIdV1,
+    LocationExtensionCause, PageDraft, PageIdV1, PropertyKey, PropertyRefusalKind,
+    PropertyResolutionRefusalKind, PropertyValueV1, QualifiedOwnerV1, SiteDraft, SiteIdV1,
 };
 
 /// A manifest with no authored properties at any level.
@@ -510,10 +510,10 @@ fn r03a_09_effective_cardinality_and_duplicates_refuse() {
     );
 }
 
-/// `R03A-10`/`R03A-09` — the accepted `extend` syntax is recognized as a declaration and then
-/// refused by its dedicated code, never merged and never treated as `add`.
+/// `R03B-04` — converted from `R03A-10`. The accepted `extend` syntax is still recognized, and
+/// a target with no inherited fact now refuses with the R03.B code and typed cause.
 #[test]
-fn r03a_09_recognized_extend_is_refused_by_name() {
+fn r03b_04_extend_without_an_inherited_target_refuses() {
     let document = manifest(
         NO_PROPERTIES,
         NO_PROPERTIES,
@@ -524,13 +524,17 @@ fn r03a_09_recognized_extend_is_refused_by_name() {
     let parsed = parse_document(&document);
     let graph = graph_from(&parsed);
     let refusal = validate_manifest_property_candidate_v1(&parsed, &graph, &representation_owner())
-        .expect_err("R03.A refuses an extension at resolution");
-    assert_eq!(refusal.code(), "LOCATION_EXTENSION_NOT_IMPLEMENTED_IN_R03A");
+        .expect_err("an extension with no inherited target refuses");
+    assert_eq!(refusal.code(), "LOCATION_INVALID_EXTEND");
     assert_eq!(
         refusal.kind(),
         ManifestPropertyRefusalKind::ResolutionRefused(
-            PropertyResolutionRefusalKind::LocationExtensionNotImplementedInR03A
+            PropertyResolutionRefusalKind::InvalidLocationExtension
         )
+    );
+    assert_eq!(
+        refusal.cause(),
+        Some(LocationExtensionCause::TargetNotInherited)
     );
     assert!(
         !matches!(
@@ -868,9 +872,11 @@ fn r03a_09_graph_membership_mismatch_refuses() {
         .expect("the matching graph resolves");
 }
 
-/// `R03A-10`/`R03A-09` - a valid recognized extension in another Site refuses the whole candidate.
+/// `R03B-04`/`R03B-11` — converted from `R03A-10`. A sibling-targeted extension in another Site
+/// now refuses with the R03.B code, names that declaration's owner, and fails the whole
+/// candidate even though the requested branch is valid.
 #[test]
-fn r03a_09_extension_anywhere_refuses_the_whole_candidate() {
+fn r03b_04_extension_in_another_site_fails_the_whole_candidate() {
     let document = manifest_two_sites(
         NO_PROPERTIES,
         NO_PROPERTIES,
@@ -881,19 +887,30 @@ fn r03a_09_extension_anywhere_refuses_the_whole_candidate() {
     let graph = graph_from(&parsed);
     let refusal = validate_manifest_property_candidate_v1(&parsed, &graph, &representation_owner())
         .expect_err("the extension in the second Site refuses the whole candidate");
-    assert_eq!(refusal.code(), "LOCATION_EXTENSION_NOT_IMPLEMENTED_IN_R03A");
+    assert_eq!(refusal.code(), "LOCATION_INVALID_EXTEND");
     assert_eq!(
         refusal.kind(),
         ManifestPropertyRefusalKind::ResolutionRefused(
-            PropertyResolutionRefusalKind::LocationExtensionNotImplementedInR03A
+            PropertyResolutionRefusalKind::InvalidLocationExtension
         )
     );
+    assert_eq!(
+        refusal.cause(),
+        Some(LocationExtensionCause::TargetNotAncestor)
+    );
+    assert_eq!(
+        refusal.owner().map(QualifiedOwnerV1::describe),
+        Some(second_representation_owner().describe()),
+        "the refusal names the offending declaration, not the requested target"
+    );
+    assert_eq!(refusal.property(), Some(PropertyKey::Location));
 }
 
-/// `R03A-06`/`R03A-10`/`R03A-09` - the accepted extend envelope is fully validated before it can
-/// ever be reported as the named unsupported operation.
+/// `R03B-08` — the accepted `extend` envelope stays fully closed at the JSON boundary: empty or
+/// unknown `set`, `null`, wrong types, invalid geometry, locale, lineage and extra members all
+/// refuse as declarations, never as resolution outcomes.
 #[test]
-fn r03a_09_extend_syntax_refusals() {
+fn r03b_08_extend_syntax_refusals_are_unchanged() {
     fn extend(target_owner: &str, set: &str) -> String {
         format!(
             r#"{{ "location": {{ "inheritance": "inherit", "currentContext": [ {{ "operation": "extend", "target": {{ "owner": {target_owner}, "factId": "bali-base" }}, "set": {set} }} ] }} }}"#
@@ -968,7 +985,23 @@ fn r03a_09_extend_syntax_refusals() {
         );
     }
 
-    // A complete, typed extension is still recognized, and refused only at resolution.
+    // A closed extension may not author an `exposure`, and a `null` member is not a typed value.
+    assert_eq!(
+        page_level_refusal_kind(
+            r#"{ "location": { "inheritance": "inherit", "currentContext": [ { "operation": "extend", "target": { "owner": { "entity": "example", "facet": "main" }, "factId": "bali-base" }, "set": { "locality": "Ubud" }, "exposure": "public" } ] } }"#
+        ),
+        ManifestPropertyRefusalKind::DeclarationRefused(PropertyRefusalKind::ExtraEntryField)
+    );
+    assert_eq!(
+        page_level_refusal_kind(&extend(
+            r#"{ "entity": "example", "facet": "main" }"#,
+            r#"{ "locality": null }"#,
+        )),
+        ManifestPropertyRefusalKind::DeclarationRefused(PropertyRefusalKind::WrongEntryShape)
+    );
+
+    // A syntactically complete extension is recognized as a declaration and refused only when
+    // resolution finds no inherited fact to extend.
     let valid = extend(
         r#"{ "entity": "example", "facet": "main" }"#,
         r#"{ "locality": "Ubud", "countryCode": "ID" }"#,
@@ -983,12 +1016,257 @@ fn r03a_09_extend_syntax_refusals() {
     let parsed = parse_document(&document);
     let graph = graph_from(&parsed);
     let refusal = validate_manifest_property_candidate_v1(&parsed, &graph, &representation_owner())
-        .expect_err("a valid extension is still refused at resolution");
-    assert_eq!(refusal.code(), "LOCATION_EXTENSION_NOT_IMPLEMENTED_IN_R03A");
+        .expect_err("a valid extension with no inherited target is refused at resolution");
+    assert_eq!(refusal.code(), "LOCATION_INVALID_EXTEND");
     assert_eq!(
         refusal.kind(),
         ManifestPropertyRefusalKind::ResolutionRefused(
-            PropertyResolutionRefusalKind::LocationExtensionNotImplementedInR03A
+            PropertyResolutionRefusalKind::InvalidLocationExtension
         )
+    );
+    assert_eq!(
+        refusal.cause(),
+        Some(LocationExtensionCause::TargetNotInherited)
+    );
+}
+
+/// The `id-ID` representation owner of the single-Site test manifest.
+fn indonesian_representation_owner() -> QualifiedOwnerV1 {
+    QualifiedOwnerV1::representation(entity(), facet(), site(), page(), locale("id-ID"))
+}
+
+/// The **unlisted** `id-ID` representation owner of the two-representation test manifest.
+fn unlisted_representation_owner() -> QualifiedOwnerV1 {
+    QualifiedOwnerV1::representation(entity(), facet(), site(), page(), locale("id-ID"))
+}
+
+/// The authored five-level geography manifest: Entity Australia, Facet Indonesia, one Site, one
+/// Page and two full-locale representations, each extending the Entity's fact in turn.
+const GEOGRAPHY_MANIFEST: &str = r#"{
+  "schemaVersion": "1.0.0",
+  "propertyRegistryVersion": "1.0.0",
+  "platformAssetLibraryVersion": "1.0.0",
+  "base": {
+    "canonical": "https://example.org/site",
+    "landing": { "entity": "example", "facet": "main", "site": "main", "page": "home", "locale": "en-001" }
+  },
+  "entity": {
+    "id": "example",
+    "label": "Example",
+    "properties": {
+      "location": { "inheritance": "inherit", "currentContext": [
+        { "operation": "add", "factId": "aus-hq", "kind": "association",
+          "fields": { "worldRegion": "Oceania", "countryCode": "AU" }, "exposure": "public" }
+      ] }
+    },
+    "facets": [
+      {
+        "id": "main",
+        "label": "Main",
+        "properties": {
+          "location": { "inheritance": "inherit", "currentContext": [
+            { "operation": "extend", "target": { "owner": { "entity": "example" }, "factId": "aus-hq" },
+              "set": { "administrativeArea": "Bali" } }
+          ] }
+        },
+        "sites": [
+          {
+            "id": "main",
+            "label": "Main site",
+            "defaultLocale": "en-001",
+            "languagePreferences": { "en": "en-001" },
+            "properties": {
+              "location": { "inheritance": "inherit", "currentContext": [
+                { "operation": "extend", "target": { "owner": { "entity": "example" }, "factId": "aus-hq" },
+                  "set": { "locality": "Denpasar" } }
+              ] }
+            },
+            "pages": [
+              {
+                "id": "home",
+                "label": "Home",
+                "properties": {
+                  "location": { "inheritance": "inherit", "currentContext": [
+                    { "operation": "extend", "target": { "owner": { "entity": "example" }, "factId": "aus-hq" },
+                      "set": { "district": "Renon" } }
+                  ] }
+                },
+                "representations": [
+                  {
+                    "locale": "en-001",
+                    "route": { "path": "/en-001/home" },
+                    "sourceCandidates": { "markdown": "pages/main-home.en-001.md" },
+                    "properties": {
+                      "location": { "inheritance": "inherit", "currentContext": [
+                        { "operation": "extend", "target": { "owner": { "entity": "example" }, "factId": "aus-hq" },
+                          "set": { "postalCode": "80226" } }
+                      ] }
+                    }
+                  },
+                  {
+                    "locale": "id-ID",
+                    "route": { "path": "/id-ID/home" },
+                    "sourceCandidates": { "markdown": "pages/main-home.id-ID.md" },
+                    "properties": {
+                      "location": { "inheritance": "inherit", "currentContext": [
+                        { "operation": "extend", "target": { "owner": { "entity": "example" }, "factId": "aus-hq" },
+                          "set": { "namedPlace": "Renon" } },
+                        { "operation": "add", "factId": "jkt-office", "kind": "premises",
+                          "fields": { "countryCode": "ID", "locality": "Jakarta" }, "exposure": "public" }
+                      ] }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}"#;
+
+/// `R03B-10` — real strict JSON bytes: Entity Australia, Facet Indonesia, Site, Page and two
+/// full-locale representations, each extending the same original fact. Identity, base, locale
+/// and authored route text stay exactly as authored, and no geographic value is inferred.
+#[test]
+fn r03b_10_real_json_geography_extends_without_identity_or_locale_effects() {
+    let parsed = parse_document(GEOGRAPHY_MANIFEST);
+    let graph = graph_from(&parsed);
+
+    // Identity, base and route text come from containment and the manifest, never the property.
+    assert_eq!(parsed.entity().id().as_str(), "example");
+    assert_eq!(parsed.base().canonical(), "https://example.org/site");
+    let page_declaration = &parsed.entity().facets()[0].sites()[0].pages()[0];
+    assert_eq!(page_declaration.id().as_str(), "home");
+    assert_eq!(
+        page_declaration
+            .representations()
+            .iter()
+            .map(|representation| representation.locale())
+            .collect::<Vec<_>>(),
+        vec!["en-001", "id-ID"]
+    );
+    assert_eq!(
+        page_declaration
+            .representations()
+            .iter()
+            .map(|representation| representation.route().path())
+            .collect::<Vec<_>>(),
+        vec!["/en-001/home", "/id-ID/home"]
+    );
+
+    let english = validate_manifest_property_candidate_v1(&parsed, &graph, &representation_owner())
+        .expect("the en-001 branch resolves");
+    assert!(!english.is_publication_authorized());
+    let english_facts = english.public().values_of(PropertyKey::Location);
+    assert_eq!(english_facts.len(), 1);
+    let english_fact = english_facts[0].location_fact().expect("a fact");
+    assert_eq!(english_fact.fact_id().as_str(), "aus-hq");
+    assert_eq!(
+        english_fact.fields().set_field_names(),
+        vec![
+            "worldRegion",
+            "countryCode",
+            "administrativeArea",
+            "locality",
+            "district",
+            "postalCode"
+        ],
+        "each author level contributed only its own member"
+    );
+
+    let indonesian = validate_manifest_property_candidate_v1(
+        &parsed,
+        &graph,
+        &indonesian_representation_owner(),
+    )
+    .expect("the id-ID branch resolves");
+    let indonesian_facts = indonesian.public().values_of(PropertyKey::Location);
+    assert_eq!(
+        indonesian_facts.len(),
+        2,
+        "the id-ID branch adds one independent fact after extending the inherited one"
+    );
+    let inherited = indonesian_facts[0].location_fact().expect("a fact");
+    assert_eq!(inherited.fact_id().as_str(), "aus-hq");
+    assert!(
+        inherited.fields().set_field_names().contains(&"namedPlace"),
+        "the id-ID extension applied to the same original fact"
+    );
+    assert!(
+        !inherited.fields().set_field_names().contains(&"postalCode"),
+        "a sibling representation's field never leaks across branches"
+    );
+    let added = indonesian_facts[1].location_fact().expect("a fact");
+    assert_eq!(added.fact_id().as_str(), "jkt-office");
+
+    // Both representations are the same Page identity under the same Entity: location and
+    // locale changed nothing about identity, and neither selected the other's route.
+    assert_eq!(
+        representation_owner().page_id(),
+        indonesian_representation_owner().page_id()
+    );
+    assert_eq!(
+        representation_owner().entity_id(),
+        indonesian_representation_owner().entity_id()
+    );
+}
+
+/// `R03B-11` — an invalid `extend` on an **unlisted** representation fails the whole candidate
+/// even though the requested `en-001` branch is valid, and the refusal names that declaration.
+#[test]
+fn r03b_11_unlisted_invalid_extension_fails_the_whole_candidate() {
+    let page_properties = r#"{ "location": { "inheritance": "inherit", "currentContext": [ { "operation": "add", "factId": "page-annex", "kind": "association", "fields": { "countryCode": "ID", "locality": "Sanur" }, "exposure": "public" } ] } }"#;
+    let invalid_sibling = r#"{ "location": { "inheritance": "inherit", "currentContext": [ { "operation": "extend", "target": { "owner": { "entity": "example", "facet": "main", "site": "main" }, "factId": "main-base" }, "set": { "locality": "Ubud" } } ] } }"#;
+    let parsed = parse_document(&manifest_with_unlisted_sibling(
+        page_properties,
+        invalid_sibling,
+    ));
+    let graph = graph_from(&parsed);
+    let refusal = validate_manifest_property_candidate_v1(&parsed, &graph, &representation_owner())
+        .expect_err("the unlisted sibling's invalid extension fails the whole candidate");
+    assert_eq!(refusal.code(), "LOCATION_INVALID_EXTEND");
+    assert_eq!(
+        refusal.cause(),
+        Some(LocationExtensionCause::TargetNotInherited)
+    );
+    assert_eq!(
+        refusal.owner().map(QualifiedOwnerV1::describe),
+        Some(unlisted_representation_owner().describe()),
+        "the refusal names the invalid unlisted declaration"
+    );
+    assert_eq!(refusal.property(), Some(PropertyKey::Location));
+    let rendered = format!("{refusal}");
+    assert!(!rendered.contains("Ubud"), "no authored value is echoed");
+    assert!(!rendered.contains("Sanur"), "no unrelated value is echoed");
+
+    // The same manifest without the invalid declaration resolves, and the unlisted branch keeps
+    // its own inherited copy of the same Page fact.
+    let control = parse_document(&manifest_with_unlisted_sibling(
+        page_properties,
+        NO_PROPERTIES,
+    ));
+    let control_graph = graph_from(&control);
+    let requested =
+        validate_manifest_property_candidate_v1(&control, &control_graph, &representation_owner())
+            .expect("the valid branch resolves");
+    assert_eq!(requested.public().values_of(PropertyKey::Location).len(), 1);
+    let unlisted = validate_manifest_property_candidate_v1(
+        &control,
+        &control_graph,
+        &unlisted_representation_owner(),
+    )
+    .expect("the unlisted branch resolves");
+    let unlisted_values = unlisted.public().values_of(PropertyKey::Location);
+    assert_eq!(unlisted_values.len(), 1);
+    assert_eq!(
+        unlisted_values[0]
+            .location_fact()
+            .expect("a fact")
+            .fact_id()
+            .as_str(),
+        "page-annex",
+        "unlisted visibility changes no property inheritance"
     );
 }

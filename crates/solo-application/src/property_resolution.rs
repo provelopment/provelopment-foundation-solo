@@ -1,4 +1,4 @@
-//! Inbound property-resolution use case (`R03.A`).
+//! Inbound property-resolution use case (`R03.A`/`R03.B`).
 //!
 //! This module is the application boundary for the accepted typed property contract. It
 //! composes the pure domain steps in one place — bind authored declarations to the one
@@ -156,9 +156,8 @@ impl PropertyResolutionCandidateV1 {
 /// Returns a [`PropertyResolutionRefusalV1`] when a declaration owner is outside the graph,
 /// when one owner is declared twice, when an effective collection exceeds its registry
 /// maximum, when a background source or location identity repeats, when a supplied owner
-/// inventory differs from the graph's membership, or when a recognized `extend` request is
-/// reached anywhere in the graph (the dedicated
-/// `LOCATION_EXTENSION_NOT_IMPLEMENTED_IN_R03A` outcome).
+/// inventory differs from the graph's membership, or when an identified `location` `extend`
+/// names a target it may not extend (the dedicated `LOCATION_INVALID_EXTEND` outcome).
 pub fn resolve_declared_properties_v1(
     request: PropertyResolutionRequestV1<'_>,
 ) -> Result<PropertyResolutionCandidateV1, PropertyResolutionRefusalV1> {

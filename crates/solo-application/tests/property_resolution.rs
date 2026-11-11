@@ -10,10 +10,10 @@ use solo_application::{
 use solo_domain::{
     AssetNamespace, AssetReferenceV1, AuthoredPropertyValueV1, CurrentContextV1,
     DeclaredOwnerPropertiesV1, EfsOwnershipDraft, EfsOwnershipGraph, EntityIdV1, Exposure,
-    FacetDraft, FacetIdV1, FactIdV1, Inheritance, LocaleKeyV1, LocationExtensionRequestV1,
-    LocationFactV1, LocationFieldsV1, LocationKind, MailboxV1, PageDraft, PageIdV1,
-    PropertyDeclarationV1, PropertyKey, PropertyResolutionRefusalKind, PropertyValueV1,
-    QualifiedOwnerV1, SiteDraft, SiteIdV1,
+    FacetDraft, FacetIdV1, FactIdV1, Inheritance, LocaleKeyV1, LocationExtensionCause,
+    LocationExtensionRequestV1, LocationFactV1, LocationFieldsV1, LocationKind, MailboxV1,
+    PageDraft, PageIdV1, PropertyDeclarationV1, PropertyKey, PropertyResolutionRefusalKind,
+    PropertyValueV1, QualifiedOwnerV1, SiteDraft, SiteIdV1,
 };
 
 fn entity() -> EntityIdV1 {
@@ -99,7 +99,7 @@ fn inherit(values: Vec<AuthoredPropertyValueV1>) -> PropertyDeclarationV1 {
 }
 
 fn auth(value: PropertyValueV1, exposure: Exposure) -> AuthoredPropertyValueV1 {
-    AuthoredPropertyValueV1::new(value, exposure)
+    AuthoredPropertyValueV1::new(value, exposure).expect("a valid authored value")
 }
 
 fn email(address: &str) -> PropertyValueV1 {
@@ -256,14 +256,15 @@ fn application_refuses_a_declaration_owner_outside_the_graph() {
     );
 }
 
-/// `R03A-10` — the recognized `extend` request surfaces as the named unsupported outcome, and
-/// the `add` path stays a plain validated fact.
+/// `R03B-02` — converted from `R03A-10`. The use case now executes an identified extension, and
+/// its public projection carries the overlaid fact without any internal provenance.
 #[test]
-fn application_surfaces_the_named_extension_refusal() {
+fn application_executes_an_identified_extension_without_publication_authority() {
     let mut fields = LocationFieldsV1::new();
     fields
         .set_locality("Denpasar")
         .expect("valid locality text");
+    fields.set_country_code("ID").expect("ID");
     let fact = LocationFactV1::add(
         FactIdV1::parse("bali-base").expect("a valid fact identifier"),
         LocationKind::Association,
@@ -272,11 +273,15 @@ fn application_surfaces_the_named_extension_refusal() {
     .expect("a non-empty location fact");
     let mut set = LocationFieldsV1::new();
     set.set_locality("Ubud").expect("valid locality text");
-    let extension = PropertyValueV1::location_extension(LocationExtensionRequestV1::new(
-        FactIdV1::parse("bali-base").expect("a valid fact identifier"),
-        site_owner(),
-        set,
-    ));
+    set.set_district("Gianyar").expect("valid district text");
+    let extension = PropertyValueV1::location_extension(
+        LocationExtensionRequestV1::new(
+            FactIdV1::parse("bali-base").expect("a valid fact identifier"),
+            site_owner(),
+            set,
+        )
+        .expect("a nonempty typed set"),
+    );
     let declarations = vec![
         declared(
             site_owner(),
@@ -297,17 +302,96 @@ fn application_surfaces_the_named_extension_refusal() {
         ),
     ];
     let graph = graph();
+    let candidate = resolve_declared_properties_v1(PropertyResolutionRequestV1::new(
+        &graph,
+        declarations,
+        representation_owner(),
+    ))
+    .expect("the identified extension resolves");
+    assert!(!candidate.is_publication_authorized());
+    assert_eq!(candidate.resolved_owner_count(), 8);
+
+    let public = candidate.public().values_of(PropertyKey::Location);
+    assert_eq!(public.len(), 1);
+    let projected = public[0].location_fact().expect("a projected fact");
+    assert_eq!(projected.fact_id().as_str(), "bali-base");
+    assert_eq!(
+        projected.fields().set_field_names(),
+        vec!["countryCode", "locality", "district"],
+        "the public data carries the overlaid fields"
+    );
+
+    let internal = candidate.resolved().values_of(PropertyKey::Location);
+    assert_eq!(internal.len(), 1);
+    assert_eq!(internal[0].origin_owner(), &site_owner());
+    assert_eq!(internal[0].field_origins().expect("field origins").len(), 3);
+}
+
+/// `R03B-11` — a valid requested branch still fails closed when an unrequested sibling
+/// declaration has an invalid extension, and the refusal names that declaration's owner.
+#[test]
+fn application_fails_closed_on_an_invalid_sibling_extension() {
+    let mut fields = LocationFieldsV1::new();
+    fields
+        .set_locality("Denpasar")
+        .expect("valid locality text");
+    let fact = LocationFactV1::add(
+        FactIdV1::parse("bali-base").expect("a valid fact identifier"),
+        LocationKind::Association,
+        fields,
+    )
+    .expect("a non-empty location fact");
+    let mut set = LocationFieldsV1::new();
+    set.set_locality("Ubud").expect("valid locality text");
+    let sibling_extension = PropertyValueV1::location_extension(
+        LocationExtensionRequestV1::new(
+            FactIdV1::parse("bali-base").expect("a valid fact identifier"),
+            site_owner(),
+            set,
+        )
+        .expect("a nonempty typed set"),
+    );
+    let declarations = vec![
+        declared(
+            site_owner(),
+            vec![(
+                PropertyKey::Location,
+                inherit(vec![auth(
+                    PropertyValueV1::location(fact),
+                    Exposure::Public,
+                )]),
+            )],
+        ),
+        declared(
+            jakarta_representation_owner(),
+            vec![(
+                PropertyKey::Location,
+                inherit(vec![auth(sibling_extension, Exposure::Internal)]),
+            )],
+        ),
+    ];
+    let graph = graph();
     let refusal = resolve_declared_properties_v1(PropertyResolutionRequestV1::new(
         &graph,
         declarations,
         representation_owner(),
     ))
-    .expect_err("R03.A cannot execute an extension");
+    .expect_err("an invalid sibling declaration refuses the whole candidate");
     assert_eq!(
         refusal.kind(),
-        PropertyResolutionRefusalKind::LocationExtensionNotImplementedInR03A
+        PropertyResolutionRefusalKind::InvalidLocationExtension
     );
-    assert_eq!(refusal.code(), "LOCATION_EXTENSION_NOT_IMPLEMENTED_IN_R03A");
+    assert_eq!(refusal.code(), "LOCATION_INVALID_EXTEND");
+    assert_eq!(
+        refusal.cause(),
+        Some(LocationExtensionCause::TargetNotAncestor)
+    );
+    assert_eq!(
+        refusal.owner().map(QualifiedOwnerV1::describe),
+        Some(jakarta_representation_owner().describe()),
+        "the refusal names the offending declaration, not the requested target"
+    );
+    assert_eq!(refusal.property(), Some(PropertyKey::Location));
 }
 
 /// `R03A-05` - the use case refuses a conflict in a Site the requested target never visits.

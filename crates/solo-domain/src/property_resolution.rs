@@ -1,8 +1,9 @@
-//! Direct-ancestry property resolution, provenance and public projection (`R03.A`).
+//! Direct-ancestry property resolution, provenance and public projection (`R03.A`/`R03.B`).
 //!
 //! This module owns the five-level cascade of `ARCHITECTURE.md` §6.2G.2 and §6.2G.6 over
 //! **exactly one** Entity's `Entity → Facet → Site → Page → localized representation`
-//! chain. It is pure Rust: no JSON, filesystem, transport or provider concern reaches it.
+//! chain, including the identified-record `extend` of §6.2H.4–§6.2H.5. It is pure Rust: no
+//! JSON, filesystem, transport or provider concern reaches it.
 //!
 //! # The three decisions this module keeps separate
 //!
@@ -27,8 +28,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::efs_ownership::EfsOwnershipGraph;
 use crate::property_registry::{
-    DeclaredOwnerPropertiesV1, Exposure, FactIdV1, Inheritance, PropertyKey, PropertyValueV1,
-    QualifiedOwnerV1,
+    DeclaredOwnerPropertiesV1, Exposure, FactIdV1, Inheritance, LocationExtensionRequestV1,
+    PropertyKey, PropertyValueV1, QualifiedOwnerV1,
 };
 
 /// A refused property resolution.
@@ -46,8 +47,8 @@ pub enum PropertyResolutionRefusalKind {
     DuplicateGraphicSource,
     /// One effective collection repeated an original `(owner, factId)` location identity.
     DuplicateLocationFact,
-    /// A recognized `extend` operation was reached by a real `R03.A` resolution.
-    LocationExtensionNotImplementedInR03A,
+    /// A `location` `extend` operation named a target it may not extend (§6.2H.4–§6.2H.5).
+    InvalidLocationExtension,
     /// A supplied owner inventory did not match the graph's complete membership.
     OwnerMembershipMismatch,
     /// The resolved record described a state the validated graph cannot contain.
@@ -67,9 +68,7 @@ impl PropertyResolutionRefusalKind {
             Self::CardinalityExceeded => "cardinality-exceeded",
             Self::DuplicateGraphicSource => "duplicate-graphic-source",
             Self::DuplicateLocationFact => "duplicate-location-fact",
-            Self::LocationExtensionNotImplementedInR03A => {
-                "location-extension-not-implemented-in-r03a"
-            }
+            Self::InvalidLocationExtension => "invalid-location-extension",
             Self::OwnerMembershipMismatch => "owner-membership-mismatch",
             Self::InconsistentGraph => "inconsistent-graph",
             Self::InconsistentRecord => "inconsistent-record",
@@ -77,21 +76,102 @@ impl PropertyResolutionRefusalKind {
     }
 }
 
+/// The typed cause of an invalid `location` `extend` (§6.2H.4–§6.2H.5).
+///
+/// Each token is stable, bounded and structural: it describes the relationship that failed and
+/// never carries an authored field value, a place name, a coordinate or a locale.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LocationExtensionCause {
+    /// The named target is not a strict direct ancestor of the declaring node.
+    TargetNotAncestor,
+    /// No presently inherited fact carries that original owner and fact identifier.
+    TargetNotInherited,
+    /// This node's own `suppress` removed the fact the extension names.
+    TargetSuppressed,
+    /// This node already extended that original fact once.
+    DuplicateExtensionTarget,
+}
+
+impl LocationExtensionCause {
+    /// Stable, safe diagnostic token for this cause.
+    #[must_use]
+    pub const fn detail(self) -> &'static str {
+        match self {
+            Self::TargetNotAncestor => "target-not-ancestor",
+            Self::TargetNotInherited => "target-not-inherited",
+            Self::TargetSuppressed => "target-suppressed",
+            Self::DuplicateExtensionTarget => "duplicate-extension-target",
+        }
+    }
+}
+
 /// Refusal of one property resolution.
 ///
-/// The dedicated [`PropertyResolutionRefusalKind::LocationExtensionNotImplementedInR03A`]
-/// outcome is the only refusal with its own engineering code, so an unsupported `extend`
-/// is never confused with a malformed declaration.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// An invalid `location` extension keeps its own engineering code, so a refused operation is
+/// never confused with a malformed declaration. The refusal also records the offending
+/// declaring owner and registered key when known, so a diagnostic names the node whose
+/// declaration actually failed rather than an unrelated requested target.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PropertyResolutionRefusalV1 {
     kind: PropertyResolutionRefusalKind,
+    cause: Option<LocationExtensionCause>,
+    owner: Option<Box<QualifiedOwnerV1>>,
+    property: Option<PropertyKey>,
 }
 
 impl PropertyResolutionRefusalV1 {
     /// Wraps one refusal category.
     #[must_use]
     pub const fn of(kind: PropertyResolutionRefusalKind) -> Self {
-        Self { kind }
+        Self {
+            kind,
+            cause: None,
+            owner: None,
+            property: None,
+        }
+    }
+
+    /// Records the typed extension cause.
+    #[must_use]
+    pub const fn with_cause(mut self, cause: LocationExtensionCause) -> Self {
+        self.cause = Some(cause);
+        self
+    }
+
+    /// Records the offending declaring owner and registered key when they are not known yet.
+    #[must_use]
+    pub fn with_declaration(mut self, owner: &QualifiedOwnerV1, property: PropertyKey) -> Self {
+        if self.owner.is_none() {
+            self.owner = Some(Box::new(owner.clone()));
+        }
+        if self.property.is_none() {
+            self.property = Some(property);
+        }
+        self
+    }
+
+    /// The typed extension cause, when this refusal is an invalid extension.
+    #[must_use]
+    pub const fn cause(&self) -> Option<LocationExtensionCause> {
+        self.cause
+    }
+
+    /// Stable, safe diagnostic token for the typed extension cause, when present.
+    #[must_use]
+    pub fn cause_detail(&self) -> Option<&'static str> {
+        self.cause.map(LocationExtensionCause::detail)
+    }
+
+    /// The offending declaring owner, when known.
+    #[must_use]
+    pub fn owner(&self) -> Option<&QualifiedOwnerV1> {
+        self.owner.as_deref()
+    }
+
+    /// The registered key this refusal applies to, when known.
+    #[must_use]
+    pub const fn property(&self) -> Option<PropertyKey> {
+        self.property
     }
 
     /// The refusal category.
@@ -104,9 +184,7 @@ impl PropertyResolutionRefusalV1 {
     #[must_use]
     pub const fn code(&self) -> &'static str {
         match self.kind {
-            PropertyResolutionRefusalKind::LocationExtensionNotImplementedInR03A => {
-                "LOCATION_EXTENSION_NOT_IMPLEMENTED_IN_R03A"
-            }
+            PropertyResolutionRefusalKind::InvalidLocationExtension => "LOCATION_INVALID_EXTEND",
             _ => "PROPERTY_RESOLUTION_REFUSED",
         }
     }
@@ -495,11 +573,10 @@ impl ValidatedPropertyInputV1 {
             .find(|declaration| declaration.owner() == owner)
     }
 
-    /// Whether any validated declaration carries a recognized `extend` request.
+    /// Whether any validated declaration carries a `location` `extend` operation.
     ///
-    /// This reports the accepted-but-unimplemented operation without claiming it works and
-    /// without failing an unrelated target: a real resolution that reaches the request
-    /// refuses by name.
+    /// This is an inventory of authored operations, not a verdict: every extension is still
+    /// resolved against its own target and refused when that target is not extendable.
     #[must_use]
     pub fn has_recognized_location_extension(&self) -> bool {
         self.declarations.iter().any(|declaration| {
@@ -508,7 +585,7 @@ impl ValidatedPropertyInputV1 {
                     .current_context()
                     .values()
                     .iter()
-                    .any(|value| !value.value().is_supported_in_r03a())
+                    .any(|value| value.value().is_location_extension())
             })
         })
     }
@@ -611,7 +688,11 @@ impl ValidatedPropertyInputV1 {
         let declaration = index.get(owner).copied();
         let mut properties = Vec::with_capacity(PropertyKey::ALL.len());
         for key in PropertyKey::ALL {
-            properties.push(Self::resolve_key_from(parent, declaration, key, owner)?);
+            // A refusal is attributed to the node whose declaration produced it, so a
+            // diagnostic never blames the requested target for a distant failure.
+            let record = Self::resolve_key_from(parent, declaration, key, owner)
+                .map_err(|refusal| refusal.with_declaration(owner, key))?;
+            properties.push(record);
         }
         Ok(ResolvedPropertiesV1 {
             owner: owner.clone(),
@@ -632,6 +713,10 @@ impl ValidatedPropertyInputV1 {
         let mut resolution_events: Vec<ResolutionEventV1> =
             inherited.map_or_else(Vec::new, |record| record.resolution_events().to_vec());
         if let Some(envelope) = declaration.and_then(|declared| declared.declaration(key)) {
+            // The identities this node's own `suppress` removed. They are kept only long enough
+            // to refuse an `extend` naming one of them with the accurate cause instead of a
+            // vague "missing" one; nothing here can restore a suppressed value.
+            let mut suppressed_here: Vec<ProvenanceValueV1> = Vec::new();
             match envelope.inheritance() {
                 // `inherited` records an explicit declaration that actually carried
                 // inherited values; a root declaration has nothing to inherit and records
@@ -647,7 +732,7 @@ impl ValidatedPropertyInputV1 {
                     }
                 }
                 Inheritance::Suppress => {
-                    values.clear();
+                    suppressed_here = core::mem::take(&mut values);
                     resolution_events.push(ResolutionEventV1::new(
                         owner.clone(),
                         ResolutionOperation::Suppressed,
@@ -656,11 +741,31 @@ impl ValidatedPropertyInputV1 {
                     ));
                 }
             }
+            // Facts carried from the immediate parent occupy the prefix `[0, inherited_len)`;
+            // anything appended below is authored at this node and is therefore never eligible
+            // as an extension target at the same node.
+            let inherited_len = values.len();
+            let mut extended_targets: Vec<(QualifiedOwnerV1, FactIdV1)> = Vec::new();
             for (local_index, authored) in envelope.current_context().values().iter().enumerate() {
-                if !authored.value().is_supported_in_r03a() {
-                    return Err(PropertyResolutionRefusalV1::of(
-                        PropertyResolutionRefusalKind::LocationExtensionNotImplementedInR03A,
+                if key.is_location()
+                    && let PropertyValueV1::LocationExtension(request) = authored.value()
+                {
+                    apply_location_extension(
+                        request,
+                        owner,
+                        local_index,
+                        &mut values,
+                        inherited_len,
+                        &suppressed_here,
+                        &mut extended_targets,
+                    )?;
+                    resolution_events.push(ResolutionEventV1::new(
+                        owner.clone(),
+                        ResolutionOperation::Extended,
+                        Some(local_index),
+                        Some(request.target_fact_id().clone()),
                     ));
+                    continue;
                 }
                 if let Some(fact) = authored.value().location_fact()
                     && values
@@ -802,11 +907,105 @@ fn validate_effective(
     Ok(())
 }
 
+/// Applies one `extend` operation to the identified inherited fact, in place (§6.2H.4–§6.2H.5).
+///
+/// The named target must be a strict direct ancestor of the declaring node, the fact must sit
+/// in the immediate parent's effective set and must still be inherited here, and one node may
+/// extend one original fact only once. On success only the members `set` explicitly names are
+/// written; the fact keeps its identifier, kind, original owner/index, exposure and position,
+/// and only the written members' field origins move to this node and this local index.
+fn apply_location_extension(
+    request: &LocationExtensionRequestV1,
+    owner: &QualifiedOwnerV1,
+    local_index: usize,
+    values: &mut [ProvenanceValueV1],
+    inherited_len: usize,
+    suppressed_here: &[ProvenanceValueV1],
+    extended_targets: &mut Vec<(QualifiedOwnerV1, FactIdV1)>,
+) -> Result<(), PropertyResolutionRefusalV1> {
+    let target_owner = request.target_owner();
+    let target_fact_id = request.target_fact_id();
+    if !target_owner.is_ancestor_of(owner) {
+        return Err(extension_refusal(LocationExtensionCause::TargetNotAncestor));
+    }
+    let position = values
+        .iter()
+        .enumerate()
+        .find(|(index, value)| {
+            *index < inherited_len && value.identity_matches(target_owner, target_fact_id)
+        })
+        .map(|(index, _)| index);
+    let Some(position) = position else {
+        let cause = if suppressed_here
+            .iter()
+            .any(|value| value.identity_matches(target_owner, target_fact_id))
+        {
+            LocationExtensionCause::TargetSuppressed
+        } else {
+            LocationExtensionCause::TargetNotInherited
+        };
+        return Err(extension_refusal(cause));
+    };
+    let identity = (
+        values[position].origin_owner().clone(),
+        target_fact_id.clone(),
+    );
+    if extended_targets.contains(&identity) {
+        return Err(extension_refusal(
+            LocationExtensionCause::DuplicateExtensionTarget,
+        ));
+    }
+    let Some(existing) = values[position].data().location_fact() else {
+        return Err(extension_refusal(
+            LocationExtensionCause::TargetNotInherited,
+        ));
+    };
+    let set = request.set();
+    let set_names = set.set_field_names();
+    let updated = existing.with_overlay(set);
+    let field_origins: Vec<(String, FieldOriginV1)> = updated
+        .fields()
+        .set_field_names()
+        .into_iter()
+        .map(|name| {
+            let origin = if set_names.contains(&name) {
+                FieldOriginV1::new(owner.clone(), local_index)
+            } else {
+                values[position]
+                    .field_origins()
+                    .and_then(|origins| {
+                        origins
+                            .iter()
+                            .find(|(field, _)| field == name)
+                            .map(|(_, origin)| origin.clone())
+                    })
+                    .unwrap_or_else(|| FieldOriginV1::new(owner.clone(), local_index))
+            };
+            (name.to_owned(), origin)
+        })
+        .collect();
+    extended_targets.push(identity);
+    values[position] = ProvenanceValueV1::new(
+        PropertyValueV1::location(updated),
+        values[position].exposure(),
+        values[position].origin_owner().clone(),
+        values[position].origin_local_index(),
+        Some(field_origins),
+    );
+    Ok(())
+}
+
+/// One invalid-extension refusal with its typed cause.
+fn extension_refusal(cause: LocationExtensionCause) -> PropertyResolutionRefusalV1 {
+    PropertyResolutionRefusalV1::of(PropertyResolutionRefusalKind::InvalidLocationExtension)
+        .with_cause(cause)
+}
+
 /// The field origins of one locally authored location fact (§6.2H.6).
 ///
 /// On an `add`, every populated field carries the adding node's owner and that operation's
-/// array index. `R03.A` performs no extension, so no field origin can be inherited-through
-/// or partially updated here.
+/// array index. An `extend` never calls this: it updates only the origins of the members it
+/// explicitly sets and leaves every untouched field origin exactly as inherited.
 fn field_origins_for(
     key: PropertyKey,
     owner: &QualifiedOwnerV1,

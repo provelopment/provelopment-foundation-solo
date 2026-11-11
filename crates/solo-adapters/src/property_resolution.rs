@@ -26,11 +26,12 @@ use solo_application::{
 use solo_domain::{
     AssetNamespace, AssetReferenceV1, AuthoredPropertyValueV1, CoordinatesV1, CurrentContextV1,
     DeclaredOwnerPropertiesV1, EfsOwnershipGraph, EntityIdV1, Exposure, FactIdV1, Inheritance,
-    LOCATION_FIELD_NAMES, LocaleKeyV1, LocationExtensionRequestV1, LocationFactV1,
-    LocationFieldsV1, LocationKind, MAX_SEO_DESCRIPTION_SCALARS, MAX_SEO_TITLE_SCALARS, MailboxV1,
-    PROPERTY_REGISTRY_VERSION, PlainTextV1, PropertyDeclarationRefusalV1, PropertyDeclarationV1,
-    PropertyKey, PropertyRefusalKind, PropertyResolutionRefusalKind, PropertyValueV1,
-    PublicPropertyProjectionV1, QualifiedOwnerV1, ResolvedPropertiesV1, ResolvedPropertyGraphV1,
+    LOCATION_FIELD_NAMES, LocaleKeyV1, LocationExtensionCause, LocationExtensionRequestV1,
+    LocationFactV1, LocationFieldsV1, LocationKind, MAX_SEO_DESCRIPTION_SCALARS,
+    MAX_SEO_TITLE_SCALARS, MailboxV1, PROPERTY_REGISTRY_VERSION, PlainTextV1,
+    PropertyDeclarationRefusalV1, PropertyDeclarationV1, PropertyKey, PropertyRefusalKind,
+    PropertyResolutionRefusalKind, PropertyValueV1, PublicPropertyProjectionV1, QualifiedOwnerV1,
+    ResolvedPropertiesV1, ResolvedPropertyGraphV1,
 };
 
 use solo_domain::{FacetIdV1, PageIdV1, SiteIdV1};
@@ -72,6 +73,7 @@ pub struct ManifestPropertyRefusalV1 {
     kind: ManifestPropertyRefusalKind,
     owner: Option<Box<QualifiedOwnerV1>>,
     property: Option<PropertyKey>,
+    cause: Option<LocationExtensionCause>,
 }
 
 impl ManifestPropertyRefusalV1 {
@@ -84,7 +86,19 @@ impl ManifestPropertyRefusalV1 {
             kind,
             owner: owner.map(Box::new),
             property,
+            cause: None,
         }
+    }
+
+    /// The typed invalid-extension cause, when this refusal is one.
+    #[must_use]
+    pub const fn cause(&self) -> Option<LocationExtensionCause> {
+        self.cause
+    }
+
+    fn with_cause(mut self, cause: Option<LocationExtensionCause>) -> Self {
+        self.cause = cause;
+        self
     }
 
     /// The refusal category.
@@ -107,8 +121,8 @@ impl ManifestPropertyRefusalV1 {
 
     /// Stable engineering code for this refusal.
     ///
-    /// A recognized-but-unimplemented `location` extension keeps its own dedicated code so
-    /// it is never confused with a malformed declaration.
+    /// An invalid `location` extension keeps its own dedicated code so it is never confused
+    /// with a malformed declaration or with an unrelated resolution failure.
     #[must_use]
     pub const fn code(&self) -> &'static str {
         match self.kind {
@@ -118,8 +132,8 @@ impl ManifestPropertyRefusalV1 {
             }
             ManifestPropertyRefusalKind::DeclarationRefused(_) => "PROPERTY_DECLARATION_REFUSED",
             ManifestPropertyRefusalKind::ResolutionRefused(
-                PropertyResolutionRefusalKind::LocationExtensionNotImplementedInR03A,
-            ) => "LOCATION_EXTENSION_NOT_IMPLEMENTED_IN_R03A",
+                PropertyResolutionRefusalKind::InvalidLocationExtension,
+            ) => "LOCATION_INVALID_EXTEND",
             ManifestPropertyRefusalKind::ResolutionRefused(_) => "PROPERTY_RESOLUTION_REFUSED",
         }
     }
@@ -242,11 +256,16 @@ pub fn validate_manifest_property_candidate_v1(
     let request = PropertyResolutionRequestV1::new(graph, declared, target.clone())
         .with_required_membership(owners);
     let candidate = resolve_declared_properties_v1(request).map_err(|resolution| {
+        // The domain records the declaring owner and registered key that actually failed, so a
+        // diagnostic names that declaration instead of blaming the requested target. The
+        // requested target is used only when the refusal carries no declaration context.
+        let owner = resolution.owner().cloned().or_else(|| Some(target.clone()));
         refuse(
             ManifestPropertyRefusalKind::ResolutionRefused(resolution.kind()),
-            Some(target.clone()),
-            None,
+            owner,
+            resolution.property(),
         )
+        .with_cause(resolution.cause())
     })?;
     Ok(ManifestPropertyCandidateV1 {
         candidate,
@@ -474,14 +493,11 @@ fn translate_value(
 ) -> Result<AuthoredPropertyValueV1, PropertyDeclarationRefusalV1> {
     if key.is_location() {
         let (value, exposure) = translate_location(node)?;
-        return Ok(AuthoredPropertyValueV1::new(value, exposure));
+        return AuthoredPropertyValueV1::new(value, exposure);
     }
     if key.is_graphic() {
         let (reference, exposure) = translate_graphic(node)?;
-        return Ok(AuthoredPropertyValueV1::new(
-            PropertyValueV1::graphic(reference),
-            exposure,
-        ));
+        return AuthoredPropertyValueV1::new(PropertyValueV1::graphic(reference), exposure);
     }
     match key {
         PropertyKey::SeoTitle => translate_text(node, MAX_SEO_TITLE_SCALARS, "text"),
@@ -500,10 +516,7 @@ fn translate_text(
     let members = closed_members(node, &[field, "exposure"])?;
     let exposure = exposure_of(required(&members, "exposure")?)?;
     let text = PlainTextV1::parse(as_string(required(&members, field)?)?, max_scalars)?;
-    Ok(AuthoredPropertyValueV1::new(
-        PropertyValueV1::text(text),
-        exposure,
-    ))
+    AuthoredPropertyValueV1::new(PropertyValueV1::text(text), exposure)
 }
 
 /// Translates one closed `{ address, exposure }` mailbox entry.
@@ -513,10 +526,7 @@ fn translate_mailbox(
     let members = closed_members(node, &["address", "exposure"])?;
     let exposure = exposure_of(required(&members, "exposure")?)?;
     let mailbox = MailboxV1::parse(as_string(required(&members, "address")?)?)?;
-    Ok(AuthoredPropertyValueV1::new(
-        PropertyValueV1::mailbox(mailbox),
-        exposure,
-    ))
+    AuthoredPropertyValueV1::new(PropertyValueV1::mailbox(mailbox), exposure)
 }
 
 /// Translates one closed `{ source: { namespace, reference }, exposure }` graphic entry.
@@ -594,12 +604,11 @@ fn exposure_of(node: &DeclaredNode) -> Result<Exposure, PropertyDeclarationRefus
     }
 }
 
-/// Translates one location operation: a validated `add` fact or a recognized `extend`.
+/// Translates one location operation: a validated `add` fact or a validated `extend`.
 ///
-/// The `extend` branch validates only that the accepted §6.2H.4 envelope is present and
-/// closed. It deliberately does **not** implement identified-record mutation: it returns the
-/// typed unsupported request so a real resolution refuses by name instead of merging in
-/// place, publishing a partial record or claiming the accepted syntax is invalid.
+/// Both branches validate the accepted §6.2H.4 envelope and its closed, typed members. Which
+/// fact an `extend` may actually update is a resolution decision made against the real
+/// ancestry, never a syntax decision made here.
 fn translate_location(
     node: &DeclaredNode,
 ) -> Result<(PropertyValueV1, Exposure), PropertyDeclarationRefusalV1> {
@@ -634,6 +643,13 @@ fn translate_location_add(
     Ok((PropertyValueV1::location(fact), exposure))
 }
 
+/// Translates one `extend` operation (§6.2H.4).
+///
+/// The qualified target owner, the stable fact identifier and a nonempty typed `set` are
+/// validated here; whether that target is an accessible, presently inherited, unsuppressed fact
+/// is decided by the resolver against the real direct ancestry. The returned exposure is the
+/// inert placeholder: an extension carries no authored exposure and can never change the
+/// whole-record exposure of the fact it names.
 fn translate_location_extend(
     node: &DeclaredNode,
 ) -> Result<(PropertyValueV1, Exposure), PropertyDeclarationRefusalV1> {
@@ -644,18 +660,17 @@ fn translate_location_extend(
     // identifier and locale-key boundaries, and a contiguous lineage.
     let target_owner = translate_extend_target_owner(required(&target, "owner")?)?;
     // `set` carries the same closed, typed `LocationFields` values as an `add` operation,
-    // including element types, bounds, country-code form and coordinate ranges. Its
-    // identified-record mutation semantics remain R03.B.
+    // including element types, bounds, country-code form and coordinate ranges. An empty `set`
+    // is refused by the typed request itself, so the accepted shape stays non-empty.
     let set = translate_location_fields(required(&members, "set")?)?;
-    // An extension may never supply or change exposure (section 6.2H.6), and it never becomes
-    // an effective value in R03.A because resolution refuses it by name. `Internal` is the
-    // inert placeholder and cannot elevate anything.
+    // An extension may never supply or change exposure (section 6.2H.6). `Internal` is the inert
+    // placeholder the typed wrapper requires; resolution keeps the fact's own exposure.
     Ok((
         PropertyValueV1::location_extension(LocationExtensionRequestV1::new(
             fact_id,
             target_owner,
             set,
-        )),
+        )?),
         Exposure::Internal,
     ))
 }

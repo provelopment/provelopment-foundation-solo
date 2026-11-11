@@ -8,12 +8,12 @@
 use solo_domain::{
     AssetNamespace, AssetReferenceV1, AuthoredPropertyValueV1, CoordinatesV1, CurrentContextV1,
     DeclaredOwnerPropertiesV1, EfsLevel, EfsOwnershipDraft, EfsOwnershipGraph, EntityIdV1,
-    Exposure, FacetDraft, FacetIdV1, FactIdV1, Inheritance, LocaleKeyV1,
+    Exposure, FacetDraft, FacetIdV1, FactIdV1, Inheritance, LocaleKeyV1, LocationExtensionCause,
     LocationExtensionRequestV1, LocationFactV1, LocationFieldsV1, LocationKind,
     MAX_BACKGROUND_LAYERS, MAX_LOCAL_ENTRIES, MAX_LOCATION_FACTS, MAX_SEO_TITLE_SCALARS, MailboxV1,
     PROPERTY_REGISTRY_VERSION, PageDraft, PageIdV1, PlainTextV1, PropertyDeclarationV1,
-    PropertyKey, PropertyRefusalKind, PropertyResolutionRefusalKind, PropertyValueV1,
-    ProvenanceValueV1, QualifiedOwnerV1, ResolutionOperation, SiteDraft, SiteIdV1,
+    PropertyKey, PropertyRefusalKind, PropertyResolutionRefusalKind, PropertyResolutionRefusalV1,
+    PropertyValueV1, ProvenanceValueV1, QualifiedOwnerV1, ResolutionOperation, SiteDraft, SiteIdV1,
     project_public_properties_v1, resolve_all_owners_v1, validate_declared_properties_v1,
 };
 
@@ -120,7 +120,7 @@ fn jakarta_representation_owner() -> QualifiedOwnerV1 {
 }
 
 fn auth(value: PropertyValueV1, exposure: Exposure) -> AuthoredPropertyValueV1 {
-    AuthoredPropertyValueV1::new(value, exposure)
+    AuthoredPropertyValueV1::new(value, exposure).expect("a valid authored value")
 }
 
 fn inherit(values: Vec<AuthoredPropertyValueV1>) -> PropertyDeclarationV1 {
@@ -184,11 +184,19 @@ fn location(fact_id: &str, locality: &str) -> PropertyValueV1 {
 fn extension_request(fact_id: &str, locality: &str) -> PropertyValueV1 {
     let mut set = LocationFieldsV1::new();
     set.set_locality(locality).expect("valid locality text");
-    PropertyValueV1::location_extension(LocationExtensionRequestV1::new(
-        FactIdV1::parse(fact_id).expect("a valid fact identifier"),
-        site_owner(),
-        set,
-    ))
+    extension_to(site_owner(), fact_id, set)
+}
+
+/// One typed `extend` operation naming `target` and the members to set.
+fn extension_to(target: QualifiedOwnerV1, fact_id: &str, set: LocationFieldsV1) -> PropertyValueV1 {
+    PropertyValueV1::location_extension(
+        LocationExtensionRequestV1::new(
+            FactIdV1::parse(fact_id).expect("a valid fact identifier"),
+            target,
+            set,
+        )
+        .expect("a nonempty typed extension set"),
+    )
 }
 
 /// `R03A-01` — the registry is exactly the nine accepted keys with the accepted spellings,
@@ -1337,11 +1345,13 @@ fn r03a_08_wrong_lineage_and_second_entity_refuse() {
     );
 }
 
-/// `R03A-10` — the accepted `location` `extend` syntax is recognized and refused by name,
-/// while the ordinary `add` cascade still resolves.
+/// `R03B-01` — converted from `R03A-10`. A Page-level `extend` of an inherited Site fact now
+/// updates that one fact in place, and an `add`-only input still resolves unchanged.
 #[test]
-fn r03a_10_recognized_extend_is_refused_by_name_while_add_works() {
-    let extension = extension_request("bali-base", "Ubud");
+fn r03b_01_page_extension_updates_the_inherited_fact_in_place() {
+    let mut set = LocationFieldsV1::new();
+    set.set_locality("Ubud").expect("valid locality text");
+    set.set_district("Gianyar").expect("valid district text");
     let input = validate_declared_properties_v1(
         &graph(),
         vec![
@@ -1359,21 +1369,55 @@ fn r03a_10_recognized_extend_is_refused_by_name_while_add_works() {
                 page_owner(),
                 vec![(
                     PropertyKey::Location,
-                    inherit(vec![auth(extension, Exposure::Internal)]),
+                    inherit(vec![auth(
+                        extension_to(site_owner(), "bali-base", set),
+                        Exposure::Internal,
+                    )]),
                 )],
             ),
         ],
     )
     .expect("the accepted extend syntax is recognized, not reported as invalid");
     assert!(input.has_recognized_location_extension());
-    let refusal = input
+
+    let resolved = input
         .resolve(&representation_owner())
-        .expect_err("an attempted resolution involving extend refuses");
-    assert_eq!(
-        refusal.kind(),
-        PropertyResolutionRefusalKind::LocationExtensionNotImplementedInR03A
+        .expect("a valid extension resolves");
+    let facts = resolved.values_of(PropertyKey::Location);
+    assert_eq!(facts.len(), 1, "an extension never appends a fact");
+    assert_eq!(facts[0].origin_owner(), &site_owner());
+    assert_eq!(facts[0].origin_local_index(), 0);
+    assert!(
+        facts[0].exposure().is_public(),
+        "an extension never changes exposure"
     );
-    assert_eq!(refusal.code(), "LOCATION_EXTENSION_NOT_IMPLEMENTED_IN_R03A");
+    let fact = facts[0]
+        .data()
+        .location_fact()
+        .expect("the resolved location fact");
+    assert_eq!(fact.fact_id().as_str(), "bali-base");
+    assert_eq!(fact.kind(), LocationKind::Association);
+    let mut expected = LocationFieldsV1::new();
+    expected.set_country_code("ID").expect("ID");
+    expected.set_locality("Ubud").expect("Ubud");
+    expected.set_district("Gianyar").expect("Gianyar");
+    assert_eq!(fact.fields(), &expected);
+    let origins = facts[0].field_origins().expect("field origins");
+    assert_eq!(
+        origins
+            .iter()
+            .map(|(name, origin)| (
+                name.as_str(),
+                origin.owner().describe(),
+                origin.local_index()
+            ))
+            .collect::<Vec<_>>(),
+        vec![
+            ("countryCode", site_owner().describe(), 0),
+            ("locality", page_owner().describe(), 0),
+            ("district", page_owner().describe(), 0),
+        ]
+    );
 
     let add_only = validate_declared_properties_v1(
         &graph(),
@@ -1393,16 +1437,15 @@ fn r03a_10_recognized_extend_is_refused_by_name_while_add_works() {
     let add_resolved = add_only
         .resolve(&representation_owner())
         .expect("a valid resolution");
-    let facts = add_resolved.values_of(PropertyKey::Location);
-    assert_eq!(facts.len(), 1);
-    let fact = facts[0]
+    let add_facts = add_resolved.values_of(PropertyKey::Location);
+    assert_eq!(add_facts.len(), 1);
+    let add_fact = add_facts[0]
         .data()
         .location_fact()
         .expect("a resolved location fact");
-    assert_eq!(fact.fact_id().as_str(), "bali-base");
-    assert_eq!(fact.kind(), LocationKind::Association);
+    assert_eq!(add_fact.fact_id().as_str(), "bali-base");
     assert_eq!(
-        fact.fields().set_field_names(),
+        add_fact.fields().set_field_names(),
         vec!["countryCode", "locality"]
     );
 }
@@ -1601,9 +1644,10 @@ fn r03a_04_whole_graph_preserves_each_branch_original_values() {
     );
 }
 
-/// `R03A-10` - a recognized extension anywhere in the graph refuses the whole candidate.
+/// `R03B-04` — converted from `R03A-10`. A sibling-targeted extension still refuses the whole
+/// candidate, now with the R03.B code and typed cause, while the valid Bali branch is untouched.
 #[test]
-fn r03a_10_whole_graph_refuses_a_recognized_extension_anywhere() {
+fn r03b_04_sibling_extension_refuses_the_whole_graph() {
     let declarations = vec![
         declared(
             site_owner(),
@@ -1620,7 +1664,7 @@ fn r03a_10_whole_graph_refuses_a_recognized_extension_anywhere() {
             vec![(
                 PropertyKey::Location,
                 inherit(vec![auth(
-                    extension_request("jakarta-base", "Ubud"),
+                    extension_request("bali-base", "Ubud"),
                     Exposure::Internal,
                 )]),
             )],
@@ -1643,7 +1687,919 @@ fn r03a_10_whole_graph_refuses_a_recognized_extension_anywhere() {
     let refusal = resolve_all_owners_v1(&input).expect_err("the extension refuses the whole graph");
     assert_eq!(
         refusal.kind(),
-        PropertyResolutionRefusalKind::LocationExtensionNotImplementedInR03A
+        PropertyResolutionRefusalKind::InvalidLocationExtension
     );
-    assert_eq!(refusal.code(), "LOCATION_EXTENSION_NOT_IMPLEMENTED_IN_R03A");
+    assert_eq!(refusal.code(), "LOCATION_INVALID_EXTEND");
+    assert_eq!(
+        refusal.cause(),
+        Some(LocationExtensionCause::TargetNotAncestor)
+    );
+    assert_eq!(
+        refusal.owner().map(solo_domain::QualifiedOwnerV1::describe),
+        Some(jakarta_site_owner().describe()),
+        "the diagnostic names the declaring node, not the requested target"
+    );
+    assert_eq!(refusal.property(), Some(PropertyKey::Location));
+}
+
+/// Every resolved field origin of one location value as `(field, owner, local index)`.
+fn origins_of(value: &ProvenanceValueV1) -> Vec<(String, String, usize)> {
+    value
+        .field_origins()
+        .expect("field origins")
+        .iter()
+        .map(|(name, origin)| {
+            (
+                name.clone(),
+                origin.owner().describe(),
+                origin.local_index(),
+            )
+        })
+        .collect()
+}
+
+/// `R03B-02` — consecutive extensions of one original fact preserve untouched fields and their
+/// earlier origins while updating only newly-set fields, across all five EFS levels.
+#[test]
+fn r03b_02_consecutive_extensions_overlay_all_ten_fields_across_five_levels() {
+    let mut entity_fields = LocationFieldsV1::new();
+    entity_fields.set_world_region("Oceania").expect("region");
+    entity_fields.set_country_code("AU").expect("AU");
+    let hq = PropertyValueV1::location(
+        LocationFactV1::add(
+            FactIdV1::parse("hq").expect("hq"),
+            LocationKind::Premises,
+            entity_fields,
+        )
+        .expect("a nonempty fact"),
+    );
+
+    let mut facet_set = LocationFieldsV1::new();
+    facet_set.set_administrative_area("Bali").expect("area");
+    let mut site_set = LocationFieldsV1::new();
+    site_set.set_locality("Denpasar").expect("locality");
+    let mut page_set = LocationFieldsV1::new();
+    page_set.set_district("Denpasar Barat").expect("district");
+    page_set.set_named_place("Renon").expect("named place");
+    let mut representation_set = LocationFieldsV1::new();
+    representation_set
+        .set_address_line1("Jalan Raya 1")
+        .expect("line 1");
+    representation_set
+        .set_address_line2("Suite 2")
+        .expect("line 2");
+    representation_set
+        .set_postal_code("80226")
+        .expect("postal code");
+    representation_set.set_coordinates(CoordinatesV1::new(-8.65, 115.22).expect("WGS84"));
+
+    let extensions = vec![
+        (facet_owner(), facet_set),
+        (site_owner(), site_set),
+        (page_owner(), page_set),
+        (representation_owner(), representation_set),
+    ];
+    let mut declarations = vec![declared(
+        entity_owner(),
+        vec![(
+            PropertyKey::Location,
+            inherit(vec![auth(hq, Exposure::Public)]),
+        )],
+    )];
+    for (owner, set) in extensions {
+        declarations.push(declared(
+            owner,
+            vec![(
+                PropertyKey::Location,
+                inherit(vec![auth(
+                    extension_to(entity_owner(), "hq", set),
+                    Exposure::Internal,
+                )]),
+            )],
+        ));
+    }
+    let input = validate_declared_properties_v1(&graph(), declarations)
+        .expect("every extension targets a strict ancestor's inherited fact");
+
+    let resolved = input
+        .resolve(&representation_owner())
+        .expect("the five-level chain resolves");
+    let facts = resolved.values_of(PropertyKey::Location);
+    assert_eq!(facts.len(), 1, "one original fact, never a second");
+    assert_eq!(facts[0].origin_owner(), &entity_owner());
+    assert_eq!(facts[0].origin_local_index(), 0);
+    assert!(facts[0].exposure().is_public());
+    let fact = facts[0].data().location_fact().expect("the fact");
+    assert_eq!(fact.fact_id().as_str(), "hq");
+    assert_eq!(fact.kind(), LocationKind::Premises);
+    assert_eq!(
+        fact.fields().set_field_names(),
+        solo_domain::LOCATION_FIELD_NAMES.to_vec(),
+        "all ten members are present in canonical order"
+    );
+    assert_eq!(
+        origins_of(&facts[0]),
+        vec![
+            ("worldRegion".to_owned(), entity_owner().describe(), 0),
+            ("countryCode".to_owned(), entity_owner().describe(), 0),
+            ("administrativeArea".to_owned(), facet_owner().describe(), 0),
+            ("locality".to_owned(), site_owner().describe(), 0),
+            ("district".to_owned(), page_owner().describe(), 0),
+            ("namedPlace".to_owned(), page_owner().describe(), 0),
+            (
+                "addressLine1".to_owned(),
+                representation_owner().describe(),
+                0
+            ),
+            (
+                "addressLine2".to_owned(),
+                representation_owner().describe(),
+                0
+            ),
+            (
+                "postalCode".to_owned(),
+                representation_owner().describe(),
+                0
+            ),
+            (
+                "coordinates".to_owned(),
+                representation_owner().describe(),
+                0
+            ),
+        ],
+        "only explicitly set members move their origin; coordinates is one field"
+    );
+    let events = resolved
+        .property(PropertyKey::Location)
+        .expect("a location record")
+        .resolution_events();
+    assert_eq!(
+        events
+            .iter()
+            .filter(|event| event.operation() == ResolutionOperation::Extended)
+            .count(),
+        4,
+        "one `extended` event per successful extension"
+    );
+    assert_eq!(
+        events
+            .iter()
+            .filter(|event| event.operation() == ResolutionOperation::Added)
+            .count(),
+        1,
+        "an extension never records a phantom `added` event"
+    );
+}
+
+/// `R03B-03` — mixed `add`, `extend`, `add` keeps inherited-first then authored order, records
+/// the real sequence, repeats identically and keeps `none` distinct from an absent key.
+#[test]
+fn r03b_03_mixed_add_extend_add_keeps_order_and_records_the_real_sequence() {
+    fn added(fact_id: &str, locality: &str) -> PropertyValueV1 {
+        let mut fields = LocationFieldsV1::new();
+        fields.set_locality(locality).expect("locality");
+        PropertyValueV1::location(
+            LocationFactV1::add(
+                FactIdV1::parse(fact_id).expect("a fact identifier"),
+                LocationKind::Association,
+                fields,
+            )
+            .expect("a nonempty fact"),
+        )
+    }
+    let mut ubud = LocationFieldsV1::new();
+    ubud.set_locality("Ubud").expect("locality");
+
+    let input = validate_declared_properties_v1(
+        &graph(),
+        vec![
+            declared(
+                site_owner(),
+                vec![(
+                    PropertyKey::Location,
+                    inherit(vec![auth(
+                        location("bali-base", "Denpasar"),
+                        Exposure::Public,
+                    )]),
+                )],
+            ),
+            declared(
+                page_owner(),
+                vec![(
+                    PropertyKey::Location,
+                    inherit(vec![
+                        auth(added("page-annex", "Sanur"), Exposure::Public),
+                        auth(
+                            extension_to(site_owner(), "bali-base", ubud),
+                            Exposure::Internal,
+                        ),
+                        auth(added("page-depot", "Jimbaran"), Exposure::Internal),
+                    ]),
+                )],
+            ),
+        ],
+    )
+    .expect("the mixed declarations are valid");
+
+    let resolved = input
+        .resolve(&representation_owner())
+        .expect("the mixed declaration resolves");
+    let facts = resolved.values_of(PropertyKey::Location);
+    assert_eq!(
+        facts.len(),
+        3,
+        "two adds and no extra fact from the extension"
+    );
+    assert_eq!(
+        facts
+            .iter()
+            .map(|value| (value.origin_owner().describe(), value.origin_local_index()))
+            .collect::<Vec<_>>(),
+        vec![
+            (site_owner().describe(), 0),
+            (page_owner().describe(), 0),
+            (page_owner().describe(), 2),
+        ],
+        "the inherited fact stays first and keeps its slot; adds keep authored order"
+    );
+    assert_eq!(
+        origins_of(&facts[0])[1],
+        ("locality".to_owned(), page_owner().describe(), 1),
+        "a field origin records the extension's own zero-based local index"
+    );
+    let localities = facts
+        .iter()
+        .map(|value| {
+            value
+                .data()
+                .location_fact()
+                .expect("a fact")
+                .fields()
+                .set_field_names()
+                .len()
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(localities, vec![2, 2, 2]);
+
+    let sequence = resolved
+        .property(PropertyKey::Location)
+        .expect("a location record")
+        .resolution_events()
+        .iter()
+        .map(|event| {
+            (
+                event.owner().describe(),
+                event.operation().detail(),
+                event.local_index(),
+                event.target_fact_id().map(ToString::to_string),
+            )
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        sequence,
+        vec![
+            (site_owner().describe(), "added", Some(0), None),
+            (page_owner().describe(), "inherited", None, None),
+            (page_owner().describe(), "added", Some(0), None),
+            (
+                page_owner().describe(),
+                "extended",
+                Some(1),
+                Some("bali-base".to_owned())
+            ),
+            (page_owner().describe(), "added", Some(2), None),
+        ]
+    );
+
+    // Repeated resolution is value-identical: no memoised mutation survives between calls.
+    assert_eq!(
+        input
+            .resolve(&representation_owner())
+            .expect("a repeated resolution"),
+        resolved
+    );
+
+    // An explicit `"none"` declares the key and contributes nothing; an absent key declares
+    // nothing at all. Both resolve identically, so the distinction is authored, not effective.
+    let literal_none = validate_declared_properties_v1(
+        &graph(),
+        vec![declared(
+            page_owner(),
+            vec![(PropertyKey::Location, inherit(Vec::new()))],
+        )],
+    )
+    .expect("an explicit `none` is valid");
+    let none_resolved = literal_none
+        .resolve(&page_owner())
+        .expect("`none` resolves");
+    assert!(none_resolved.values_of(PropertyKey::Location).is_empty());
+    assert!(
+        none_resolved
+            .property(PropertyKey::Location)
+            .expect("a location record")
+            .resolution_events()
+            .is_empty(),
+        "`none` carries nothing and records no inheritance event"
+    );
+    let absent = validate_declared_properties_v1(&graph(), Vec::new()).expect("a valid input");
+    let absent_resolved = absent
+        .resolve(&page_owner())
+        .expect("an absent key resolves");
+    assert_eq!(absent_resolved, none_resolved);
+    assert!(
+        literal_none
+            .declaration_for(&page_owner())
+            .expect("a declaration set")
+            .declaration(PropertyKey::Location)
+            .is_some(),
+        "the explicit `none` declaration still exists"
+    );
+    assert!(absent.declaration_for(&page_owner()).is_none());
+}
+
+/// `R03B-04` — every forbidden extension target refuses with `LOCATION_INVALID_EXTEND` and its
+/// typed cause, and never falls back to another fact or the requested target.
+#[test]
+fn r03b_04_invalid_extension_targets_refuse_with_typed_causes() {
+    fn refusal(
+        declarations: Vec<DeclaredOwnerPropertiesV1>,
+        target: &QualifiedOwnerV1,
+    ) -> PropertyResolutionRefusalV1 {
+        validate_declared_properties_v1(&graph(), declarations)
+            .expect("a structurally valid declaration set")
+            .resolve(target)
+            .expect_err("the extension must refuse")
+    }
+
+    let mut set = LocationFieldsV1::new();
+    set.set_locality("Ubud").expect("locality");
+    let other_entity = QualifiedOwnerV1::entity(EntityIdV1::parse("other").expect("other"));
+    let company_facet = QualifiedOwnerV1::facet(entity_id(), facet("company"));
+    let id_representation = QualifiedOwnerV1::representation(
+        entity_id(),
+        facet("main"),
+        site("bali"),
+        page("home"),
+        locale("id-ID"),
+    );
+    let extension_declaration =
+        |declaring: QualifiedOwnerV1, target: QualifiedOwnerV1, fact_id: &str| {
+            declared(
+                declaring,
+                vec![(
+                    PropertyKey::Location,
+                    inherit(vec![auth(
+                        extension_to(target, fact_id, set.clone()),
+                        Exposure::Internal,
+                    )]),
+                )],
+            )
+        };
+
+    // Forbidden lineage: the Entity root, the current node, a sibling, another Facet, another
+    // Entity, a descendant and a different full locale fail before any fact lookup.
+    let lineage_cases = vec![
+        (entity_owner(), entity_owner(), "hq"),
+        (page_owner(), page_owner(), "bali-base"),
+        (page_owner(), jakarta_site_owner(), "jakarta-base"),
+        (page_owner(), company_facet, "corporate-base"),
+        (page_owner(), other_entity, "hq"),
+        (site_owner(), page_owner(), "bali-base"),
+        (page_owner(), id_representation, "bali-base"),
+    ];
+    for (declaring, target, fact_id) in lineage_cases {
+        let failure = refusal(
+            vec![extension_declaration(declaring, target.clone(), fact_id)],
+            &page_owner(),
+        );
+        assert_eq!(
+            failure.kind(),
+            PropertyResolutionRefusalKind::InvalidLocationExtension
+        );
+        assert_eq!(failure.code(), "LOCATION_INVALID_EXTEND");
+        assert_eq!(
+            failure.cause(),
+            Some(LocationExtensionCause::TargetNotAncestor),
+            "target {} must be a forbidden lineage",
+            target.describe()
+        );
+    }
+
+    // A missing fact, and an ancestor named with the right identifier but not the original
+    // owner, both refuse as not-inherited rather than matching another identity.
+    let site_fact = declared(
+        site_owner(),
+        vec![(
+            PropertyKey::Location,
+            inherit(vec![auth(
+                location("bali-base", "Denpasar"),
+                Exposure::Public,
+            )]),
+        )],
+    );
+    let missing = refusal(
+        vec![
+            site_fact.clone(),
+            extension_declaration(page_owner(), site_owner(), "nope"),
+        ],
+        &representation_owner(),
+    );
+    assert_eq!(
+        missing.cause(),
+        Some(LocationExtensionCause::TargetNotInherited)
+    );
+    let wrong_original_owner = refusal(
+        vec![
+            site_fact,
+            extension_declaration(page_owner(), entity_owner(), "bali-base"),
+        ],
+        &representation_owner(),
+    );
+    assert_eq!(
+        wrong_original_owner.cause(),
+        Some(LocationExtensionCause::TargetNotInherited)
+    );
+    assert_eq!(wrong_original_owner.code(), "LOCATION_INVALID_EXTEND");
+
+    // A fact removed by an intervening ancestor is no longer inherited and cannot be extended.
+    let removed = refusal(
+        vec![
+            declared(
+                entity_owner(),
+                vec![(
+                    PropertyKey::Location,
+                    inherit(vec![auth(location("shared", "Denpasar"), Exposure::Public)]),
+                )],
+            ),
+            declared(
+                site_owner(),
+                vec![(PropertyKey::Location, suppress(Vec::new()))],
+            ),
+            extension_declaration(page_owner(), entity_owner(), "shared"),
+        ],
+        &representation_owner(),
+    );
+    assert_eq!(
+        removed.cause(),
+        Some(LocationExtensionCause::TargetNotInherited)
+    );
+}
+
+/// `R03B-05` — suppression is final: a suppressed target refuses, `suppress` with a new `add`
+/// is valid, and a fact added at the same node is not an eligible target.
+#[test]
+fn r03b_05_suppression_is_final_for_extensions() {
+    let mut set = LocationFieldsV1::new();
+    set.set_locality("Ubud").expect("locality");
+    let entity_fact = declared(
+        entity_owner(),
+        vec![(
+            PropertyKey::Location,
+            inherit(vec![auth(location("shared", "Denpasar"), Exposure::Public)]),
+        )],
+    );
+
+    // The same node both suppresses and names the removed fact: the accurate cause is
+    // suppression, not a generic missing fact.
+    let suppressed = validate_declared_properties_v1(
+        &graph(),
+        vec![
+            entity_fact.clone(),
+            declared(
+                site_owner(),
+                vec![(
+                    PropertyKey::Location,
+                    suppress(vec![auth(
+                        extension_to(entity_owner(), "shared", set.clone()),
+                        Exposure::Internal,
+                    )]),
+                )],
+            ),
+        ],
+    )
+    .expect("a structurally valid declaration set")
+    .resolve(&site_owner())
+    .expect_err("a suppressed target cannot be extended");
+    assert_eq!(
+        suppressed.cause(),
+        Some(LocationExtensionCause::TargetSuppressed)
+    );
+    assert_eq!(suppressed.code(), "LOCATION_INVALID_EXTEND");
+
+    // `suppress` plus an independent `add` stays valid and clears the suppressed value.
+    let replaced = validate_declared_properties_v1(
+        &graph(),
+        vec![
+            entity_fact,
+            declared(
+                site_owner(),
+                vec![(
+                    PropertyKey::Location,
+                    suppress(vec![auth(
+                        location("bali-new", "Denpasar"),
+                        Exposure::Public,
+                    )]),
+                )],
+            ),
+        ],
+    )
+    .expect("suppress plus add is valid")
+    .resolve(&representation_owner())
+    .expect("the replacement resolves");
+    let facts = replaced.values_of(PropertyKey::Location);
+    assert_eq!(facts.len(), 1);
+    assert_eq!(facts[0].origin_owner(), &site_owner());
+    assert_eq!(
+        facts[0]
+            .data()
+            .location_fact()
+            .expect("a fact")
+            .fact_id()
+            .as_str(),
+        "bali-new"
+    );
+    assert!(
+        replaced
+            .property(PropertyKey::Location)
+            .expect("a record")
+            .resolution_events()
+            .iter()
+            .any(|event| event.operation() == ResolutionOperation::Suppressed)
+    );
+
+    // A fact the same node has just added is not an eligible extension target.
+    let same_node = validate_declared_properties_v1(
+        &graph(),
+        vec![declared(
+            page_owner(),
+            vec![(
+                PropertyKey::Location,
+                inherit(vec![
+                    auth(location("page-annex", "Sanur"), Exposure::Public),
+                    auth(
+                        extension_to(page_owner(), "page-annex", set),
+                        Exposure::Internal,
+                    ),
+                ]),
+            )],
+        )],
+    )
+    .expect("a structurally valid declaration set")
+    .resolve(&page_owner())
+    .expect_err("a same-node add is not extendable");
+    assert_eq!(
+        same_node.cause(),
+        Some(LocationExtensionCause::TargetNotInherited)
+    );
+}
+
+/// `R03B-06` — two extensions of one original fact at one node refuse even when identical, and
+/// two inherited facts that share a `factId` under different original owners stay distinct.
+#[test]
+fn r03b_06_duplicate_extensions_refuse_and_same_ids_stay_distinguishable() {
+    let mut set = LocationFieldsV1::new();
+    set.set_locality("Ubud").expect("locality");
+    let site_fact = declared(
+        site_owner(),
+        vec![(
+            PropertyKey::Location,
+            inherit(vec![auth(
+                location("bali-base", "Denpasar"),
+                Exposure::Public,
+            )]),
+        )],
+    );
+    let repeated = validate_declared_properties_v1(
+        &graph(),
+        vec![
+            site_fact,
+            declared(
+                page_owner(),
+                vec![(
+                    PropertyKey::Location,
+                    inherit(vec![
+                        auth(
+                            extension_to(site_owner(), "bali-base", set.clone()),
+                            Exposure::Internal,
+                        ),
+                        auth(
+                            extension_to(site_owner(), "bali-base", set.clone()),
+                            Exposure::Internal,
+                        ),
+                    ]),
+                )],
+            ),
+        ],
+    )
+    .expect("a structurally valid declaration set")
+    .resolve(&page_owner())
+    .expect_err("two extensions of one target refuse");
+    assert_eq!(
+        repeated.cause(),
+        Some(LocationExtensionCause::DuplicateExtensionTarget)
+    );
+    assert_eq!(repeated.code(), "LOCATION_INVALID_EXTEND");
+
+    let distinct = validate_declared_properties_v1(
+        &graph(),
+        vec![
+            declared(
+                entity_owner(),
+                vec![(
+                    PropertyKey::Location,
+                    inherit(vec![auth(location("shared", "Denpasar"), Exposure::Public)]),
+                )],
+            ),
+            declared(
+                facet_owner(),
+                vec![(
+                    PropertyKey::Location,
+                    inherit(vec![auth(location("shared", "Denpasar"), Exposure::Public)]),
+                )],
+            ),
+            declared(
+                page_owner(),
+                vec![(
+                    PropertyKey::Location,
+                    inherit(vec![auth(
+                        extension_to(facet_owner(), "shared", set),
+                        Exposure::Internal,
+                    )]),
+                )],
+            ),
+        ],
+    )
+    .expect("distinct original owners may reuse one fact identifier")
+    .resolve(&representation_owner())
+    .expect("the qualified target resolves");
+    let facts = distinct.values_of(PropertyKey::Location);
+    assert_eq!(facts.len(), 2, "no silent de-duplication");
+    assert_eq!(facts[0].origin_owner(), &entity_owner());
+    assert_eq!(facts[1].origin_owner(), &facet_owner());
+    let mut untouched = LocationFieldsV1::new();
+    untouched.set_country_code("ID").expect("ID");
+    untouched.set_locality("Denpasar").expect("Denpasar");
+    assert_eq!(
+        facts[0].data().location_fact().expect("a fact").fields(),
+        &untouched,
+        "the entity-owned fact is untouched"
+    );
+    let mut extended = LocationFieldsV1::new();
+    extended.set_country_code("ID").expect("ID");
+    extended.set_locality("Ubud").expect("Ubud");
+    assert_eq!(
+        facts[1].data().location_fact().expect("a fact").fields(),
+        &extended,
+        "only the named original owner changes"
+    );
+}
+
+/// `R03B-07` — the effective maximum stays 16 distinct facts: a valid extension is never a
+/// seventeenth fact, a seventeenth independent `add` refuses before public filtering, and a
+/// duplicate independent `add` identity still refuses.
+#[test]
+fn r03b_07_effective_maximum_and_duplicate_add_refusals_are_unchanged() {
+    let site_facts: Vec<AuthoredPropertyValueV1> = (0..MAX_LOCATION_FACTS)
+        .map(|index| {
+            auth(
+                location(&format!("f-{index}"), "Denpasar"),
+                Exposure::Public,
+            )
+        })
+        .collect();
+    let site_declaration = declared(
+        site_owner(),
+        vec![(PropertyKey::Location, inherit(site_facts))],
+    );
+    let mut set = LocationFieldsV1::new();
+    set.set_locality("Ubud").expect("locality");
+
+    let extended = validate_declared_properties_v1(
+        &graph(),
+        vec![
+            site_declaration.clone(),
+            declared(
+                page_owner(),
+                vec![(
+                    PropertyKey::Location,
+                    inherit(vec![auth(
+                        extension_to(site_owner(), "f-0", set.clone()),
+                        Exposure::Internal,
+                    )]),
+                )],
+            ),
+        ],
+    )
+    .expect("the extension's target is inherited")
+    .resolve(&representation_owner())
+    .expect("a valid extension at the effective maximum resolves");
+    assert_eq!(
+        extended.values_of(PropertyKey::Location).len(),
+        MAX_LOCATION_FACTS,
+        "an extension is not a seventeenth fact"
+    );
+
+    // A seventeenth fact refuses even though the extra value is `internal` and would never be
+    // publicly projected.
+    let seventeenth = validate_declared_properties_v1(
+        &graph(),
+        vec![
+            site_declaration,
+            declared(
+                page_owner(),
+                vec![(
+                    PropertyKey::Location,
+                    inherit(vec![auth(location("extra", "Sanur"), Exposure::Internal)]),
+                )],
+            ),
+        ],
+    )
+    .expect("a structurally valid declaration set")
+    .resolve(&page_owner())
+    .expect_err("seventeen effective facts refuse");
+    assert_eq!(
+        seventeenth.kind(),
+        PropertyResolutionRefusalKind::CardinalityExceeded
+    );
+
+    // A duplicate independent `add` at one owner still refuses by identity.
+    let duplicate = validate_declared_properties_v1(
+        &graph(),
+        vec![declared(
+            site_owner(),
+            vec![(
+                PropertyKey::Location,
+                inherit(vec![
+                    auth(location("dup", "Denpasar"), Exposure::Public),
+                    auth(location("dup", "Sanur"), Exposure::Public),
+                ]),
+            )],
+        )],
+    )
+    .expect("a structurally valid declaration set")
+    .resolve(&site_owner())
+    .expect_err("a repeated identity refuses");
+    assert_eq!(
+        duplicate.kind(),
+        PropertyResolutionRefusalKind::DuplicateLocationFact
+    );
+}
+
+/// `R03B-08` — the validated typed boundary refuses an empty extension `set` and a public
+/// extension wrapper, so a typed caller cannot express either forbidden state.
+#[test]
+fn r03b_08_typed_boundary_refuses_empty_set_and_public_wrapper() {
+    let fact_id = FactIdV1::parse("bali-base").expect("a fact identifier");
+    let empty =
+        LocationExtensionRequestV1::new(fact_id.clone(), site_owner(), LocationFieldsV1::new())
+            .expect_err("an empty set can never be an extension");
+    assert_eq!(empty.kind(), PropertyRefusalKind::EmptyLocationFields);
+
+    let mut set = LocationFieldsV1::new();
+    set.set_locality("Ubud").expect("locality");
+    let request =
+        LocationExtensionRequestV1::new(fact_id, site_owner(), set).expect("a typed request");
+    let public = AuthoredPropertyValueV1::new(
+        PropertyValueV1::location_extension(request.clone()),
+        Exposure::Public,
+    )
+    .expect_err("an extension may not claim a public exposure");
+    assert_eq!(
+        public.kind(),
+        PropertyRefusalKind::ExtensionExposureForbidden
+    );
+    let internal = AuthoredPropertyValueV1::new(
+        PropertyValueV1::location_extension(request),
+        Exposure::Internal,
+    )
+    .expect("the inert internal placeholder is allowed");
+    assert_eq!(internal.exposure(), Exposure::Internal);
+}
+
+/// `R03B-09` — an internal inherited fact extended at Page and representation stays internal,
+/// the public projection omits it and all provenance, public sibling facts stay in their own
+/// branch, and a refusal never echoes authored content.
+#[test]
+fn r03b_09_internal_facts_stay_unprojected_after_extension() {
+    let mut page_set = LocationFieldsV1::new();
+    page_set.set_locality("Ubud").expect("locality");
+    let mut representation_set = LocationFieldsV1::new();
+    representation_set.set_district("Renon").expect("district");
+
+    let input = validate_declared_properties_v1(
+        &graph(),
+        vec![
+            declared(
+                site_owner(),
+                vec![(
+                    PropertyKey::Location,
+                    inherit(vec![auth(
+                        location("secret", "Denpasar"),
+                        Exposure::Internal,
+                    )]),
+                )],
+            ),
+            declared(
+                page_owner(),
+                vec![(
+                    PropertyKey::Location,
+                    inherit(vec![auth(
+                        extension_to(site_owner(), "secret", page_set),
+                        Exposure::Internal,
+                    )]),
+                )],
+            ),
+            declared(
+                representation_owner(),
+                vec![(
+                    PropertyKey::Location,
+                    inherit(vec![auth(
+                        extension_to(site_owner(), "secret", representation_set),
+                        Exposure::Internal,
+                    )]),
+                )],
+            ),
+            declared(
+                jakarta_site_owner(),
+                vec![(
+                    PropertyKey::Location,
+                    inherit(vec![auth(
+                        location("jakarta-base", "Jakarta"),
+                        Exposure::Public,
+                    )]),
+                )],
+            ),
+        ],
+    )
+    .expect("the declarations are valid");
+
+    let resolved = input
+        .resolve(&representation_owner())
+        .expect("the internal chain resolves");
+    let facts = resolved.values_of(PropertyKey::Location);
+    assert_eq!(facts.len(), 1);
+    assert_eq!(
+        facts[0].exposure(),
+        Exposure::Internal,
+        "an extension never elevates a whole-record exposure"
+    );
+    let fact = facts[0].data().location_fact().expect("a fact");
+    assert!(
+        fact.fields().set_field_names().contains(&"district"),
+        "both extensions were applied"
+    );
+    let projection = project_public_properties_v1(&resolved);
+    assert!(
+        projection.values_of(PropertyKey::Location).is_empty(),
+        "an internal fact never reaches the public projection"
+    );
+    assert!(
+        projection
+            .property(PropertyKey::Location)
+            .expect("a projected record")
+            .is_empty()
+    );
+
+    // The public sibling branch keeps only its own fact and its own projection.
+    let jakarta = input
+        .resolve(&jakarta_representation_owner())
+        .expect("the sibling branch resolves");
+    assert_eq!(jakarta.values_of(PropertyKey::Location).len(), 1);
+    assert_eq!(
+        jakarta.values_of(PropertyKey::Location)[0].origin_owner(),
+        &jakarta_site_owner()
+    );
+    assert_eq!(
+        project_public_properties_v1(&jakarta)
+            .values_of(PropertyKey::Location)
+            .len(),
+        1
+    );
+
+    // A refusal is safe: it names the code and structural identifiers, never authored content.
+    let mut leaked = LocationFieldsV1::new();
+    leaked.set_locality("Ubud").expect("locality");
+    let refusal = validate_declared_properties_v1(
+        &graph(),
+        vec![declared(
+            page_owner(),
+            vec![(
+                PropertyKey::Location,
+                inherit(vec![auth(
+                    extension_to(site_owner(), "missing", leaked),
+                    Exposure::Internal,
+                )]),
+            )],
+        )],
+    )
+    .expect("a structurally valid declaration set")
+    .resolve(&page_owner())
+    .expect_err("a missing target refuses");
+    let rendered = format!("{refusal}");
+    assert!(rendered.contains("LOCATION_INVALID_EXTEND"));
+    assert!(!rendered.contains("Ubud"), "no authored value is echoed");
+    assert!(
+        !rendered.contains("Denpasar"),
+        "no inherited value is echoed"
+    );
 }

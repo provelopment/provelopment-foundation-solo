@@ -60,11 +60,11 @@ pub use property_registry::{
     PropertyRefusalKind, PropertyValueV1, QualifiedOwnerV1,
 };
 pub use property_resolution::{
-    FieldOriginV1, PropertyResolutionRefusalKind, PropertyResolutionRefusalV1, ProvenanceValueV1,
-    PublicPropertyProjectionV1, PublicPropertyV1, ResolutionEventV1, ResolutionOperation,
-    ResolvedPropertiesV1, ResolvedPropertyGraphV1, ResolvedPropertyV1, ValidatedPropertyInputV1,
-    project_public_properties_v1, require_matching_owner_membership_v1, resolve_all_owners_v1,
-    validate_declared_properties_v1,
+    FieldOriginV1, LocationExtensionCause, PropertyResolutionRefusalKind,
+    PropertyResolutionRefusalV1, ProvenanceValueV1, PublicPropertyProjectionV1, PublicPropertyV1,
+    ResolutionEventV1, ResolutionOperation, ResolvedPropertiesV1, ResolvedPropertyGraphV1,
+    ResolvedPropertyV1, ValidatedPropertyInputV1, project_public_properties_v1,
+    require_matching_owner_membership_v1, resolve_all_owners_v1, validate_declared_properties_v1,
 };
 pub use source_locator::{
     FILESYSTEM_IDENTITY_PROVEN, MAX_LOCATOR_BYTES, MAX_LOCATOR_SEGMENTS, MAX_SEGMENT_BYTES,

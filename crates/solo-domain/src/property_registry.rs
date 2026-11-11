@@ -316,6 +316,8 @@ pub enum PropertyRefusalKind {
     InvalidCoordinates,
     /// A location operation was neither `add` nor `extend`.
     InvalidOperation,
+    /// An authored `extend` wrapper claimed a public exposure, which section 6.2H.6 forbids.
+    ExtensionExposureForbidden,
     /// The declared property-registry version is not the accepted `1.0.0`.
     UnsupportedRegistryVersion,
     /// A qualified owner was not internally consistent.
@@ -357,6 +359,7 @@ impl PropertyRefusalKind {
             Self::InvalidCountryCode => "invalid-country-code",
             Self::InvalidCoordinates => "invalid-coordinates",
             Self::InvalidOperation => "invalid-operation",
+            Self::ExtensionExposureForbidden => "extension-exposure-forbidden",
             Self::UnsupportedRegistryVersion => "unsupported-registry-version",
             Self::InconsistentOwner => "inconsistent-owner",
         }
@@ -921,6 +924,46 @@ impl LocationFieldsV1 {
         self.set_field_names().is_empty()
     }
 
+    /// Overlays the members that `set` explicitly carries onto this field set (§6.2H.4).
+    ///
+    /// Only members present in `set` are written: an existing member is overwritten, an absent
+    /// member is added, and every member `set` does not mention is preserved exactly as it was.
+    /// `coordinates` is one atomic field, so it is either replaced whole or left untouched.
+    /// This is the single bounded typed overlay the resolver uses; no JSON, string map or
+    /// parallel location type is involved, and no member is ever removed or defaulted.
+    pub fn overlay(&mut self, set: &Self) {
+        if let Some(value) = &set.world_region {
+            self.world_region = Some(value.clone());
+        }
+        if let Some(value) = &set.country_code {
+            self.country_code = Some(value.clone());
+        }
+        if let Some(value) = &set.administrative_area {
+            self.administrative_area = Some(value.clone());
+        }
+        if let Some(value) = &set.locality {
+            self.locality = Some(value.clone());
+        }
+        if let Some(value) = &set.district {
+            self.district = Some(value.clone());
+        }
+        if let Some(value) = &set.named_place {
+            self.named_place = Some(value.clone());
+        }
+        if let Some(value) = &set.address_line1 {
+            self.address_line1 = Some(value.clone());
+        }
+        if let Some(value) = &set.address_line2 {
+            self.address_line2 = Some(value.clone());
+        }
+        if let Some(value) = &set.postal_code {
+            self.postal_code = Some(value.clone());
+        }
+        if let Some(value) = &set.coordinates {
+            self.coordinates = Some(*value);
+        }
+    }
+
     /// The set field names in the closed §6.2H.3 order.
     #[must_use]
     pub fn set_field_names(&self) -> Vec<&'static str> {
@@ -1080,15 +1123,31 @@ impl LocationFactV1 {
     pub fn fields(&self) -> &LocationFieldsV1 {
         &self.fields
     }
+
+    /// The same identified fact with `set` overlaid in place (§6.2H.4).
+    ///
+    /// The fact identifier, kind and every member `set` does not name are preserved exactly;
+    /// nothing is removed, renumbered, re-exposed or re-created. The returned value is the
+    /// same fact, so an extension can never mint a new identity or a new effective position.
+    #[must_use]
+    pub fn with_overlay(&self, set: &LocationFieldsV1) -> Self {
+        let mut fields = self.fields.clone();
+        fields.overlay(set);
+        Self {
+            fact_id: self.fact_id.clone(),
+            kind: self.kind,
+            fields,
+        }
+    }
 }
 
-/// A recognized but deliberately unimplemented §6.2H.4 `extend` request.
+/// A validated §6.2H.4 `extend` request naming one inherited fact and the members to set.
 ///
-/// `R03.A` implements the ordinary validated `add` cascade. The accepted `extend` syntax
-/// is recognized here - with its qualified target owner and its typed `set` fields - so it
-/// can be refused **by name** at resolution instead of being ignored, treated as `add`,
-/// merged in place or reported as invalid. `R03.B` owns the identified-record mutation and
-/// field-provenance semantics.
+/// The request carries only the fully qualified **original** owner, the stable fact identifier
+/// and the typed `set` members. It never carries an exposure: the accepted contract forbids an
+/// authored extension exposure, so a request can never change, promote or replace the exposed
+/// state of the fact it names. Construction refuses an empty `set`, so this type can never
+/// express a no-op extension, and identity resolution stays the resolver's decision.
 #[derive(Debug, Clone, PartialEq)]
 pub struct LocationExtensionRequestV1 {
     target_fact_id: FactIdV1,
@@ -1097,18 +1156,27 @@ pub struct LocationExtensionRequestV1 {
 }
 
 impl LocationExtensionRequestV1 {
-    /// Records one recognized extension request.
-    #[must_use]
-    pub const fn new(
+    /// Validates one extension request.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PropertyRefusalKind::EmptyLocationFields`] when `set` carries no member: an
+    /// extension must explicitly set at least one field.
+    pub fn new(
         target_fact_id: FactIdV1,
         target_owner: QualifiedOwnerV1,
         set: LocationFieldsV1,
-    ) -> Self {
-        Self {
+    ) -> Result<Self, PropertyDeclarationRefusalV1> {
+        if set.is_empty() {
+            return Err(PropertyDeclarationRefusalV1::of(
+                PropertyRefusalKind::EmptyLocationFields,
+            ));
+        }
+        Ok(Self {
             target_fact_id,
             target_owner,
             set,
-        }
+        })
     }
 
     /// The fact the extension names.
@@ -1135,7 +1203,7 @@ impl LocationExtensionRequestV1 {
 pub enum PropertyValueV1 {
     /// A §6.2H.2 location `add` fact.
     Location(Box<LocationFactV1>),
-    /// A recognized §6.2H.4 `extend` request that `R03.A` cannot execute.
+    /// A §6.2H.4 `extend` operation targeting one inherited fact.
     LocationExtension(Box<LocationExtensionRequestV1>),
     /// A graphic role selection reference.
     Graphic(AssetReferenceV1),
@@ -1176,12 +1244,14 @@ impl PropertyValueV1 {
         Self::Mailbox(mailbox)
     }
 
-    /// Whether this value can participate in a complete `R03.A` resolution.
+    /// Whether this value is a §6.2H.4 `extend` operation rather than an `add` fact.
     ///
-    /// A recognized `extend` request cannot: it is refused by name instead.
+    /// An extension is an operation, never an independently effective value: it updates one
+    /// inherited fact in place, so it never appears as its own fact, its own exposure or its
+    /// own position in any projection.
     #[must_use]
-    pub fn is_supported_in_r03a(&self) -> bool {
-        !matches!(self, Self::LocationExtension(_))
+    pub fn is_location_extension(&self) -> bool {
+        matches!(self, Self::LocationExtension(_))
     }
 
     /// The exact asset reference, when this value is a graphic selection.
@@ -1212,9 +1282,23 @@ pub struct AuthoredPropertyValueV1 {
 
 impl AuthoredPropertyValueV1 {
     /// Pairs a validated value with its authored exposure.
-    #[must_use]
-    pub const fn new(value: PropertyValueV1, exposure: Exposure) -> Self {
-        Self { value, exposure }
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PropertyRefusalKind::ExtensionExposureForbidden`] when an `extend` operation is
+    /// paired with `public`. Section 6.2H.6 defines no authored extension exposure, so this
+    /// validated boundary makes a public extension wrapper unrepresentable instead of letting a
+    /// placeholder decide exposure later.
+    pub fn new(
+        value: PropertyValueV1,
+        exposure: Exposure,
+    ) -> Result<Self, PropertyDeclarationRefusalV1> {
+        if value.is_location_extension() && exposure.is_public() {
+            return Err(PropertyDeclarationRefusalV1::of(
+                PropertyRefusalKind::ExtensionExposureForbidden,
+            ));
+        }
+        Ok(Self { value, exposure })
     }
 
     /// The validated typed value.
