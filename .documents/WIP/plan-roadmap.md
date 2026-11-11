@@ -6,7 +6,7 @@
 
 **Remaining packages**
 
-- **R03.C:** implement graphic role declarations, public shared generic library, authored asset ownership, inheritance/override/suppression, and optional role-specific generic fallback strictly beneath authored hierarchy.
+- **R03.C:** complete the remaining governed graphic-asset delivery beyond the accepted authored-obligation inventory: confined Entity `content/assets/` and explicitly authored, exactly pinned Platform `platform/assets/` source acquisition; authoritative bounded media-byte, format/magic/MIME, image dimension and pixel-limit verification; an Owner-reviewed lawful `platformAssetLibraryVersion: "1.0.0"` catalogue with complete asset IDs, hashes, media class, dimensions and licence/provenance; whole-candidate validation across all declared owners including internal, suppressed and unlisted declarations; and privacy-safe public use and immutable derived outputs. Preserve the accepted five-level graphic inheritance, provenance, exposure, cardinality, suppression and **no automatic platform or role fallback** under binding Architecture §§6.2G/6.2I.
 
 **Exit gate:** property resolution and negative isolation tests, no sibling leakage, no private or suppressed values exposed in public output, no fallback after explicit suppression. Changing location never changes Page identity, route, locale or canonical. No cross-Entity generic asset ownership is created.
 
