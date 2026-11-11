@@ -542,7 +542,7 @@ fn r03a_09_recognized_extend_is_refused_by_name() {
 }
 
 /// A manifest whose Page also publishes an **unlisted** Indonesian representation.
-fn manifest_with_unlisted_sibling(sibling_properties: &str) -> String {
+fn manifest_with_unlisted_sibling(page_properties: &str, sibling_properties: &str) -> String {
     format!(
         r#"{{
   "schemaVersion": "1.0.0",
@@ -569,6 +569,7 @@ fn manifest_with_unlisted_sibling(sibling_properties: &str) -> String {
               {{
                 "id": "home",
                 "label": "Home",
+                "properties": {page_properties},
                 "representations": [
                   {{
                     "locale": "en-001",
@@ -599,6 +600,7 @@ fn manifest_with_unlisted_sibling(sibling_properties: &str) -> String {
 #[test]
 fn r03a_09_unlisted_sibling_declaration_fails_closed() {
     let invalid = manifest_with_unlisted_sibling(
+        NO_PROPERTIES,
         r#"{ "seo.title": { "inheritance": "inherit", "currentContext": [ { "text": "<b>not plain</b>", "exposure": "public" } ] } }"#,
     );
     let parsed = parse_document(&invalid);
@@ -615,6 +617,7 @@ fn r03a_09_unlisted_sibling_declaration_fails_closed() {
     assert!(!message.contains("not plain"));
 
     let valid = manifest_with_unlisted_sibling(
+        NO_PROPERTIES,
         r#"{ "seo.title": { "inheritance": "inherit", "currentContext": [ { "text": "Beranda", "exposure": "public" } ] } }"#,
     );
     let parsed = parse_document(&valid);
@@ -676,5 +679,316 @@ fn r03a_09_committed_starter_seed_stays_inert() {
             .public()
             .values_of(PropertyKey::GraphicLogo)
             .is_empty()
+    );
+}
+
+/// A manifest with two Sites under one Facet, each publishing a Page `home` in `en-001`.
+fn manifest_two_sites(
+    first_site_properties: &str,
+    first_representation_properties: &str,
+    second_site_properties: &str,
+    second_representation_properties: &str,
+) -> String {
+    format!(
+        r#"{{
+  "schemaVersion": "1.0.0",
+  "propertyRegistryVersion": "1.0.0",
+  "platformAssetLibraryVersion": "1.0.0",
+  "base": {{
+    "canonical": "https://example.org/site",
+    "landing": {{ "entity": "example", "facet": "main", "site": "main", "page": "home", "locale": "en-001" }}
+  }},
+  "entity": {{
+    "id": "example",
+    "label": "Example",
+    "facets": [
+      {{
+        "id": "main",
+        "label": "Main",
+        "sites": [
+          {{
+            "id": "main",
+            "label": "Main site",
+            "defaultLocale": "en-001",
+            "languagePreferences": {{ "en": "en-001" }},
+            "properties": {first_site_properties},
+            "pages": [
+              {{
+                "id": "home",
+                "label": "Home",
+                "representations": [
+                  {{
+                    "locale": "en-001",
+                    "route": {{ "path": "/en-001/home" }},
+                    "sourceCandidates": {{ "markdown": "pages/main-home.en-001.md" }},
+                    "properties": {first_representation_properties}
+                  }}
+                ]
+              }}
+            ]
+          }},
+          {{
+            "id": "second",
+            "label": "Second site",
+            "defaultLocale": "en-001",
+            "languagePreferences": {{ "en": "en-001" }},
+            "properties": {second_site_properties},
+            "pages": [
+              {{
+                "id": "home",
+                "label": "Home",
+                "representations": [
+                  {{
+                    "locale": "en-001",
+                    "route": {{ "path": "/second/en-001/home" }},
+                    "sourceCandidates": {{ "markdown": "pages/second-home.en-001.md" }},
+                    "properties": {second_representation_properties}
+                  }}
+                ]
+              }}
+            ]
+          }}
+        ]
+      }}
+    ]
+  }}
+}}"#
+    )
+}
+
+fn second_site_id() -> SiteIdV1 {
+    SiteIdV1::parse("second").expect("a canonical Site identifier")
+}
+
+fn second_representation_owner() -> QualifiedOwnerV1 {
+    QualifiedOwnerV1::representation(
+        entity(),
+        facet(),
+        second_site_id(),
+        page(),
+        locale("en-001"),
+    )
+}
+
+/// `R03A-05`/`R03A-09` - a singular conflict in a Site the target never visits refuses the whole
+/// candidate, even though the requested branch itself is valid.
+#[test]
+fn r03a_09_unrelated_site_conflict_refuses_the_whole_candidate() {
+    let document = manifest_two_sites(
+        NO_PROPERTIES,
+        NO_PROPERTIES,
+        r#"{ "seo.title": { "inheritance": "inherit", "currentContext": [ { "text": "Second site", "exposure": "public" } ] } }"#,
+        r#"{ "seo.title": { "inheritance": "inherit", "currentContext": [ { "text": "Second site EN", "exposure": "public" } ] } }"#,
+    );
+    let parsed = parse_document(&document);
+    let graph = graph_from(&parsed);
+    let refusal = validate_manifest_property_candidate_v1(&parsed, &graph, &representation_owner())
+        .expect_err("the second Site conflict refuses the whole candidate");
+    assert_eq!(
+        refusal.kind(),
+        ManifestPropertyRefusalKind::ResolutionRefused(
+            PropertyResolutionRefusalKind::CardinalityExceeded
+        )
+    );
+    assert_eq!(refusal.code(), "PROPERTY_RESOLUTION_REFUSED");
+
+    // Without the conflicting second-Site declarations the same shape succeeds, proving the
+    // refusal came from the whole-graph check and not from the target's own chain.
+    let clean = manifest_two_sites(NO_PROPERTIES, NO_PROPERTIES, NO_PROPERTIES, NO_PROPERTIES);
+    let clean_parsed = parse_document(&clean);
+    let clean_graph = graph_from(&clean_parsed);
+    let candidate = validate_manifest_property_candidate_v1(
+        &clean_parsed,
+        &clean_graph,
+        &representation_owner(),
+    )
+    .expect("a conflict-free graph resolves");
+    assert_eq!(candidate.resolved_owner_count(), 8);
+    assert!(
+        candidate
+            .resolved_graph()
+            .for_owner(&second_representation_owner())
+            .is_some(),
+        "the unrelated Site is resolved and validated too"
+    );
+}
+
+/// `R03A-09` - the same conflict on an **unlisted** representation refuses the whole candidate.
+#[test]
+fn r03a_09_unlisted_representation_conflict_refuses() {
+    let document = manifest_with_unlisted_sibling(
+        r#"{ "seo.title": { "inheritance": "inherit", "currentContext": [ { "text": "Home", "exposure": "public" } ] } }"#,
+        r#"{ "seo.title": { "inheritance": "inherit", "currentContext": [ { "text": "Beranda", "exposure": "public" } ] } }"#,
+    );
+    let parsed = parse_document(&document);
+    let graph = graph_from(&parsed);
+    let refusal = validate_manifest_property_candidate_v1(&parsed, &graph, &representation_owner())
+        .expect_err("the unlisted representation conflict refuses the whole candidate");
+    assert_eq!(
+        refusal.kind(),
+        ManifestPropertyRefusalKind::ResolutionRefused(
+            PropertyResolutionRefusalKind::CardinalityExceeded
+        )
+    );
+}
+
+/// `R03A-09`/`R03A-08` - a graph whose membership differs from the manifest refuses even when the
+/// differing owners declare no properties at all.
+#[test]
+fn r03a_09_graph_membership_mismatch_refuses() {
+    let two_sites = parse_document(&manifest_two_sites(
+        NO_PROPERTIES,
+        NO_PROPERTIES,
+        NO_PROPERTIES,
+        NO_PROPERTIES,
+    ));
+    let single_site = parse_document(&manifest(
+        NO_PROPERTIES,
+        NO_PROPERTIES,
+        NO_PROPERTIES,
+        NO_PROPERTIES,
+        NO_PROPERTIES,
+    ));
+
+    // The narrower graph is missing the manifest's second Site.
+    let narrow_graph = graph_from(&single_site);
+    let refusal =
+        validate_manifest_property_candidate_v1(&two_sites, &narrow_graph, &representation_owner())
+            .expect_err("a graph missing a manifest owner refuses");
+    assert_eq!(
+        refusal.kind(),
+        ManifestPropertyRefusalKind::ResolutionRefused(
+            PropertyResolutionRefusalKind::OwnerMembershipMismatch
+        )
+    );
+
+    // The matching graph resolves.
+    let matching_graph = graph_from(&two_sites);
+    validate_manifest_property_candidate_v1(&two_sites, &matching_graph, &representation_owner())
+        .expect("the matching graph resolves");
+}
+
+/// `R03A-10`/`R03A-09` - a valid recognized extension in another Site refuses the whole candidate.
+#[test]
+fn r03a_09_extension_anywhere_refuses_the_whole_candidate() {
+    let document = manifest_two_sites(
+        NO_PROPERTIES,
+        NO_PROPERTIES,
+        NO_PROPERTIES,
+        r#"{ "location": { "inheritance": "inherit", "currentContext": [ { "operation": "extend", "target": { "owner": { "entity": "example", "facet": "main", "site": "main" }, "factId": "main-base" }, "set": { "locality": "Ubud" } } ] } }"#,
+    );
+    let parsed = parse_document(&document);
+    let graph = graph_from(&parsed);
+    let refusal = validate_manifest_property_candidate_v1(&parsed, &graph, &representation_owner())
+        .expect_err("the extension in the second Site refuses the whole candidate");
+    assert_eq!(refusal.code(), "LOCATION_EXTENSION_NOT_IMPLEMENTED_IN_R03A");
+    assert_eq!(
+        refusal.kind(),
+        ManifestPropertyRefusalKind::ResolutionRefused(
+            PropertyResolutionRefusalKind::LocationExtensionNotImplementedInR03A
+        )
+    );
+}
+
+/// `R03A-06`/`R03A-10`/`R03A-09` - the accepted extend envelope is fully validated before it can
+/// ever be reported as the named unsupported operation.
+#[test]
+fn r03a_09_extend_syntax_refusals() {
+    fn extend(target_owner: &str, set: &str) -> String {
+        format!(
+            r#"{{ "location": {{ "inheritance": "inherit", "currentContext": [ {{ "operation": "extend", "target": {{ "owner": {target_owner}, "factId": "bali-base" }}, "set": {set} }} ] }} }}"#
+        )
+    }
+
+    let cases: Vec<(String, PropertyRefusalKind)> = vec![
+        (
+            extend(r#"{ "entity": "example", "facet": "main" }"#, "{}"),
+            PropertyRefusalKind::EmptyLocationFields,
+        ),
+        (
+            extend(
+                r#"{ "entity": "example", "facet": "main" }"#,
+                r#"{ "country": "ID" }"#,
+            ),
+            PropertyRefusalKind::UnknownLocationField,
+        ),
+        (
+            extend(
+                r#"{ "entity": "example", "facet": "main" }"#,
+                r#"{ "locality": 42 }"#,
+            ),
+            PropertyRefusalKind::WrongEntryShape,
+        ),
+        (
+            extend(
+                r#"{ "entity": "example", "facet": "main" }"#,
+                r#"{ "coordinates": { "latitude": 91, "longitude": 0 } }"#,
+            ),
+            PropertyRefusalKind::InvalidCoordinates,
+        ),
+        (
+            extend(
+                r#"{ "entity": "example", "facet": "main" }"#,
+                r#"{ "countryCode": "id" }"#,
+            ),
+            PropertyRefusalKind::InvalidCountryCode,
+        ),
+        (
+            extend(
+                r#"{ "entity": "example", "page": "home" }"#,
+                r#"{ "locality": "Ubud" }"#,
+            ),
+            PropertyRefusalKind::InconsistentOwner,
+        ),
+        (
+            extend(
+                r#"{ "entity": "example", "facet": "main", "site": "main", "page": "home", "locale": "en" }"#,
+                r#"{ "locality": "Ubud" }"#,
+            ),
+            PropertyRefusalKind::InconsistentOwner,
+        ),
+        (
+            extend(
+                r#"{ "entity": "example", "facet": "main", "country": "ID" }"#,
+                r#"{ "locality": "Ubud" }"#,
+            ),
+            PropertyRefusalKind::ExtraEntryField,
+        ),
+        (
+            r#"{ "location": { "inheritance": "inherit", "currentContext": [ { "operation": "extend", "target": { "owner": { "entity": "example", "facet": "main" }, "factId": "bali-base" } } ] } }"#
+                .to_owned(),
+            PropertyRefusalKind::MissingEntryField,
+        ),
+    ];
+    for (properties, expected) in cases {
+        assert_eq!(
+            page_level_refusal_kind(&properties),
+            ManifestPropertyRefusalKind::DeclarationRefused(expected),
+            "properties {properties} must be refused"
+        );
+    }
+
+    // A complete, typed extension is still recognized, and refused only at resolution.
+    let valid = extend(
+        r#"{ "entity": "example", "facet": "main" }"#,
+        r#"{ "locality": "Ubud", "countryCode": "ID" }"#,
+    );
+    let document = manifest(
+        NO_PROPERTIES,
+        NO_PROPERTIES,
+        NO_PROPERTIES,
+        &valid,
+        NO_PROPERTIES,
+    );
+    let parsed = parse_document(&document);
+    let graph = graph_from(&parsed);
+    let refusal = validate_manifest_property_candidate_v1(&parsed, &graph, &representation_owner())
+        .expect_err("a valid extension is still refused at resolution");
+    assert_eq!(refusal.code(), "LOCATION_EXTENSION_NOT_IMPLEMENTED_IN_R03A");
+    assert_eq!(
+        refusal.kind(),
+        ManifestPropertyRefusalKind::ResolutionRefused(
+            PropertyResolutionRefusalKind::LocationExtensionNotImplementedInR03A
+        )
     );
 }

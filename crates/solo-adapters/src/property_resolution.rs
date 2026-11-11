@@ -30,8 +30,10 @@ use solo_domain::{
     LocationFieldsV1, LocationKind, MAX_SEO_DESCRIPTION_SCALARS, MAX_SEO_TITLE_SCALARS, MailboxV1,
     PROPERTY_REGISTRY_VERSION, PlainTextV1, PropertyDeclarationRefusalV1, PropertyDeclarationV1,
     PropertyKey, PropertyRefusalKind, PropertyResolutionRefusalKind, PropertyValueV1,
-    PublicPropertyProjectionV1, QualifiedOwnerV1, ResolvedPropertiesV1,
+    PublicPropertyProjectionV1, QualifiedOwnerV1, ResolvedPropertiesV1, ResolvedPropertyGraphV1,
 };
+
+use solo_domain::{FacetIdV1, PageIdV1, SiteIdV1};
 
 use crate::publication_manifest::{DeclaredNode, InertPropertiesV1, ParsedManifestCandidateV1};
 
@@ -181,6 +183,18 @@ impl ManifestPropertyCandidateV1 {
         self.candidate.public()
     }
 
+    /// How many owners of the single Entity were resolved and validated.
+    #[must_use]
+    pub fn resolved_owner_count(&self) -> usize {
+        self.candidate.resolved_owner_count()
+    }
+
+    /// The whole-graph resolved record that had to validate before this candidate existed.
+    #[must_use]
+    pub const fn resolved_graph(&self) -> &ResolvedPropertyGraphV1 {
+        self.candidate.resolved_graph()
+    }
+
     /// How many owners in the candidate declared at least one property.
     #[must_use]
     pub const fn declared_owner_count(&self) -> usize {
@@ -224,8 +238,9 @@ pub fn validate_manifest_property_candidate_v1(
             None,
         ));
     }
-    let (declared, declared_owner_count) = translate_candidate(manifest)?;
-    let request = PropertyResolutionRequestV1::new(graph, declared, target.clone());
+    let (owners, declared, declared_owner_count) = translate_candidate(manifest)?;
+    let request = PropertyResolutionRequestV1::new(graph, declared, target.clone())
+        .with_required_membership(owners);
     let candidate = resolve_declared_properties_v1(request).map_err(|resolution| {
         refuse(
             ManifestPropertyRefusalKind::ResolutionRefused(resolution.kind()),
@@ -252,14 +267,19 @@ fn refuse(
 ///
 /// Ownership comes from the containment itself: the Entity, its Facets, their Sites, their
 /// Pages and each Page's declared representations. No directory, filename, route or label is
-/// consulted, so a property can never attach to a node the manifest does not contain.
+/// consulted, so a property can never attach to a node the manifest does not contain. The
+/// returned inventory is the **complete** membership, including every owner that declares no
+/// properties, so it can be bound to the supplied graph.
 fn translate_candidate(
     manifest: &ParsedManifestCandidateV1,
-) -> Result<(Vec<DeclaredOwnerPropertiesV1>, usize), ManifestPropertyRefusalV1> {
+) -> Result<(Vec<QualifiedOwnerV1>, Vec<DeclaredOwnerPropertiesV1>, usize), ManifestPropertyRefusalV1>
+{
+    let mut owners: Vec<QualifiedOwnerV1> = Vec::new();
     let mut declared: Vec<DeclaredOwnerPropertiesV1> = Vec::new();
     let entity = manifest.entity();
     let entity_id: EntityIdV1 = entity.id().clone();
     push_owner(
+        &mut owners,
         &mut declared,
         QualifiedOwnerV1::entity(entity_id.clone()),
         entity.properties(),
@@ -279,7 +299,12 @@ fn translate_candidate(
                     site_id.clone(),
                     page_id.clone(),
                 );
-                push_owner(&mut declared, page_owner.clone(), page.properties())?;
+                push_owner(
+                    &mut owners,
+                    &mut declared,
+                    page_owner.clone(),
+                    page.properties(),
+                )?;
                 for representation in page.representations() {
                     let locale = LocaleKeyV1::from_already_canonical(representation.locale())
                         .map_err(|_| {
@@ -299,25 +324,28 @@ fn translate_candidate(
                         locale,
                     );
                     push_owner(
+                        &mut owners,
                         &mut declared,
                         representation_owner,
                         representation.properties(),
                     )?;
                 }
             }
-            push_owner(&mut declared, site_owner, site.properties())?;
+            push_owner(&mut owners, &mut declared, site_owner, site.properties())?;
         }
-        push_owner(&mut declared, facet_owner, facet.properties())?;
+        push_owner(&mut owners, &mut declared, facet_owner, facet.properties())?;
     }
     let declared_owner_count = declared.len();
-    Ok((declared, declared_owner_count))
+    Ok((owners, declared, declared_owner_count))
 }
 
 fn push_owner(
+    owners: &mut Vec<QualifiedOwnerV1>,
     declared: &mut Vec<DeclaredOwnerPropertiesV1>,
     owner: QualifiedOwnerV1,
     properties: Option<&InertPropertiesV1>,
 ) -> Result<(), ManifestPropertyRefusalV1> {
+    owners.push(owner.clone());
     if let Some(entry) = translate_owner(owner, properties)? {
         declared.push(entry);
     }
@@ -612,22 +640,72 @@ fn translate_location_extend(
     let members = closed_members(node, &["operation", "target", "set"])?;
     let target = closed_members(required(&members, "target")?, &["owner", "factId"])?;
     let fact_id = FactIdV1::parse(as_string(required(&target, "factId")?)?)?;
-    let owner_target = closed_members(
-        required(&target, "owner")?,
-        &["entity", "facet", "site", "page", "locale"],
-    )?;
-    as_string(required(&owner_target, "entity")?)?;
-    let set = location_field_members(required(&members, "set")?)?;
-    if set.is_empty() {
-        return Err(refusal(PropertyRefusalKind::EmptyLocationFields));
-    }
-    // An extension may never supply or change exposure (§6.2H.6), and it never becomes an
-    // effective value in R03.A because resolution refuses it by name. `Internal` is the inert
-    // placeholder and cannot elevate anything.
+    // The qualified target owner is validated structurally: closed members, accepted
+    // identifier and locale-key boundaries, and a contiguous lineage.
+    let target_owner = translate_extend_target_owner(required(&target, "owner")?)?;
+    // `set` carries the same closed, typed `LocationFields` values as an `add` operation,
+    // including element types, bounds, country-code form and coordinate ranges. Its
+    // identified-record mutation semantics remain R03.B.
+    let set = translate_location_fields(required(&members, "set")?)?;
+    // An extension may never supply or change exposure (section 6.2H.6), and it never becomes
+    // an effective value in R03.A because resolution refuses it by name. `Internal` is the
+    // inert placeholder and cannot elevate anything.
     Ok((
-        PropertyValueV1::location_extension(LocationExtensionRequestV1::new(fact_id)),
+        PropertyValueV1::location_extension(LocationExtensionRequestV1::new(
+            fact_id,
+            target_owner,
+            set,
+        )),
         Exposure::Internal,
     ))
+}
+
+/// Translates the qualified target owner of an `extend` operation.
+///
+/// Every level uses the accepted identifier or locale-key boundary, the member set is closed,
+/// and the lineage must be contiguous: `site` requires `facet`, `page` requires `facet` and
+/// `site`, and `locale` requires the whole ancestor chain.
+fn translate_extend_target_owner(
+    node: &DeclaredNode,
+) -> Result<QualifiedOwnerV1, PropertyDeclarationRefusalV1> {
+    let refused = || refusal(PropertyRefusalKind::InconsistentOwner);
+    let members = closed_members(node, &["entity", "facet", "site", "page", "locale"])?;
+    let entity =
+        EntityIdV1::parse(as_string(required(&members, "entity")?)?).map_err(|_| refused())?;
+    let facet = members
+        .iter()
+        .find(|(name, _)| *name == "facet")
+        .map(|(_, value)| FacetIdV1::parse(as_string(value)?).map_err(|_| refused()))
+        .transpose()?;
+    let site = members
+        .iter()
+        .find(|(name, _)| *name == "site")
+        .map(|(_, value)| SiteIdV1::parse(as_string(value)?).map_err(|_| refused()))
+        .transpose()?;
+    let page = members
+        .iter()
+        .find(|(name, _)| *name == "page")
+        .map(|(_, value)| PageIdV1::parse(as_string(value)?).map_err(|_| refused()))
+        .transpose()?;
+    let locale = members
+        .iter()
+        .find(|(name, _)| *name == "locale")
+        .map(|(_, value)| {
+            LocaleKeyV1::from_already_canonical(as_string(value)?).map_err(|_| refused())
+        })
+        .transpose()?;
+    match (facet, site, page, locale) {
+        (None, None, None, None) => Ok(QualifiedOwnerV1::entity(entity)),
+        (Some(facet), None, None, None) => Ok(QualifiedOwnerV1::facet(entity, facet)),
+        (Some(facet), Some(site), None, None) => Ok(QualifiedOwnerV1::site(entity, facet, site)),
+        (Some(facet), Some(site), Some(page), None) => {
+            Ok(QualifiedOwnerV1::page(entity, facet, site, page))
+        }
+        (Some(facet), Some(site), Some(page), Some(locale)) => Ok(
+            QualifiedOwnerV1::representation(entity, facet, site, page, locale),
+        ),
+        _ => Err(refused()),
+    }
 }
 
 /// Translates one closed `LocationFields` object with at least one set field.
