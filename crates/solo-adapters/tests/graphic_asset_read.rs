@@ -15,7 +15,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use solo_adapters::{ContentRootCapability, RootProvenanceV1};
+use solo_adapters::{ContentRootCapability, RootProvenanceV1, TrustedDirectoryHandle};
 use solo_application::{
     CandidateBodyV1, EntityAssetSourceV1, GraphicAssetReadPort, GraphicAssetReadRefusalKind,
     MAX_GRAPHIC_SOURCE_BYTES, PhysicalIdentityV1, SourceReadPort, SourceReadRefusalKind,
@@ -54,7 +54,15 @@ fn scratch_parent() -> PathBuf {
 
 impl Scratch {
     fn new(label: &str) -> Self {
-        let base = scratch_parent().join(format!("solo-asset-read-{}-{label}", std::process::id()));
+        Self::on(scratch_parent(), label)
+    }
+
+    /// A scratch tree created inside an explicitly chosen test-owned parent.
+    ///
+    /// The Linux non-reflink proof needs a directory on the workflow's `tmpfs` fixture, while
+    /// every other case stays on the verified snapshot filesystem.
+    fn on(parent: PathBuf, label: &str) -> Self {
+        let base = parent.join(format!("solo-asset-read-{}-{label}", std::process::id()));
         let _ = fs::remove_dir_all(&base);
         fs::create_dir_all(base.join("content").join("assets")).expect("create scratch asset root");
         Self { base }
@@ -374,4 +382,273 @@ fn r03c2_10_same_size_rewrite_is_observed_and_never_served_from_memory() {
     assert_ne!(second, first, "a rewrite is observed, never cached");
     assert_eq!(length_after, length_before);
     assert_eq!(identity_after, identity_before);
+}
+
+// ---------------------------------------------------------------------------
+// Task-owned handle helpers and host-specific fixtures.
+//
+// These mirror the accepted R02 trusted-handle and writer fixtures, but every assertion below is
+// made through the **R03.C2 `read_entity_asset` interface**, never through a Page locator.
+// ---------------------------------------------------------------------------
+
+#[cfg(unix)]
+fn open_directory_handle(path: &Path) -> TrustedDirectoryHandle {
+    use std::os::fd::OwnedFd;
+    OwnedFd::from(fs::File::open(path).expect("open the content root as a directory handle"))
+}
+
+#[cfg(windows)]
+fn open_directory_handle(path: &Path) -> TrustedDirectoryHandle {
+    use std::os::windows::fs::OpenOptionsExt;
+    use std::os::windows::io::OwnedHandle;
+    const FILE_FLAG_BACKUP_SEMANTICS: u32 = 0x0200_0000;
+    let file = fs::File::options()
+        .read(true)
+        .custom_flags(FILE_FLAG_BACKUP_SEMANTICS)
+        .open(path)
+        .expect("open the content root as a directory handle");
+    OwnedHandle::from(file)
+}
+
+#[cfg(unix)]
+fn open_file_handle(path: &Path) -> TrustedDirectoryHandle {
+    use std::os::fd::OwnedFd;
+    OwnedFd::from(fs::File::open(path).expect("open the regular file as a handle"))
+}
+
+#[cfg(windows)]
+fn open_file_handle(path: &Path) -> TrustedDirectoryHandle {
+    use std::os::windows::io::OwnedHandle;
+    OwnedHandle::from(fs::File::open(path).expect("open the regular file as a handle"))
+}
+
+/// Opens a reparse point as itself, so a junction can be presented to the reader unchanged.
+#[cfg(windows)]
+fn open_reparse_handle(path: &Path) -> TrustedDirectoryHandle {
+    use std::os::windows::fs::OpenOptionsExt;
+    use std::os::windows::io::OwnedHandle;
+    const FILE_FLAG_BACKUP_SEMANTICS: u32 = 0x0200_0000;
+    const FILE_FLAG_OPEN_REPARSE_POINT: u32 = 0x0020_0000;
+    let file = fs::File::options()
+        .read(true)
+        .custom_flags(FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT)
+        .open(path)
+        .expect("open the reparse point as a handle");
+    OwnedHandle::from(file)
+}
+
+/// `S065R02-05` / `R03C2-08` — a transferred, already-open `content/` directory handle anchors the
+/// same confined `assets/` route as the bootstrap path, with the same physical root identity and
+/// the same leaf bytes, length, link count and identity.
+#[test]
+fn r03c2_08b_trusted_directory_handle_reads_the_same_assets_with_one_root_identity() {
+    let scratch = Scratch::new("asset-trusted-handle");
+    scratch.write("assets/brand/logo.png", b"trusted-handle-bytes");
+    let by_path = scratch.capability();
+    let by_handle = ContentRootCapability::from_trusted_directory(
+        open_directory_handle(&scratch.content()),
+        TRUSTED,
+    )
+    .expect("a real directory handle must be accepted as the content root");
+
+    assert_eq!(by_handle.provenance(), TRUSTED);
+    assert_eq!(
+        by_handle.identity(),
+        by_path.identity(),
+        "the handle and the bootstrap path name one physical directory"
+    );
+    assert!(!by_handle.mechanism().is_empty());
+
+    let (path_bytes, path_identity, path_length, path_links) =
+        present(read(&by_path, "brand/logo.png"));
+    let (handle_bytes, handle_identity, handle_length, handle_links) =
+        present(read(&by_handle, "brand/logo.png"));
+
+    assert_eq!(handle_bytes, b"trusted-handle-bytes".to_vec());
+    assert_eq!(handle_bytes, path_bytes);
+    assert_eq!(handle_length, path_length);
+    assert_eq!(handle_links, 1);
+    assert_eq!(path_links, 1);
+    assert_eq!(handle_identity, path_identity);
+
+    // A second read through the transferred handle still reports the same leaf object.
+    let (again, again_identity, _, _) = present(read(&by_handle, "brand/logo.png"));
+    assert_eq!(again, handle_bytes);
+    assert_eq!(again_identity, handle_identity);
+}
+
+/// `S065R02-05`/`S065R02-06` / `R03C2-08` — a purported root that is a regular file, a path
+/// symlink or a path junction/reparse point is refused before any asset is opened through it.
+#[test]
+fn r03c2_08b_bootstrap_root_that_is_a_file_or_a_link_is_refused() {
+    let scratch = Scratch::new("asset-unsafe-root");
+    scratch.write("plain.txt", b"not a content root");
+
+    match ContentRootCapability::adopt_bootstrap_path(&scratch.path("plain.txt"), TRUSTED) {
+        Ok(_) => panic!("a regular file must never become a content root"),
+        Err(refusal) => assert_eq!(refusal.kind(), SourceReadRefusalKind::UnsafeLocation),
+    }
+
+    let linked = scratch.base.join("content-link");
+    create_directory_link(&scratch.content(), &linked);
+    match ContentRootCapability::adopt_bootstrap_path(&linked, TRUSTED) {
+        Ok(_) => panic!("a link must never become a content root"),
+        Err(refusal) => assert_eq!(refusal.kind(), SourceReadRefusalKind::UnsafeLocation),
+    }
+}
+
+/// `S065R02-05` — a transferred handle that names a **regular file** can never be elevated into a
+/// content root, on either host, and therefore can never anchor an `assets/` read.
+#[test]
+fn r03c2_08b_transferred_regular_file_handle_is_refused() {
+    let scratch = Scratch::new("asset-trusted-file");
+    scratch.write("plain.txt", b"not a content root");
+
+    match ContentRootCapability::from_trusted_directory(
+        open_file_handle(&scratch.path("plain.txt")),
+        TRUSTED,
+    ) {
+        Ok(_) => panic!("a handle naming a regular file must not become a content root"),
+        Err(refusal) => assert_eq!(refusal.kind(), SourceReadRefusalKind::UnsafeLocation),
+    }
+}
+
+/// `S065R02-06` — a transferred **reparse/junction** handle is refused on Windows before it can
+/// anchor any asset read.
+#[cfg(windows)]
+#[test]
+fn r03c2_08b_transferred_reparse_handle_is_refused() {
+    let scratch = Scratch::new("asset-trusted-junction");
+    scratch.write("assets/logo.png", b"behind-a-junction");
+    let linked = scratch.base.join("content-junction");
+    create_directory_link(&scratch.content(), &linked);
+
+    match ContentRootCapability::from_trusted_directory(open_reparse_handle(&linked), TRUSTED) {
+        Ok(_) => panic!("a handle naming a reparse point must be refused"),
+        Err(refusal) => assert_eq!(refusal.kind(), SourceReadRefusalKind::UnsafeLocation),
+    }
+}
+
+/// `S065R02-07` / `R03C2-10` — on Linux the actual `assets/` route must refuse a filesystem that
+/// cannot provide the immutable reflink snapshot, and must not copy the bytes as a fallback. The
+/// accepted Btrfs fixture stays positive, so the refusal is caused by the filesystem, not by the
+/// test shape.
+#[cfg(target_os = "linux")]
+#[test]
+fn r03c2_10b_asset_read_on_a_non_reflink_filesystem_is_unsupported() {
+    let parent = match std::env::var_os("SOLO_TEST_UNSUPPORTED_FS_ROOT") {
+        Some(root) if !root.is_empty() => PathBuf::from(root),
+        _ => panic!(
+            "SOLO_TEST_UNSUPPORTED_FS_ROOT must name a filesystem without reflink; the asset refusal path cannot be proven without it"
+        ),
+    };
+    let unsupported = Scratch::on(parent, "unsupported-asset");
+    // Small by design: the fixture volume is 16 MiB, and the refusal must not depend on size.
+    unsupported.write("assets/logo.png", b"tmpfs-bytes");
+    let unsupported_capability = unsupported.capability();
+    let outcome = read(&unsupported_capability, "logo.png");
+    match outcome {
+        EntityAssetSourceV1::Refused(refusal) => {
+            assert_eq!(refusal.kind(), GraphicAssetReadRefusalKind::Unsupported);
+            assert_eq!(refusal.code(), "ASSET_SOURCE_UNSUPPORTED");
+        }
+        EntityAssetSourceV1::Present { bytes, .. } => panic!(
+            "a filesystem without reflink must refuse rather than copy, got {} bytes",
+            bytes.len()
+        ),
+    }
+
+    // The same route on the accepted reflink fixture still acquires the bytes.
+    let supported = Scratch::new("supported-asset");
+    supported.write("assets/logo.png", b"btrfs-bytes");
+    let (bytes, _, length, links) = present(read(&supported.capability(), "logo.png"));
+    assert_eq!(bytes, b"btrfs-bytes".to_vec());
+    assert_eq!(length, 11);
+    assert_eq!(links, 1);
+}
+
+// ---------------------------------------------------------------------------
+// Windows — a real pre-existing writer over an `assets/` leaf, proven through the asset port.
+//
+// A fake port cannot prove a share mode. These cases drive the real Win32 sharing rules on the
+// actual `read_entity_asset` route: the reader's leaf handle requests read data with share-read
+// only, so an existing writable handle blocks it, and the refusal category is the one the frozen
+// native mapping produces for a sharing violation.
+// ---------------------------------------------------------------------------
+
+#[cfg(windows)]
+mod asset_writer {
+    use super::*;
+    use std::fs::OpenOptions;
+    use std::os::windows::fs::OpenOptionsExt;
+
+    /// `FILE_SHARE_READ` — the share mode the reader requests for a leaf handle.
+    const FILE_SHARE_READ: u32 = 0x0000_0001;
+
+    #[test]
+    fn r03c2_10b_asset_read_is_refused_while_a_writer_holds_the_leaf() {
+        let scratch = Scratch::new("asset-writer");
+        scratch.write("assets/written.png", b"writer-visible-bytes");
+        let path = scratch.path("assets/written.png");
+
+        // A writer that got there first. The reader shares read only, so this existing write
+        // access makes its own leaf open fail: no bytes are returned for the duration.
+        let writer = OpenOptions::new()
+            .write(true)
+            .open(&path)
+            .expect("a writer may hold the asset before the reader arrives");
+        let capability = scratch.capability();
+
+        match read(&capability, "written.png") {
+            EntityAssetSourceV1::Refused(refusal) => {
+                // The frozen native mapping reports a sharing violation as `OtherIo`; the
+                // assertion records the actual category rather than inventing a stronger one.
+                assert_eq!(refusal.kind(), GraphicAssetReadRefusalKind::OtherIo);
+                assert_eq!(refusal.code(), "ASSET_SOURCE_IO_ERROR");
+            }
+            EntityAssetSourceV1::Present { bytes, .. } => panic!(
+                "a leaf a writer already holds must not be acquired, got {} bytes",
+                bytes.len()
+            ),
+        }
+
+        drop(writer);
+
+        // Once the writer is released the same route acquires exactly the file's bytes.
+        let (bytes, identity, length, links) = present(read(&capability, "written.png"));
+        assert_eq!(bytes, b"writer-visible-bytes".to_vec());
+        assert_eq!(length, 20);
+        assert_eq!(links, 1);
+        let (again, again_identity, _, _) = present(read(&capability, "written.png"));
+        assert_eq!(again, bytes);
+        assert_eq!(again_identity, identity);
+    }
+
+    #[test]
+    fn r03c2_10b_pinned_asset_handle_denies_a_competing_writer_and_delete() {
+        let scratch = Scratch::new("asset-pinned");
+        scratch.write("assets/pin.png", b"pinned-bytes");
+        let path = scratch.path("assets/pin.png");
+
+        // Exactly the handle the reader takes for a leaf: read access, share-read only.
+        let pinned = OpenOptions::new()
+            .read(true)
+            .share_mode(FILE_SHARE_READ)
+            .open(&path)
+            .expect("open the asset the way the reader does");
+
+        assert!(
+            OpenOptions::new().write(true).open(&path).is_err(),
+            "a writer must be denied while the asset handle is pinned"
+        );
+        assert!(
+            fs::remove_file(&path).is_err(),
+            "a delete must be denied while the asset handle is pinned"
+        );
+
+        drop(pinned);
+        let (bytes, _, length, _) = present(read(&scratch.capability(), "pin.png"));
+        assert_eq!(bytes, b"pinned-bytes".to_vec());
+        assert_eq!(length, 12);
+    }
 }

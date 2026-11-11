@@ -959,3 +959,185 @@ fn r03c2_09_portable_boundary_refuses_prohibited_spellings_without_repair() {
     assert!(!set.validates_media());
     assert!(!set.grants_publication_authority());
 }
+
+/// `S065R02-04` / `R03C2-04` — the same logical reference authored twice must agree in its
+/// **exact bytes**. Two equal-length bodies with a deliberately identical supplied fingerprint
+/// are a change, not a consistent source, and no partial evidence escapes.
+#[test]
+fn r03c2_04b_same_reference_with_equal_fingerprint_and_different_bytes_is_refused() {
+    let declarations = vec![
+        declared(
+            entity_owner(),
+            vec![(
+                PropertyKey::GraphicLogo,
+                inherit(vec![authored(
+                    entity_asset("brand/shared.png"),
+                    Exposure::Public,
+                )]),
+            )],
+        ),
+        declared(
+            site_owner(),
+            vec![(
+                PropertyKey::GraphicBackground,
+                inherit(vec![authored(
+                    entity_asset("brand/shared.png"),
+                    Exposure::Public,
+                )]),
+            )],
+        ),
+    ];
+
+    // Same object, same length, same deliberately supplied fingerprint, different bytes. A
+    // fingerprint-only comparison would accept this; the exact-byte rule must not.
+    let deliberately_equal_fingerprint = 42;
+    let port = FakePort::new(vec![
+        present_with(
+            b"shared-one",
+            identity(21, 7),
+            10,
+            1,
+            deliberately_equal_fingerprint,
+        ),
+        present_with(
+            b"shared-two",
+            identity(21, 7),
+            10,
+            1,
+            deliberately_equal_fingerprint,
+        ),
+    ]);
+    assert_eq!(
+        b"shared-one".len(),
+        b"shared-two".len(),
+        "the two bodies differ only in content"
+    );
+
+    let outcome = read_graphic_asset_bytes_v1(&inventory(declarations, entity_owner()), &port);
+    assert_eq!(port.calls().len(), 2, "both authored occurrences are read");
+    match outcome {
+        GraphicAssetReadSetOutcomeV1::Refused(refusal) => {
+            assert_eq!(
+                refusal.kind(),
+                GraphicAssetReadRefusalKind::ChangedDuringRead
+            );
+            assert_eq!(refusal.code(), "ASSET_SOURCE_CHANGED");
+            // The second obligation is the one that detected the inconsistency.
+            assert_eq!(
+                refusal.declaring_owner().map(QualifiedOwnerV1::describe),
+                Some(site_owner().describe())
+            );
+            assert_eq!(refusal.role(), Some(PropertyKey::GraphicBackground));
+            assert_eq!(refusal.local_index(), Some(0));
+            let text = format!("{refusal}");
+            assert!(!text.contains("assets/"), "a diagnostic carries no path");
+            assert!(
+                !text.contains("shared"),
+                "a diagnostic carries no authored value"
+            );
+            assert!(
+                !text.contains("bytes"),
+                "a diagnostic carries no source bytes"
+            );
+        }
+        GraphicAssetReadSetOutcomeV1::Complete(set) => panic!(
+            "different bytes under one logical reference must never be accepted, got {} records",
+            set.len()
+        ),
+    }
+}
+
+/// `S065R02-04` / `R03C2-04` — identical bytes, identity, length and fingerprint remain two
+/// separately ordered observations of the same authored filename, never deduplicated.
+#[test]
+fn r03c2_04b_same_reference_with_equal_bytes_stays_two_ordered_observations() {
+    let declarations = vec![
+        declared(
+            entity_owner(),
+            vec![(
+                PropertyKey::GraphicLogo,
+                inherit(vec![authored(
+                    entity_asset("brand/shared.png"),
+                    Exposure::Public,
+                )]),
+            )],
+        ),
+        declared(
+            site_owner(),
+            vec![(
+                PropertyKey::GraphicBackground,
+                inherit(vec![authored(
+                    entity_asset("brand/shared.png"),
+                    Exposure::Public,
+                )]),
+            )],
+        ),
+    ];
+
+    let port = FakePort::new(vec![
+        present(b"shared-same", identity(22, 3)),
+        present(b"shared-same", identity(22, 3)),
+    ]);
+    let set = completed(read_graphic_asset_bytes_v1(
+        &inventory(declarations, entity_owner()),
+        &port,
+    ));
+    assert_eq!(
+        set.len(),
+        2,
+        "two authored obligations, not one deduplicated value"
+    );
+    assert_eq!(port.calls().len(), 2);
+    assert_eq!(
+        set.evidence()[0].obligation().declaring_owner().describe(),
+        entity_owner().describe()
+    );
+    assert_eq!(
+        set.evidence()[1].obligation().declaring_owner().describe(),
+        site_owner().describe()
+    );
+    assert_eq!(set.evidence()[0].bytes(), b"shared-same");
+    assert_eq!(set.evidence()[1].bytes(), b"shared-same");
+    assert_eq!(set.evidence()[0].identity(), set.evidence()[1].identity());
+    assert_eq!(set.evidence()[0].logical_path(), "assets/brand/shared.png");
+    assert_eq!(set.evidence()[1].logical_path(), "assets/brand/shared.png");
+}
+
+/// `S065R02-04` / `R03C2-04` — the retained fingerprint check is still real: equal bytes with an
+/// inconsistent fingerprint is a refused repeat observation rather than a silent acceptance.
+#[test]
+fn r03c2_04b_same_reference_with_equal_bytes_and_different_fingerprint_is_inconsistent() {
+    let declarations = vec![
+        declared(
+            entity_owner(),
+            vec![(
+                PropertyKey::GraphicLogo,
+                inherit(vec![authored(
+                    entity_asset("brand/shared.png"),
+                    Exposure::Public,
+                )]),
+            )],
+        ),
+        declared(
+            site_owner(),
+            vec![(
+                PropertyKey::GraphicBackground,
+                inherit(vec![authored(
+                    entity_asset("brand/shared.png"),
+                    Exposure::Public,
+                )]),
+            )],
+        ),
+    ];
+
+    let port = FakePort::new(vec![
+        present_with(b"shared-same", identity(23, 8), 11, 1, 111),
+        present_with(b"shared-same", identity(23, 8), 11, 1, 222),
+    ]);
+    let (kind, code) = refused(read_graphic_asset_bytes_v1(
+        &inventory(declarations, entity_owner()),
+        &port,
+    ));
+    assert_eq!(kind, GraphicAssetReadRefusalKind::ChangedDuringRead);
+    assert_eq!(code, "ASSET_SOURCE_CHANGED");
+}

@@ -563,6 +563,12 @@ impl GraphicAssetReadSetOutcomeV1 {
 /// Platform-namespaced obligations are refused first, before any outbound call, because this gate
 /// cannot verify them; an inventory that mixes namespaces is therefore never reported as a
 /// complete Entity-only success.
+///
+/// A logical reference authored more than once is read once per authored obligation, and every
+/// repeat observation must agree with the first in physical identity, reported length and the
+/// **exact acquired byte sequence**. A non-cryptographic fingerprint is never accepted as a
+/// substitute for that comparison, so two different bodies of equal length can never be reported
+/// as one consistent source, however their fingerprints were produced.
 pub fn read_graphic_asset_bytes_v1<P: GraphicAssetReadPort + ?Sized>(
     inventory: &GraphicAssetObligationInventoryV1,
     port: &P,
@@ -577,7 +583,10 @@ pub fn read_graphic_asset_bytes_v1<P: GraphicAssetReadPort + ?Sized>(
     }
 
     let mut evidence: Vec<GraphicAssetSourceEvidenceV1> = Vec::new();
-    let mut seen_paths: BTreeMap<String, (PhysicalIdentityV1, u64, u64)> = BTreeMap::new();
+    // Index of the first evidence record for each logical path. The retained record owns its
+    // exact bytes, so a repeated reference is compared against those bytes directly instead of
+    // against a second copy of them or against a digest of them.
+    let mut seen_paths: BTreeMap<String, usize> = BTreeMap::new();
     let mut seen_identities: BTreeMap<(u64, u64, u64), String> = BTreeMap::new();
 
     for obligation in inventory.obligations() {
@@ -617,10 +626,17 @@ pub fn read_graphic_asset_bytes_v1<P: GraphicAssetReadPort + ?Sized>(
         } else {
             let key = identity_key(identity);
             match seen_paths.get(path.logical_path()) {
-                Some((known_identity, known_length, known_fingerprint)) => {
-                    if *known_identity != identity {
+                Some(first) => {
+                    let first = &evidence[*first];
+                    if first.identity() != identity {
                         Some(GraphicAssetReadRefusalKind::IdentityCollision)
-                    } else if *known_length != length || *known_fingerprint != fingerprint {
+                    } else if first.length() != length
+                        || first.fingerprint() != fingerprint
+                        || first.bytes() != bytes.as_slice()
+                    {
+                        // A non-cryptographic fingerprint proves nothing about content: the
+                        // exact bytes must agree, so equal-length different bodies are a change
+                        // even when the supplied fingerprints happen to match.
                         Some(GraphicAssetReadRefusalKind::ChangedDuringRead)
                     } else {
                         None
@@ -640,10 +656,7 @@ pub fn read_graphic_asset_bytes_v1<P: GraphicAssetReadPort + ?Sized>(
             ));
         }
 
-        seen_paths.insert(
-            path.logical_path().to_owned(),
-            (identity, length, fingerprint),
-        );
+        seen_paths.insert(path.logical_path().to_owned(), evidence.len());
         seen_identities.insert(identity_key(identity), path.logical_path().to_owned());
         evidence.push(GraphicAssetSourceEvidenceV1 {
             obligation: obligation.clone(),
