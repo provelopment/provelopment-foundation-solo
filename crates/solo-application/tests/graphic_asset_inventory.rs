@@ -242,7 +242,11 @@ fn r03c1_01_inventory_covers_all_five_levels_in_graph_and_registry_order() {
             bali_de_owner(),
             vec![(
                 PropertyKey::GraphicLogo,
-                inherit(vec![authored(
+                // `graphic.logo` is singular, so a descendant that authors its own logo cannot
+                // also inherit the Entity one. `suppress` plus this one local value is the
+                // accepted legal replacement form: exactly one effective selection, and still
+                // exactly one independently authored obligation at this representation.
+                suppress(vec![authored(
                     entity_asset("brand/de-logo.png"),
                     Exposure::Public,
                 )]),
@@ -252,7 +256,9 @@ fn r03c1_01_inventory_covers_all_five_levels_in_graph_and_registry_order() {
             jakarta_en_owner(),
             vec![(
                 PropertyKey::GraphicBanner,
-                inherit(vec![authored(
+                // Same rule for the singular banner: `suppress` excludes the Facet banner and
+                // keeps this single authored `internal` value legal before public filtering.
+                suppress(vec![authored(
                     entity_asset("brand/jakarta-banner.png"),
                     Exposure::Internal,
                 )]),
@@ -790,7 +796,10 @@ fn r03c1_06_same_filename_at_two_owners_and_two_namespaces_stays_distinct() {
                 bali_page_owner(),
                 vec![(
                     PropertyKey::GraphicLogo,
-                    inherit(vec![authored(
+                    // The Page authors its own `graphic.logo` with the same filename; because the
+                    // role is singular it must use the legal `suppress` + local replacement form
+                    // rather than inheriting the Entity logo as a second effective value.
+                    suppress(vec![authored(
                         entity_asset("brand/logo.png"),
                         Exposure::Public,
                     )]),
@@ -800,7 +809,8 @@ fn r03c1_06_same_filename_at_two_owners_and_two_namespaces_stays_distinct() {
                 jakarta_page_owner(),
                 vec![(
                     PropertyKey::GraphicLogo,
-                    inherit(vec![authored(
+                    // Symmetric case in the sibling Site, and the only `platform` reference here.
+                    suppress(vec![authored(
                         asset(AssetNamespace::Platform, "brand/logo.png"),
                         Exposure::Public,
                     )]),
