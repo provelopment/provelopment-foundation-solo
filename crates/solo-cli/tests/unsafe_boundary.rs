@@ -1,9 +1,10 @@
 //! Load-bearing guard: `unsafe` is confined to two exact, platform-gated native modules.
 //!
-//! The architecture allows exactly one project-owned `unsafe` region today — the Windows source
-//! reader must call `NtCreateFile` directly — and `SOLO-WO-074 R01` reserves exactly one further
-//! path, `crates/solo-adapters/src/media_worker_host_native.rs`, for a later separately issued
-//! Linux/Windows process-control implementation. The reserved file does not exist yet. Everywhere
+//! The architecture allows exactly two project-owned `unsafe` regions — the Windows source
+//! reader must call `NtCreateFile` directly, and the path
+//! `crates/solo-adapters/src/media_worker_host_native.rs` reserved by `SOLO-WO-074 R01` now holds
+//! the Linux-only limit **readback** seam added by `SOLO-WO-076 R01`, which observes two
+//! `getrlimit` ceilings and launches nothing. Everywhere
 //! else the code is safe Rust. A comment in a crate header cannot enforce that, so this file does
 //! it mechanically:
 //!
@@ -14,9 +15,10 @@
 //!   architecture checker's own `syn` AST rule, not by substring matching, so a negated,
 //!   `any`-alternated, malformed or merely textual `windows`/`linux` mention never counts;
 //! * every `unsafe` block in an eligible file must carry an adjacent `// SAFETY:` rationale;
-//! * the adapter's lint arrangement must be exactly `#![deny(unsafe_code)]` plus a single
-//!   `#[cfg_attr(windows, allow(unsafe_code))]` on the existing native module, with no second
-//!   allowance and no crate-wide one;
+//! * the adapter's lint arrangement must be exactly `#![deny(unsafe_code)]` plus two
+//!   module-scoped allowances — `#[cfg_attr(windows, allow(unsafe_code))]` on the existing
+//!   source reader and `#[cfg_attr(target_os = "linux", allow(unsafe_code))]` on the Linux
+//!   readback seam — with no third, wildcard, combined, negated or crate-wide one;
 //! * the native roots each eligible path may name are fixed: the source reader may use
 //!   `windows_sys`/`rustix`, the reserved process path may use `windows_sys`/`libc`, and every
 //!   other file may use none of them — `libloading`, `dlopen` and `LoadLibrary` never.
@@ -32,7 +34,8 @@ use std::path::{Path, PathBuf};
 /// The pre-existing file permitted to contain `unsafe` and to import its native roots.
 const NATIVE_MODULE: &str = "crates/solo-adapters/src/source_read_native.rs";
 
-/// The reserved future process-native path (`SOLO-WO-074 R01`). It does not exist yet.
+/// The reserved process-native path (`SOLO-WO-074 R01`), filled by `SOLO-WO-076 R01` with a
+/// Linux-only limit-readback seam.
 const RESERVED_PROCESS_MODULE: &str = "crates/solo-adapters/src/media_worker_host_native.rs";
 
 /// Which exception, if any, one repository-relative path may claim.
@@ -254,16 +257,28 @@ fn uses_unsafe(code: &str) -> bool {
         .any(|word| word == "unsafe")
 }
 
-/// Whether any `allow(unsafe_code)` is asked for **without** a Windows gate.
+/// The two, and only two, attribute forms that may gate an `allow(unsafe_code)` request.
 ///
-/// The crate root carries the single documented `#[cfg_attr(windows, allow(unsafe_code))]`
-/// that lets the approved module compile; that gated form is the only acceptable one, and an
-/// ungated request anywhere is a refusal.
-fn has_ungated_allowance(code: &str) -> bool {
-    code.match_indices("allow(unsafe_code)").any(|(index, _)| {
-        let start = index.saturating_sub(24);
-        !code[start..index].contains("cfg_attr(windows,")
-    })
+/// Both are exact: the Windows source reader and the Linux readback seam. Anything else — a bare
+/// `#[allow(unsafe_code)]`, a crate-wide `#![allow(unsafe_code)]`, an `any(..)`/`not(..)`/combined
+/// or ambiguous predicate, or an ungated request — fails the match and is refused.
+const APPROVED_ALLOWANCE_GATES: [&str; 2] =
+    ["cfg_attr(windows,", "cfg_attr(target_os = \"linux\","];
+
+/// Whether any `allow(unsafe_code)` is asked for **without** one of the two approved gates.
+///
+/// The crate root carries exactly two module-scoped allowances — the documented
+/// `#[cfg_attr(windows, allow(unsafe_code))]` for the Windows source reader and the documented
+/// `#[cfg_attr(target_os = "linux", allow(unsafe_code))]` for the Linux readback seam. Those two
+/// exact attribute texts are removed first, on the **raw** source, because the code-only view
+/// erases the string literal that carries the gate; whatever request remains after that, in code
+/// rather than in a comment or a string, is an ungated or unapproved request and is refused.
+fn has_ungated_allowance(source: &str) -> bool {
+    let mut remainder = source.to_owned();
+    for gate in APPROVED_ALLOWANCE_GATES {
+        remainder = remainder.replace(&format!("#[{gate} allow(unsafe_code))]"), "");
+    }
+    code_only(&remainder).contains("allow(unsafe_code)")
 }
 
 /// Why `source`, located at the repository-relative `path`, is not allowed.
@@ -280,7 +295,7 @@ fn violations(path: &str, source: &str) -> Vec<String> {
     // a platform gate. A `deny(unsafe_code)` is the opposite of an allowance. This holds at every
     // path, including the two eligible ones, so an eligible file can never gain a blanket
     // allowance either.
-    if has_ungated_allowance(&code) {
+    if has_ungated_allowance(source) {
         problems.push(format!(
             "{path}: asks for `allow(unsafe_code)` outside the single approved Windows gate"
         ));
@@ -382,12 +397,27 @@ fn the_adapter_lint_arrangement_is_exactly_the_approved_one() {
         !source.contains("#![allow(unsafe_code)]"),
         "a crate-wide allowance is never permitted"
     );
-    let allowances = source
+    let windows_allowances = source
         .matches("#[cfg_attr(windows, allow(unsafe_code))]")
         .count();
     assert_eq!(
-        allowances, 1,
+        windows_allowances, 1,
         "exactly one module-scoped, Windows-only allowance is approved"
+    );
+    let linux_allowances = source
+        .matches("#[cfg_attr(target_os = \"linux\", allow(unsafe_code))]")
+        .count();
+    assert_eq!(
+        linux_allowances, 1,
+        "exactly one module-scoped, Linux-only allowance is approved"
+    );
+    assert!(
+        source.contains("mod media_worker_host_native;"),
+        "the Linux allowance must be scoped to the readback seam itself"
+    );
+    assert!(
+        source.contains("mod source_read_native;"),
+        "the Windows allowance must remain scoped to the source reader itself"
     );
 }
 
@@ -467,22 +497,37 @@ fn gated_block(attribute: &str) -> String {
 }
 
 #[test]
-fn the_reserved_process_module_does_not_exist_in_the_real_tree() {
+fn the_reserved_process_module_now_holds_the_linux_readback_seam() {
     let root = repository_root();
     assert!(
         root.join(NATIVE_MODULE).is_file(),
         "the existing source-read module must still be present"
     );
+
+    let source = fs::read_to_string(root.join(RESERVED_PROCESS_MODULE))
+        .expect("the Linux readback seam exists after SOLO-WO-076 R01");
     assert!(
-        !root.join(RESERVED_PROCESS_MODULE).exists(),
-        "the reserved process-native file must not exist until a separate code order adds it"
+        violations(RESERVED_PROCESS_MODULE, &source).is_empty(),
+        "the readback seam must be positively Linux-gated and justify every unsafe block"
+    );
+    assert!(
+        source.contains("#[cfg(target_os = \"linux\")]"),
+        "the real seam must carry its own positive Linux gate in source text"
+    );
+    assert!(
+        code_only(&source).contains("unsafe {"),
+        "the seam is expected to contain its two audited observations"
     );
 
     let adapter_root =
         fs::read_to_string(root.join(ADAPTER_ROOT)).expect("the adapter root exists");
     assert!(
-        !adapter_root.contains("media_worker_host_native"),
-        "no allowance may be added for a file that does not exist yet"
+        adapter_root.contains("mod media_worker_host_native;"),
+        "the adapter root must declare the readback seam"
+    );
+    assert!(
+        !adapter_root.contains("pub use media_worker_host_native"),
+        "the seam stays private: no public host API may be exported"
     );
 }
 
@@ -610,7 +655,7 @@ fn the_guard_refuses_an_allowance_that_is_not_the_single_approved_one() {
         }
     }
 
-    // The one approved form stays legal at the adapter root.
+    // Both approved gated forms stay legal at the adapter root.
     assert!(
         violations(
             ADAPTER_ROOT,
@@ -618,5 +663,23 @@ fn the_guard_refuses_an_allowance_that_is_not_the_single_approved_one() {
         )
         .is_empty(),
         "the single documented Windows-gated allowance must remain legal"
+    );
+    assert!(
+        violations(
+            ADAPTER_ROOT,
+            "#[cfg_attr(target_os = \"linux\", allow(unsafe_code))]\nmod native;\n"
+        )
+        .is_empty(),
+        "the single documented Linux-gated allowance must be legal too"
+    );
+
+    // A combined predicate is neither of the two approved forms, at any path.
+    assert!(
+        !violations(
+            ADAPTER_ROOT,
+            "#[cfg_attr(any(target_os = \"linux\", windows), allow(unsafe_code))]\nmod native;\n"
+        )
+        .is_empty(),
+        "a combined `any(..)` gate is never an approved allowance"
     );
 }
