@@ -435,10 +435,16 @@ pub fn build_negative(name: &str, base: &[u8]) -> Result<Vec<u8>, String> {
             if v.len() < 20 {
                 return Err("base fixture too short for a brand patch".to_string());
             }
-            // Overwrite the major brand *and* the first compatible brand so the
-            // file's brand set is genuinely unclassifiable, not merely unusual.
+            // Overwrite the major brand *and every* compatible brand so the file's
+            // brand set is genuinely unclassifiable, not merely unusual.
             v[8..12].copy_from_slice(b"xxxx");
-            v[16..20].copy_from_slice(b"zzzz");
+            let box_len = u32::from_be_bytes([v[0], v[1], v[2], v[3]]) as usize;
+            let end = box_len.min(v.len());
+            let mut off = 16usize;
+            while off + 4 <= end {
+                v[off..off + 4].copy_from_slice(b"zzzz");
+                off += 4;
+            }
             Ok(v)
         }
         "neg:trailing_garbage" => {
@@ -774,38 +780,71 @@ pub fn sanitize_id(id: &str) -> String {
     out
 }
 
-fn geometry_issues(d: &Decoded) -> Vec<String> {
+/// Geometry facts about a decoded frame. `orientation` records whether the plane
+/// buffers match the reported dimensions or are transposed relative to them, which
+/// is a real property of transform-bearing files rather than a harness error.
+pub struct GeometryReport {
+    pub issues: Vec<String>,
+    pub orientation: String,
+}
+
+fn geometry_report(d: &Decoded) -> GeometryReport {
     let mut issues: Vec<String> = Vec::new();
+    let mut orientation = String::from("matches_reported_dimensions");
     if d.planes.is_empty() {
         issues.push("no planes decoded".to_string());
     }
-    if d.planes.len() != 1 && d.planes.len() != 3 {
+    // 1 plane = monochrome, 3 = Y/Cb/Cr, 4 = Y/Cb/Cr/alpha.
+    if !matches!(d.planes.len(), 1 | 3 | 4) {
         issues.push(format!("unexpected plane count {}", d.planes.len()));
     }
     let bps: u64 = if d.bit_depth > 8 { 2 } else { 1 };
+
+    // Reference geometry for the chroma/alpha checks, taken from the luma plane.
+    let mut ref_w = d.width;
+    let mut ref_h = d.height;
     if let Some(p0) = d.planes.first() {
-        let need = d.width.saturating_mul(bps);
-        if p0.stride < need {
-            issues.push(format!("luma stride {} < width*bps {}", p0.stride, need));
-        }
-        let rows = if p0.stride == 0 {
-            0
+        if p0.stride == 0 {
+            issues.push("luma stride is zero".to_string());
         } else {
-            p0.data.len() as u64 / p0.stride
-        };
-        if rows < d.height {
-            issues.push(format!("luma rows {rows} < height {}", d.height));
+            let rows = p0.data.len() as u64 / p0.stride;
+            let normal = p0.stride >= d.width.saturating_mul(bps) && rows >= d.height;
+            let transposed = p0.stride >= d.height.saturating_mul(bps) && rows >= d.width;
+            if normal {
+                // as reported
+            } else if transposed {
+                orientation = String::from("transposed_relative_to_reported_dimensions");
+                ref_w = d.height;
+                ref_h = d.width;
+            } else {
+                issues.push(format!(
+                    "luma stride {x} x rows {rows} inconsistent with reported {w}x{h}",
+                    x = p0.stride,
+                    w = d.width,
+                    h = d.height
+                ));
+            }
         }
     }
+
     for (i, p) in d.planes.iter().enumerate().skip(1) {
-        if p.stride < d.width.div_ceil(2).saturating_mul(bps) {
-            issues.push(format!("plane {i} stride {} too small", p.stride));
+        if p.stride == 0 {
+            issues.push(format!("plane {i} stride is zero"));
+            continue;
         }
-        if p.stride > 0 && (p.data.len() as u64 / p.stride) < d.height.div_ceil(2) {
-            issues.push(format!("plane {i} has fewer rows than height/2"));
+        let rows = p.data.len() as u64 / p.stride;
+        let full_resolution = p.stride >= ref_w.saturating_mul(bps) && rows >= ref_h;
+        let subsampled = p.stride >= ref_w.div_ceil(2).saturating_mul(bps)
+            && rows >= ref_h.div_ceil(2);
+        if !full_resolution && !subsampled {
+            issues.push(format!(
+                "plane {i} geometry inconsistent (stride {}, rows {rows}, reference {ref_w}x{ref_h})",
+                p.stride
+            ));
         }
     }
-    issues
+
+    GeometryReport { issues, orientation }
 }
 
 /// Evaluate one case end to end and return its evidence record.
@@ -843,7 +882,7 @@ pub fn evaluate_case(case: &Case, bytes: &[u8], raw_dir: Option<&Path>) -> CaseR
 
     match decode(bytes) {
         Outcome::Decoded(d) => {
-            let issues = geometry_issues(&d);
+            let geometry = geometry_report(&d);
             rec.result = "DECODED".to_string();
             rec.width = Some(d.width);
             rec.height = Some(d.height);
@@ -869,14 +908,19 @@ pub fn evaluate_case(case: &Case, bytes: &[u8], raw_dir: Option<&Path>) -> CaseR
                 rec.oracle = oracle.to_string();
                 rec.oracle_verdict = verdict.to_string();
                 rec.oracle_detail = detail;
-                if !issues.is_empty() {
+                if !geometry.issues.is_empty() {
                     rec.status = "FAIL".to_string();
-                    rec.note = format!("plane geometry: {}", issues.join("; "));
+                    rec.note = format!(
+                        "geometry_orientation={}; plane geometry: {}",
+                        geometry.orientation,
+                        geometry.issues.join("; ")
+                    );
                 } else if verdict == "FAIL" {
                     rec.status = "FAIL".to_string();
                     rec.note = "independent oracle rejected the decoded pixels".to_string();
                 } else {
                     rec.status = "PASS".to_string();
+                    rec.note = format!("geometry_orientation={}", geometry.orientation);
                 }
             } else {
                 rec.result = "ACCEPTED".to_string();
