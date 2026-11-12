@@ -10,7 +10,7 @@
 //! id equal to its own pid, and only then can it print anything usable. On `windows-2025` the same
 //! two internal modes are refused before any child exists and the public CLI is unchanged.
 
-use std::io::Read;
+use std::io::{Read, Write};
 use std::process::{Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -111,6 +111,18 @@ fn evidence_fields(line: &str) -> Vec<(String, String)> {
         .collect()
 }
 
+/// Emits one bounded observation line to the real stderr stream, and nothing else.
+///
+/// libtest replaces the `print!`/`eprintln!` sink for a *passing* test, so a captured line would
+/// never reach the CI log. Writing straight to file descriptor 2 does, which lets the reviewer
+/// read the actual kernel values this case asserted without a workflow change and without
+/// weakening any assertion. Only the already bounded evidence line is echoed.
+#[cfg(target_os = "linux")]
+fn report_observation(label: &str, line: &str) {
+    let mut stderr = std::io::stderr();
+    let _ = writeln!(stderr, "{label}={}", line.trim_end());
+}
+
 /// Reads one numeric field, refusing an absent, duplicated or non-numeric one.
 #[cfg(target_os = "linux")]
 fn numeric(fields: &[(String, String)], key: &str) -> u64 {
@@ -156,6 +168,7 @@ fn n079_01_the_real_child_observes_the_installed_limits() {
     );
 
     let fields = evidence_fields(&observed.stdout);
+    report_observation("n079_observation", &observed.stdout);
     assert_eq!(
         fields.len(),
         8,
@@ -238,6 +251,7 @@ fn n079_04_a_direct_unsupervised_child_is_refused() {
     let code = observed
         .exit_code
         .expect("the child must exit with a status, not a signal");
+    report_observation("n079_direct_child", &format!("exit={code}"));
     assert!(
         matches!(code, 71..=73),
         "the child's own verification refusal is one of its three fixed statuses: {code}"
