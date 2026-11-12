@@ -1,0 +1,372 @@
+# Foundation Solo — branch-only AVIF qualification probe (non-product evidence).
+#
+# Scope: `SOLO-WO-069 R01` only. This workflow executes the standalone proof crate
+# under `verification/avif-r03-c3/` on both accepted hosts and records what the
+# pinned `oxideav` candidate actually does. It runs on the short-lived
+# `solo-wo-069-r01` branch only and never on `main`.
+#
+# Trust model, in the spirit of `rust-verify.yml`:
+#   * read-only token (`permissions: contents: read`), no secrets, no write step;
+#   * the only external action is `actions/checkout` pinned to the same full commit
+#     SHA already approved in `rust-verify.yml`, credentials not persisted;
+#   * network-capable steps are exactly: checkout, toolchain installation, one
+#     `cargo fetch --locked` of the standalone probe, the pinned `cargo-deny 0.20.2`
+#     archive download (SHA-256 verified) and its RustSec refresh;
+#   * everything else runs with `CARGO_NET_OFFLINE=true` and `--locked`;
+#   * no `continue-on-error`, no masked exit code, no `|| true`, no broad skip.
+#
+# A genuine decoder defect fails this workflow. An honest research finding such as
+# "the library exposes no allocation budget" does not: it is recorded as evidence,
+# because that classification is the deliverable.
+name: avif-qualification
+
+on:
+  push:
+    branches: [solo-wo-069-r01]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: "1"
+  CARGO_NET_OFFLINE: "true"
+
+jobs:
+  qualify:
+    name: qualify (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            shell: bash
+          - os: windows-2025
+            shell: pwsh
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
+
+    steps:
+      # actions/checkout v7.0.1 (tag verified 2026-11-08), same full commit SHA as
+      # the product workflow. Credentials are never persisted.
+      - name: Checkout (SHA pinned)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Install the pinned toolchain
+        run: rustup toolchain install 1.99.1 --profile minimal --no-self-update
+
+      # Keep every probe artefact outside the repository so the tracked tree stays
+      # byte-identical and the security gate's cleanliness assertion stays meaningful.
+      - name: Set probe artefact paths (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          echo "CARGO_TARGET_DIR=$RUNNER_TEMP/avif-target" >> "$GITHUB_ENV"
+          echo "PROBE_OUT=$RUNNER_TEMP/avif-out" >> "$GITHUB_ENV"
+
+      - name: Set probe artefact paths (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          $ErrorActionPreference = 'Stop'
+          "CARGO_TARGET_DIR=$env:RUNNER_TEMP\avif-target" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "PROBE_OUT=$env:RUNNER_TEMP\avif-out" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Assert pinned compiler identity (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          IDENTITY="$RUNNER_TEMP/rustc-identity.txt"
+          rustc -Vv | tee "$IDENTITY"
+          cargo -V
+          grep -q '^release: 1.99.1$' "$IDENTITY"
+          grep -q '^host: x86_64-unknown-linux-gnu$' "$IDENTITY"
+          echo "host_os=${{ runner.os }} runner=${{ matrix.os }} sha=${GITHUB_SHA} ref=${GITHUB_REF_NAME} run=${GITHUB_RUN_ID}"
+
+      - name: Assert pinned compiler identity (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $identity = Join-Path $env:RUNNER_TEMP 'rustc-identity.txt'
+          rustc -Vv | Tee-Object -FilePath $identity
+          cargo -V
+          $text = (Get-Content $identity -Raw).Replace("`r", "")
+          if ($text -notmatch '(?m)^release: 1\.99\.1$') { throw 'unexpected rustc release' }
+          if ($text -notmatch '(?m)^host: x86_64-pc-windows-msvc$') { throw 'unexpected rustc host triple' }
+          Write-Output "host_os=${{ runner.os }} runner=${{ matrix.os }} sha=$env:GITHUB_SHA ref=$env:GITHUB_REF_NAME run=$env:GITHUB_RUN_ID"
+
+      # Network-enabled acquisition of the *probe* graph only. The product
+      # workspace lockfile is never fetched, resolved or modified here.
+      - name: Fetch the standalone probe graph (network-enabled, locked)
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          CARGO_NET_OFFLINE=false cargo fetch --locked --manifest-path verification/avif-r03-c3/Cargo.toml
+          echo "probe_lock_sha256=$(sha256sum verification/avif-r03-c3/Cargo.lock | cut -d' ' -f1)"
+
+      - name: Fetch the standalone probe graph (network-enabled, locked)
+        if: runner.os == 'Windows'
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $env:CARGO_NET_OFFLINE = 'false'
+          cargo fetch --locked --manifest-path verification/avif-r03-c3/Cargo.toml
+          if ($LASTEXITCODE -ne 0) { throw "cargo fetch failed ($LASTEXITCODE)" }
+          $hash = (Get-FileHash 'verification/avif-r03-c3/Cargo.lock' -Algorithm SHA256).Hash.ToLower()
+          Write-Output "probe_lock_sha256=$hash"
+
+      - name: Resolve the published oxideav-avif package directory (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          META="$(cargo metadata --locked --format-version 1 --manifest-path verification/avif-r03-c3/Cargo.toml)"
+          PKG_MANIFEST="$(printf '%s' "$META" | jq -r '.packages[] | select(.name=="oxideav-avif" and .version=="0.0.11") | .manifest_path')"
+          [ -n "$PKG_MANIFEST" ] || { echo "::error::oxideav-avif 0.0.11 is not in the resolved graph"; exit 1; }
+          PKG_DIR="$(dirname "$PKG_MANIFEST")"
+          echo "OXIDEAV_AVIF_PKG_DIR=$PKG_DIR" >> "$GITHUB_ENV"
+          echo "oxideav_avif_pkg_dir=$PKG_DIR"
+          find "$PKG_DIR/tests/fixtures" -name '*.avif' | sort | sed "s|$PKG_DIR/||"
+
+      - name: Resolve the published oxideav-avif package directory (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $meta = cargo metadata --locked --format-version 1 --manifest-path verification/avif-r03-c3/Cargo.toml
+          if ($LASTEXITCODE -ne 0) { throw "cargo metadata failed ($LASTEXITCODE)" }
+          $parsed = $meta | ConvertFrom-Json
+          $pkg = $parsed.packages | Where-Object { $_.name -eq 'oxideav-avif' -and $_.version -eq '0.0.11' }
+          if (-not $pkg) { throw 'oxideav-avif 0.0.11 is not in the resolved graph' }
+          $pkgDir = Split-Path -Parent $pkg.manifest_path
+          Write-Output "OXIDEAV_AVIF_PKG_DIR=$pkgDir" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Output "oxideav_avif_pkg_dir=$pkgDir"
+          Get-ChildItem -Path (Join-Path $pkgDir 'tests/fixtures') -Recurse -Filter '*.avif' |
+            ForEach-Object { $_.FullName.Substring($pkgDir.Length + 1).Replace('\', '/') } | Sort-Object
+
+      - name: Print the resolved probe graph
+        run: |
+          cargo tree --locked --manifest-path verification/avif-r03-c3/Cargo.toml --edges normal,build
+
+      - name: Build the probe (offline, locked, release)
+        run: cargo build --locked --release --manifest-path verification/avif-r03-c3/Cargo.toml
+
+      - name: Probe unit tests (offline, locked, all targets)
+        run: cargo test --locked --all-targets --manifest-path verification/avif-r03-c3/Cargo.toml
+
+      # Positive fixtures, controlled negatives, hard per-case timeouts and
+      # per-case peak-RSS observation. A functional defect here fails the job.
+      - name: Run the proof matrix (Linux, timed, peak RSS)
+        if: runner.os == 'Linux'
+        run: |
+          set -uo pipefail
+          mkdir -p "$PROBE_OUT"
+          set +e
+          /usr/bin/time -v "$CARGO_TARGET_DIR/release/solo-avif-r03-c3-proof" \
+            --all --out "$PROBE_OUT" --timeout-ms 15000 2>&1 | tee "$PROBE_OUT/run.log"
+          code=${PIPESTATUS[0]}
+          set -e
+          echo "probe_exit=$code"
+          sed -n '1,400p' "$PROBE_OUT/run.log"
+          echo "--- peak resident set (whole driver process) ---"
+          grep 'Maximum resident set size' "$PROBE_OUT/run.log"
+          exit "$code"
+
+      - name: Run the proof matrix (Windows, timed, peak working set)
+        if: runner.os == 'Windows'
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path $env:PROBE_OUT | Out-Null
+          $exe = Join-Path $env:CARGO_TARGET_DIR 'release/solo-avif-r03-c3-proof.exe'
+          if (-not (Test-Path $exe)) { throw "probe binary missing at $exe" }
+          $stdout = Join-Path $env:PROBE_OUT 'run.log'
+          $stderr = Join-Path $env:PROBE_OUT 'run.err.log'
+          $proc = Start-Process -FilePath $exe -ArgumentList @('--all','--out',$env:PROBE_OUT,'--timeout-ms','15000') `
+            -PassThru -NoNewWindow -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+          $peak = 0
+          while (-not $proc.HasExited) {
+            try {
+              $m = (Get-Process -Id $proc.Id -ErrorAction Stop).PeakWorkingSet64
+              if ($m -gt $peak) { $peak = $m }
+            } catch { }
+            Start-Sleep -Milliseconds 20
+          }
+          $proc.WaitForExit()
+          try { if ($proc.PeakWorkingSet64 -gt $peak) { $peak = $proc.PeakWorkingSet64 } } catch { }
+          Get-Content $stdout | Write-Output
+          if (Test-Path $stderr) { Get-Content $stderr | Write-Output }
+          Write-Output "driver_peak_working_set_bytes=$peak"
+          if ($proc.ExitCode -ne 0) { throw "probe exited $($proc.ExitCode)" }
+
+      # The harness must never be trusted to hash its own output: the host tool
+      # hashes the very same bytes independently on each platform.
+      - name: Cross-check decoded-pixel digests against the host tool (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          checked=0
+          for f in "$PROBE_OUT"/*.planes.bin; do
+            [ -e "$f" ] || continue
+            base="$(basename "$f" .planes.bin)"
+            declared="$(jq -r '.decoded_sha256' "$PROBE_OUT/$base.json")"
+            actual="$(sha256sum "$f" | cut -d' ' -f1)"
+            [ "$declared" = "$actual" ] || { echo "::error::digest mismatch for $base"; exit 1; }
+            echo "digest_ok case=$base sha256=$actual bytes=$(stat -c%s "$f")"
+            checked=$((checked + 1))
+          done
+          echo "host_digest_crosschecks=$checked"
+          [ "$checked" -gt 0 ] || { echo "::error::no decoded plane output to verify"; exit 1; }
+
+      - name: Cross-check decoded-pixel digests against the host tool (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $checked = 0
+          foreach ($f in Get-ChildItem -Path $env:PROBE_OUT -Filter '*.planes.bin') {
+            $base = $f.Name -replace '\.planes\.bin$', ''
+            $json = Join-Path $env:PROBE_OUT "$base.json"
+            if (-not (Test-Path $json)) { throw "missing record for $base" }
+            $declared = (Get-Content $json -Raw | ConvertFrom-Json).decoded_sha256
+            $actual = (Get-FileHash $f.FullName -Algorithm SHA256).Hash.ToLower()
+            if ($declared -ne $actual) { throw "digest mismatch for $base" }
+            Write-Output "digest_ok case=$base sha256=$actual bytes=$($f.Length)"
+            $checked++
+          }
+          Write-Output "host_digest_crosschecks=$checked"
+          if ($checked -le 0) { throw 'no decoded plane output to verify' }
+
+      # ---------------------------------------------------------------------------
+      # Candidate-scoped component security gate. Same pinned scanner release, same
+      # SHA-256 verification, same version assertion, same fresh RustSec refresh and
+      # the same *unaltered* repository `deny.toml` policy — applied to the probe's
+      # own lockfile via `--manifest-path`. The single official release download route
+      # is used here (the product workflow additionally keeps a release-asset-API
+      # fallback for availability); no integrity, advisory, licence, ban or source
+      # check is relaxed, and a failed or missing advisory fetch fails the gate.
+      # ---------------------------------------------------------------------------
+      - name: Candidate security gate — cargo-deny 0.20.2 on the probe graph (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          DENY_VERSION="0.20.2"
+          DENY_ASSET="cargo-deny-${DENY_VERSION}-x86_64-unknown-linux-musl.tar.gz"
+          DENY_SHA256="9f12ed4c49936e09b48bf862b595cde2fe64fcbd9d74dfacac6131ca824c8d5f"
+          DENY_URL="https://github.com/EmbarkStudios/cargo-deny/releases/download/${DENY_VERSION}/${DENY_ASSET}"
+          WORK="$RUNNER_TEMP/deny-gate"
+          ARCHIVE="$WORK/archive/$DENY_ASSET"
+          fail() { echo "::error::$*"; exit 1; }
+
+          rm -rf "$WORK"
+          mkdir -p "$WORK/archive" "$WORK/tool"
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+            --connect-timeout 10 --max-time 30 --retry 4 --retry-max-time 120 --retry-connrefused \
+            --output "$ARCHIVE" "$DENY_URL" || fail "cargo-deny archive download failed"
+
+          ACTUAL_SHA256="$(sha256sum "$ARCHIVE" | cut -d' ' -f1)"
+          [ "$ACTUAL_SHA256" = "$DENY_SHA256" ] || fail "cargo-deny archive digest mismatch: $ACTUAL_SHA256"
+          MEMBERS="$(tar -tzf "$ARCHIVE")" || fail "cargo-deny archive listing failed"
+          printf '%s\n' "$MEMBERS" | grep -Eq '^[A-Za-z0-9._/-]+$' || fail "unsafe archive member names"
+          if printf '%s\n' "$MEMBERS" | grep -Eq '(^/|^[A-Za-z]:|(^|/)\.\.(/|$))'; then
+            fail "archive member escapes the extraction root"
+          fi
+          tar -xzf "$ARCHIVE" -C "$WORK/tool" --no-same-owner --no-same-permissions || fail "extraction failed"
+          BIN="$(find "$WORK/tool" -maxdepth 2 -type f -name cargo-deny -print -quit)"
+          [ -n "$BIN" ] || fail "cargo-deny binary not found"
+          REPORTED_VERSION="$("$BIN" --version)"
+          [ "$REPORTED_VERSION" = "cargo-deny $DENY_VERSION" ] || fail "unexpected scanner version: $REPORTED_VERSION"
+
+          PROBE_LOCK_BEFORE="$(sha256sum verification/avif-r03-c3/Cargo.lock | cut -d' ' -f1)"
+          "$BIN" -L info fetch db || fail "RustSec advisory database fetch failed"
+          DB_DIR="$(find "${CARGO_HOME:-$HOME/.cargo}/advisory-dbs" -maxdepth 2 -type d -name .git -print -quit | xargs -r dirname)"
+          [ -n "$DB_DIR" ] || fail "no advisory database checkout found"
+          DB_COMMIT="$(git -C "$DB_DIR" rev-parse HEAD)"
+          DB_FETCHED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+          for CLASS in advisories bans licenses sources; do
+            "$BIN" --config "$GITHUB_WORKSPACE/deny.toml" \
+              --manifest-path "$GITHUB_WORKSPACE/verification/avif-r03-c3/Cargo.toml" \
+              --locked --all-features check "$CLASS" --show-stats 2>&1 \
+              | tee "$WORK/check-$CLASS.log" \
+              || fail "cargo-deny check $CLASS failed for the probe graph"
+          done
+
+          PROBE_LOCK_AFTER="$(sha256sum verification/avif-r03-c3/Cargo.lock | cut -d' ' -f1)"
+          [ "$PROBE_LOCK_AFTER" = "$PROBE_LOCK_BEFORE" ] || fail "probe Cargo.lock changed during the gate"
+          [ -z "$(git status --porcelain)" ] || fail "working tree is dirty after the security gate"
+          echo "probe_security_gate=pass scanner=$REPORTED_VERSION archive_sha256=$ACTUAL_SHA256 db_commit=$DB_COMMIT fetched_at=$DB_FETCHED_AT"
+
+      - name: Candidate security gate — cargo-deny 0.20.2 on the probe graph (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (-not $env:CARGO_HOME) { $env:CARGO_HOME = Join-Path $env:USERPROFILE '.cargo' }
+          $DenyVersion = '0.20.2'
+          $DenyAsset = "cargo-deny-$DenyVersion-x86_64-pc-windows-msvc.tar.gz"
+          $DenySha256 = '975a22143262fd27476d19ee00c7af67978426e40e1dee94eed6bbade1cf87dc'
+          $DenyUrl = "https://github.com/EmbarkStudios/cargo-deny/releases/download/$DenyVersion/$DenyAsset"
+          $Work = Join-Path $env:RUNNER_TEMP 'deny-gate'
+          $Archive = Join-Path $Work "archive\$DenyAsset"
+          if (Test-Path $Work) { Remove-Item -Recurse -Force $Work }
+          New-Item -ItemType Directory -Force -Path (Join-Path $Work 'archive') | Out-Null
+          New-Item -ItemType Directory -Force -Path (Join-Path $Work 'tool') | Out-Null
+
+          curl.exe --fail --silent --show-error --location --proto '=https' --tlsv1.2 `
+            --connect-timeout 10 --max-time 30 --retry 4 --retry-max-time 120 --retry-connrefused `
+            --output $Archive $DenyUrl
+          if ($LASTEXITCODE -ne 0) { throw 'cargo-deny archive download failed' }
+
+          $actual = (Get-FileHash $Archive -Algorithm SHA256).Hash.ToLower()
+          if ($actual -ne $DenySha256) { throw "cargo-deny archive digest mismatch: $actual" }
+          $members = tar -tzf $Archive
+          if ($LASTEXITCODE -ne 0) { throw 'archive listing failed' }
+          foreach ($m in $members) {
+            if ($m -notmatch '^[A-Za-z0-9._/-]+$') { throw "unsafe archive member name: $m" }
+            if ($m -match '^/|^[A-Za-z]:|(^|/)\.\.(/|$)') { throw "archive member escapes the extraction root: $m" }
+          }
+          tar -xzf $Archive -C (Join-Path $Work 'tool')
+          if ($LASTEXITCODE -ne 0) { throw 'archive extraction failed' }
+          $bin = Get-ChildItem -Path (Join-Path $Work 'tool') -Recurse -Filter 'cargo-deny.exe' | Select-Object -First 1
+          if (-not $bin) { throw 'cargo-deny.exe not found after extraction' }
+          $reported = (& $bin.FullName --version)
+          if ($reported -ne "cargo-deny $DenyVersion") { throw "unexpected scanner version: $reported" }
+
+          $lockBefore = (Get-FileHash 'verification/avif-r03-c3/Cargo.lock' -Algorithm SHA256).Hash.ToLower()
+          & $bin.FullName -L info fetch db
+          if ($LASTEXITCODE -ne 0) { throw 'RustSec advisory database fetch failed' }
+          $dbGit = Get-ChildItem -Path (Join-Path $env:CARGO_HOME 'advisory-dbs') -Recurse -Force -Filter '.git' -Directory | Select-Object -First 1
+          if (-not $dbGit) { throw 'no advisory database checkout found' }
+          $dbCommit = (git -C (Split-Path -Parent $dbGit.FullName) rev-parse HEAD).Trim()
+
+          foreach ($class in 'advisories','bans','licenses','sources') {
+            & $bin.FullName --config "$env:GITHUB_WORKSPACE\deny.toml" `
+              --manifest-path "$env:GITHUB_WORKSPACE\verification\avif-r03-c3\Cargo.toml" `
+              --locked --all-features check $class --show-stats
+            if ($LASTEXITCODE -ne 0) { throw "cargo-deny check $class failed for the probe graph" }
+          }
+
+          $lockAfter = (Get-FileHash 'verification/avif-r03-c3/Cargo.lock' -Algorithm SHA256).Hash.ToLower()
+          if ($lockAfter -ne $lockBefore) { throw 'probe Cargo.lock changed during the gate' }
+          $dirty = git status --porcelain
+          if ($dirty) { throw "working tree is dirty after the security gate: $dirty" }
+          Write-Output "probe_security_gate=pass scanner=$reported archive_sha256=$actual db_commit=$dbCommit"
+
+      # Cross-host comparable evidence lines: identical fixture, identical digest.
+      - name: Emit case evidence table (Linux)
+        if: always() && runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          jq -r '"table \(.case_id) result=\(.result) status=\(.status) dims=\(.width)x\(.height) depth=\(.bit_depth) bytes=\(.pixel_bytes) sha=\(.decoded_sha256) oracle=\(.oracle)/\(.oracle_verdict) guard=\(.guard)"' \
+            "$PROBE_OUT/results.jsonl" | sort
+
+      - name: Emit case evidence table (Windows)
+        if: always() && runner.os == 'Windows'
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $lines = Get-Content (Join-Path $env:PROBE_OUT 'results.jsonl')
+          $rows = foreach ($l in $lines) {
+            $r = $l | ConvertFrom-Json
+            "table $($r.case_id) result=$($r.result) status=$($r.status) dims=$($r.width)x$($r.height) depth=$($r.bit_depth) bytes=$($r.pixel_bytes) sha=$($r.decoded_sha256) oracle=$($r.oracle)/$($r.oracle_verdict) guard=$($r.guard)"
+          }
+          $rows | Sort-Object | Write-Output
