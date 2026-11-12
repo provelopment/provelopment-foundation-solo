@@ -539,17 +539,15 @@ pub fn decode(bytes: &[u8]) -> Outcome {
         use oxideav_core::{CodecId, Decoder};
 
         let mut dec = AvifDecoder::new(CodecId::new("avif"));
-        let info = dec.decode_file(bytes)?;
+        let info = dec
+            .decode_file(bytes)
+            .map_err(|e| format!("decode_file: {e}"))?;
         let frame = dec
             .receive_frame()
-            .map_err(|e| oxideav_avif::error::AvifError::invalid(format!("receive_frame: {e}")))?;
+            .map_err(|e| format!("receive_frame: {e}"))?;
         let vf = match frame {
             oxideav_core::Frame::Video(v) => v,
-            _ => {
-                return Err(oxideav_avif::error::AvifError::unsupported(
-                    "decoder returned a non-video frame",
-                ));
-            }
+            _ => return Err("decoder returned a non-video frame".to_string()),
         };
         let mut planes: Vec<Plane> = Vec::new();
         for p in vf.image_planes().iter() {
@@ -564,7 +562,7 @@ pub fn decode(bytes: &[u8]) -> Outcome {
             .copied()
             .map(u64::from)
             .unwrap_or(0);
-        Ok::<Decoded, oxideav_avif::error::AvifError>(Decoded {
+        Ok::<Decoded, String>(Decoded {
             width: u64::from(info.width),
             height: u64::from(info.height),
             bit_depth,
