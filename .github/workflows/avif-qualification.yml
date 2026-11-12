@@ -352,14 +352,14 @@ jobs:
 
       # Cross-host comparable evidence lines: identical fixture, identical digest.
       - name: Emit case evidence table (Linux)
-        if: runner.os == 'Linux'
+        if: always() && runner.os == 'Linux'
         run: |
           set -euo pipefail
           jq -r '"table \(.case_id) result=\(.result) status=\(.status) dims=\(.width)x\(.height) depth=\(.bit_depth) bytes=\(.pixel_bytes) sha=\(.decoded_sha256) oracle=\(.oracle)/\(.oracle_verdict) guard=\(.guard)"' \
             "$PROBE_OUT/results.jsonl" | sort
 
       - name: Emit case evidence table (Windows)
-        if: runner.os == 'Windows'
+        if: always() && runner.os == 'Windows'
         run: |
           $ErrorActionPreference = 'Stop'
           $lines = Get-Content (Join-Path $env:PROBE_OUT 'results.jsonl')

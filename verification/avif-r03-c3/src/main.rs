@@ -312,6 +312,7 @@ fn run_all(
             "UNVERIFIED" => unverified += 1,
             _ => fail += 1,
         }
+        println!("record {line}");
         println!(
             "annotation case={} wall_ms={} peak_rss_bytes={} timed_out={} status={}",
             case.id,

@@ -432,10 +432,13 @@ pub fn build_negative(name: &str, base: &[u8]) -> Result<Vec<u8>, String> {
         }
         "neg:invalid_brand" => {
             let mut v = base.to_vec();
-            if v.len() < 12 {
+            if v.len() < 20 {
                 return Err("base fixture too short for a brand patch".to_string());
             }
+            // Overwrite the major brand *and* the first compatible brand so the
+            // file's brand set is genuinely unclassifiable, not merely unusual.
             v[8..12].copy_from_slice(b"xxxx");
+            v[16..20].copy_from_slice(b"zzzz");
             Ok(v)
         }
         "neg:trailing_garbage" => {
