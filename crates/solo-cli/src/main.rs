@@ -8,13 +8,20 @@
 //! Exit status: `0` accepted, `2` refused, `1` internal error. A required output
 //! write or flush that fails is an internal error, never a silent success and never
 //! a false input refusal — a lost report must not be reported as a clean result.
+//!
+//! One reserved internal mode is dispatched before the public adapter: the fixed
+//! `--internal-media-host-probe-v1 <parent|child>` harness of the `R03.C3` limit smoke. It is not
+//! part of the public product surface, appears in no help output, and returns its own fixed
+//! refusal status `3`. Its presence changes nothing when the reserved flag is absent.
 
 #![forbid(unsafe_code)]
 
 use std::io::Write;
 use std::process::ExitCode;
 
-use solo_adapters::{CliOutcome, EXIT_INTERNAL, run};
+use solo_adapters::{
+    CliOutcome, EXIT_INTERNAL, InternalProbeReportV1, run, run_internal_media_host_probe_v1,
+};
 use solo_application::BootstrapPreflightService;
 
 /// Fixed, safe diagnostic emitted when a required output could not be written.
@@ -83,12 +90,49 @@ fn emit(outcome: &CliOutcome, stdout: &mut impl OutputSink, stderr: &mut impl Ou
     outcome.exit_code()
 }
 
+/// Emits an internal probe's single payload or single refusal line, and returns the status.
+///
+/// The semantics match the public path exactly: a required write or flush that fails is an
+/// internal error, never a silent success, and no partial evidence line is ever claimed.
+fn emit_internal_probe(
+    report: &InternalProbeReportV1,
+    stdout: &mut impl OutputSink,
+    stderr: &mut impl OutputSink,
+) -> u8 {
+    if let Some(payload) = report.stdout.as_deref()
+        && stdout
+            .write_all(payload.as_bytes())
+            .and_then(|()| stdout.flush())
+            .is_err()
+    {
+        return EXIT_INTERNAL;
+    }
+
+    if let Some(payload) = report.stderr.as_deref()
+        && stderr
+            .write_all(payload.as_bytes())
+            .and_then(|()| stderr.flush())
+            .is_err()
+    {
+        return EXIT_INTERNAL;
+    }
+
+    report.exit_code
+}
+
 fn main() -> ExitCode {
-    let outcome = run(std::env::args_os(), &BootstrapPreflightService);
+    let arguments: Vec<std::ffi::OsString> = std::env::args_os().collect();
 
     let mut stdout = StreamSink::new(std::io::stdout().lock());
     let mut stderr = StreamSink::new(std::io::stderr().lock());
 
+    // The reserved internal harness is settled first and can never reach the public parser. When
+    // the reserved flag is absent this returns `None` and the public CLI runs unchanged.
+    if let Some(report) = run_internal_media_host_probe_v1(&arguments) {
+        return ExitCode::from(emit_internal_probe(&report, &mut stdout, &mut stderr));
+    }
+
+    let outcome = run(arguments, &BootstrapPreflightService);
     ExitCode::from(emit(&outcome, &mut stdout, &mut stderr))
 }
 

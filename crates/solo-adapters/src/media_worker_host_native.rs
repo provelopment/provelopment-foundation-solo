@@ -23,6 +23,10 @@ mod linux {
     #![allow(dead_code)]
 
     use std::mem::MaybeUninit;
+    use std::os::unix::process::CommandExt;
+    use std::process::Command;
+
+    use crate::media_worker_host::{PROFILE_V1_AS_BYTES, PROFILE_V1_CPU_SECONDS};
 
     /// The kernel's "no limit" sentinel for an unsigned resource value.
     #[cfg(test)]
@@ -133,6 +137,74 @@ mod linux {
         let raw = unsafe { raw.assume_init() };
 
         Ok(ceiling_from_raw(raw.rlim_cur, raw.rlim_max))
+    }
+
+    /// Why the calling process's group identity could not be observed.
+    ///
+    /// Closed and typed, like the ceiling refusals: it carries no OS error text and no path.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub(crate) enum NativeGroupRefusalV1 {
+        /// The `getpgid` query did not return a valid group identity.
+        ProcessGroupUnreadable,
+    }
+
+    /// Registers the fixed Linux pre-exec boundary on `command`.
+    ///
+    /// The closure runs in the forked child **after** `fork` and **before** `exec`, so it may use
+    /// only async-signal-safe operations: it calls `setsid`, then installs both hard and soft
+    /// ceilings with two `setrlimit` calls, and returns a plain `errno`-derived error on failure.
+    /// It allocates nothing, locks nothing, formats nothing, performs no Rust I/O, resolves no
+    /// path, reads no limit, spawns no thread and cannot panic, because every value it needs was
+    /// computed here, before the fork. A failure means the image is never executed.
+    pub(crate) fn install_linux_child_limits_v1(command: &mut Command) {
+        let address_space = libc::rlimit {
+            rlim_cur: PROFILE_V1_AS_BYTES,
+            rlim_max: PROFILE_V1_AS_BYTES,
+        };
+        let cpu = libc::rlimit {
+            rlim_cur: PROFILE_V1_CPU_SECONDS,
+            rlim_max: PROFILE_V1_CPU_SECONDS,
+        };
+
+        // SAFETY: `pre_exec` is `unsafe` because the registered closure runs in a restricted
+        // post-fork child, where only async-signal-safe work is permitted. The closure captures
+        // exactly two `Copy` `libc::rlimit` values built above and performs only `setsid` and two
+        // `setrlimit` calls, all three of which POSIX lists as async-signal-safe; it allocates,
+        // locks, formats, logs, opens, scans, resolves, observes and spawns nothing, and it cannot
+        // panic. Each failure path reports the child's own `errno` through
+        // `std::io::Error::last_os_error`, which only reads the thread-local errno and allocates
+        // nothing, and the parent never echoes that text. Both ceilings are installed with equal
+        // soft and hard values, so the child cannot raise them after `exec`.
+        unsafe {
+            command.pre_exec(move || {
+                if libc::setsid() == -1 {
+                    return Err(std::io::Error::last_os_error());
+                }
+                if libc::setrlimit(libc::RLIMIT_AS, &address_space) != 0 {
+                    return Err(std::io::Error::last_os_error());
+                }
+                if libc::setrlimit(libc::RLIMIT_CPU, &cpu) != 0 {
+                    return Err(std::io::Error::last_os_error());
+                }
+                Ok(())
+            });
+        }
+    }
+
+    /// Reads the calling process's own process-group id.
+    ///
+    /// Used only by the fixed child, to prove that `setsid` inside the pre-exec boundary really
+    /// made this process a session leader in its own group.
+    pub(crate) fn own_process_group_v1() -> Result<u32, NativeGroupRefusalV1> {
+        // SAFETY: `getpgid(0)` asks the kernel for the process-group id of the calling process
+        // itself. It takes a plain `pid_t`, writes through no pointer, allocates nothing, mutates
+        // no state and cannot fault; a negative return is the kernel's error report and is turned
+        // into the closed refusal below rather than being cast or ignored.
+        let group = unsafe { libc::getpgid(0) };
+        if group < 0 {
+            return Err(NativeGroupRefusalV1::ProcessGroupUnreadable);
+        }
+        Ok(group as u32)
     }
 
     #[cfg(test)]

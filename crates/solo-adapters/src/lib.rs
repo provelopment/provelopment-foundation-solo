@@ -29,13 +29,16 @@
 //!
 //! **Unsafe isolation.** This crate denies `unsafe_code` rather than forbidding it, because
 //! exactly two platform-gated modules must call the operating system directly: the Windows NT
-//! source reader, and — from `SOLO-WO-076 R01` — the Linux limit-readback seam, which only
-//! *observes* the calling process's existing `RLIMIT_AS` and `RLIMIT_CPU` ceilings with
-//! `getrlimit` and mutates nothing. There are therefore exactly two module-scoped allowances
-//! below, one Windows and one Linux; the architecture guard fails the build if any other file,
-//! module or attribute acquires an unsafe capability. The `R03.C3` protocol module added by
-//! `SOLO-WO-072 R01` holds no allowance of its own: it parses supplied bytes only and starts no
-//! process, opens no file and holds no handle.
+//! source reader, and — from `SOLO-WO-076 R01`, and widened by `SOLO-WO-079 R01` — the Linux
+//! limit boundary, which reads the calling process's existing `RLIMIT_AS` and `RLIMIT_CPU`
+//! ceilings with `getrlimit`, and which in one fixed internal mode installs those ceilings and a
+//! new session on a single trusted child inside `pre_exec`, before that child is executed. There
+//! are therefore exactly two module-scoped allowances below, one Windows and one Linux; the
+//! architecture guard fails the build if any other file, module or attribute acquires an unsafe
+//! capability. The `R03.C3` protocol module added by `SOLO-WO-072 R01` holds no allowance of its
+//! own: it parses supplied bytes only and starts no process, opens no file and holds no handle.
+//! The safe `media_worker_host` façade added by `SOLO-WO-079 R01` holds no allowance either: it
+//! is ordinary safe Rust that names no OS constant, no raw handle and no native root.
 //!
 //! The media-worker half strictly parses **already-supplied** worker metadata into an inert,
 //! untrusted claim. It performs no I/O, cannot execute anything, and authorizes nothing.
@@ -43,6 +46,7 @@
 #![deny(unsafe_code)]
 
 mod bootstrap_cli;
+mod media_worker_host;
 #[cfg(target_os = "linux")]
 #[cfg_attr(target_os = "linux", allow(unsafe_code))]
 mod media_worker_host_native;
@@ -59,6 +63,15 @@ mod source_set_staging;
 pub use bootstrap_cli::{
     CliOutcome, CliRefusal, CliRefusalCode, EXIT_INTERNAL, EXIT_OK, EXIT_REFUSED, FLAG_BASE_URL,
     FLAG_ENTITY_ID, SUBCOMMAND, parse_request, run,
+};
+pub use media_worker_host::{
+    CHILD_OBSERVATION_MARKER_V1, EXIT_INTERNAL_PROBE_REFUSED, INTERNAL_PROBE_CHILD_TOKEN_V1,
+    INTERNAL_PROBE_FLAG_V1, INTERNAL_PROBE_PARENT_TOKEN_V1, INTERNAL_REFUSAL_PREFIX_V1,
+    InternalProbeModeV1, InternalProbeReportV1, MAX_CHILD_STDERR_BYTES, MAX_CHILD_STDOUT_BYTES,
+    PARENT_EVIDENCE_MARKER_V1, PROFILE_V1_AS_BYTES, PROFILE_V1_CPU_SECONDS, SMOKE_WALL_DEADLINE_MS,
+    SmokeObservationV1, SmokeRefusalV1, classify_child_exit_v1, classify_internal_arguments_v1,
+    parse_child_observation_v1, run_internal_linux_limit_smoke_v1,
+    run_internal_media_host_probe_v1, validate_observation_v1,
 };
 pub use media_worker_protocol::{
     MediaWorkerProtocolRefusalKindV1, MediaWorkerProtocolRefusalV1, parse_media_worker_envelope_v1,
