@@ -1,13 +1,23 @@
 //! Driver for the standalone AVIF qualification probe (non-product evidence).
 //!
-//! Two roles:
+//! Roles:
 //!   * `--all`   — parent: runs every case in its own OS process with a hard
 //!                 wall-clock timeout, collects one JSON line per case, and fails
 //!                 only on a genuine functional assertion (never on an honest
 //!                 `BLOCKED`/`UNVERIFIED` resource finding).
 //!   * `--case`  — child: evaluates exactly one case and writes its record.
+//!   * `--list`  — prints the case identifiers so the workflow can enumerate them.
 //!
-//! `--list` prints the case identifiers so the workflow can enumerate them.
+//! Containment-probe roles (`SOLO-WO-070 R01`). Every one of these is test-only and
+//! is designed to be launched *only* by the platform supervisor, which installs the
+//! hard OS limits before the first instruction of this process runs:
+//!   * `--report-limits`               — print this process's own enforced limits
+//!   * `--stress-allocate-bytes N`     — infallible allocation of N bytes, touching
+//!                                       every page; aborts under a smaller cap
+//!   * `--stress-spin-ms N`            — busy CPU loop for N ms
+//!   * `--stress-sleep-ms N`           — sleep for N ms
+//!   * `--stress-spawn-descendant N`   — spawn a sleeping descendant, then exit, so a
+//!                                       supervisor can prove descendant containment
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -28,12 +38,34 @@ fn run() -> i32 {
     let mut out: Option<PathBuf> = None;
     let mut json_out: Option<PathBuf> = None;
     let mut timeout_ms: u64 = probe::DEFAULT_CASE_TIMEOUT_MS;
+    let mut report_limits = false;
+    let mut stress_allocate: Option<u64> = None;
+    let mut stress_spin: Option<u64> = None;
+    let mut stress_sleep: Option<u64> = None;
+    let mut stress_descendant: Option<u64> = None;
 
     let mut i = 0usize;
     while i < args.len() {
         match args[i].as_str() {
             "--list" => mode = String::from("list"),
             "--all" => mode = String::from("all"),
+            "--report-limits" => report_limits = true,
+            "--stress-allocate-bytes" => {
+                i += 1;
+                stress_allocate = args.get(i).and_then(|v| v.parse::<u64>().ok());
+            }
+            "--stress-spin-ms" => {
+                i += 1;
+                stress_spin = args.get(i).and_then(|v| v.parse::<u64>().ok());
+            }
+            "--stress-sleep-ms" => {
+                i += 1;
+                stress_sleep = args.get(i).and_then(|v| v.parse::<u64>().ok());
+            }
+            "--stress-spawn-descendant" => {
+                i += 1;
+                stress_descendant = args.get(i).and_then(|v| v.parse::<u64>().ok());
+            }
             "--case" => {
                 i += 1;
                 case_id = args.get(i).cloned();
@@ -64,6 +96,24 @@ fn run() -> i32 {
             }
         }
         i += 1;
+    }
+
+    // Containment probes never need fixtures, a package directory or a case list:
+    // they exist only to be launched under an already-installed hard OS limit.
+    if report_limits {
+        return run_report_limits();
+    }
+    if let Some(bytes) = stress_allocate {
+        return run_stress_allocate(bytes, out.as_deref());
+    }
+    if let Some(ms) = stress_spin {
+        return run_stress_spin(ms);
+    }
+    if let Some(ms) = stress_sleep {
+        return run_stress_sleep(ms);
+    }
+    if let Some(ms) = stress_descendant {
+        return run_stress_descendant(ms, out.as_deref());
     }
 
     let pkg_dir = match probe::locate_package(pkg.as_deref()) {
@@ -345,4 +395,140 @@ fn run_all(
     );
 
     if fail > 0 { 1 } else { 0 }
+}
+
+fn run_report_limits() -> i32 {
+    #[cfg(target_os = "linux")]
+    {
+        let table = match std::fs::read_to_string("/proc/self/limits") {
+            Ok(t) => t,
+            Err(e) => {
+                eprintln!("limits-read-failed: {e}");
+                return 5;
+            }
+        };
+        let mut as_soft = String::from("unknown");
+        let mut as_hard = String::from("unknown");
+        let mut cpu_soft = String::from("unknown");
+        let mut cpu_hard = String::from("unknown");
+        for line in table.lines() {
+            let l = line.trim_end();
+            let fields: Vec<&str> = l.split_whitespace().collect();
+            if fields.len() >= 5 && fields[0] == "Max" {
+                let label = format!("{} {}", fields[0], fields[1]);
+                let (soft, hard) = (fields[3], fields[4]);
+                match label.as_str() {
+                    "Max cpu" => {
+                        cpu_soft = soft.to_string();
+                        cpu_hard = hard.to_string();
+                    }
+                    "Max address" => {
+                        as_soft = soft.to_string();
+                        as_hard = hard.to_string();
+                    }
+                    _ => {}
+                }
+            }
+        }
+        let escaped = table.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', "\\n");
+        println!(
+            "{{\"mode\":\"report-limits\",\"platform\":\"linux\",\"as_soft\":\"{as_soft}\",\"as_hard\":\"{as_hard}\",\"cpu_soft_s\":\"{cpu_soft}\",\"cpu_hard_s\":\"{cpu_hard}\",\"limits_table\":\"{escaped}\"}}"
+        );
+        0
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        // On Windows the effective limits live on the Job Object, which only the
+        // supervisor can query; the child reports that plainly instead of guessing.
+        println!(
+            "{{\"mode\":\"report-limits\",\"platform\":\"windows\",\"note\":\"job limits are installed and queried by the supervisor\"}}"
+        );
+        0
+    }
+}
+
+fn stress_output_dir(out: Option<&Path>) -> PathBuf {
+    out.map(|p| p.to_path_buf())
+        .unwrap_or_else(|| PathBuf::from("."))
+}
+
+fn run_stress_allocate(bytes: u64, out: Option<&Path>) -> i32 {
+    let dir = stress_output_dir(out);
+    let _ = std::fs::create_dir_all(&dir);
+    let len = match usize::try_from(bytes) {
+        Ok(v) => v,
+        Err(_) => return 70,
+    };
+    // Deliberately infallible: the point is that a cap smaller than `len` must make
+    // the operating system deny the allocation and abort this process, not that the
+    // program politely declines. The marker below is written only on real success.
+    let mut buf: Vec<u8> = vec![0u8; len];
+    let mut i = 0usize;
+    while i < len {
+        buf[i] = 0xA5;
+        i += 4096;
+    }
+    if len > 0 {
+        buf[len - 1] = 0x5A;
+    }
+    std::hint::black_box(&buf);
+    if std::fs::write(dir.join("stress-allocate.done"), format!("allocated_bytes={len}\n")).is_err() {
+        return 71;
+    }
+    println!("stress-allocate-ok bytes={len}");
+    0
+}
+
+fn run_stress_spin(ms: u64) -> i32 {
+    let start = Instant::now();
+    let mut x: u64 = 0x9E37_79B9_7F4A_7C15;
+    while start.elapsed().as_millis() < ms as u128 {
+        for _ in 0..10_000u32 {
+            x = x
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+        }
+        // Prevent the optimizer from removing the loop body.
+        std::hint::black_box(x);
+    }
+    println!("stress-spin-finished ms={ms}");
+    0
+}
+
+fn run_stress_sleep(ms: u64) -> i32 {
+    std::thread::sleep(Duration::from_millis(ms));
+    println!("stress-sleep-finished ms={ms}");
+    0
+}
+
+fn run_stress_descendant(ms: u64, out: Option<&Path>) -> i32 {
+    let dir = stress_output_dir(out);
+    let _ = std::fs::create_dir_all(&dir);
+    let exe = match std::env::current_exe() {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("current-exe-failed: {e}");
+            return 72;
+        }
+    };
+    let spawned = Command::new(&exe)
+        .arg("--stress-sleep-ms")
+        .arg(ms.to_string())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn();
+    let child = match spawned {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("descendant-spawn-failed: {e}");
+            return 73;
+        }
+    };
+    let pid = child.id();
+    let _ = std::fs::write(dir.join("descendant.pid"), format!("{pid}\n"));
+    println!("descendant-pid={pid}");
+    // Leave the descendant running and exit: a correct supervisor must terminate the
+    // whole job/process group, so the descendant must not outlive this process.
+    std::thread::sleep(Duration::from_millis(300));
+    0
 }

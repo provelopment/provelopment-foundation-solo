@@ -1,9 +1,10 @@
 # Foundation Solo — branch-only AVIF qualification probe (non-product evidence).
 #
-# Scope: `SOLO-WO-069 R01` only. This workflow executes the standalone proof crate
-# under `verification/avif-r03-c3/` on both accepted hosts and records what the
-# pinned `oxideav` candidate actually does. It runs on the short-lived
-# `solo-wo-069-r01` branch only and never on `main`.
+# Scope: `SOLO-WO-070 R01` only. This workflow executes the standalone proof crate
+# under `verification/avif-r03-c3/` on both accepted hosts, inside the platform
+# containment supervisors, and records what the pinned `oxideav` candidate actually
+# does under hard operating-system limits. It runs on the short-lived
+# `solo-wo-070-r01` branch only and never on `main`.
 #
 # Trust model, in the spirit of `rust-verify.yml`:
 #   * read-only token (`permissions: contents: read`), no secrets, no write step;
@@ -22,7 +23,7 @@ name: avif-qualification
 
 on:
   push:
-    branches: [solo-wo-069-r01]
+    branches: [solo-wo-070-r01]
   workflow_dispatch:
 
 permissions:
@@ -156,86 +157,75 @@ jobs:
       - name: Probe unit tests (offline, locked, all targets)
         run: cargo test --locked --all-targets --manifest-path verification/avif-r03-c3/Cargo.toml
 
-      # Positive fixtures, controlled negatives, hard per-case timeouts and
-      # per-case peak-RSS observation. A functional defect here fails the job.
-      - name: Run the proof matrix (Linux, timed, peak RSS)
+      # Positive fixtures, controlled negatives and deliberate resource faults, all
+      # executed inside the platform containment supervisor. A functional failure or
+      # a safety probe that does not deny fails the job.
+      - name: Containment suite — rlimits, fault injection, corpus (Linux)
         if: runner.os == 'Linux'
         run: |
           set -uo pipefail
           mkdir -p "$PROBE_OUT"
-          set +e
-          /usr/bin/time -v "$CARGO_TARGET_DIR/release/solo-avif-r03-c3-proof" \
-            --all --out "$PROBE_OUT" --timeout-ms 15000 2>&1 | tee "$PROBE_OUT/run.log"
+          /usr/bin/time -v bash verification/avif-r03-c3/limit-linux.sh suite \
+            --bin "$CARGO_TARGET_DIR/release/solo-avif-r03-c3-proof" \
+            --pkg "$OXIDEAV_AVIF_PKG_DIR" \
+            --root "$PROBE_OUT/suite" \
+            --jsonl "$PROBE_OUT/isolation.jsonl" 2>&1 | tee "$PROBE_OUT/suite.log"
           code=${PIPESTATUS[0]}
-          set -e
-          echo "probe_exit=$code"
-          sed -n '1,400p' "$PROBE_OUT/run.log"
-          echo "--- peak resident set (whole driver process) ---"
-          grep 'Maximum resident set size' "$PROBE_OUT/run.log"
+          echo "---------- isolation records ----------"
+          cat "$PROBE_OUT/isolation.jsonl"
+          echo "---------------------------------------"
+          echo "--- driver peak resident set ---"
+          grep 'Maximum resident set size' "$PROBE_OUT/suite.log"
           exit "$code"
 
-      - name: Run the proof matrix (Windows, timed, peak working set)
+      - name: Containment suite — Job Object, fault injection, corpus (Windows)
         if: runner.os == 'Windows'
         run: |
           $ErrorActionPreference = 'Stop'
           New-Item -ItemType Directory -Force -Path $env:PROBE_OUT | Out-Null
-          $exe = Join-Path $env:CARGO_TARGET_DIR 'release/solo-avif-r03-c3-proof.exe'
+          $exe = Join-Path $env:CARGO_TARGET_DIR 'release\solo-avif-r03-c3-proof.exe'
           if (-not (Test-Path $exe)) { throw "probe binary missing at $exe" }
-          $stdout = Join-Path $env:PROBE_OUT 'run.log'
-          $stderr = Join-Path $env:PROBE_OUT 'run.err.log'
-          $proc = Start-Process -FilePath $exe -ArgumentList @('--all','--out',$env:PROBE_OUT,'--timeout-ms','15000') `
-            -PassThru -NoNewWindow -RedirectStandardOutput $stdout -RedirectStandardError $stderr
-          $peak = 0
-          while (-not $proc.HasExited) {
-            try {
-              $m = (Get-Process -Id $proc.Id -ErrorAction Stop).PeakWorkingSet64
-              if ($m -gt $peak) { $peak = $m }
-            } catch { }
-            Start-Sleep -Milliseconds 20
-          }
-          $proc.WaitForExit()
-          try { if ($proc.PeakWorkingSet64 -gt $peak) { $peak = $proc.PeakWorkingSet64 } } catch { }
-          Get-Content $stdout | Write-Output
-          if (Test-Path $stderr) { Get-Content $stderr | Write-Output }
-          Write-Output "driver_peak_working_set_bytes=$peak"
-          if ($proc.ExitCode -ne 0) { throw "probe exited $($proc.ExitCode)" }
+          $supervisor = Join-Path $env:GITHUB_WORKSPACE 'verification\avif-r03-c3\limit-windows.ps1'
+          & $supervisor suite --bin $exe --pkg $env:OXIDEAV_AVIF_PKG_DIR `
+            --root (Join-Path $env:PROBE_OUT 'suite') `
+            --jsonl (Join-Path $env:PROBE_OUT 'isolation.jsonl')
+          if ($LASTEXITCODE -ne 0) { throw "containment suite failed ($LASTEXITCODE)" }
+          Write-Output '---------- isolation records ----------'
+          Get-Content (Join-Path $env:PROBE_OUT 'isolation.jsonl') | Write-Output
 
-      # The harness must never be trusted to hash its own output: the host tool
-      # hashes the very same bytes independently on each platform.
-      - name: Cross-check decoded-pixel digests against the host tool (Linux)
+      # The supervisor already compared every promoted plane file with the host tool
+      # and the known accepted digest; this table is the cross-host readable record.
+      - name: Promoted decoded-plane digest table (Linux)
         if: runner.os == 'Linux'
         run: |
           set -euo pipefail
-          checked=0
-          for f in "$PROBE_OUT"/*.planes.bin; do
+          found=0
+          for f in "$PROBE_OUT"/suite/T11-corpus/*/final/*.planes.bin; do
             [ -e "$f" ] || continue
-            base="$(basename "$f" .planes.bin)"
-            declared="$(jq -r '.decoded_sha256' "$PROBE_OUT/$base.json")"
-            actual="$(sha256sum "$f" | cut -d' ' -f1)"
-            [ "$declared" = "$actual" ] || { echo "::error::digest mismatch for $base"; exit 1; }
-            echo "digest_ok case=$base sha256=$actual bytes=$(stat -c%s "$f")"
-            checked=$((checked + 1))
+            c=$(basename "$(dirname "$(dirname "$f")")")
+            echo "promoted case=$c sha256=$(sha256sum "$f" | cut -d' ' -f1) bytes=$(stat -c%s "$f")"
+            found=$(( found + 1 ))
           done
-          echo "host_digest_crosschecks=$checked"
-          [ "$checked" -gt 0 ] || { echo "::error::no decoded plane output to verify"; exit 1; }
+          echo "promoted_plane_files=$found"
+          [ "$found" -ge 12 ] || { echo "::error::fewer than 12 promoted decoded-plane files"; exit 1; }
 
-      - name: Cross-check decoded-pixel digests against the host tool (Windows)
+      - name: Promoted decoded-plane digest table (Windows)
         if: runner.os == 'Windows'
         run: |
           $ErrorActionPreference = 'Stop'
-          $checked = 0
-          foreach ($f in Get-ChildItem -Path $env:PROBE_OUT -Filter '*.planes.bin') {
-            $base = $f.Name -replace '\.planes\.bin$', ''
-            $json = Join-Path $env:PROBE_OUT "$base.json"
-            if (-not (Test-Path $json)) { throw "missing record for $base" }
-            $declared = (Get-Content $json -Raw | ConvertFrom-Json).decoded_sha256
-            $actual = (Get-FileHash $f.FullName -Algorithm SHA256).Hash.ToLower()
-            if ($declared -ne $actual) { throw "digest mismatch for $base" }
-            Write-Output "digest_ok case=$base sha256=$actual bytes=$($f.Length)"
-            $checked++
+          $found = 0
+          $corpus = Join-Path $env:PROBE_OUT 'suite\T11-corpus'
+          if (Test-Path $corpus) {
+            foreach ($f in Get-ChildItem -Path $corpus -Recurse -Filter '*.planes.bin') {
+              if ($f.FullName -notmatch '\\final\\') { continue }
+              $case = $f.Directory.Parent.Name
+              $sha = (Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256).Hash.ToLower()
+              Write-Output "promoted case=$case sha256=$sha bytes=$($f.Length)"
+              $found++
+            }
           }
-          Write-Output "host_digest_crosschecks=$checked"
-          if ($checked -le 0) { throw 'no decoded plane output to verify' }
+          Write-Output "promoted_plane_files=$found"
+          if ($found -lt 12) { throw 'fewer than 12 promoted decoded-plane files' }
 
       # ---------------------------------------------------------------------------
       # Candidate-scoped component security gate. Same pinned scanner release, same
@@ -352,21 +342,28 @@ jobs:
           if ($dirty) { throw "working tree is dirty after the security gate: $dirty" }
           Write-Output "probe_security_gate=pass scanner=$reported archive_sha256=$actual db_commit=$dbCommit"
 
-      # Cross-host comparable evidence lines: identical fixture, identical digest.
-      - name: Emit case evidence table (Linux)
+      # Cross-host comparable containment record, emitted even when the suite fails.
+      - name: Isolation verdict summary (Linux)
         if: always() && runner.os == 'Linux'
         run: |
-          set -euo pipefail
-          jq -r '"table \(.case_id) result=\(.result) status=\(.status) dims=\(.width)x\(.height) depth=\(.bit_depth) bytes=\(.pixel_bytes) sha=\(.decoded_sha256) oracle=\(.oracle)/\(.oracle_verdict) guard=\(.guard)"' \
-            "$PROBE_OUT/results.jsonl" | sort
+          if [ -f "$PROBE_OUT/isolation.jsonl" ]; then
+            jq -r '"iso \(.test) outcome=\(.outcome) child_started=\(.child_started) exit=\(.exit_code) signal=\(.signal) wall_ms=\(.wall_ms_observed) promoted=\(.promoted) final_files=\(.final_files) enforceable=\(.enforceable)"' \
+              "$PROBE_OUT/isolation.jsonl" | sort
+          else
+            echo "isolation.jsonl was not produced"
+          fi
 
-      - name: Emit case evidence table (Windows)
+      - name: Isolation verdict summary (Windows)
         if: always() && runner.os == 'Windows'
         run: |
-          $ErrorActionPreference = 'Stop'
-          $lines = Get-Content (Join-Path $env:PROBE_OUT 'results.jsonl')
-          $rows = foreach ($l in $lines) {
-            $r = $l | ConvertFrom-Json
-            "table $($r.case_id) result=$($r.result) status=$($r.status) dims=$($r.width)x$($r.height) depth=$($r.bit_depth) bytes=$($r.pixel_bytes) sha=$($r.decoded_sha256) oracle=$($r.oracle)/$($r.oracle_verdict) guard=$($r.guard)"
+          $p = Join-Path $env:PROBE_OUT 'isolation.jsonl'
+          if (Test-Path $p) {
+            $rows = foreach ($l in Get-Content $p) {
+              if (-not $l.Trim()) { continue }
+              $r = $l | ConvertFrom-Json
+              "iso $($r.test) outcome=$($r.outcome) child_started=$($r.child_started) exit=$($r.exit_code) signal=$($r.signal) wall_ms=$($r.wall_ms_observed) promoted=$($r.promoted) final_files=$($r.final_files) enforceable=$($r.enforceable)"
+            }
+            $rows | Sort-Object | Write-Output
+          } else {
+            Write-Output 'isolation.jsonl was not produced'
           }
-          $rows | Sort-Object | Write-Output
