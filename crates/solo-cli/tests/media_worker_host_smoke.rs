@@ -239,7 +239,7 @@ fn n079_04_a_direct_unsupervised_child_is_refused() {
         .exit_code
         .expect("the child must exit with a status, not a signal");
     assert!(
-        matches!(code, 71 | 72 | 73),
+        matches!(code, 71..=73),
         "the child's own verification refusal is one of its three fixed statuses: {code}"
     );
 }
