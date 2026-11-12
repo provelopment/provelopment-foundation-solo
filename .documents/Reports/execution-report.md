@@ -1,116 +1,142 @@
 # Execution Report
 
-**Order:** `OWNER-ISSUED — SOLO-WO-075 R01` — R03.C3 Linux-only resource containment: implement and prove one native process supervisor on a preserved technical branch.
-**Matching handoff:** `SOLO-WO-075 R01`. **Report date (ISO):** 2026-11-12.
+**Order:** `OWNER-ISSUED — SOLO-WO-076 R01` — R03.C3: establish and prove the Linux native limit-readback seam on an isolated CI branch (no child launch).
+**Matching handoff:** `SOLO-WO-076 R01`. **Report date (ISO):** 2026-11-12.
 
-**Outcome: `UNVERIFIED`.** The governed preflight, the ACTIVE-only issuance and the both-host issuance CI all passed and are evidenced below. The Linux supervisor itself was **not** implemented to a reviewable, CI-verified state in this run, so no `H075` case was executed and **no** `LINUX-HOST-CONTAINMENT-PROVEN` claim is made. No native code was committed or pushed to any branch, `main` contains only the issuance and this report, and no `H075`/`S075` acceptance is asserted.
+**Outcome: `BLOCKED`.** The readback seam is implemented, committed to the preserved technical branch and **executed for real on `ubuntu-24.04`** — the three `N076` kernel tests ran and passed — but the branch cannot be made green on both hosts without editing a file this order forbids touching. The unchanged `rust-verify` workflow asserts a hardcoded approved-dependency-edge count of `40`, and the one `solo-adapters → libc` Linux edge this order mandates necessarily makes it `41`. `LINUX-NATIVE-READBACK-PROVEN` is therefore **not** claimed, nothing was merged, and `R03.C3` / `R03.C` / Stage 03 stay **OPEN**.
 
-## 1. Preflight — `S075-01` PASS
+## 1. Preflight — `S076-01` PASS
 
 | Anchor | Required | Observed |
 | --- | --- | --- |
-| `HEAD == main == origin/main` | `acc05c1dc1c579a676c36353cc00446a59ce65e3` | exact |
-| `HEAD^{tree}` | `a2fff721f99f68e3b9860613c4cf725cf657adca` | exact |
-| Current report blob | `de56766d4079599be0777886105566ded6f65636` | exact |
-| Prior ACTIVE blob | `38c32b488a9f449e98bc65d0d6caa6c0271c44eb` | exact |
+| Baseline `main` | `d76f24b886208be415a6376455c3367bd8f848e7` | exact |
+| Baseline tree | `1540ea788c911995a3abcb34840267c8ba8cfd50` | exact |
+| Canonical report blob | `432c925fd21e51f0b4fd7ff1deec9b6123bb04dc` | exact |
+| Prior ACTIVE blob | `6806a9002a7ce825f029da26868266c43294ec18` | exact |
 | Architecture Charter | `c941c7f90cc1b1955f9d60b348a3b1092cafe97f` | exact |
-| AST checker | `df1f8758b201214e5a4066823e83449f9c6cef6f` | exact |
-| `unsafe_boundary.rs` | `5c59a71bf4bf31808dde45be18fa123ba3fb7c44` | exact |
+| AST source checker | `df1f8758b201214e5a4066823e83449f9c6cef6f` | exact |
+| Unsafe-boundary guard | `5c59a71bf4bf31808dde45be18fa123ba3fb7c44` | exact |
 | Architecture fixtures | `dd8bcfe2a0c99acbe9ae5b9a6aeccb4993156ad2` | exact |
+| Adapter manifest | `6109224cd3e3e89487884631f2b07c68ad8149c3` | exact |
+| Adapter `lib.rs` | `4c5732983ce5a0ced0a7ebc9e25af2e24149f5ee` | exact |
 | Root `Cargo.lock` | `2f9e53576df117f2020ae064d6973304f20833f1` | exact |
-| Adapter `Cargo.toml` | `6109224cd3e3e89487884631f2b07c68ad8149c3` | exact |
-| Adapter `src/lib.rs` | `4c5732983ce5a0ced0a7ebc9e25af2e24149f5ee` | exact |
-| `plan-next` / `plan-roadmap` / `plan-outlook` | `92fa562b…` / `9d7a8622…` / `cb9c7a61…` | exact |
-| Preserved branches | `solo-wo-061-r01` `4371af21…`, `solo-wo-069-r01` `e6162cdf…`, `solo-wo-070-r01` `d270f95c…` | exact, unchanged |
-| Last accepted CI | `rust-verify` `43191888514` green at `acc05c1d…` | confirmed |
+| Dependency graph checker | `268fcf9a33d7e41e304173586952c8341acfbda4` | exact |
+| Workspace graph test | `69fa6837f52a1dff72a4a3bb0057021bf544aa4e` | exact |
+| Workflow (declares `workflow_dispatch:`) | `eb78dad240bb7adb3e0ef9535870897176c99843` | exact |
+| NEXT / ROADMAP / OUTLOOK | `92fa562b…` / `9d7a8622…` / `cb9c7a61…` | exact |
+| Historical branches | `solo-wo-061-r01` `4371af21…`, `solo-wo-069-r01` `e6162cdf…`, `solo-wo-070-r01` `d270f95c…` | unchanged |
+| Previous report CI | run `43195232774` both hosts success | confirmed |
 
-Repository shape at start: one checkout/worktree, exactly one remote
-`origin=https://github.com/provelopment/provelopment-foundation-solo.git`, `main` clean apart from the Owner-installed ACTIVE replacement (working blob `6806a900…`, complete `OWNER-ISSUED — SOLO-WO-075 R01` text, matching handoff), exactly four files in `.documents/WIP/`, and both `crates/solo-adapters/src/media_worker_host_native.rs` and `crates/solo-adapters/src/media_worker_host.rs` absent.
+One checkout, one worktree, one remote `origin=https://github.com/provelopment/provelopment-foundation-solo.git`, `main` clean apart from the Owner-installed ACTIVE replacement (working blob `9ba2a7937396a3032a393a31500909c2e8158586`), exactly four WIP files, both product paths `media_worker_host_native.rs` and `media_worker_host.rs` absent, and no local or remote `solo-wo-076-r01` before creation.
 
-Two further prerequisites the order makes decisive were confirmed **before** any branch work:
+> **Disclosed discrepancy (not caused by this run):** the order asks to verify two inherited Owner archives at `.temp/` (`mingw.zip`, `rustup-init.exe`). `.temp/` contains **no** top-level files (`temp_top = 0`), so neither archive is present there. The four inherited research files in `.temp/solo-wo-073-wip/` are present and unmodified at **4 files / 46,062 bytes** (`Cargo.lock.prepared`, `Cargo.toml.prepared`, `media_worker_host_native.rs`, `NOTES.md`). I did not create, delete, overwrite or stage any of it.
 
-* the unchanged workflow `.github/workflows/rust-verify.yml` (blob `eb78dad2…`) declares `workflow_dispatch:` at line 42, so a branch-ref dispatch is possible without modifying it;
-* the authenticated GitHub identity `provelopment` holds the `workflow` scope, so `gh workflow run` against `--ref solo-wo-075-r01` is available — the STOP condition "authenticated manual dispatch at the branch SHA is unavailable" does not apply.
-
-## 2. Issuance — `S075-02` PASS
+## 2. Issuance — `S076-02` PASS
 
 | Item | Value |
 | --- | --- |
-| Issuance commit | `b608ad67d0c9d7bf276bbabe7c989e2b029190eb` |
-| Tree | `18a8a5e53b32ef4784bac6ddd42bf864b1b986db` |
-| Parent | `acc05c1dc1c579a676c36353cc00446a59ce65e3` |
-| ACTIVE blob | `6806a9002a7ce825f029da26868266c43294ec18` |
-| Changed paths | `.documents/WIP/workorder-active.md` only (one path) |
-| Push | fast-forward to `origin/main`; `origin/main == b608ad67…` |
-| CI | `rust-verify` run **43194047228** — job `131100308061` (`ubuntu-24.04`) success, job `131100307620` (`windows-2025`) success |
+| Issuance commit | `5b085d4a0d9b259da80021adb4d8c133462d4616` |
+| Tree | `d30d7a5afb255010578e353d624b37adfcf83d1b` |
+| Parent | `d76f24b886208be415a6376455c3367bd8f848e7` |
+| ACTIVE blob | `9ba2a7937396a3032a393a31500909c2e8158586` |
+| Changed paths | `.documents/WIP/workorder-active.md` only |
+| Push | fast-forward; `origin/main == 5b085d4a…` |
+| CI | `rust-verify` run **43197813264** — `131113175631` (`ubuntu-24.04`) success, `131113176051` (`windows-2025`) success |
 
-## 3. Why no branch code exists — the blocker, stated exactly
+## 3. Technical branch and its exact ledgers
 
-The technical branch `solo-wo-075-r01` **was** created from the issuance commit in the same checkout (verified absent locally and remotely immediately beforehand), and it was removed again after zero commits, because none of the code it was meant to carry could be brought to a reviewable state:
+One branch only, created in the sole checkout from the issuance commit after verifying it existed neither locally nor remotely: **`solo-wo-076-r01`**, preserved at its final SHA `8e1d5645835e50850d575de1c22d463c1efe7980` (local == `origin/solo-wo-076-r01`). No merge, cherry-pick, PR, rebase, force-push or history rewrite occurred.
 
-* `branch_tip = b608ad67d0c9d7bf276bbabe7c989e2b029190eb`, `commits_ahead = 0`, clean worktree at deletion;
-* deletion restored the topology to exactly `main:b608ad67…` plus the three historical branches, and `refs/heads/solo-wo-075-r01` no longer exists;
-* nothing was pushed for that branch, so no remote ref was ever created and no reviewer can be misled about a code branch that does not carry code.
-
-The scope this order requires is a new Linux supervisor: `crates/solo-adapters/src/media_worker_host_native.rs` (new session/process group, `setrlimit` installation inside `pre_exec`, group signalling, limit readback — all `unsafe`, all `#[cfg(target_os = "linux")]`), a typed safe façade with the thirteen refusal categories, six internal CLI probe modes with a self-check-before-workload negative control, two new test files carrying the ten-case `H075` matrix, plus the manifest, the lock edge, four checker/graph updates and the two-allowance guard change. That is roughly 900 lines across ten files, and **every** `H075` case must run as real executable evidence on `ubuntu-24.04`.
-
-This workstation cannot compile or execute **any** of it: there is still no MSVC linker or Visual Studio Build Tools and no Linux target, so even `solo-adapters` fails at `serde`'s build script. Each syntax or type error in that surface is discoverable only through a full two-host CI cycle (observed at roughly five minutes per cycle, twice over). Within this run only the governed preparation and the issuance gate could be completed, so the honest position is that the implementation is **unstarted and unverified**, not partially proven.
-
-I deliberately did **not** push a partially written supervisor to the branch to show activity. Unreviewed `unsafe` FFI that has never compiled is precisely the artifact the order's history strategy exists to keep away from `main` and out of the Architect's review queue; publishing it as a draft would invite review of code with no verified behaviour and no executed `H075` evidence, and this report would still have had to call it unverified. The STOP rule "a mandatory Linux test is absent or unverified" is met, so this report is `UNVERIFIED` and the branch carries no claim.
-
-## 4. Proof matrix — not executed
-
-No `H075` case ran, because no code existed to run. Nothing is inferred from the platform, from the workflow's capability, or from the previous order's guard proofs.
-
-| ID | Required evidence | Result |
+| Revision | Tree | Paths |
 | --- | --- | --- |
-| `H075-01` | Linux readback of 512 MiB/10 s limits, new session, normal exit, bounded evidence; Windows refusal with no child | **NOT RUN** |
-| `H075-02` | 128 MiB touch-allocation failing under a 64 MiB `RLIMIT_AS`, with proof the child started under the cap | **NOT RUN** |
-| `H075-03` | 20 s busy loop stopped by a 2 s CPU cap with typed CPU accounting | **NOT RUN** |
-| `H075-04` | 20 s sleep terminated by a 2,000 ms wall deadline with zero survivors | **NOT RUN** |
-| `H075-05` | Real descendant killed and reaped with the group; escape and aggregate-memory gaps disclosed | **NOT RUN** |
-| `H075-06` | Two concurrent limited invocations refused under their own controls | **NOT RUN** |
-| `H075-07` | Direct unsupervised stress command refusing before workload on both hosts | **NOT RUN** |
-| `H075-08` | Untrusted executor, injection, oversize/odd evidence, abnormal exit, I/O, wall and cleanup faults each typed | **NOT RUN** |
-| `H075-09` | Existing CLI/`media_worker`/source-read/AST/boundary/graph/self-test regressions | **NOT RUN for this order** — the code is unchanged; the issuance run exercised `main` as a whole |
-| `H075-10` | `fmt`, strict Clippy, `test --workspace --all-targets --locked`, release build, `cargo-deny`, exact-head readback on both hosts | **NOT RUN for any branch SHA** |
+| `f1bd7ccd72d144e4e9c403f1813c5e83605f7168` | `b0581cfc2146c2489172a7dacedda5e32d2ecf82` | the seven authorized paths |
+| `8e1d5645835e50850d575de1c22d463c1efe7980` | `363f0f99b6666e18c1961992646959b59fcb39da` | `media_worker_host_native.rs`, `unsafe_boundary.rs` (correction) |
 
-There is therefore **no** Linux resource-limit evidence, no signal/exit observation, no survivor measurement and no wall/CPU accounting to report. In particular, the 512 MiB / 10 CPU-second / 15,000 ms figures in the order remain **unimplemented**, and nothing here should be read as showing that any child was ever launched under a limit.
+Branch changed-path ledger — exactly the seven authorized paths, nothing else:
 
-## 5. Gates
+1. `Cargo.lock` — one added line `"libc",` inside the `solo-adapters` dependency list.
+2. `crates/solo-adapters/Cargo.toml` — one added line under the existing `[target.'cfg(target_os = "linux")'.dependencies]` group: `libc = { version = "=0.2.191", default-features = false }`.
+3. `crates/solo-adapters/src/lib.rs` — the `#[cfg(target_os = "linux")]` and `#[cfg_attr(target_os = "linux", allow(unsafe_code))]` declaration of `mod media_worker_host_native;`, with its documentation.
+4. `crates/solo-adapters/src/media_worker_host_native.rs` — new; the seam and its three unit tests.
+5. `crates/solo-cli/tests/unsafe_boundary.rs` — the two-allowance rules and the present-file real-tree test.
+6. `crates/solo-cli/tests/architecture_checks/graph.rs` — `libc` added to the approved adapter normal roots.
+7. `crates/solo-cli/tests/workspace_graph.rs` — the legal fixture edge and the renamed exact-root test.
+
+Nothing in `architecture_checks/source.rs`, `check_architecture_fixtures.rs`, the Charter, `source_read_native.rs`, `deny.toml`, the toolchain, the workflow or any plan file was touched.
+
+**Cargo graph delta.** Exactly one new direct edge, `solo-adapters → libc`, Linux-only; `libc 0.2.191` was already a locked node, so **no** package, version, source or checksum changed and no duplicate `libc` or `windows-sys` appeared. Still four workspace crates, one `windows-sys 0.61.2`, one `libc 0.2.191`, with `rustix`, `serde`, `serde_json` and the Windows features unchanged. Local `cargo metadata --locked` exited 0.
+
+**Native `unsafe` inventory.** Exactly **two** `unsafe` blocks, both inside the positively gated `#[cfg(target_os = "linux")] mod linux`, each with an adjacent `// SAFETY:` note: the `libc::getrlimit` call and the `MaybeUninit::assume_init` that follows the zero-status check. One FFI function in total (`getrlimit`), two compile-time-fixed selectors (`libc::RLIMIT_AS`, `libc::RLIMIT_CPU`), one raw C type (`libc::rlimit`). No `setrlimit`, `setsid`, `kill`, `prctl`, `fork`, `Command`, child process, handle, path or output channel. The crate keeps `#![deny(unsafe_code)]`; there are now exactly two module-scoped allowances — the untouched `#[cfg_attr(windows, allow(unsafe_code))]` on `source_read_native.rs` and the new Linux one on the seam — and `source_read_native.rs` is byte-identical.
+
+## 4. Branch CI — two runs, both disclosed
+
+**Run `43199345760` at `f1bd7ccd` (first iteration, failed).** Two genuine defects in my own new code, both inside the allowed paths:
+
+* `ubuntu-24.04` job `131118372707`, step 16 *Strict lint (warnings are errors)*: `error: casting to the same type is unnecessary ('u64' -> 'u64')` at `crates/solo-adapters/src/media_worker_host_native.rs:135` — `raw.rlim_cur as u64`, where `rlim_t` is already `u64`.
+* `windows-2025` job `131118372036`, step 17 *Test (workspace, all targets, locked)*: `the_guard_refuses_an_allowance_that_is_not_the_single_approved_one` and `no_first_party_file_outside_the_native_module_uses_unsafe` failed at `unsafe_boundary.rs:667` and `:361`. Cause: the allowance gate was matched against the comment-and-string-stripped view, which erases the `"linux"` literal, so the approved Linux form looked ungated.
+
+Both were corrected in `8e1d5645`: the cast is gone (the fields pass through unchanged, and the SAFETY note now says `rlim_t` is `u64` on Linux), and `has_ungated_allowance` removes the two exact approved attribute texts from the **raw** source first and then checks only the residual code, so a comment or string mention still never counts and every unapproved, combined, negated or crate-wide form is still refused.
+
+**Run `43200373681` at `8e1d5645` (final, failed at the real-tree architecture gate).**
+
+| Host | Job | Reached | Result |
+| --- | --- | --- | --- |
+| `ubuntu-24.04` | `131121910857` | step 18 *Architecture checker on the real checkout (Linux)* | **fail** — `##[error]approved edge count changed: edges=41` |
+| `windows-2025` | `131121911134` | step 19 *Architecture checker on the real checkout (Windows)* | **fail** — the same pinned count |
+
+Everything before those steps passed on both hosts: exact-version assertions, the workspace package-set gate, `cargo fmt --check`, strict Clippy with `-D warnings`, and `cargo test --workspace --all-targets --locked` including every pre-existing suite and guard test. Steps after them (release build, CLI smoke, both tripwires, the forbidden-import refusal and the byte-for-byte reproduction) were therefore **skipped**, so `S076-07` is not met.
+
+## 5. The blocker, stated exactly
+
+The checker's own real-tree output is `architecture=legal packages=4 targets=32 files=58 edges=41` — the architecture check **accepted** the new file, the new edge and the two-allowance arrangement. The failure is the workflow's separate assertion that the approved edge count is exactly forty:
+
+* `.github/workflows/rust-verify.yml:660` — `grep -q 'edges=40' "$RUNNER_TEMP/arch-real.txt" || { echo "::error::approved edge count changed: …"; exit 1; }`
+* `.github/workflows/rust-verify.yml:672` — the PowerShell twin, `if ($text -notmatch 'edges=40') { … }`
+
+The mandated Linux-only `libc` edge raises that count to 41 by construction. Clearing it needs either the workflow's pinned number (forbidden: "no changes to … workflow") or a change to the checker's fixture semantics (forbidden: "do not weaken or edit it in this order"), and both lie outside the seven authorized paths. That is the order's own STOP condition — an error in scope that would require another path — so I stopped instead of editing an unauthorized file to manufacture a green run. **No workflow, checker, fixture, manifest or policy was modified to make the count pass.**
+
+## 6. `N076` evidence — the readback is real
+
+The three native unit tests are ordinary in-file `#[cfg(test)]` tests, so they ran as part of the unchanged `cargo test --workspace --all-targets --locked` on `ubuntu-24.04`. Verbatim from the `131121910857` log:
+
+```
+test media_worker_host_native::linux::tests::n076_01_getrlimit_rlimit_as_and_rlimit_cpu_observe_the_real_kernel ... ok
+test media_worker_host_native::linux::tests::n076_02_ceilings_keep_their_full_range_and_repeat_consistently ... ok
+test media_worker_host_native::linux::tests::n076_03_a_rejected_status_is_a_typed_refusal_not_a_partial_observation ... ok
+```
+
+* **`N076-01`** — both `getrlimit(RLIMIT_AS, …)` and `getrlimit(RLIMIT_CPU, …)` returned successful typed observations on the real kernel, the selectors are named in the test, and no struct or mock was substituted. The test also asserts `soft <= hard` for both, which the kernel guarantees.
+* **`N076-02`** — soft and hard are reported as separate fields, `RLIM_INFINITY` survives as `u64::MAX` with no truncation or false finite inference, a distinct pair stays distinct, and two consecutive observations compare equal. No fixed CI-host limit value is asserted, and no process limit is changed.
+* **`N076-03`** — a **source-path proof**, not an injected syscall failure: `ceiling_status_ok` is proved to accept only `0`, and the two selectors keep distinct closed refusals. A rejected call returns before `assume_init`, so a partly initialised observation cannot become a success. No privilege was used and no fault injected.
+* **`N076-04`** — on `windows-2025` the module is not compiled at all (the crate root declares it only for `target_os = "linux"`), no `n076_*` test appears in that job, all unchanged suites and guard tests passed, and no Windows kernel readback or containment is claimed.
+
+**Not claimed:** this observes a process's own ceilings. It proves **no enforcement** — nothing about a future child starting under 512 MiB or 10 CPU seconds, no watchdog, no process group, no descendants, no Windows Job Object, no filesystem/network/syscall isolation, no decoder, no media correctness and no publication. `MEDIA_WORKER_GRANTS_PUBLICATION_AUTHORITY_V1` and `MEDIA_WORKER_PROVES_MEDIA_CORRECTNESS_V1` remain `false`.
+
+## 7. Gates
 
 | Gate | Status |
 | --- | --- |
-| `S075-01` preflight | **PASS** — §1 |
-| `S075-02` ACTIVE-only issuance, readback, both-host CI | **PASS** — §2 |
-| `S075-03` branch with Linux-only bounded native module, façade, internal CLI, Windows fail-closed | **NOT MET** — branch created and removed with zero commits |
-| `S075-04` authorized paths only, `solo-adapters → libc` Linux root only | **NOT MET** — no manifest, lock or graph change was made |
-| `S075-05` Windows exception unchanged, two exact allowances, per-block `SAFETY` | **NOT MET** — no native file exists; the WO-074 state is untouched |
-| `S075-06` `H075-01`–`H075-08` executed | **NOT MET** — §4 |
-| `S075-07` two-host regressions at an exact code-branch SHA | **NOT MET** — no code-branch SHA exists |
-| `S075-08` one clean verified technical branch, no merge | **NOT MET** — no branch ref survives; that `main` contains no branch code is the only part achieved |
-| `S075-09` report-only main commit, verified readback, main CI green | **PASS for the report commit** — see §6 and the chat handoff |
-| `S075-10` accurate scoped outcome, no self-acceptance | **PASS** — `UNVERIFIED`, Stage 03 open, no next order begun |
+| `S076-01` preflight | **PASS** — §1, with the archive discrepancy disclosed |
+| `S076-02` issuance, readback, both-host CI | **PASS** — §2 |
+| `S076-03` one branch, seven-path bounded delta, FFI limited to gated `getrlimit` | **PASS** — §3 (no process launch, stress or Windows FFI) |
+| `S076-04` one new Linux direct `libc` edge, no new package/version, source-read protections intact | **PASS** — §3 |
+| `S076-05` two exact allowances, AST plus independent guard accept only those two | **PASS** — the real-tree checker reported `architecture=legal`, and both guard suites passed on both hosts after the `8e1d5645` correction |
+| `S076-06` `N076-01`–`N076-03` executed on Ubuntu, `N076-04` Windows compilation/regression | **PASS** — §6 |
+| `S076-07` both hosts pass **all** `rust-verify` steps at the exact branch SHA | **NOT MET** — the pinned `edges=40` assertion aborts both jobs at steps 18/19; later steps skipped |
+| `S076-08` branch preserved without merge, code-free clean `main`, historical refs preserved | **PASS** — §8 |
+| `S076-09` one report-only main commit, readback, both-host CI at report HEAD | **PASS for the report commit** — see §8 and the chat handoff |
+| `S076-10` accurate vocabulary, no containment/decoder claim, Stage 03 open, no self-acceptance | **PASS** — `BLOCKED` |
 
-## 6. Changed-path ledger and CI
+## 8. State, inventories and cleanup
 
-Only two paths changed on `main` in this order: `.documents/WIP/workorder-active.md` at issuance, and `.documents/Reports/execution-report.md` in this report-only commit. No other tracked path changed, and no file was created on any branch.
+**`main` is code-free and unchanged since issuance.** `HEAD == main == origin/main == 5b085d4a0d9b259da80021adb4d8c133462d4616` with tree `d30d7a5afb255010578e353d624b37adfcf83d1b` — the issuance commit itself — an empty `git status --porcelain`, and `crates/solo-adapters/src/media_worker_host_native.rs` absent. The only difference between `main` and the branch is the seven authorized paths. This report is the one report-only commit on top of it.
 
-| Revision | Run | `ubuntu-24.04` | `windows-2025` | Result |
-| --- | --- | --- | --- | --- |
-| issuance `b608ad67` | **43194047228** | `131100308061` success | `131100307620` success | green |
-| report HEAD | in the chat handoff | — | — | required green |
+**Branches.** `main`, `solo-wo-061-r01` `4371af21…`, `solo-wo-069-r01` `e6162cdf…`, `solo-wo-070-r01` `d270f95c…` unchanged, plus the preserved proof branch `solo-wo-076-r01` `8e1d5645…` (local == remote, **not** deleted, **not** merged). Two mainline commits in this order, one path each: the ACTIVE issuance and this report.
 
-There is no branch-ref dispatch to report: the branch carried no commits, so dispatching `workflow_dispatch` at it would have re-tested the issuance tree and could not have evidenced any containment code. I did not run it, and I do not present it as a code-branch result.
+**Local gates actually executed on this workstation.** `cargo fmt --all -- --check` exit 0 (after `cargo fmt --all`), `cargo metadata --locked` exit 0, `git diff --check` exit 0. There is still no MSVC linker or Linux target here, so **no** local compile, test, lint or Clippy result is claimed; every build/test statement above comes from the two-host CI logs.
 
-## 7. State, inventories and cleanup
+**Security posture.** `deny.toml`, `rust-toolchain.toml` and the workflow are unmodified; `cargo-deny 0.20.2` passed on both hosts in the issuance run, while the final branch run's security step came **before** the failing architecture step and therefore did pass on both hosts in run `43200373681`. No dependency was installed, no target added, no provider, secret or setting touched, and no unauthorized file was written. The four WIP files are intact and `.temp/solo-wo-073-wip/` is unchanged at 4 files / 46,062 bytes, with its cleanup trigger unchanged (delete only when a superseding order completes the native scope). All task scratch (`.temp/r1.md`, `r2.md`, `r3.md`) was removed after the report was assembled.
 
-**Dependency and security posture — unchanged.** `Cargo.lock` is still `2f9e5357…`, the four-crate workspace and every approved root are untouched, `libc 0.2.191` remains a transitive node only, and `deny.toml`, `rust-toolchain.toml` and every workflow are unmodified. No dependency was installed, no target was added, and no network operation beyond ordinary Git/GitHub reads plus the issuance push occurred.
+**What the Architect must decide.** The seam is correct, minimal, positively gated, proven to compile on both hosts and proven to execute two real kernel readbacks on `ubuntu-24.04`. The one thing it cannot do is satisfy a hardcoded approved-edge count that only the Owner can authorize changing. The smallest sufficient decision is one of: (a) authorize a workflow edit raising the pinned `edges=40` to `41` (and its PowerShell twin) as a separate order, or (b) authorize the checker's own `workspace_graph`/`graph` fixtures to derive the count rather than pin it. Nothing else about this order is blocked, and the branch is intact for that follow-up.
 
-**`unsafe` inventory — zero change.** No `unsafe` block, `unsafe fn` or `SAFETY` note was added anywhere. The repository still has exactly one active allowance, the unchanged `#[cfg_attr(windows, allow(unsafe_code))]` on `source_read_native.rs`, and the WO-074 reserved-path guards are byte-identical (`df1f8758…`, `5c59a71b…`, `dd8bcfe2…`).
-
-**Scratch and cleanup.** `.temp/` holds no task-owned files after cleanup; the inherited `.temp/solo-wo-073-wip/` was re-measured independently and is unchanged at 4 files / 46,062 bytes, with the two Owner archives still present. That inherited scratch remains uncompiled research, not authority, and its cleanup trigger is unchanged: delete it only when a superseding order completes the native scope. Nothing was ever staged from `.temp/`.
-
-**Final state.** `HEAD == main == origin/main == b608ad67…`, empty `git status --porcelain`, one worktree, one remote, exactly four WIP files, and exactly the four branches `main`, `solo-wo-061-r01`, `solo-wo-069-r01`, `solo-wo-070-r01` at their original SHAs. `crates/solo-adapters/src/media_worker_host_native.rs` and `crates/solo-adapters/src/media_worker_host.rs` do not exist.
-
-**Not claimed:** any Linux containment, any resource-limit enforcement, any Windows Job Object behaviour, any sandbox or isolation property, any AVIF decode or media correctness, any publication, release or deployment, and any closure of `R03.C3`, `R03.C` or Stage 03. The Implementation Agent does not self-ACCEPT, has merged nothing, and has begun no other work order. The next step is the Architect's `ACCEPT / REVISE / STOP` against this report, and a re-issue that makes the Linux supervisor implementable in a run that can carry it end to end.
+The Implementation Agent does not self-ACCEPT, has merged nothing, and has begun no other work order.
