@@ -30,11 +30,17 @@
 //! **Unsafe isolation.** This crate denies `unsafe_code` rather than forbidding it, because
 //! one Windows-gated module must call the NT entry point directly. The single allowance below
 //! is scoped to that module and only on Windows; the architecture guard fails the build if any
-//! other file, module or attribute acquires an unsafe capability.
+//! other file, module or attribute acquires an unsafe capability. The `R03.C3` protocol module
+//! added by `SOLO-WO-072 R01` holds no allowance of its own: it parses supplied bytes only and
+//! starts no process, opens no file and holds no handle.
+//!
+//! The media-worker half strictly parses **already-supplied** worker metadata into an inert,
+//! untrusted claim. It performs no I/O, cannot execute anything, and authorizes nothing.
 
 #![deny(unsafe_code)]
 
 mod bootstrap_cli;
+mod media_worker_protocol;
 mod property_resolution;
 mod publication_manifest;
 mod source_body_preflight;
@@ -47,6 +53,9 @@ mod source_set_staging;
 pub use bootstrap_cli::{
     CliOutcome, CliRefusal, CliRefusalCode, EXIT_INTERNAL, EXIT_OK, EXIT_REFUSED, FLAG_BASE_URL,
     FLAG_ENTITY_ID, SUBCOMMAND, parse_request, run,
+};
+pub use media_worker_protocol::{
+    MediaWorkerProtocolRefusalKindV1, MediaWorkerProtocolRefusalV1, parse_media_worker_envelope_v1,
 };
 pub use property_resolution::{
     ManifestPropertyCandidateV1, ManifestPropertyRefusalKind, ManifestPropertyRefusalV1,

@@ -15,6 +15,7 @@
 mod bootstrap_preflight;
 mod graphic_asset_inventory;
 mod graphic_asset_read;
+mod media_worker;
 mod property_resolution;
 mod source_read;
 
@@ -32,6 +33,19 @@ pub use graphic_asset_read::{
     GraphicAssetReadPort, GraphicAssetReadRefusalKind, GraphicAssetReadRefusalV1,
     GraphicAssetReadSetOutcomeV1, GraphicAssetSourceEvidenceV1, GraphicAssetSourceSetV1,
     MAX_GRAPHIC_SOURCE_BYTES, read_graphic_asset_bytes_v1,
+};
+pub use media_worker::{
+    MEDIA_WORKER_GRANTS_PUBLICATION_AUTHORITY_V1, MEDIA_WORKER_MAX_DECODED_BYTES_V1,
+    MEDIA_WORKER_MAX_ENVELOPE_BYTES_V1, MEDIA_WORKER_MAX_SOURCE_BYTES_V1,
+    MEDIA_WORKER_PROTOCOL_VERSION_V1, MEDIA_WORKER_PROVES_MEDIA_CORRECTNESS_V1,
+    MEDIA_WORKER_REFERENCE_CPU_SECONDS_V1, MEDIA_WORKER_REFERENCE_MEMORY_BYTES_V1,
+    MEDIA_WORKER_REFERENCE_WALL_MS_V1, MediaWorkerBoundaryOutcomeV1, MediaWorkerCheckedEnvelopeV1,
+    MediaWorkerColorModelV1, MediaWorkerDigestV1, MediaWorkerEnvelopeV1, MediaWorkerExitV1,
+    MediaWorkerFormatV1, MediaWorkerLimitsV1, MediaWorkerMimeV1, MediaWorkerObservationV1,
+    MediaWorkerOrientationV1, MediaWorkerPlaneClaimV1, MediaWorkerPortV1, MediaWorkerRefusalKindV1,
+    MediaWorkerRefusalV1, MediaWorkerRequestV1, MediaWorkerRunV1, MediaWorkerStatusV1,
+    inspect_media_worker_source_set_v1, media_worker_output_sha256_v1,
+    sha256_media_worker_bytes_v1,
 };
 pub use property_resolution::{
     PROPERTY_CANDIDATE_GRANTS_PUBLICATION_AUTHORITY, PropertyResolutionCandidateV1,
