@@ -3,6 +3,10 @@ name = "solo-avif-r03-c3-proof"
 version = "0.0.0"
 edition = "2024"
 publish = false
+# Declared so the *unchanged* Solo licence policy (`[licenses] allow = [Apache-2.0,
+# MIT, Unlicense, Unicode-3.0]`, with `licenses.private.ignore = false`) can scan this
+# first-party, unpublished proof crate. It adds no dependency and relaxes nothing.
+license = "Apache-2.0"
 
 # Standalone, non-product proof crate. Its own workspace root keeps it out of the
 # four-crate product workspace, so it cannot alter the product lockfile, the

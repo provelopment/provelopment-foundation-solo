@@ -223,7 +223,7 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $checked = 0
           foreach ($f in Get-ChildItem -Path $env:PROBE_OUT -Filter '*.planes.bin') {
-            $base = $f.BaseName
+            $base = $f.Name -replace '\.planes\.bin$', ''
             $json = Join-Path $env:PROBE_OUT "$base.json"
             if (-not (Test-Path $json)) { throw "missing record for $base" }
             $declared = (Get-Content $json -Raw | ConvertFrom-Json).decoded_sha256
