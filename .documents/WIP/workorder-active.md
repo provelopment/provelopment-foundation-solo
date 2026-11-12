@@ -1,153 +1,114 @@
 # Foundation Solo — Active Work Order
 
-**OWNER-ISSUED — SOLO-WO-070 R01**  
-**Title:** R03.C3 AVIF recovery — prove hard OS-enforced decoder isolation on Linux and Windows (non-product)  
+**OWNER-ISSUED — SOLO-WO-071 R01**  
+**Title:** R03.C3 — adopt the verified out-of-process AVIF resource-containment architecture and fix the remaining product-adoption gates (architecture-only execution)  
 **Repository:** `provelopment/provelopment-foundation-solo` — `https://github.com/provelopment/provelopment-foundation-solo`  
 **Sole Owner-local checkout:** `C:\Users\Sean\Documents\Provelopment\00.foundation-solo`  
-**Matching Owner→Implementation Agent handoff ID:** `SOLO-WO-070 R01`  
-**Execution authority:** Execute this issued order exactly after verifying this file and the matching Owner handoff. The Chief Architect has **permanent read-only GitHub access** and performs no repository writes. The Implementation Agent performs the authorized operations inside the sole verified Solo checkout. **This order does not approve a decoder, alter the accepted image contract, integrate product media code, close R03.C3, release or deploy anything.**
+**Matching Owner → Implementation Agent handoff ID:** `SOLO-WO-071 R01`  
+**Authority:** This is the complete Owner-issued operational instruction installed in the single `workorder-active.md` slot. The Implementation Agent carries out the precisely bounded documentation operations below. The Chief Architect has **permanent GitHub READ-ONLY access**; all authorized repository writes belong to the Implementation Agent alone. There is no product-code, dependency, provider, merge, release or deployment authorization in this order.
 
-## 1. Required result and exact starting revision
+## 1. Fixed result and acceptance boundary
 
-**Required outcome:** Extend the retained, independently verified AVIF qualification harness to prove—or accurately refute—whether untrusted AVIF decoding can be confined by **hard, measured operating-system controls** on both `ubuntu-24.04` and `windows-2025`. Implement a separately executable, per-image supervisor that enforces limits **before the decoder begins executing**, kills the entire contained workload on time/resource violations, returns no image after any abnormal termination, and refuses when containment cannot be established. Demonstrate actual memory, CPU, wall-clock and descendant-containment behavior with deliberate fault-injection probes, then rerun the existing AVIF positive and negative corpus inside those limits. Record a single evidence-backed verdict: **`OS-ISOLATION-PROVEN`**, **`BLOCKED`**, or **`UNVERIFIED`**. `OS-ISOLATION-PROVEN` is a result for the bounded experimental harness, **never** production decoder approval.
+Record **one selected AVIF resource-containment architecture** in the existing canonical Architecture Charter §6A.8, using the independently accepted `SOLO-WO-070 R01` two-host proof. The selected approach is **a fresh, nonpersistent, OS-contained decoder process per input**, with validated limits installed and verified before its first decoder instruction, a finite parent wall deadline, descendant cleanup, and no promotion of unverified or partial outputs. The result of this order is an authoritative **design/engineering contract**, **not** an approved runtime decoder, an executable product feature, or a released security guarantee.
 
-**Starting remote `main` HEAD:** `4372c9e36e852cd28215aa2b53c2dcc8387b8e5b`  
-**Starting tree:** `b683f17fd999cc06db2d31a1df05e0a193711bd7`  
-**Current canonical report blob:** `a891ad95ea0c6f7958bbb1c5434fb8db8a3e9503` (`SOLO-WO-069 R01`, honestly `BLOCKED`).  
-**Current ACTIVE blob:** `7af728e7057ba8fc9101a5684f84273d8f92172a` (`SOLO-WO-069 R01`).  
-**Neutral NEXT:** `92fa562b1af0c54391851aa5c79deb1631127069`; **ROADMAP:** `9d7a86226878f490fd5e26c6813a81e5f73f3f37`; **OUTLOOK:** `cb9c7a610cf3c537557e060ca9656e44a053e69d`.  
-**Retained evidence branch:** `solo-wo-069-r01` = `e6162cdf733ea3136e96cbc139e46a6daf4054ee` (tree `8865f49c34e6f0b362144e4913264b95c96092e0`).  
-**Other preserved branch:** `solo-wo-061-r01` = `4371af21dce67f33cf1df0384738bf353ca80fc6`.  
-**Existing final `rust-verify`:** `43155025111`, both hosts green at `4372c9e3…`. **Existing qualification workflow:** `43154012989`, both hosts green at the retained proof branch head.
+The resource-control experiment is accepted as evidence **only at its measured scope**: `ubuntu-24.04` used hard/soft `RLIMIT_AS` and `RLIMIT_CPU` plus a process-group watchdog; `windows-2025` used a Job Object, suspended process creation, verified job assignment and limits before resume. The measured proof settings were 536,870,912 bytes address-space/commit, 10 CPU seconds, 15,000 ms wall time per decode. These become the **engineering reference profile to be validated in product implementation**; they are not already installed in Solo, nor a guarantee that every conforming AVIF can finish within them.
 
-Read `README.md`, `AGENTS.md`, both SOPs (especially Architect §§6A, 6B, 7A, 7B, 8; Implementation §§4, 5A–5C, 7A–7B), Architecture §§5A, 6.2I, 6A.8, all four WIP files, the exact WO-069 execution report, and the five files on `solo-wo-069-r01`. Treat the published source and CI evidence as the authority; do **not** rely on chat summaries.
+Keep all binding product requirements intact: exactly one Entity; strict inward-only Hexagonal Architecture; manifest-only publication authority; 20 MiB maximum image input; image dimensions 1–8,192 on each side; at most 32,000,000 decoded pixels; PNG, JPEG, WebP and AVIF all retained in the first-release set; fail-closed validation for all declared owners including internal, suppressed and unlisted references; no automatic graphic fallback; no publication from the mere presence of a file. `R03.C3`, `R03.C` and Stage 03 **stay OPEN**. **Do not select or add a production AVIF codec in this order.**
 
-**Preserve all accepted invariants.** PNG/JPEG/WebP/AVIF remain required; input ≤20 MiB, dimensions 1–8192, pixels ≤32,000,000; enforce safe format/byte validation, whole-candidate failure, no implicit platform artwork/role fallback, no publication from unlisted/internal/suppressed owners and no product unsafe exception. The experiment does not narrow the accepted format or bit-depth contract. The exact codec pins stay `oxideav-avif =0.0.11`, `oxideav-av1 =0.1.23`, `oxideav-core =0.1.43`; no alternate dependency, licence waiver, policy relaxation or cargo scanner substitution.
+## 2. Immutable starting anchors and required reading
 
-## 2. Exactly authorized file and Git operations
+Before any Git operation verify the actual one-checkout Solo root, one worktree and one `origin` remote pointing to this exact repository; the Owner-installed `ACTIVE` replacement is the only initial tracked difference.
 
-### A. `main` — exactly two paths
-
-1. `.documents/WIP/workorder-active.md`: the Owner installs this complete issued R01 file. Stage **only this file**, commit the byte-identical issuance to `main` and push normally to `origin/main`. Never edit its approved scope during the run.
-2. `.documents/Reports/execution-report.md`: overwrite **only at run end**, commit **only this report** to `main`, push, remotely read back the blob/tree/parent and require completed green existing `rust-verify` on both hosts at that exact HEAD. Do not embed the report's own future commit SHA within its contents.
-
-No other mainline path is writable. `plan-next.md`, `plan-roadmap.md`, `plan-outlook.md`, Architecture, About, SOPs, `Cargo.toml`, root `Cargo.lock`, `deny.toml`, `rust-toolchain.toml`, all production crates/tests and `.github/workflows/rust-verify.yml` remain byte-identical. WIP always contains **exactly four files**.
-
-### B. One technical branch — `solo-wo-070-r01`
-
-Create this new branch **from the verified WO-070 issuance commit on `main`** in the sole existing checkout. Check first that no same-named local or remote branch exists. Restore **only the five previously accepted test-harness paths** from the exact preserved `solo-wo-069-r01` commit using Git's per-path restore; this is not a second checkout, clone or a merge:
-
-```powershell
-git restore --source=e6162cdf733ea3136e96cbc139e46a6daf4054ee --staged --worktree -- `
-  verification/avif-r03-c3/Cargo.toml `
-  verification/avif-r03-c3/Cargo.lock `
-  verification/avif-r03-c3/src/lib.rs `
-  verification/avif-r03-c3/src/main.rs `
-  .github/workflows/avif-qualification.yml
-```
-
-Confirm all five staged blobs match their source commit before further changes. Commit these five paths together as a traceable import of the prior proof, then modify the existing workflow to trigger only `solo-wo-070-r01`. Preserve the original `solo-wo-069-r01` branch byte-for-byte.
-
-**Only these branch paths may be created or modified:**
-
-- `verification/avif-r03-c3/Cargo.toml`, `Cargo.lock`, `src/lib.rs`, `src/main.rs` — original standalone proof and bounded fault-injection additions;
-- `verification/avif-r03-c3/limit-linux.sh` — Linux containment launcher/test driver;
-- `verification/avif-r03-c3/limit-windows.ps1` — Windows containment launcher/test driver, including narrowly scoped test-only Windows Job Object native interop;
-- `.github/workflows/avif-qualification.yml` — exclusively the new branch trigger and two-host containment tests.
-
-No other file, workflow, fixture, root workspace, source or policy change. The standalone proof retains its own `[workspace]`, `publish = false`, exactly pinned three oxideav roots and `#![forbid(unsafe_code)]` for its Rust sources. No new third-party runtime root or new vendor source. Do not create a PR, merge, delete or move historical branches, tag/release/deploy, use `git reset`, `git clean`, stash, amend, rebase, force-push or create another checkout/worktree.
-
-Use only Solo's ignored `.temp/` and the active Cline task temporary workspace for generated case bytes, output planes, logs and scratch. Preserve existing Owner-owned archives and ordinary `target/`; remove only positively identified task-owned disposable files. Git operations are authorized solely within this repository on the two specified refs, with non-force pushes to `origin` and readback. External network access is limited to the exact existing Cargo acquisition, pinned toolchain and verified scanner/advisory refresh already used by the proof workflow. No provider/service account, elevated system configuration, general tool installation or unrelated repository operation is authorized.
-
-## 3. Mandatory preflight and issuance
-
-1. Verify actual root via `git rev-parse --show-toplevel`, `git status --porcelain --untracked-files=all`, `git worktree list`, `git remote -v`, `git branch -avv`, `git rev-parse HEAD`, `git rev-parse HEAD^{tree}`. Confirm one checkout/worktree, one remote `origin`, clean `main == origin/main` at the exact §1 SHA/tree except **only** the Owner-installed ACTIVE replacement, no sequencer/conflicts, exact WIP inventory and report. Check the installed `SOLO-WO-070 R01` and matching Owner handoff. STOP on unrelated material or unexplained drift; never discard data.
-2. Stage only ACTIVE; commit `Issue SOLO-WO-070 R01: bounded AVIF isolation proof`; push `origin/main`; verify exact remote parent/tree/blob and untouched other WIP/report paths. Wait for **completed successful** original `rust-verify` both `ubuntu-24.04` and `windows-2025` on the issuance SHA before beginning the branch.
-3. Create `solo-wo-070-r01`, restore and validate the five exact WO-069 proof blobs as §2B, and keep the old branches intact. The committed probe `Cargo.lock` and original 12 positive pixel digests are the reproducibility baseline. No product codec adoption.
-
-## 4. Fixed experimental resource contract
-
-Run **one decoder invocation per isolated child**. The following limits are **the enforced test thresholds of this order**, not a new product promise:
-
-| Limit | Normal isolated decode | Deliberate failure probe |
-| --- | --- | --- |
-| Source bytes | ≤20,971,520 bytes, checked before launch | 20,971,521 bytes: refuse before child |
-| Dimensions | each 1–8,192 and checked `width × height ≤32,000,000` before decoder | 8,193 side and >32M pixels: caller refusal |
-| OS memory / commit | **536,870,912 bytes (512 MiB)** hard child/job budget | **67,108,864 bytes (64 MiB)** hard budget while attempting to touch **134,217,728 bytes (128 MiB)** |
-| OS CPU time | **10 seconds** hard per decode | Busy CPU workload above **2 seconds** under a **2-second** CPU cap |
-| Elapsed wall time | **15 seconds** hard per decode | **20-second sleep** with a **2-second** wall cap |
-| Parallelism | one untrusted decode process per request | two injected simultaneous children must not escape a total job/group policy |
-
-A normal success has exit status 0, a complete decoded output and matching pre-existing pixel digest. A memory/CPU/wall-limit violation, inability to set/verify limits, abnormal exit or missing/partial output must produce **only an explicit typed refusal**; no success record, publishable output or retained partial plane file. The parent may create temporary output only in an inaccessible staging area; it atomically promotes results to the proof's final case output **after** verified normal completion. Do not equate measured RSS/working set with an enforced cap.
-
-### Linux implementation — set limits before execution
-
-Implement `limit-linux.sh` as an auditable `bash` containment launcher. Apply **hard and soft** kernel `RLIMIT_AS` and `RLIMIT_CPU` to the child before `exec`, use a new process group/session, retain the parent watchdog's finite wall timer and terminate/reap the whole contained process group on timeout. The essential resource-setting step must be equivalent to:
-
-```bash
-# These values are experimental caps, not derived from observed RSS.
-ulimit -Hv 524288     # 512 MiB address space in KiB
-ulimit -Sv 524288
-ulimit -Ht 10         # CPU seconds
-ulimit -St 10
-exec "$@"              # only the pinned, locally built proof binary
-```
-
-For the injected memory and CPU probes, apply their stricter values **before exec**. Confirm the actual hard limits inside the child (e.g. `/proc/self/limits`) and that a child cannot raise them. `RLIMIT_AS` is virtual-address-space enforcement, **not** an RSS measurement; report that difference. Do not treat `/proc/<pid>/status` peak observations as a cap. If this hosted Linux environment cannot enforce the limits or contain/reap the workload, record `BLOCKED` rather than falling back to a watchdog-only run.
-
-### Windows implementation — Job Object, suspended child and hard quotas
-
-Implement `limit-windows.ps1` with narrowly scoped in-script C# `Add-Type` P/Invoke for the **documented Windows Job Object API**. Use `CreateJobObjectW`, `SetInformationJobObject(JobObjectExtendedLimitInformation)`, `CreateProcessW` with `CREATE_SUSPENDED`, `AssignProcessToJobObject`, `ResumeThread`, `WaitForSingleObject`, `TerminateJobObject`, `QueryInformationJobObject`, `GetExitCodeProcess`, and handle closing with `CloseHandle`. The child must be in the limited Job Object **before its first decoder instruction runs**. Use:
-
-```csharp
-// Set on JOBOBJECT_EXTENDED_LIMIT_INFORMATION.BasicLimitInformation.LimitFlags.
-const uint JOB_OBJECT_LIMIT_PROCESS_TIME = 0x00000002;
-const uint JOB_OBJECT_LIMIT_PROCESS_MEMORY = 0x00000100;
-const uint JOB_OBJECT_LIMIT_JOB_MEMORY = 0x00000200;
-const uint JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x00002000;
-// PerProcessUserTimeLimit is in 100-ns units; 10 s = 100_000_000.
-// Set ProcessMemoryLimit AND JobMemoryLimit to 536_870_912 bytes.
-// Verify every native API return value before ResumeThread.
-```
-
-A 15-second parent deadline independently calls `TerminateJobObject`, waits for termination, and discards all partial outputs. Query and log the effective job limits, peak committed memory (`PeakJobMemoryUsed`/`PeakProcessMemoryUsed` where supported), CPU-time limit outcome and process exit/termination reason. Demonstrate deliberate memory, CPU and wall-time denials through actual Job Object enforcement; demonstrate the job's descendant-wide memory/kill boundary rather than only killing the initial PID. If nested Job Objects or runner policy block assignment, query or enforcement, report `BLOCKED` — no unsuspended `Start-Process`/`Get-Process` fallback, no administrator changes, no global host resource setting, no first-party Rust `unsafe` exception.
-
-**Both hosts:** Add three test-only child modes to the standalone proof executable (not to product code): `--stress-allocate-bytes 134217728` (touch every allocated page and emit a marker only on completed allocation), `--stress-spin-ms 20000` (use `std::hint::black_box` to prevent optimizing away CPU work), and `--stress-sleep-ms 20000`. These modes run **only** within the new supervisor. Force-verify that 512 MiB permits a harmless control invocation, the 64 MiB memory probe cannot succeed, 2-second CPU limit stops the busy loop, and the 2-second wall timer stops sleep. Also verify a child attempting to outlive its supervisor is terminated, with no surviving process, output marker, leaked handle or published partial result. Assert refusal type, OS enforcement evidence and cleanup, not merely a nonzero exit code.
-
-## 5. Exact qualification matrix and safety conditions
-
-1. Inside the normal 512 MiB / 10 CPU s / 15 wall s isolation on **both hosts**, rerun the same **12 published AVIF fixtures** and the **13 negative cases** from `solo-wo-069-r01`; require the same known real decoded-plane SHA-256 results for all 12 positives, no missing fixture, and fail-closed negatives. Recheck after inspection that the exact 20 MiB, 8192-side and 32M-pixel preconditions fire, with checked `u64` multiplication, before decoding. No metadata-only success, hidden fallback or acceptance after a guard violation.
-2. Implement and execute the normal-limit control plus memory-exhaustion, CPU-exhaustion and elapsed-time-exhaustion tests separately on Linux and Windows; prove **the limit was installed before the process ran**. Include a descendant-containment test, and prove zero retained partial public/result output after each forced failure. A successful codec decode does not cancel a later isolation failure.
-3. Verify actual child process CPU consumption and its termination/refusal reason; record Linux `RLIMIT_AS`/`RLIMIT_CPU` values, Windows Job Object flags/limits/peaks and source commands/APIs used. Record parent and child IDs only as non-sensitive ephemeral IDs. Do not hide Windows measurement gaps.
-4. Preserve known quality limits explicitly: all 12 positive fixtures are 8-bit stills; 10/12-bit, grid and AVIS remain **UNVERIFIED** unless independently reproduced with permissible test vectors. Record `kimono_rotate90` plane orientation separately from the declared 1024×722 geometry; do not claim that its correctness is proven by a digest match. No independent alpha/transform golden exists yet; do not award that check `PASS` without a genuine external expectation.
-5. Repeat exact standalone graph identity/checksum verification and pinned `cargo-deny 0.20.2` with **unchanged** `deny.toml` on both CI hosts. Record fresh advisory database date/commit, yanks, licence/provenance and the continuing `Unicode-3.0` notice obligation. Do not substitute `oxideav` versions, relax Cargo policy, accept suspicious origin claims or add native codec tools. Existing upstream descriptions conflict; an OS sandbox does not resolve provenance or full AVIF conformance.
-6. Run real refusal tests for container-unavailable, limit-setting failure, child-creation failure, worker crash/abort, timeout, over-memory, excessive CPU, invalid media, post-decode digest mismatch and partial-output cleanup. Each is a distinct fail-closed outcome. Test at the actual allowed boundaries rather than writing tests whose chosen input is rejected earlier for a different cause.
-
-**Do not run uncontrolled exhaustion, CPU loops or attacker-like inputs outside the verified OS containment.** Stress inputs must be generated by the trusted proof binary itself, with the supervisor already enforcing resource limits. No hidden fallback to unbounded `AvifDecoder::decode_file` in the same process as a persistent publisher or test coordinator.
-
-## 6. Branch CI and exact acceptance gates
-
-Change `.github/workflows/avif-qualification.yml` on `solo-wo-070-r01` to trigger pushes **only** to `solo-wo-070-r01`, with `permissions: contents: read`, SHA-pinned checkout, `persist-credentials: false`, the pinned Rust 1.99.1 toolchain, locked/offline product-independent probe build, the same verified candidate scanner and **two full host jobs** (`ubuntu-24.04`, `windows-2025`). Require successful pre-exec OS limit verification, normal-limit corpus, deliberate resource-failure probes and cleanup tests. Do not swallow a functional failure with `continue-on-error`, `|| true`, an optional skip or a passing summary after a failing command. Publish readable, privacy-safe JSONL case evidence and exact host/job/commit identities in Actions logs, with no raw untrusted payload, secrets or private absolute file paths.
-
-The proof may finish **`OS-ISOLATION-PROVEN`** only when *both hosts* demonstrate every mandatory resource-control and containment test, actual 12/12 pixel digest preservation and 13/13 refusal preservation, strict scanner pass and no unreviewed material security warning. A confirmed failure is **`BLOCKED`**, a genuinely unexecuted essential proof is **`UNVERIFIED`**. In every case, preserve `R03.C3`, `R03.C` and Stage 03 as **OPEN**. No codec or publication capability becomes approved, and no architecture contract changes in this order.
-
-**Acceptance ledger** (report each separately as `PASS`, `FAIL`, `UNVERIFIED` or justified `NOT APPLICABLE`):
-
-| Gate | Evidence required |
+| Anchor | Exact required value |
 | --- | --- |
-| `S070-01` | Verified sole checkout, exact baseline/ref/blobs, `OWNER-ISSUED` handoff; safe ACTIVE-only issuance and both-host original `rust-verify` green at issuance SHA. |
-| `S070-02` | One new proof branch; exact five-file proof import from `e6162cdf…`; only listed proof files changed; historical branches and product preserved. |
-| `S070-03` | Real pre-exec enforced memory, CPU and wall limits on Linux; actual limit readback and negative fault-injection proof. |
-| `S070-04` | Real pre-exec Job Object process/job memory, CPU and wall enforcement on Windows, including query evidence and negative fault-injection proof. |
-| `S070-05` | Descendant containment, process termination and zero promoted/retained partial output after failures on both hosts. |
-| `S070-06` | Normal isolated 12-positive/13-negative corpus on both hosts, exact repeat digests and guarded dimensions/input, no false claims about outstanding high-depth/alpha/rotation correctness. |
-| `S070-07` | Exact three-root locked graph; unchanged licence/security/unsafe posture, pinned verified `cargo-deny` on both hosts; provenance gaps and `Unicode-3.0` notice truthfully reported. |
-| `S070-08` | Completed two-host branch CI at exact final branch SHA with all mandatory steps actually executed; failing safety probes are not masked. |
-| `S070-09` | Single truthful `OS-ISOLATION-PROVEN` / `BLOCKED` / `UNVERIFIED` verdict; no decoder approval, product edit, licence waiver or R03.C3/stage closure. |
-| `S070-10` | Report-only final `main` commit, correct remote parent/tree/blob, green existing original `rust-verify` on both hosts, one clean checkout and preserved branches, safe scratch cleanup. |
+| Starting `main == origin/main` | `e3a223439e0127f720a6bf2885f9ac65aca3c217` |
+| Starting tree | `b27d54d95b31cb42c3c826838d24272604107be0` |
+| Current report blob | `05b220d7c4966d73d3237d87a71f4bfee6a32835` (`SOLO-WO-070 R01`, `OS-ISOLATION-PROVEN`) |
+| Prior ACTIVE blob | `0d3edb136c54c3a115cd3ec265fae73f2e597fd3` (`SOLO-WO-070 R01`) |
+| Architecture blob | `250bf62efd07037fe70022b5fc88a63610692245` |
+| NEXT blob | `92fa562b1af0c54391851aa5c79deb1631127069` (neutral) |
+| ROADMAP blob | `9d7a86226878f490fd5e26c6813a81e5f73f3f37` |
+| OUTLOOK blob | `cb9c7a610cf3c537557e060ca9656e44a053e69d` |
+| Retained `solo-wo-061-r01` branch | `4371af21dce67f33cf1df0384738bf353ca80fc6` |
+| Retained `solo-wo-069-r01` branch | `e6162cdf733ea3136e96cbc139e46a6daf4054ee` |
+| Retained `solo-wo-070-r01` branch | `d270f95cad10db11b67d2cbc68a5c593ecbbc7c8` |
+| WO-070 proof CI | `43162966403`, both platform jobs successful |
+| WO-070 final report CI | `43163844387`, both platform jobs successful |
 
-## 7. Final publication and handoff
+Read, in order: `README.md`; `AGENTS.md`; `.documents/About/FOUNDATION-SOLO.md` relevant product boundaries; `.documents/Architecture/ARCHITECTURE.md` §§5, 5A, 6.2C, 6.2G, 6.2I, 6A.8 and 6A.9; Architect SOP §§6A, 6B, 7–8; Implementation SOP §§4–5C and 7A; the four WIP files; the exact WO-070 execution report; and the two branch proof launchers at `solo-wo-070-r01` (`verification/avif-r03-c3/limit-linux.sh`, `limit-windows.ps1`) plus its workflow. **Read those branch files; do not copy, merge, cherry-pick or import them.**
 
-At final proof-branch HEAD, record branch SHA/tree, exact changed-path list, both CI run/job IDs, effective kernel/Job Object limits, all pass/fail/unsupported observations, decoded hashes, refusal outcomes and cleanup. Leave the proof branch pushed and intact for independent review. Return safely to clean `main`; overwrite only `.documents/Reports/execution-report.md`, with report date, authorized scope, initial/issuance/report-parent anchors, every acceptance-gate verdict, concrete commands and evidence URLs, OS limit implementation details, result matrix, source/provenance and security assessment, limitations, exact temporary ownership/cleanup and next smallest architectural action. No second report or archive. Commit only the report, push normally, remotely read back and require green `rust-verify` at the **exact final report HEAD** on both hosts. Give the new report SHA/tree/blob, branch SHA/tree and two-host CI run links in the Implementation Agent's chat handoff. Do not self-ACCEPT, close ROADMAP or start a further work order.
+## 3. Exact writable-path and operation ledger
 
-**STOP immediately and report safely** on wrong root/remote/ref/sha/handoff, dirty unknown material, branch-name collision, unauthorized path, failed issuance CI, unverified Windows Job Object assignment, unenforceable Linux limits, native API error, unexpected unsafe/system installation, suspicious dependency, unbounded stress execution, permission escalation, destructive cleanup, non-fast-forward push, security-policy change or inability to establish correct process containment. A genuine negative *candidate* outcome may still be reported as `BLOCKED` with truthful, complete evidence; never repair the verdict by weakening a limit or moving the approved threshold. The Owner alone authorizes any later product integration, release, deployment or architectural change. The Chief Architect's independent disposition is `ACCEPT / REVISE / STOP` against the published exact revision.
+**Only these three permanent paths may change, on `main` only:**
+
+1. `.documents/WIP/workorder-active.md` — Owner installs this complete R01 file; the agent stages and commits this one path **without editing it**, then pushes the one-path issuance commit to `origin/main`.
+2. `.documents/Architecture/ARCHITECTURE.md` — edit **only the `## 6A` / `### 6A.8` section**, immediately after its **Asset pipeline** paragraph and before **Single portable sealed artefact**, inserting the exact accepted boundary text supplied in §5 below. Make no other alteration to §6A.8 or any other architecture section. Commit and push this one file separately after the issuance CI succeeds.
+3. `.documents/Reports/execution-report.md` — overwrite **once** at run completion with the execution facts, actual checks and final evidence. Commit and push this **one file only**, separately from the architecture commit.
+
+**Every other tracked path is READ-ONLY.** In particular: no `plan-next.md`, `plan-roadmap.md`, `plan-outlook.md`, About, README, AGENTS, SOP, `.github/`, test, `verification/`, product source, `Cargo.toml`, `Cargo.lock`, `deny.toml`, Rust toolchain, license/NOTICE or fixture edits. WIP remains exactly four existing files, without new subfolders or report archives.
+
+No branch creation, PR, merge, tag, release, dependency install, unreviewed external executable, deployment, provider action, secret change, GitHub administration, extra checkout/worktree/nested clone/shadow tree or history rewriting. No Git `reset`, `clean`, stash, force-push, amend or rebase. No change to any preserved historical branch. Permitted networking is limited to the existing authenticated `origin` push, official GitHub CI/status readback, and the existing CI's pinned/verified toolchain and dependency acquisition; **no new package/network research** is required.
+
+The agent may use existing Solo `.temp/` or its provided task temporary workspace for disposable diff/validation output; remove only positively task-owned material and do not touch inherited archives or `target/`.
+
+## 4. Required execution sequence
+
+**4A — Preflight.** In the verified single checkout execute and record the actual outcomes of:
+
+```text
+git rev-parse --show-toplevel
+git rev-parse HEAD
+git rev-parse HEAD^{tree}
+git branch -avv
+git worktree list
+git remote -v
+git status --porcelain --untracked-files=all
+git diff --name-only
+```
+
+Verify the exact §2 SHA/tree, four WIP blobs, report, Architecture blob, branch inventory and correct sole origin. The installed ACTIVE must say `OWNER-ISSUED — SOLO-WO-071 R01` and the received handoff must name **that exact ID/edition**. Only ACTIVE may differ locally from the remote baseline. If anything else differs or is unaccounted for, **STOP** and preserve it. Do not use a second checkout or destructive cleanup.
+
+**4B — Issue the unchanged order.** On `main` stage **only** `.documents/WIP/workorder-active.md`, commit `Issue SOLO-WO-071 R01: AVIF isolation architecture`, and push normally to `origin/main`. Verify the remote parent is precisely the §2 starting commit, the new remote tree and ACTIVE blob, and byte-identity of every other file. Require completed **successful** `rust-verify` on **both `ubuntu-24.04` and `windows-2025`** at this exact issuance SHA. Red or unverifiable mandatory CI is a STOP: use the report-only closeout where safe, without Architecture changes.
+
+**4C — Apply the exact architecture contract.** Insert the Markdown in §5 as **one** contiguous block after the existing **Asset pipeline** paragraph in §6A.8 and before the existing **Single portable sealed artefact** paragraph. Preserve all existing charter statements, headings, examples and normative contract literals. No other documentation edits. Verify `git diff --name-only` shows only `.documents/Architecture/ARCHITECTURE.md` after issuance. Commit it separately as `architecture: bind isolated AVIF resource-control boundary (SOLO-WO-071)` and push normally. Verify exact remote diff/parent/tree and two-host successful `rust-verify` at this architecture SHA.
+
+**4D — Validate fidelity.** Inspect the rendered Markdown, surrounding §6A.8 text and all references. The new block must occur **once**, contain every fixed rule below, and preserve its own explicit `UNVERIFIED` and future-work obligations. Verify before/after full-text differences are limited to the one insertion. No product build/test on this work order is claimed as evidence of implemented media: existing CI is a *no-regression/document integrity* gate only. Mark new decoder, worker runtime, codec conformance, release and browser checks `NOT APPLICABLE` to this documentation-only scope, not `PASS`.
+
+**4E — Publish the canonical report.** Return to a clean `main`; overwrite only `.documents/Reports/execution-report.md`. Record starting SHA/tree/blobs; installed order ID and handoff; issuance/architecture commits and CI run/job IDs; exact one-block Architecture diff and checks; retained branches and four-WIP inventory; `PASS/FAIL/UNVERIFIED/NOT APPLICABLE` for every §6 acceptance gate; preserved code/lock/policy; real cleanup; explicit next action. State that accepted architecture is **documentary**, with no released decoder, media validation, provider compatibility or security proof beyond WO-070's harness. The report must **not embed its own future final commit SHA**. Stage/commit **only this report**, push and verify remote blob/tree/parent. Require completed successful `rust-verify` **both hosts** at the exact final report HEAD. Include the final report SHA/tree/blob and CI run links in the agent chat handoff.
+
+## 5. Exact Architecture Charter text to insert
+
+Insert the following Markdown verbatim, including its heading. Its normative wording constitutes the adopted resource-containment architectural decision. Keep it in the existing §6A.8; do not open a new architecture file, ADR, register, policy or WIP item.
+
+---
+
+**AVIF out-of-process resource boundary — accepted engineering design (`SOLO-WO-071 R01`; not an implemented adapter).** The R03.C3 AVIF media verifier shall run each untrusted image decoding attempt in a **new, bounded, single-use child process**, with the parent retaining exclusive publication authority. The verified `SOLO-WO-070 R01` experimental Linux and Windows harness establishes that OS-level resource controls can be installed before child execution and can deny deliberate memory, CPU, wall-time and descendant escapes on the tested hosts. This result selects **out-of-process resource containment** as the AVIF engineering direction; it neither selects `oxideav-*` as a production dependency nor certifies complete AVIF conformance, host portability, network/filesystem sandboxing or released functionality. In-library allocation controls remain welcome but are not assumed to exist.
+
+1. **Trusted parent, untrusted bytes.** The parent receives only bytes already obtained through the authorized confined-source and manifest-declaration pipeline. It checks the 20 MiB source byte maximum **before launching a worker**. Any parsing of untrusted AVIF media headers, including `inspect`/`ftyp`/`av1C`, occurs **inside the already-contained worker**, never in an unbounded parent process. Inside the worker, apply checked integer conversion and multiplication, refuse either dimension outside 1–8,192 or product above 32,000,000, and only then attempt full decoding. File name, extension, magic, metadata or a partial plane never alone suffice. MIME/magic and complete media consistency remain whole-candidate publication gates.
+2. **Limits before execution.** Each worker uses the reference engineering profile of **536,870,912 bytes** for child OS address-space/commit, **10 CPU seconds**, and a **15,000 ms parent-observed wall deadline**. On Linux, install and read back hard/soft `RLIMIT_AS` and `RLIMIT_CPU` before `exec` in a fresh process session, then terminate/reap the entire process group on every terminal path. On Windows, create a Job Object with `JOB_OBJECT_LIMIT_PROCESS_TIME`, `JOB_OBJECT_LIMIT_PROCESS_MEMORY`, `JOB_OBJECT_LIMIT_JOB_MEMORY` and `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`; create the worker **suspended**, assign it to the job, query the effective limits, verify membership, and only then resume. Any inability to install, verify, enforce or clean up limits **refuses the image**: no unsupervised fallback. The reference values require product-host validation; they do not relax the accepted image source/dimension/pixel ceilings.
+3. **What the limits actually mean.** Linux `RLIMIT_AS` bounds a process's **virtual address space**, not its RSS or aggregate descendants' memory. Windows Job Object memory controls bound **committed** process/job memory, not physical RSS. Windows per-process CPU accounting is periodically enforced: the WO-070 2-second test accrued **5.203 CPU seconds**, so neither 2 seconds nor the 10-second normal CPU setting is an exact hard real-time deadline. The independent wall watchdog is the outer elapsed-time guard, with actual kill/reap completion checked; scheduling overhead must be measured and disclosed. A general Linux multi-process aggregate memory/pid cap, host concurrency cap, denial of service and global resource accounting **are not proven** by `RLIMIT_AS` plus a process group and must be addressed before claiming a production bound for process trees or concurrent images.
+4. **Isolation is not a general security sandbox.** `RLIMIT_*`, process groups and Windows Job Objects limit resources and lifecycle; **they do not prohibit arbitrary filesystem, network, credential or system-call access**. A later code-bearing order must prove the worker runs with minimal rights, no secrets, no direct public-output path, no untrusted command/script resolution, no unexpected network capability and no uncontrolled child creation. It must verify executable and helper identity, immutable inputs, platform availability, least privilege, secure temp-directory ownership, symlink/reparse and TOCTOU resistance, handle inheritance/closure, command-line quoting, process-tree accounting and worker protocol validation on real Linux/Windows hosts. An unavailable enforcement primitive produces refusal, never a degraded decoder.
+5. **Typed worker protocol, no publication by decoding.** The application defines an inward-owned media-verification port and a typed output/refusal contract. The outer adapter owns OS process mechanics and never puts native OS handles, transport or provider code in `solo-domain` or `solo-application`. The parent passes one content-identified input and bounded worker configuration; the worker emits a length-bounded, versioned result with verified dimensions, bit depth, color/alpha/transform facts, complete plane/output hashes and a typed failure. Treat the worker's result as untrusted: validate every count, byte length, claimed digest and output provenance in the parent. Stage all outputs outside any public address; promote only complete, re-read and independently digested outputs after **normal exit, verified limits, finite deadlines, successful validation and whole-candidate authority**. Crash, timeout, limit trip, malformed input, missing output, mismatched digest, worker/protocol error or cleanup failure yields one refusal and no discoverable or partial output. Never allow an image worker to publish its own result or imply Page/Entity/route authority.
+6. **Quality and implementation gates remain open.** WO-069 and WO-070 proved the exact **twelve 8-bit still-image fixture plane digests** and thirteen refusals on both hosts, not overall pixel correctness. **10/12-bit AVIF, grids, AVIS sequences, independent alpha and rotation goldens, upstream provenance inconsistencies and complete decode/format behavior are UNVERIFIED**. The rotated fixture's raw planes were transposed relative to reported geometry; reproduction of its hash does not establish correct orientation. The currently tested `oxideav-avif =0.0.11`, `oxideav-av1 =0.1.23`, `oxideav-core =0.1.43` are **research pins only**. Product adoption must receive a separate Owner-issued code order and A1 evidence on exact dependency/security/licence/notice versions, decoder quality, two-host process-boundary escape/refusal tests, actual confined-source composition, deployment-mode capabilities and whole-publication fail-closed behavior. No additional first-party `unsafe` is approved: preserve the sole existing Windows native exception in `source_read_native.rs` until a separately accepted architecture decision changes it. This architectural direction does not authorize source changes, a codec, Stage 03 closure, release or deployment.
+
+---
+
+## 6. Independent acceptance gates for this exact order
+
+| ID | Required evidence |
+| --- | --- |
+| `S071-01` | Exact baseline commit/tree/report/Architecture/WIP blobs and branch inventory; one verified checkout/worktree/origin; matching `OWNER-ISSUED — SOLO-WO-071 R01` handoff and only installed ACTIVE differing. |
+| `S071-02` | One-path ACTIVE issuance; exact remote parent/tree/blob; pre-existing Linux and Windows `rust-verify` successful on issuance SHA. |
+| `S071-03` | Single contiguous insertion into §6A.8 between the existing **Asset pipeline** and **Single portable sealed artefact** paragraphs, with verbatim §5 text and no other Architecture diff. |
+| `S071-04` | Explicit distinctions preserved: input check outside child but **all AVIF header parsing inside contained child**; 20 MiB / 1–8192 / 32 M pixels and original PNG/JPEG/WebP/AVIF set untouched. |
+| `S071-05` | Linux and Windows pre-execution mechanisms; reference resource values; Windows periodic CPU overrun, Linux per-process virtual address space and unproven global/descendant bounds disclosed. |
+| `S071-06` | Document states OS resource containment **is not syscall/network/filesystem isolation**; secure worker identity, privileges, protocol, staging, symlink/race and whole-publication proof are future non-negotiable product gates. |
+| `S071-07` | `oxideav` research pins not adopted; high-bit-depth/grid/sequence/alpha/rotation/provenance gaps stay `UNVERIFIED`; first-party `unsafe`, source/lock/policy, ROADMAP/NEXT, branches and product remain unchanged. |
+| `S071-08` | Architecture-only commit one file, exact remote readback, `rust-verify` successfully completed on both hosts at architecture SHA. |
+| `S071-09` | One report-only final commit and exact remote readback; `rust-verify` green on both hosts at report HEAD; clean main and safe scratch cleanup; no hidden stage closure or release claims. |
+
+## 7. Strict STOP and reporting rules
+
+STOP without Architecture edits on any mismatch of baseline SHA/tree/blob, root, worktree count, remote, branch, installed Owner order/handoff, unexplained dirty/unknown material, historical-branch drift, non-fast-forward push, failed issuance CI or unverified GitHub readback. Once issued, STOP and publish a factual report safely if the exact one-block insertion would conflict with an accepted architectural invariant, if a prohibited path changes, if mandatory two-host CI is red or unverifiable, or if reporting/cleanup cannot be performed safely. Preserve unknown and Owner-owned data; do not use destructive Git mechanics or weaken a check to reach green.
+
+The Implementation Agent **does not** self-ACCEPT the architecture update or issue the next order. The Chief Architect independently returns `ACCEPT / REVISE / STOP` on the **published exact revision**. This order closes **only its documentary task** on successful evidence; R03.C3/R03.C/Stage 03 stay open for a separately issued code-bearing implementation and decoder-conformance qualification.
