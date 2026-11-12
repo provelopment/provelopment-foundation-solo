@@ -267,3 +267,14 @@ mod linux {
         }
     }
 }
+
+// The three fixed entry points the safe façade consumes.
+//
+// The implementation lives inside the positively Linux-gated `linux` module above, which keeps
+// every `unsafe` occurrence inside a provable gate; these re-exports only make the same three
+// fixed functions nameable from the rest of the crate. There is no general-purpose native API, no
+// caller-selected limit, no executable parameter and no Windows counterpart here.
+#[cfg(target_os = "linux")]
+pub(crate) use linux::{
+    install_linux_child_limits_v1, own_process_group_v1, read_limit_ceilings_v1,
+};

@@ -407,7 +407,6 @@ fn refusal_report(refusal: SmokeRefusalV1) -> InternalProbeReportV1 {
 mod linux {
     use std::io::Read;
     use std::process::{Command, Stdio};
-    use std::thread::{self, JoinHandle};
     use std::time::{Duration, Instant};
 
     use super::{
@@ -462,11 +461,11 @@ mod linux {
         let out_reader = child
             .stdout
             .take()
-            .map(|stream| thread::spawn(move || read_bounded(stream, MAX_CHILD_STDOUT_BYTES)));
+            .map(|stream| std::thread::spawn(move || read_bounded(stream, MAX_CHILD_STDOUT_BYTES)));
         let err_reader = child
             .stderr
             .take()
-            .map(|stream| thread::spawn(move || read_bounded(stream, MAX_CHILD_STDERR_BYTES)));
+            .map(|stream| std::thread::spawn(move || read_bounded(stream, MAX_CHILD_STDERR_BYTES)));
 
         let deadline = Duration::from_millis(SMOKE_WALL_DEADLINE_MS);
         let status = loop {
@@ -488,7 +487,7 @@ mod linux {
                     Err(_) => Err(SmokeRefusalV1::HostReapFailed),
                 };
             }
-            thread::sleep(POLL_INTERVAL);
+            std::thread::sleep(POLL_INTERVAL);
         };
         let wall_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
 
@@ -555,7 +554,7 @@ mod linux {
     }
 
     /// Joins one capped reader. A panicked or failed reader is a refusal, never empty success.
-    fn join_reader(handle: Option<JoinHandle<BoundedRead>>) -> Option<BoundedRead> {
+    fn join_reader(handle: Option<std::thread::JoinHandle<BoundedRead>>) -> Option<BoundedRead> {
         handle.map(|handle| handle.join().unwrap_or(Err(())))
     }
 }
