@@ -10,7 +10,7 @@
 //! id equal to its own pid, and only then can it print anything usable. On `windows-2025` the same
 //! two internal modes are refused before any child exists and the public CLI is unchanged.
 
-use std::io::{Read, Write};
+use std::io::Read;
 use std::process::{Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -119,6 +119,8 @@ fn evidence_fields(line: &str) -> Vec<(String, String)> {
 /// weakening any assertion. Only the already bounded evidence line is echoed.
 #[cfg(target_os = "linux")]
 fn report_observation(label: &str, line: &str) {
+    use std::io::Write;
+
     let mut stderr = std::io::stderr();
     let _ = writeln!(stderr, "{label}={}", line.trim_end());
 }
