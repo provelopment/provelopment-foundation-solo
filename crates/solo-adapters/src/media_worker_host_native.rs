@@ -128,11 +128,11 @@ mod linux {
 
         // SAFETY: the status just checked was zero, which is `getrlimit`'s contract for having
         // written the complete structure into the slot. The slot is therefore initialised, it is
-        // not read again afterwards, and `rlim_t` is an unsigned integer type that converts to
-        // `u64` without loss, so no ceiling value can be narrowed or clamped here.
+        // not read again afterwards, and `rlim_t` is `u64` on Linux, so both fields pass through
+        // with no narrowing, clamping or reinterpretation of the ceiling value.
         let raw = unsafe { raw.assume_init() };
 
-        Ok(ceiling_from_raw(raw.rlim_cur as u64, raw.rlim_max as u64))
+        Ok(ceiling_from_raw(raw.rlim_cur, raw.rlim_max))
     }
 
     #[cfg(test)]

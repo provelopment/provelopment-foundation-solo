@@ -270,15 +270,15 @@ const APPROVED_ALLOWANCE_GATES: [&str; 2] =
 /// The crate root carries exactly two module-scoped allowances — the documented
 /// `#[cfg_attr(windows, allow(unsafe_code))]` for the Windows source reader and the documented
 /// `#[cfg_attr(target_os = "linux", allow(unsafe_code))]` for the Linux readback seam. Those two
-/// gated forms are the only acceptable ones, and an ungated request anywhere is a refusal.
-fn has_ungated_allowance(code: &str) -> bool {
-    code.match_indices("allow(unsafe_code)").any(|(index, _)| {
-        let start = index.saturating_sub(48);
-        let prefix = &code[start..index];
-        !APPROVED_ALLOWANCE_GATES
-            .iter()
-            .any(|gate| prefix.contains(gate))
-    })
+/// exact attribute texts are removed first, on the **raw** source, because the code-only view
+/// erases the string literal that carries the gate; whatever request remains after that, in code
+/// rather than in a comment or a string, is an ungated or unapproved request and is refused.
+fn has_ungated_allowance(source: &str) -> bool {
+    let mut remainder = source.to_owned();
+    for gate in APPROVED_ALLOWANCE_GATES {
+        remainder = remainder.replace(&format!("#[{gate} allow(unsafe_code))]"), "");
+    }
+    code_only(&remainder).contains("allow(unsafe_code)")
 }
 
 /// Why `source`, located at the repository-relative `path`, is not allowed.
@@ -295,7 +295,7 @@ fn violations(path: &str, source: &str) -> Vec<String> {
     // a platform gate. A `deny(unsafe_code)` is the opposite of an allowance. This holds at every
     // path, including the two eligible ones, so an eligible file can never gain a blanket
     // allowance either.
-    if has_ungated_allowance(&code) {
+    if has_ungated_allowance(source) {
         problems.push(format!(
             "{path}: asks for `allow(unsafe_code)` outside the single approved Windows gate"
         ));
