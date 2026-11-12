@@ -760,14 +760,26 @@ function Invoke-Suite {
   $d = New-Dir 'T12-parallel'
   $mk = {
     param($sfx)
-    @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $PSCommandPath, 'run',
-      '--mem-bytes', '67108864', '--cpu-sec', $normalCpu, '--wall-ms', $normalWall,
-      '--stage', (Join-Path $d "stage$sfx"), '--final', (Join-Path $d "final$sfx"),
-      '--json', (Join-Path $root "T12$sfx.json"), '--test', "T12-parallel-$sfx", '--',
-      $bin, '--stress-allocate-bytes', '134217728', '--out', (Join-Path $d "stage$sfx"))
+    $q = { param($v) '"' + $v + '"' }
+    $parts = @(
+      '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (& $q $PSCommandPath),
+      'run', '--mem-bytes', '67108864', '--cpu-sec', "$normalCpu", '--wall-ms', "$normalWall",
+      '--stage', (& $q (Join-Path $d "stage$sfx")),
+      '--final', (& $q (Join-Path $d "final$sfx")),
+      '--json', (& $q (Join-Path $root "T12$sfx.json")),
+      '--test', "T12-parallel-$sfx", '::',
+      (& $q $bin), '--stress-allocate-bytes', '134217728', '--out', (& $q (Join-Path $d "stage$sfx"))
+    )
+    return ($parts -join ' ')
   }
-  $pa = Start-Process -FilePath $hostExe -ArgumentList (& $mk 'A') -PassThru -WindowStyle Hidden
-  $pb = Start-Process -FilePath $hostExe -ArgumentList (& $mk 'B') -PassThru -WindowStyle Hidden
+  $outA = Join-Path $d 'childA.out'
+  $errA = Join-Path $d 'childA.err'
+  $outB = Join-Path $d 'childB.out'
+  $errB = Join-Path $d 'childB.err'
+  $pa = Start-Process -FilePath $hostExe -ArgumentList ([string](& $mk 'A')) -PassThru -WindowStyle Hidden `
+    -RedirectStandardOutput $outA -RedirectStandardError $errA
+  $pb = Start-Process -FilePath $hostExe -ArgumentList ([string](& $mk 'B')) -PassThru -WindowStyle Hidden `
+    -RedirectStandardOutput $outB -RedirectStandardError $errB
   $recA = Join-Path $root 'T12A.json'
   $recB = Join-Path $root 'T12B.json'
   for ($n = 0; $n -lt 160; $n++) {
@@ -780,6 +792,12 @@ function Invoke-Suite {
   $r12b = $null
   if (Test-Path -LiteralPath $recA) { $r12a = (Get-Content -LiteralPath $recA -Raw).Trim() | ConvertFrom-Json }
   if (Test-Path -LiteralPath $recB) { $r12b = (Get-Content -LiteralPath $recB -Raw).Trim() | ConvertFrom-Json }
+  if ($null -eq $r12a -or $null -eq $r12b) {
+    Write-Output 'parallel child diagnostics:'
+    foreach ($f in @($outA, $errA, $outB, $errB)) {
+      if (Test-Path -LiteralPath $f) { Write-Output "--- $(Split-Path -Leaf $f) ---"; Get-Content -LiteralPath $f | Write-Output }
+    }
+  }
   Check 'T12-parallel-A' $r12a 'REFUSED_MEMORY_LIMIT' 'no-promotion'
   Check 'T12-parallel-B' $r12b 'REFUSED_MEMORY_LIMIT' 'no-promotion'
   $residue = @(Get-ChildItem -LiteralPath (Join-Path $d 'finalA') -File -ErrorAction SilentlyContinue).Count +
