@@ -758,45 +758,33 @@ function Invoke-Suite {
 
   # T12 - two simultaneous contained workloads each stay inside their own policy
   $d = New-Dir 'T12-parallel'
-  $mk = {
-    param($sfx)
-    $q = { param($v) '"' + $v + '"' }
-    $parts = @(
-      '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (& $q $PSCommandPath),
-      'run', '--mem-bytes', '67108864', '--cpu-sec', "$normalCpu", '--wall-ms', "$normalWall",
-      '--stage', (& $q (Join-Path $d "stage$sfx")),
-      '--final', (& $q (Join-Path $d "final$sfx")),
-      '--json', (& $q (Join-Path $root "T12$sfx.json")),
-      '--test', "T12-parallel-$sfx", '::',
-      (& $q $bin), '--stress-allocate-bytes', '134217728', '--out', (& $q (Join-Path $d "stage$sfx"))
-    )
-    return ($parts -join ' ')
-  }
-  $outA = Join-Path $d 'childA.out'
-  $errA = Join-Path $d 'childA.err'
-  $outB = Join-Path $d 'childB.out'
-  $errB = Join-Path $d 'childB.err'
-  $pa = Start-Process -FilePath $hostExe -ArgumentList ([string](& $mk 'A')) -PassThru -WindowStyle Hidden `
-    -RedirectStandardOutput $outA -RedirectStandardError $errA
-  $pb = Start-Process -FilePath $hostExe -ArgumentList ([string](& $mk 'B')) -PassThru -WindowStyle Hidden `
-    -RedirectStandardOutput $outB -RedirectStandardError $errB
+  # Two simultaneous supervisors, started as separate PowerShell jobs so the child
+  # arguments are passed as objects (no command-line re-quoting) and their output can
+  # be captured for diagnosis.
+  $argA = @('run', '--mem-bytes', '67108864', '--cpu-sec', "$normalCpu", '--wall-ms', "$normalWall",
+    '--stage', (Join-Path $d 'stageA'), '--final', (Join-Path $d 'finalA'),
+    '--json', (Join-Path $root 'T12A.json'), '--test', 'T12-parallel-A', '::',
+    $bin, '--stress-allocate-bytes', '134217728', '--out', (Join-Path $d 'stageA'))
+  $argB = @('run', '--mem-bytes', '67108864', '--cpu-sec', "$normalCpu", '--wall-ms', "$normalWall",
+    '--stage', (Join-Path $d 'stageB'), '--final', (Join-Path $d 'finalB'),
+    '--json', (Join-Path $root 'T12B.json'), '--test', 'T12-parallel-B', '::',
+    $bin, '--stress-allocate-bytes', '134217728', '--out', (Join-Path $d 'stageB'))
+  $jobA = Start-Job -ScriptBlock { param($s, $a) & $s @a } -ArgumentList $PSCommandPath, $argA
+  $jobB = Start-Job -ScriptBlock { param($s, $a) & $s @a } -ArgumentList $PSCommandPath, $argB
+  $null = Wait-Job -Job $jobA, $jobB -Timeout 180
+  $echoA = Receive-Job -Job $jobA 2>&1 | Out-String
+  $echoB = Receive-Job -Job $jobB 2>&1 | Out-String
+  Remove-Job -Job $jobA, $jobB -Force -ErrorAction SilentlyContinue
   $recA = Join-Path $root 'T12A.json'
   $recB = Join-Path $root 'T12B.json'
-  for ($n = 0; $n -lt 160; $n++) {
-    if ((Test-Path -LiteralPath $recA) -and (Test-Path -LiteralPath $recB)) { break }
-    Start-Sleep -Milliseconds 250
-  }
-  try { $null = $pa.WaitForExit(30000) } catch { }
-  try { $null = $pb.WaitForExit(30000) } catch { }
   $r12a = $null
   $r12b = $null
   if (Test-Path -LiteralPath $recA) { $r12a = (Get-Content -LiteralPath $recA -Raw).Trim() | ConvertFrom-Json }
   if (Test-Path -LiteralPath $recB) { $r12b = (Get-Content -LiteralPath $recB -Raw).Trim() | ConvertFrom-Json }
   if ($null -eq $r12a -or $null -eq $r12b) {
     Write-Output 'parallel child diagnostics:'
-    foreach ($f in @($outA, $errA, $outB, $errB)) {
-      if (Test-Path -LiteralPath $f) { Write-Output "--- $(Split-Path -Leaf $f) ---"; Get-Content -LiteralPath $f | Write-Output }
-    }
+    Write-Output "--- job A output ---"; Write-Output $echoA
+    Write-Output "--- job B output ---"; Write-Output $echoB
   }
   Check 'T12-parallel-A' $r12a 'REFUSED_MEMORY_LIMIT' 'no-promotion'
   Check 'T12-parallel-B' $r12b 'REFUSED_MEMORY_LIMIT' 'no-promotion'
