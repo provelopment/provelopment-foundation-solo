@@ -1,0 +1,21 @@
+[package]
+name = "solo-avif-r03-c3-proof"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+# Standalone, non-product proof crate. Its own workspace root keeps it out of the
+# four-crate product workspace, so it cannot alter the product lockfile, the
+# product build or the production dependency graph.
+[workspace]
+resolver = "3"
+
+[dependencies]
+oxideav-avif = { version = "=0.0.11", default-features = true }
+oxideav-av1 = { version = "=0.1.23" }
+oxideav-core = { version = "=0.1.43" }
+
+[profile.release]
+opt-level = 2
+debug = false
+panic = "unwind"
