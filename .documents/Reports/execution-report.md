@@ -1,121 +1,111 @@
 # Execution Report
 
-**Order:** `OWNER-ISSUED — SOLO-WO-066 R01` — administrative closure of independently accepted `R03.C2`, selection of one unissued `R03.C3` candidate, and conditional safe pruning of the integrated `SOLO-WO-065` branches.
-**Matching Owner→Implementation Agent handoff:** `SOLO-WO-066 R01`.
+**Order:** `OWNER-ISSUED — SOLO-WO-067 R01` — R03.C3 bounded Entity image-media verification.
+**Matching Owner→Implementation Agent handoff:** `SOLO-WO-067 R01`.
 **Session date (ISO):** 2026-11-11.
-**Root:** the single verified Owner-local checkout of `provelopment/provelopment-foundation-solo`; one worktree, sole `origin`, no second checkout.
-**Disposition:** **COMPLETE** for the demonstrated **administrative** scope only. This run performed documentation and Git-lifecycle work: it closed `R03.C2` administratively, installed one *unissued* `R03.C3` candidate, and pruned three fully integrated task branches. It issued **no** implementation order, changed **no** product code, and claims **no** media validity, catalogue, publication, release or deployment. **`R03.C` and Stage 03 remain OPEN**, `R03.C3` is **not issued**, and this report is **not** a self-ACCEPT.
+**Root:** the single verified Owner-local checkout of `provelopment/provelopment-foundation-solo`; one worktree, sole `origin`.
+**Disposition: `STOPPED`.** The mandatory §4 decoder/security qualification **failed** for the AVIF path, and two further independent policy blockers were measured for the remaining scope. Per §4 and §110 this order forbids a header-only pass, a skipped format, a substitute dependency, a workflow tool addition or any policy relaxation, so **no technical branch was created, no product path was modified and no dependency was added**. The only published change is this report. `R03.C3` is **not implemented**, `R03.C` and Stage 03 remain **OPEN**, and this report is **not** a self-ACCEPT.
 
-## 1. Baseline (verified before any write)
+## 1. Baseline and issuance (verified)
 
 | Anchor | Verified value |
 | --- | --- |
-| `HEAD == main == origin/main` | `b7c999ac1d4d7341ea1aaee177b7be130591d8d1` |
-| Tree | `dc4978e2a87b814d6c50aab3fae6b6380030c367` |
-| Canonical report | `.documents/Reports/execution-report.md` = `4cd3298ffc85dec69079ec948674efc92b7fd9fb` |
-| Previous ACTIVE (frozen `SOLO-WO-065 R03`) | `2622aeace2329a91e15cbdced3781a30bb05d2d0` |
-| ROADMAP / NEXT / OUTLOOK | `97df81e5cf63443d11a8f4414934d4fd05edd0d8` / `92fa562b1af0c54391851aa5c79deb1631127069` / `cb9c7a610cf3c537557e060ca9656e44a053e69d` |
-| Accepted Entity reader / image policy / inventory / native proof | `fb6f005a053ea80cea452fe2d57fb9fc8ea45ad9` / `6499421d6e718e9d46d64e45fb152f34e2989cc1` / `7de9bc7399854b2059cbec17ee23c1e1ae637159` / `5527b2b4f0d4f47acaa86eead74c7106607c789f` |
-| `Cargo.lock` / adapter manifest / `deny.toml` / workflow / toolchain | `2f9e53576df117f2020ae064d6973304f20833f1` / `6109224cd3e3e89487884631f2b07c68ad8149c3` / `3063e864c28be1e77787f43f1b6f561d543c8f4a` / `eb78dad240bb7adb3e0ef9535870897176c99843` / `9ec55b3b621dbc75fc68817cd51b96e407d3c94c` |
-| Architecture / Architect SOP / Implementation SOP | `250bf62efd07037fe70022b5fc88a63610692245` / `1483c9bec1dc9cc7bb7a51590b72eb90c1506af1` / `51bb37922cf7fc56952e4ad6155c9a59d3c09036` |
-| Branch tips (local = remote-tracking = GitHub) | `solo-wo-065-r01` `7f609320afc0ee6a6bbc6637ef3f3fc68f19ecbb`; `solo-wo-065-r02` `2de75c1e3f96a84b32f8cd21f491d925225d62d1`; `solo-wo-065-r03` `bbe4a98f4da464ce189956fea34dd94323499ab8`; `solo-wo-061-r01` `4371af21dce67f33cf1df0384738bf353ca80fc6` |
-| Dirty state | only the Owner-installed complete `SOLO-WO-066 R01` ACTIVE (`de6b54173dd48584e2c4fa82a0c8ffdd294d02dd`, 28,732 bytes, 163 lines); nothing untracked, no sequencer, no stash used |
-| WIP inventory | exactly four files: `plan-roadmap.md`, `plan-next.md`, `workorder-active.md`, `plan-outlook.md` |
+| Accepted `main` / `origin/main` / HEAD | `ac9a7ad1fd3c1514546948e2e01ccba3e3e39f94` |
+| Tree / parent | `81e73f73c6fe007cd5cbe1d28f5c425e607f24cc` / `c28f30a42e6529ac5742a5ef7c242eeb8f117ad6` |
+| Canonical report (accepted `SOLO-WO-066 R01`) | `057751003035592888f41ad1699e3f552f3dbf90` |
+| WIP baseline blobs | ROADMAP `9d7a8622…`, NEXT `aef9b6cf…` (one unissued `R03.C3`), ACTIVE `ea5f20b7…` (neutral), OUTLOOK `cb9c7a61…` |
+| Branch inventory | exactly `main` and the divergent retained `solo-wo-061-r01` at `4371af21dce67f33cf1df0384738bf353ca80fc6`; no R03.C3 branch existed |
+| Dirty state | only the Owner-installed complete `SOLO-WO-067 R01` ACTIVE (`6acea804ec3124979d477e303c2169e43eb787a9`, 33,741 bytes, 132 lines); handoff ID matched |
+| Checkouts / worktrees / remotes | 1 / 1 / 1 — no second clone, worktree, nested repository or sequencer state |
 
-The handoff ID in the installed document matched `SOLO-WO-066 R01` exactly, and the committed ROADMAP contained the order's **old** `R03.C` bullet exactly once, byte-for-byte (`-ceq`), at line 9 — the precondition for a literal single-line replacement. The committed ROADMAP held exactly one `R03.C` bullet and the new bullet was absent. No `reset`, `clean`, forced checkout or rebase was used at any point.
+**Issuance commit `93e91982fa79f9cefb6527df729d659581525c5a`** — tree `a84e265717777f338bf8b113fbf42e3af59179e2`, parent `ac9a7ad1…`; exactly two changed paths: `.documents/WIP/workorder-active.md` → `6acea804…` (order frozen) and `.documents/WIP/plan-next.md` → `92fa562b1af0c54391851aa5c79deb1631127069` (neutral one-line heading plus LF). ROADMAP `9d7a8622…` and OUTLOOK `cb9c7a61…` stayed byte-identical. Remote readback confirmed commit/tree/parent/blobs.
 
-## 2. Issuance (ACTIVE alone)
+**Issuance CI `43141229695` — `success`** at `93e91982…`: Ubuntu job `130928437246` (33 steps, 9 skips, **407 passed**), Windows job `130928436877` (33 steps, 14 skips, **412 passed**), 0 failed / 0 ignored, component gate `security_gate=pass`. Inherited `warning[license-not-encountered]` (`Unicode-3.0`) still emitted on both hosts and remains **UNVERIFIED**.
 
-| Item | Value |
-| --- | --- |
-| **Issuance commit** | **`7660b354f80cfa7a65495ab693186f08cb1e63bc`** |
-| Tree / parent | `62cee9548e64245c6b6b708d72526da377b620ca` / `b7c999ac1d4d7341ea1aaee177b7be130591d8d1` |
-| Changed paths | `.documents/WIP/workorder-active.md` **only** → `de6b54173dd48584e2c4fa82a0c8ffdd294d02dd` (remote readback identical) |
-| Other WIP blobs | NEXT `92fa562b…`, ROADMAP `97df81e5…`, OUTLOOK `cb9c7a61…` — unchanged |
-| Issuance CI | run **`43052441379`** — `success`; Ubuntu job `130632913806` (33 steps, 9 skips) **407 passed**; Windows job `130632913466` (33 steps, 14 skips) **412 passed**; 0 failed, 0 ignored on both hosts |
-| Remote verification | `gh api` returned commit `7660b354…`, tree `62cee954…`, parent `b7c999ac…`, `files = [.documents/WIP/workorder-active.md]` |
+## 2. §4 qualification — measured results, exact versions
 
-## 3. Conditional branch pruning (performed while the issued ACTIVE still existed)
+Qualification used two disposable probe manifests in the permitted Solo `.temp/` scratch (a full-scope two-root graph and a PNG/JPEG/WebP-only graph), each resolved by Cargo against crates.io, measured, and then deleted. No tracked manifest, lock file or policy entry was modified; the accepted workspace still resolves exactly as at baseline.
 
-Every condition in §3C was independently re-proved **immediately before** each deletion, per ref, then each ref was removed individually with normative, non-force commands.
-
-| Ref | Exact tip (local = remote-tracking = GitHub) | Protected | Ancestor of `main` | `main...tip` | PRs | Worktree | Action |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| `solo-wo-065-r01` | `7f609320afc0ee6a6bbc6637ef3f3fc68f19ecbb` | `false` (protection endpoint 404) | yes | `8 0` | none (`[]`) | none | `git branch -d` → `Deleted branch solo-wo-065-r01 (was 7f60932)`; `git push origin --delete` → `[deleted]`; GitHub re-probe 404 |
-| `solo-wo-065-r02` | `2de75c1e3f96a84b32f8cd21f491d925225d62d1` | `false` (404) | yes | `5 0` | none | none | `git branch -d` → `Deleted branch solo-wo-065-r02 (was 2de75c1)`; `git push origin --delete` → `[deleted]`; GitHub re-probe 404 |
-| `solo-wo-065-r03` | `bbe4a98f4da464ce189956fea34dd94323499ab8` | `false` (404) | yes | `2 0` | none | none | `git branch -d` → `Deleted branch solo-wo-065-r03 (was bbe4a98)`; `git push origin --delete` → `[deleted]`; GitHub re-probe 404 |
-| `solo-wo-061-r01` | `4371af21dce67f33cf1df0384738bf353ca80fc6` | `false` (404) | **no** | `22 1` | none | none | **PRESERVED, untouched** |
-
-`main...tip` reads as *main-only* then *tip-only* commits, so `N 0` proves the tip had no unmerged work; counts rose by exactly one against the pre-issuance probe because `main` advanced by the issuance commit. The divergent `solo-wo-061-r01` still holds **one branch-only commit**, so it was not a candidate: no deletion, move, force or reconciliation touched it, and it remains at `4371af21…` locally, in `origin/solo-wo-061-r01` and on GitHub. No `-D`, force-push, bulk command or ref rewrite occurred anywhere.
-
-After pruning: **branch inventory is exactly `main` and `solo-wo-061-r01`** locally and on GitHub; `main` remained `7660b354…` throughout the pruning step. All pruned commits remain reachable through accepted `main` history.
-
-## 4. Administrative closure (ROADMAP + NEXT + ACTIVE, one commit)
-
-| Item | Value |
-| --- | --- |
-| **Closure commit** | **`c28f30a42e6529ac5742a5ef7c242eeb8f117ad6`** |
-| Tree / parent | `82b8cb7b79c5bb7366e95c822097e7b4dc887cd9` / `7660b354f80cfa7a65495ab693186f08cb1e63bc` |
-| Changed paths | `.documents/WIP/plan-roadmap.md`, `.documents/WIP/plan-next.md`, `.documents/WIP/workorder-active.md` — **only these three** |
-| New blobs | ROADMAP `9d7a86226878f490fd5e26c6813a81e5f73f3f37`; NEXT `aef9b6cfd0435aef6ff858dc77624952f6e96f0a`; ACTIVE `ea5f20b736483c2e102456be1cea9104059fc81a` |
-| OUTLOOK | `cb9c7a610cf3c537557e060ca9656e44a053e69d` — **byte-identical** to baseline |
-| `git diff --numstat` | ROADMAP `1 1`; NEXT `12 0`; ACTIVE `0 162`; `git diff --check` empty |
-
-**ROADMAP delta — exactly one line, verified by byte comparison of the decoded blobs.** Of 133 lines, only line 9 differs; the baseline line 9 equals the order's *OLD* bullet and the closure line 9 equals its *NEW* bullet, both compared case-sensitively against the order text:
-
-- **removed:** the `R03.C` bullet that still listed already accepted "confined Entity `content/assets/` … source acquisition" as unfinished;
-- **inserted:** the bullet that requires authoritative bounded media-byte, format/magic/observed MIME, safe decoding, image dimension and pixel-limit verification; explicitly authored, exactly pinned Platform `platform/assets/` acquisition and an Owner-reviewed lawful `platformAssetLibraryVersion: "1.0.0"` catalogue with IDs, hashes, media class, dimensions and licence/provenance; whole-candidate validation across internal, suppressed and unlisted owners; and privacy-safe public use with immutable derived outputs — while preserving the five-level inheritance, provenance, exposure, cardinality, suppression and **no automatic platform or role fallback** under Architecture §§6.2G/6.2I.
-
-Every heading, the Stage 03 exit gate and Stages 04–13 are unchanged; no other ROADMAP byte moved.
-
-**NEXT — byte comparison against the order.** The committed file (`aef9b6cf…`, 5,050 characters) is **character-identical** (`-ceq`) to lines 128–140 of the issued order plus exactly one trailing newline; it holds exactly one `#` title, exactly one `## R03.C3` heading, exactly five labeled fields (Objective, Prerequisites/readiness, Proposed scope, Proposed deliverables, Exit conditions) and no second candidate. `R03.C3` is **unissued**: the file grants no implementation authority and pre-approves no dependency, decoder, Platform catalogue, media or publication claim.
-
-**ACTIVE** was reset to exactly `# Foundation Solo — Active Work Order` plus one trailing newline (40 bytes, `ea5f20b7…`); the issued order remains preserved in Git history. **WIP is still exactly four files** with no archive, extra folder or per-task report.
-
-## 5. CI — three exact-revision two-host gates, no red attempt
-
-| Phase | Run | Revision | Ubuntu job | Windows job | Result |
-| --- | --- | --- | --- | --- | --- |
-| Issuance | `43052441379` | `7660b354…` | `130632913806` — 33 steps, 9 skips, **407 passed** | `130632913466` — 33 steps, 14 skips, **412 passed** | success, 0 failed / 0 ignored |
-| Closure | `43053736064` | `c28f30a4…` | `130637537682` — 33 steps, 9 skips, **407 passed** | `130637538213` — 33 steps, 14 skips, **412 passed** | success, 0 failed / 0 ignored |
-| Final report HEAD | given in the chat handoff | report commit | required green | required green | required green |
-
-The skip counts are the same host-inapplicable steps as the accepted baseline (counterpart-host steps, the Ubuntu-only component-advisory negative probe, the byte-reproducible double build and R03 fixture provisioning). No mandatory gate was neutralised and **no red attempt occurred** in this order. Workspace test totals are unchanged by this order (Ubuntu 407 / Windows 412), as expected for a documentation-only change; the previously accepted Windows `r03c2_10c_transferred_writable_view_refuses_asset_port_until_unmapped` proof continues to execute and pass inside those totals.
-
-## 6. Acceptance matrix
-
-| ID | Result | Evidence |
+| Root | Exact version / licence / provenance | Posture |
 | --- | --- | --- |
-| `S066-01` | PASS | §1: accepted `b7c999ac…`/`dc4978e2…`/report `4cd3298f…`, all four WIP baseline blobs, single checkout/worktree/`origin`, complete Owner-installed R01 ACTIVE with matching handoff ID, no unrelated dirty or unknown material. |
-| `S066-02` | PASS | §2: one issuance commit changing only ACTIVE at `7660b354…`, remote commit/tree/parent/blob readback identical, full two-host CI green before any further action. |
-| `S066-03` | PASS | §3: all three `solo-wo-065` refs pruned locally and remotely only after exact-tip, ancestry (`N 0`), no-PR, no-protection, no-worktree checks; normal `-d`/`--delete` only; each re-probed 404; divergent `solo-wo-061-r01` preserved byte-for-byte on both refs. |
-| `S066-04` | PASS | §4: ROADMAP is exactly one literal `R03.C` line replacement (numstat `1 1`, only line 9 differs, byte-compared); accepted Entity byte acquisition is no longer presented as unfinished while every media, Platform/library, whole-candidate, privacy and derivative gate remains; Stage 03 and Stages 04–13 untouched. |
-| `S066-05` | PASS | §4: NEXT is character-identical to the order's §4 content (5,050 chars), one `R03.C3` heading, five labeled fields, no second candidate, no authority, no hidden fallback. |
-| `S066-06` | PASS | §4: ACTIVE is the exact one-heading neutral file; OUTLOOK blob unchanged; WIP exactly four files, no archive or subfolder. |
-| `S066-07` | PASS | §4/§5: one closure commit changing only ROADMAP/NEXT/ACTIVE, pushed normally, complete two-host CI green at `c28f30a4…`. |
-| `S066-08` | PASS | §7: Architecture, About, AGENTS, SOP, all product source and tests, Cargo lock/manifests, toolchain, workflow, security policy, `.gitignore`, assets and catalogues unchanged. |
-| `S066-09` | PASS | §8: the canonical report alone changes in the last commit; its remote blob/tree/parent read back, both-host final-head CI green, no parallel or archived report, all ancestor/diff/WIP/ref checks accurate. |
-| `S066-10` | PASS with inherited warning | §7: `warning[license-not-encountered]` for `Unicode-3.0` still emitted on both hosts and remains **UNVERIFIED**; no suppression, waiver, skipped mandatory gate, softened test or invented supply-chain clearance. |
-| `S066-11` | PASS | §8: single checkout/worktree/remote, clean final status, build cache and inherited archives preserved, truthful task-owned scratch cleanup, no release/deploy/provider/extra-repository action; `COMPLETE` stated only for administrative scope, no self-ACCEPT, `R03.C3` not begun. |
+| `image` | `=0.25.10`, `MIT OR Apache-2.0`, published 2026-03-10, not yanked, checksum `85ab80394333c02fe689eaf900ab500fbd0c2213da414687ebf995a65d5a6104`, MSRV 1.88.0 (project toolchain 1.99.1) | Pure Rust, no build script; `png`/`jpeg`/`webp` features exist and the prohibited `avif`, `avif-native`, `nasm`, `ravif`, `dav1d` and default-format features were excluded as ordered. Blocked in practice by the duplicate-version defect in §3. |
+| `avif-decode` | `=3.0.0`, `BSD-3-Clause`, published 2026-09-20, not yanked, checksum `1eee11893966d77d3e18c66fdcfb1c30e2d8df050346609c775ce8eec3390344`, MSRV 1.98 | **Not acceptable:** it pulls `rav1d` with default features on x86/x86_64 (§2.1) and a required transitive is `MPL-2.0` (§2.2). |
+| `rav1d` (pulled by the permitted AVIF root) | `1.1.0`, `BSD-2-Clause`, published 2025-05-07, not yanked, checksum `1932f060d5e7bd49dc9f8b272c1dc5e9ce0ffe141c28be900265d3989b36c9ed` | **Forbidden build surface:** default features `asm`, `asm_arm64_dotprod`, `asm_arm64_i8mm`, `asm_arm64_sve2`, `bitdepth_8`, `bitdepth_16`; build-dependencies `cc ^1.0.79` and `nasm-rs ^0.3` (feature `parallel`); the crate ships **48 `.asm` files / 155,378 assembly lines**, and its `build.rs` assembles them under `#[cfg(feature = "asm")]`. |
+| Transitives of note | `avif-parse 2.1.0` = **`MPL-2.0`**; `imgref` `CC0-1.0 OR Apache-2.0`; `to_method` `CC0-1.0`; `byteorder` `Unlicense OR MIT`; `moxcms`, `pxfm`, `yuv` `BSD-3-Clause OR Apache-2.0`; `zlib-rs` `Zlib`; `adler2` `0BSD OR MIT OR Apache-2.0`; `r-efi` `MIT OR Apache-2.0 OR LGPL-2.1-or-later` (MIT/Apache selectable) | New licence families relative to `deny.toml`'s `allow = [Apache-2.0, MIT, Unlicense, Unicode-3.0]`. |
 
-## 7. Product, security and policy invariance
+### 2.1 AVIF requires a native assembler (measured)
 
-`git diff --name-status b7c999ac… c28f30a4…` lists **only** `.documents/WIP/plan-next.md`, `.documents/WIP/plan-roadmap.md` and `.documents/WIP/workorder-active.md`. Fifteen audited invariant paths were compared blob-for-blob and are **unchanged**: `AGENTS.md` `6eae1da8…`, `ARCHITECTURE.md` `250bf62e…`, Architect SOP `1483c9be…`, Implementation SOP `51bb3792…`, workspace `Cargo.toml` `14505be4…`, `Cargo.lock` `2f9e5357…`, adapter manifest `6109224c…` (`rustix = "=1.1.6"`), `source_read.rs` `fb6f005a…`, `source_read_native.rs` `5527b2b4…`, `graphic_asset_read.rs` `6499421d…`, `graphic_asset_inventory.rs` `7de9bc73…`, `deny.toml` `3063e864…`, `rust-verify.yml` `eb78dad2…`, `rust-toolchain.toml` `9ec55b3b…`, `.gitignore` `f45dd495…`.
+`cargo tree -e features -i rav1d` in the full-scope probe resolved:
 
-Both CI hosts re-ran the component gate with a fresh database: `security_gate=pass db_commit=fd6f39814c4d3c359fdbe223d0280dec4933f78f` (`fetched_at` 2026-11-11T15:59:21Z Ubuntu, 15:59:44Z Windows). No dependency, pin, permission, route, renderer, catalogue, artwork or media fixture was added; no publication or deployment authority is implied by this order or by the unissued candidate.
+```text
+rav1d v1.1.0
+└── rav1d feature "asm"
+    └── rav1d feature "asm_arm64_dotprod"
+        └── rav1d feature "default"
+            └── avif-decode v3.0.0
+```
 
-**Inherited warning, unchanged:** `warning[license-not-encountered]` for `Unicode-3.0` at `deny.toml:51` is still emitted on both hosts (two occurrences in the closure run) and remains **UNVERIFIED**. CI is **not** claimed warning-free, and no disposition was invented.
+`avif-decode 3.0.0` declares `rav1d` with `default_features = true` for `cfg(any(target_arch = "x86", target_arch = "x86_64"))` — the exact architecture of **both** accepted CI hosts — and sets `default-features = false` plus `bitdepth_8`/`bitdepth_16` only for non-x86 targets. Because Cargo features are additive, `default-features = false` on `avif-decode` **cannot** disable `rav1d`'s `asm`; the only levers would be a direct `rav1d` root (unledgered, §3) or a `[patch]` (unledgered and a policy change). Either way the graph needs `nasm` plus `cc` at build time on both hosts, and the workflow may be changed only for exact `edges=…` counts (§3 #13), never to install a tool.
 
-## 8. Workspace, cleanup, limits and handoff
+### 2.2 AVIF introduces a non-permissive licence (measured)
 
-**Repository state at closure.** `main` = `c28f30a42e6529ac5742a5ef7c242eeb8f117ad6`, tree `82b8cb7b79c5bb7366e95c822097e7b4dc887cd9`, single parent — three linear single-parent commits on `main` (`b7c999ac… → 7660b354… → c28f30a4… →` report) with no merge commit, no branch and no PR. One checkout, one worktree, one `origin`, clean `git status --porcelain --untracked-files=all` at each published revision. Branch inventory is exactly `main` plus the preserved, divergent `solo-wo-061-r01`. WIP is exactly four files.
+`avif-parse 2.1.0`, a non-optional normal dependency of the permitted AVIF root, is **`MPL-2.0`**. §3 #14 permits adding only "specifically audited **permissive** SPDX licences actually introduced in the lock graph", and §4 item 2 makes any licence needing a rights decision or a new distribution obligation a STOP. MPL-2.0 file-level source-availability obligations are exactly such a decision, so no `allow` entry could lawfully be authored under this order.
 
-**Preserved state.** The ignored live Rust `target/` cache was never cleaned or force-added. Solo `.temp/` still holds exactly **2 files / 289,253,806 bytes** (the inherited archives, untouched, no cleanup trigger satisfied). No `git clean`, reset, force-push, amend, rebase, cherry-pick or history rewrite occurred anywhere; all pruned commits remain in `main` history.
+### 2.3 Whole-scope graph size and licence growth (measured)
 
-**Task-owned scratch, truthfully reported.** This session created one disposable Cline CI log through the shell's proceed-while-running mechanism; it was deleted at the end of the run and no task-owned Solo `.temp/` file, draft or fixture was left behind (`target/` and the two inherited archives are unrelated and preserved). Nothing unknown or Owner-owned was deleted, moved or overwritten.
+The full two-root probe resolved **66 packages** against the accepted **18-crate** closure, introducing at least `MPL-2.0`, `BSD-2-Clause`, `BSD-3-Clause`, `CC0-1.0`, `0BSD`, `Zlib` and `Unlicense` expressions, `cc`/`nasm-rs`/`jobserver`/`find-msvc-tools` build tooling, and a second `miniz_oxide` version.
 
-**Local limitation, stated honestly.** This host has no MSVC `link.exe`, so local executable test runs are **NOT RUN**. This order changed no Rust code, so the authoritative evidence is the two-host CI gates above; local `cargo fmt --check` and `clippy` are therefore not claimed as evidence for this documentation-only order.
+## 3. Third independent blocker — duplicate locked versions (measured)
 
-**Remaining scope, unchanged by this order.** `R03.C` still requires authoritative media-byte/format/observed-MIME verification with safe decoding and dimension/pixel limits, explicitly pinned and Owner-reviewed Platform `platform/assets/` acquisition and catalogue, whole-candidate validation across internal/suppressed/unlisted owners, and privacy-safe public use with immutable derived outputs. Stage 03 and Stages 04–13 remain OPEN. `R03.C3` exists only as an **unissued** candidate in NEXT; no decoder, dependency, decoder ledger, media fixture, catalogue, artwork, route, renderer, release or deployment was selected or created.
+The PNG path alone breaks `[bans] multiple-versions = "deny"`. The PNG/JPEG/WebP-only probe (`image =0.25.10`, defaults off, `png`/`jpeg`/`webp`) resolved **23 packages** and still locked **two `miniz_oxide` versions**:
 
-**Handoff:** `SOLO-WO-066 R01 — COMPLETE` (**administrative scope only**), with every applicable matrix row directly evidenced above. The Implementation Agent does **not** self-ACCEPT: the Chief Architect must independently audit this report's exact remote HEAD and return `ACCEPT`, `REVISE` or `STOP`. No autonomous `R03.C3` implementation, code order, release, deployment, media artwork or Platform catalogue follows from an unissued NEXT candidate.
+```text
+miniz_oxide v0.8.9 └── png v0.18.1 └── image v0.25.10
+miniz_oxide v0.9.1 └── flate2 v1.1.11 └── png v0.18.1 └── image v0.25.10
+```
+
+`png 0.18.1` itself requires both, so the duplication cannot be resolved by unification, and `cargo tree -i miniz_oxide` refuses the query as ambiguous. The only ways to pass would be a `[bans].skip`/`skip-tree` entry or an `allow`, each explicitly forbidden ("no `skip`, no `skip-tree`", §4 item 2; no weakening, §7). §4 item 3 requires "no multiple versions", so this holds for the full scope **and** for any narrowed PNG subset.
+
+## 4. A1 supply-chain posture recorded (partial, honestly labelled)
+
+The current RustSec advisory database (`rustsec/advisory-db`, last push **2026-11-11T12:22:49Z**) was probed per package: `rav1d`, `avif-decode`, `avif-parse`, `nasm-rs`, `moxcms`, `miniz_oxide` and `pxfm` have **no advisory directory**; `image`, `zerocopy` and `zlib-rs` **do**, and their exact version-range applicability to the candidate graph was **not** evaluated. Both direct roots and `rav1d` are not yanked, with the published checksums above and maintainer identities matching their GitHub accounts (`image`: Aurelia Molzer; `avif-decode`: Kornel; `rav1d`: Per Larsen / memorysafety).
+
+Because no candidate graph was ever committed, **no two-host `cargo-deny` run was performed for it** and no A1 clearance is claimed: the licence and duplicate-version defects already fail the gate regardless of advisory status.
+
+## 5. What was and was not changed
+
+**Changed by this order (published):** `.documents/WIP/workorder-active.md` (Owner-installed order, frozen) and `.documents/WIP/plan-next.md` (neutralized) in the issuance commit; then this report alone.
+
+**Unchanged and verified at the current HEAD:** ROADMAP `9d7a8622…`, OUTLOOK `cb9c7a61…`; `AGENTS.md`; About; Architecture; all SOPs; every Rust source, test, fixture and example; `Cargo.toml`, all crate manifests and `Cargo.lock` `2f9e5357…`; `deny.toml` `3063e864…`; `.github/workflows/rust-verify.yml` `eb78dad2…`; `rust-toolchain.toml` `9ec55b3b…`; `.gitignore`; `platform/`; the accepted `graphic_asset_read.rs` `6499421d…`, `graphic_asset_inventory.rs` `7de9bc73…`, `source_read.rs` `fb6f005a…` and `source_read_native.rs` `5527b2b4…`. No file was added, deleted or renamed; no fixture was created; four-WIP purity holds and no report archive exists.
+
+**Product state:** `R03.C3` has **no** port, **no** adapter, **no** dependency, **no** tests and **no** verified-media evidence. The accepted acquisition layer still reports `media_verified = false` and remains exactly as accepted. Nothing here establishes image validity, dimensions, MIME agreement, Platform capability, publication authority, release or deployment.
+
+## 6. Acceptance matrix — truthful statuses
+
+| Gate | Status | Basis |
+| --- | --- | --- |
+| `S067-01` | **PASS** | §1: accepted `ac9a7ad1…`/`81e73f73…`/report `05775100…`, four baseline WIP blobs, sole checkout/worktree/origin, only the installed ACTIVE dirty, matching handoff, `solo-wo-061-r01` preserved and no other branch. |
+| `S067-02` | **PASS** | §1: issuance changed only ACTIVE + neutralized NEXT, no code or dependency, and full two-host CI was green at `93e91982…` before any trial. |
+| `S067-03` | **NOT EXERCISED (compliant)** | `solo-wo-067-r01` was deliberately **not** created: §4 requires the static qualification to pass first, and it did not. The §3 ledger shows zero product-path operations, no extra fixture and no collateral change. |
+| `S067-04` | **FAIL** | No complete real decoder proof is possible within scope: AVIF requires an assembler-built `rav1d`, and no format could be added under the policy as it stands. No header-only or first-frame substitute was claimed. |
+| `S067-05` | **UNVERIFIED** | Fail-closed boundaries were not implemented because no inspection path could be legitimately constructed. |
+| `S067-06` | **UNVERIFIED** | Bound enforcement (20 MiB, 1–8192, ≤32,000,000 pixels, bounded working set) is unimplemented; no allocation budget could be certified for `rav1d`. |
+| `S067-07` | **UNVERIFIED** | Whole-inventory semantics, refusal attribution and privacy-safe diagnostics are unimplemented. |
+| `S067-08` | **FAIL** | The candidate graphs violate the exact-closure and `multiple-versions = "deny"` rules (§2.3, §3) and would need an unledgered `rav1d` root or a forbidden skip; the checkers were correctly left untouched rather than weakened. |
+| `S067-09` | **FAIL / UNVERIFIED** | No two-host `cargo-deny` on a candidate graph; `MPL-2.0` needs a rights decision; `image`/`zerocopy`/`zlib-rs` advisories unevaluated. Inherited `Unicode-3.0` warning remains `UNVERIFIED`. |
+| `S067-10` | **PASS for existing regressions only** | All accepted R01–R03.C2 gates and the mapped-view/immutable-snapshot proofs are green at the issuance SHA (407 Ubuntu / 412 Windows). C3-specific media proof does not exist; user-visible rendering/HTTP/browser checks are genuinely **NOT APPLICABLE** because no public use is authorized. |
+| `S067-11` | **NOT REACHED** | No branch and no integration; a fast-forward was never considered because mandatory gates were unproven. |
+| `S067-12` | **PARTIAL — report gate only** | This single report-only commit is published with two-host CI at its exact HEAD; the product gates it would attest remain unmet, so the order's completion condition is not satisfied. |
+
+## 7. Owner decisions required to continue
+
+1. **AVIF component choice.** The order's only permitted AVIF root needs NASM plus a C toolchain at build time on both hosts and drags in `MPL-2.0`. Continuing needs a new Owner-issued order naming a genuinely pure-Rust AVIF decoder that is permissively licensed, needs no assembler/FFI, and can bound its whole decode path — with licence, unsafe-surface and resource evidence. `zenavif` (AGPL-3.0/commercial) remains unacceptable for this Apache-2.0 product, and `image`'s `avif`/`avif-native` paths still require `ravif`/`dav1d`.
+2. **Duplicate-version policy.** `png 0.18.1` forces two `miniz_oxide` versions, failing `[bans] multiple-versions = "deny"`. Continuing PNG needs an explicit Owner decision on a narrowly scoped, documented skip (a policy change this order forbids) **or** a decoder set that avoids the duplication.
+3. **Scope decision.** A PNG/JPEG/WebP-only increment is still blocked by (2) and would be a deliberately partial media claim, which §110 bars under this order; it would need its own bounded order with the residual risk stated.
+4. **Licence approvals.** Any path forward must add, with audit, the permissive expressions it actually introduces (`BSD-2-Clause`, `BSD-3-Clause`, `CC0-1.0`, `0BSD`, `Zlib`, `Unlicense`) and separately decide any non-permissive expression such as `MPL-2.0`.
+
+## 8. Workspace, preservation and handoff
+
+One checkout, one worktree, one `origin`; `main == origin/main`, empty `git status --porcelain --untracked-files=all`; branches exactly `main` and preserved divergent `solo-wo-061-r01` at `4371af21dce67f33cf1df0384738bf353ca80fc6` on both local and GitHub; WIP exactly four files; ignored `target/` untouched; inherited Solo `.temp/` archives preserved at **2 files / 289,253,806 bytes**. Both disposable probe manifests and their locks were deleted after measurement; no unknown or Owner-owned material was touched, and no `git clean`, reset, force, amend, rebase, cherry-pick, PR, release, deployment or provider action occurred.
+
+**Handoff:** `SOLO-WO-067 R01 — STOPPED`, for the reasons in §§2–3 and 7. Implementation was **not** started and **no** media verification is claimed; `R03.C`, Stage 03 and all remaining packages stay **OPEN**. The Chief Architect should independently audit this report's exact remote HEAD and return `ACCEPT`, `REVISE` or `STOP` on the administrative disposition; any resumption requires a new Owner-issued order covering the decisions in §7.
