@@ -378,7 +378,7 @@ function Invoke-Run {
   if ($cmd.Count -lt 1 -or -not $json) { Write-Error 'usage: run ... -- CMD [ARGS]'; exit 2 }
   if (-not $stage) { $stage = Join-Path (Split-Path -Parent $json) 'stage' }
   if (-not $final) { $final = Join-Path (Split-Path -Parent $json) 'final' }
-  Set-Content -LiteralPath $json -Value '' -Encoding utf8
+  if (Test-Path -LiteralPath $json) { Remove-Item -LiteralPath $json -Force }
 
   $outcome = ''
   $note = ''
@@ -555,7 +555,7 @@ function Invoke-Supervisor {
   param([string[]]$SupArgs, [string]$RecordPath)
   & $PSCommandPath @SupArgs | Out-Null
   if (-not (Test-Path -LiteralPath $RecordPath)) { return $null }
-  return (Get-Content -LiteralPath $RecordPath -Raw | ConvertFrom-Json)
+  return ((Get-Content -LiteralPath $RecordPath -Raw).Trim() | ConvertFrom-Json)
 }
 
 function Invoke-Suite {
@@ -575,7 +575,7 @@ function Invoke-Suite {
   }
   if (-not $bin -or -not $pkg -or -not $root -or -not $jsonl) { Write-Error 'usage: suite --bin --pkg --root --jsonl'; exit 2 }
   New-Item -ItemType Directory -Force -Path $root | Out-Null
-  Set-Content -LiteralPath $jsonl -Value '' -Encoding utf8
+  if (Test-Path -LiteralPath $jsonl) { Remove-Item -LiteralPath $jsonl -Force }
   $script:Passed = 0
   $script:Failed = 0
   $normalMem = 536870912
@@ -768,12 +768,18 @@ function Invoke-Suite {
   }
   $pa = Start-Process -FilePath $hostExe -ArgumentList (& $mk 'A') -PassThru -WindowStyle Hidden
   $pb = Start-Process -FilePath $hostExe -ArgumentList (& $mk 'B') -PassThru -WindowStyle Hidden
-  $pa.WaitForExit()
-  $pb.WaitForExit()
+  $recA = Join-Path $root 'T12A.json'
+  $recB = Join-Path $root 'T12B.json'
+  for ($n = 0; $n -lt 160; $n++) {
+    if ((Test-Path -LiteralPath $recA) -and (Test-Path -LiteralPath $recB)) { break }
+    Start-Sleep -Milliseconds 250
+  }
+  try { $null = $pa.WaitForExit(30000) } catch { }
+  try { $null = $pb.WaitForExit(30000) } catch { }
   $r12a = $null
   $r12b = $null
-  if (Test-Path -LiteralPath (Join-Path $root 'T12A.json')) { $r12a = Get-Content -LiteralPath (Join-Path $root 'T12A.json') -Raw | ConvertFrom-Json }
-  if (Test-Path -LiteralPath (Join-Path $root 'T12B.json')) { $r12b = Get-Content -LiteralPath (Join-Path $root 'T12B.json') -Raw | ConvertFrom-Json }
+  if (Test-Path -LiteralPath $recA) { $r12a = (Get-Content -LiteralPath $recA -Raw).Trim() | ConvertFrom-Json }
+  if (Test-Path -LiteralPath $recB) { $r12b = (Get-Content -LiteralPath $recB -Raw).Trim() | ConvertFrom-Json }
   Check 'T12-parallel-A' $r12a 'REFUSED_MEMORY_LIMIT' 'no-promotion'
   Check 'T12-parallel-B' $r12b 'REFUSED_MEMORY_LIMIT' 'no-promotion'
   $residue = @(Get-ChildItem -LiteralPath (Join-Path $d 'finalA') -File -ErrorAction SilentlyContinue).Count +
