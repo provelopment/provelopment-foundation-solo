@@ -1626,8 +1626,8 @@ fn g074_03_the_reserved_process_path_accepts_only_positive_os_gates() {
             "#[cfg(all(test, target_os = \"linux\"))]",
         ),
         (
-            "all(any, Linux)",
-            "#[cfg(all(any(unix, windows), target_os = \"linux\"))]",
+            "all(windows, all(test, windows))",
+            "#[cfg(all(windows, all(test, windows)))]",
         ),
     ] {
         assert!(
@@ -1671,6 +1671,14 @@ fn g074_04_no_ambiguous_predicate_establishes_an_os_proof() {
         ("target_family", "#[cfg(target_family = \"windows\")]"),
         ("cfg_attr only", "#[cfg_attr(windows, allow(dead_code))]"),
         ("malformed all()", "#[cfg(all())]"),
+        (
+            "all(any, Linux)",
+            "#[cfg(all(any(unix, windows), target_os = \"linux\"))]",
+        ),
+        (
+            "all(windows, Linux)",
+            "#[cfg(all(windows, target_os = \"linux\"))]",
+        ),
     ] {
         for location in [RESERVED_PROCESS_MODULE, SOURCE_READ_MODULE] {
             assert!(
