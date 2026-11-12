@@ -1,165 +1,135 @@
 # Execution Report
 
-**Order:** `OWNER-ISSUED — SOLO-WO-069 R01` — R03.C3 AVIF decoder runtime, provenance and enforceable-resource-bound qualification on Linux and Windows.
-**Matching Owner→Implementation Agent handoff:** `SOLO-WO-069 R01`.
-**Session date (ISO):** 2026-11-12 (UTC; research and CI executed 2026-11-12T03:40–04:25Z).
-**Root:** the single verified Owner-local checkout of `provelopment/provelopment-foundation-solo`; one worktree, sole `origin`.
-**Decision: `BLOCKED`.** Real pixel decoding is **proven** on both accepted hosts — 12 published fixtures decoded to identical plane-byte digests on Linux and Windows, 13 hostile inputs refused at the correct layer, and the candidate-scoped, policy-unchanged `cargo-deny` gate passed. The candidate is nevertheless **`BLOCKED` on Solo's bounded-decoder requirement**: neither `oxideav-avif 0.0.11` nor `oxideav-av1 0.1.23` exposes any caller-visible allocation, working-set or cancellation budget, and `oxideav-core`'s `DecoderLimits` type has **zero call sites** in either crate. Per this order's own rule, absent an enforceable memory/CPU limit the bounded-decoder gate is `BLOCKED` regardless of ordinary fixtures passing. `R03.C3`, `R03.C` and Stage 03 remain **OPEN**; nothing here approves a decoder, a runtime dependency or a media claim.
+**Order:** `OWNER-ISSUED — SOLO-WO-070 R01` — R03.C3 AVIF recovery: prove hard OS-enforced decoder isolation on Linux and Windows (non-product).
+**Matching Owner→Implementation Agent handoff:** `SOLO-WO-070 R01`.
+**Report date (ISO):** 2026-11-12 (run window 2026-11-12T05:05–05:5xZ).
+**Decision: `OS-ISOLATION-PROVEN`** — for the bounded experimental harness only. On **both** `ubuntu-24.04` and `windows-2025`, every mandatory containment control was installed **before the workload's first instruction**, was read back from the operating system, and demonstrably denied deliberate memory, CPU, wall-time and descendant escapes; the accepted 12-fixture / 13-negative corpus then reproduced its exact decoded-plane digests inside those limits. **No decoder is approved, no product code or contract changed, `R03.C3`/`R03.C`/Stage 03 remain OPEN.**
 
 ## 1. Anchors, ledger and CI history
 
 | Anchor | Value |
 | --- | --- |
-| Starting `main` / tree | `74f302825f1ffc82202e54fcdfd0feb7679c03da` / `babe210fe55d825ce2977c2387cdc827847cbd4d` |
-| Starting report blob | `60eabdbca10c1bbb8696024b879ff99e6fdce6c5` (`SOLO-WO-068 R01 — COMPLETE`) |
-| Baseline WIP | ACTIVE `cb3f9af8…`, NEXT `92fa562b…`, ROADMAP `9d7a8622…`, OUTLOOK `cb9c7a61…` |
-| **Issuance** | `21eb87dce64747557df5478cdae314fa7c745bdd`, tree `2438b5a7425edb0eb7682a163f8f34ee96bd6e28`, parent `74f3028…`, **ACTIVE alone** → `7af728e7…` |
-| Issuance CI (`rust-verify`) | run `43148927532` **success** — Ubuntu job `130953245728` (407 passed), Windows job `130953246073` (412 passed), 33 steps, 0 failures |
-| **Proof branch** | `solo-wo-069-r01` — 7 commits, HEAD `e6162cdf733ea3136e96cbc139e46a6daf4054ee`, tree `8865f49c34e6f0b362144e4913264b95c96092e0`, local `==` `origin/solo-wo-069-r01` |
-| Preserved | divergent `solo-wo-061-r01` at `4371af21dce67f33cf1df0384738bf353ca80fc6`, unchanged on local and GitHub |
-| Final `main` before this report | `21eb87dc…`, clean tree, three branches only (`main`, `solo-wo-061-r01`, `solo-wo-069-r01`) |
+| Starting `main` / tree | `4372c9e36e852cd28215aa2b53c2dcc8387b8e5b` / `b683f17fd999cc06db2d31a1df05e0a193711bd7` |
+| Starting report blob | `a891ad95ea0c6f7958bbb1c5434fb8db8a3e9503` (`SOLO-WO-069 R01`, `BLOCKED`) |
+| Baseline WIP | ACTIVE `7af728e7…`, NEXT `92fa562b…`, ROADMAP `9d7a8622…`, OUTLOOK `cb9c7a61…` |
+| **Issuance** | `e8a90421f9577bb000642ad2712da25265fe1b82`, tree `e44485ae954937c8b9b0fcd8e25beb9d07775265`, parent `4372c9e3…`, **ACTIVE alone** → `0d3edb13…` |
+| Issuance CI (`rust-verify`) | run `43157117182` **success**, both hosts |
+| **Proof branch** | `solo-wo-070-r01` — 8 commits, HEAD `d270f95cad10db11b67d2cbc68a5c593ecbbc7c8`, tree `561afc065969448ae2b4774ed41e961ae0f1fce5`, local `==` `origin/solo-wo-070-r01` |
+| **Branch CI** | run `43162966403` **success** — jobs `130998200678` (`ubuntu-24.04`) and `130998200950` (`windows-2025`), 24 steps each, 0 failures |
+| Preserved | `solo-wo-061-r01` = `4371af21…`, `solo-wo-069-r01` = `e6162cdf…` (unchanged, local and GitHub) |
 
-**Path ledger actually written** — exactly the five authorized proof paths and nothing else (`git diff --stat main..HEAD`: 5 files, 2,109 insertions, **zero product changes**): `verification/avif-r03-c3/Cargo.toml`, `…/Cargo.lock`, `…/src/lib.rs`, `…/src/main.rs`, `.github/workflows/avif-qualification.yml`. The probe declares its own `[workspace]`, so the product lockfile, workspace, build and `rust-verify.yml` are untouched; `rust-verify` does not trigger on the branch. One declaration beyond the order's manifest template was required: `license = "Apache-2.0"` on the unpublished proof crate, because the unchanged policy scans private crates (`licenses.private.ignore = false`) and otherwise reported `error[unlicensed]`. It adds no dependency and relaxes no check.
+**Import and ledger.** `git restore --source=e6162cdf… --staged --worktree --` restored exactly the five WO-069 proof paths; all five staged blobs were verified byte-identical to the source commit before commit `c1fe36e`. The branch then changed exactly the seven paths this order allows — `Cargo.toml` (unchanged content), `Cargo.lock` (unchanged content), `src/lib.rs` (unchanged content), `src/main.rs`, `limit-linux.sh` (new), `limit-windows.ps1` (new), `.github/workflows/avif-qualification.yml` — 3,658 insertions against the issuance revision, **zero product paths**. No PR, merge, reset, clean, stash, amend, rebase, force-push or second checkout.
 
-**Branch CI history — every red attempt, not just the final green.** `43149963741` rejected the workflow file (job-level `env` cannot use the `runner` context); `43151024369` failed on a CRLF-split compiler assertion and a real type error (`decode_file` surfaces `oxideav_core::Error`); `43151359679` exposed four misclassified harness cases; `43151974231` added full per-case records and hardened the brand mutation; `43152695894` fixed the Windows digest suffix and the unlicensed proof crate; `43153380676` fixed a tree-dirtying identity file; **`43154012989` — both hosts green**, jobs `130969623509` (ubuntu-24.04) and `130969623553` (windows-2025), 24 steps each, 0 failures, 8 skips (the other host's steps). Every fix touched only allowed proof paths; no pin, limit, scanner, licence allowlist or policy was ever changed to obtain green.
+**Red attempts, honestly listed.** `43158770912` — Linux child did not yet publish its own limit readback and the descendant probe exited voluntarily (no wall kill). `43159301411` — Linux 20/20 green; Windows aborted after T02 because PowerShell parses the hex literal `0xC0000409` as a negative `Int32`, so casting it to `UInt32` threw. `43160070536` — Windows reached 15/17; parallel probes produced no record (`Environment.TickCount64` does not exist on the .NET Framework host they inherited). `43160786070`, `43161558074`, `43162276350` — successive parallel-probe fixes (same-host spawn, clean record files, pre-quoted argument line). **`43162966403` — both hosts green.** Every fix touched only allowed proof paths; no limit, threshold, pin, licence allowlist or policy was ever weakened to obtain green.
 
-## 2. Candidate graph, security and provenance
+## 2. How containment is enforced
 
-**Exact pins, resolved standalone** (`cargo metadata --locked`: 18 packages, 17 third-party, **no duplicate package names**):
+### Linux — `verification/avif-r03-c3/limit-linux.sh`
 
-| Package | Version | Licence | Checksum (lock = crates.io) |
+A `bash` launcher that, **before the contained program executes anything**, installs hard *and* soft kernel limits in a fresh session and then `exec`s the workload:
+
+```bash
+setsid bash -c '
+  ulimit -Sv "$PROBE_MEM_KIB" || exit 90   # RLIMIT_AS soft   (524288 KiB = 512 MiB)
+  ulimit -Hv "$PROBE_MEM_KIB" || exit 90   # RLIMIT_AS hard
+  ulimit -St "$PROBE_CPU_SEC" || exit 90   # RLIMIT_CPU soft  (10 s)
+  ulimit -Ht "$PROBE_CPU_SEC" || exit 90   # RLIMIT_CPU hard
+  exec "$@"                                # only the locally built proof binary
+' bash "${cmd[@]}" &
+```
+
+Before launching, the launcher proves in a throw-away subshell that the limits can be installed **and** that the hard limit cannot be raised again (`ulimit -Hv 536870912` then `ulimit -Hv 537870336` must fail); if either check fails it refuses with `REFUSED_CONTAINER_UNAVAILABLE` and never starts a workload. A finite wall watchdog (poll + deadline) sends `SIGTERM`, then `SIGKILL`, to the whole **process group**, and after every `wait` it sweeps `kill -KILL -$pid` so no group member can outlive the supervisor on the normal-exit path either. Limits are applied soft-before-hard because the kernel rejects a hard limit below an `unlimited` soft limit with `EINVAL` — a fault the first CI run surfaced and the launcher now handles explicitly.
+
+**Readback from inside the child** (`/proc/self/limits`, promoted as `limits.json`): `as_hard = 536870912` bytes, `cpu_hard = 10` s — the values the *workload itself* observed, not the launcher's intent.
+
+### Windows — `verification/avif-r03-c3/limit-windows.ps1`
+
+Narrowly scoped in-script C# `Add-Type` P/Invoke over the documented Job Object API: `CreateJobObjectW`, `SetInformationJobObject`, `QueryInformationJobObject`, `CreateProcessW`, `AssignProcessToJobObject`, `IsProcessInJob`, `ResumeThread`, `WaitForSingleObject`, `TerminateJobObject`, `GetExitCodeProcess`, `CloseHandle`. The child is created **`CREATE_SUSPENDED`**, assigned to the limited job, verified with `IsProcessInJob`, and only then resumed — so it cannot execute a decoder instruction outside the job. Every return value is checked; any failure at `create-job`, `set-info`, `query-info`, `verify-flags`, `verify-cpu`, `verify-memory`, `create-process`, `assign`, `is-in-job` or `resume` refuses (and terminates the job) instead of falling back to an unconfined run.
+
+Effective limits read back from the kernel with `QueryInformationJobObject(JobObjectExtendedLimitInformation)` **before** `ResumeThread`:
+
+| Flag bits (`limit_flags = 8962` = `0x2302`) | Value observed |
+| --- | --- |
+| `JOB_OBJECT_LIMIT_PROCESS_TIME` `0x2` | `per_process_user_time_100ns = 100000000` (10 s normal, `20000000` = 2 s in the CPU probe) |
+| `JOB_OBJECT_LIMIT_PROCESS_MEMORY` `0x100` | `process_memory_limit = 536870912` (512 MiB; `67108864` = 64 MiB in the memory probe) |
+| `JOB_OBJECT_LIMIT_JOB_MEMORY` `0x200` | `job_memory_limit = 536870912` (identical to the process limit) |
+| `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` `0x2000` | set; verified by observation (see §3) |
+
+After completion the supervisor queries `JOBOBJECT_EXTENDED_LIMIT_INFORMATION` again for `PeakProcessMemoryUsed`/`PeakJobMemoryUsed` and `JOBOBJECT_BASIC_ACCOUNTING_INFORMATION` for job user time and `TotalProcesses`/`ActiveProcesses`. The 15 s parent deadline independently calls `TerminateJobObject` and waits for termination.
+
+### Refusal and output discipline (both hosts)
+
+One typed outcome per run: `OK`, `REFUSED_INPUT_TOO_LARGE`, `REFUSED_INPUT_MISSING`, `REFUSED_CONTAINER_UNAVAILABLE`, `REFUSED_CHILD_CREATION`, `REFUSED_MEMORY_LIMIT`, `REFUSED_CPU_LIMIT`, `REFUSED_WALL_TIMEOUT`, `REFUSED_ABNORMAL_EXIT`, `REFUSED_DIGEST_MISMATCH`, `REFUSED_MISSING_OUTPUT`. Each case runs with its own staging directory; the parent hashes the staged decoded-plane file with the **host tool** (`sha256sum` / `Get-FileHash`) and promotes files into the final directory **only** on `OK` plus a digest match. On any refusal every staged byte is deleted and the final directory stays empty — the number discarded is recorded.
+
+## 3. Result matrix — same tests, both hosts, all executed
+
+Each row is a real invocation of the containment supervisor; the numbers are from the green run `43162966403`. Linux reports 20 assertions, Windows 17 (Linux splits CPU/wall/accounting/residue into separate assertions; Windows folds them into the record plus two job-specific checks).
+
+| Test | Linux (`ubuntu-24.04`) | Windows (`windows-2025`) |
+| --- | --- | --- |
+| **T01** limits present before the workload | `OK`, `enforceable=1`; child read back `as_hard=536870912`, `cpu_hard=10` from `/proc/self/limits` | `OK`, `enforceable=1`, `limit_flags=8962`, cpu `100000000`, process/job memory `536870912`, `total_processes=2`, `peak_job=2 088 960` |
+| **T02** real decode inside the limits | `OK`; promoted `red.avif` digest `205691271feb77cc0f208f495bf466e2fb9a9733d816b2d2355f05eb6c15552c` | identical `OK` and identical digest |
+| **T03** 64 MiB cap vs 128 MiB touch | `REFUSED_MEMORY_LIMIT`, `signal=6` (SIGABRT), exit `134`, wall `105 ms`, nothing promoted | `REFUSED_MEMORY_LIMIT`, exit `0xC0000409` (abort), `peak_process_bytes=12 070 912`, `peak_job_bytes=13 463 552` under a `67 108 864` job cap |
+| **T04** 2 s CPU cap vs 20 s spin | `REFUSED_CPU_LIMIT` at `child_cpu_sec=2.065`, SIGKILL | `REFUSED_CPU_LIMIT`, job user time `5 203 125` × 100 ns = **5.203 s**, exit `0xC0000044` |
+| **T05** 2 s wall cap vs 20 s sleep | `REFUSED_WALL_TIMEOUT`, `wall_ms=2234`, SIGTERM | `REFUSED_WALL_TIMEOUT`, `terminated=true`, `wall_ms=2010`, `active_processes=0` |
+| **T06** descendant cannot outlive the group | `REFUSED_WALL_TIMEOUT`, **`surviving_descendants=0`**, one staged file discarded | `REFUSED_WALL_TIMEOUT`, `total_processes=3`, `active_processes=0`, **`surviving_descendants=0`** |
+| **T07** 20 MiB+1 input | `REFUSED_INPUT_TOO_LARGE`, `child_started=0` | same, `child_started=0` |
+| **T08** post-decode digest mismatch | `REFUSED_DIGEST_MISMATCH`, `final_files=0` | same |
+| **T09** workload cannot be created | `REFUSED_CHILD_CREATION` (exit 127) | `REFUSED_CHILD_CREATION`, `job_stage=create-process`, error 2 |
+| **T10** unusable containment configuration | `REFUSED_CONTAINER_UNAVAILABLE`, `child_started=0` | same, `child_started=0` |
+| **T11** the whole accepted corpus | `PASS` 25/25 — digests 12/12, refusals 13/13 | `PASS` 25/25 — digests 12/12, refusals 13/13 |
+| **T12** two simultaneous contained workloads | both `REFUSED_MEMORY_LIMIT`, zero promoted | both `REFUSED_MEMORY_LIMIT`, zero promoted |
+| **Suite totals** | **`passed=20 failed=0`** | **`passed=17 failed=0`** |
+
+**Corpus preservation, measured independently on each host.** All twelve positives decoded inside the 512 MiB / 10 s / 15 s isolation and their promoted plane files re-hash to the exact WO-069 values:
+
+`alpha_video` `3d26373d…b123`, `bbb_alpha` `ad25ae28…4f6f`, `black420` `d7928dbf…63bb`, `gray32` `ca707edb…f3d5`, `midgray` `b4052e74…6d8a`, `red` `205691271…552c`, `white16` `dec238c0…6f42`, `monochrome` `458ee397…8022`, `kimono_rotate90` `efcc7c58…5a5c`, `fuzz/y_plane_divergence_match` `3a9b88a3…63ec`, `fuzz/y_plane_roundtrip_avif1` `e5ebc9d1…cdc8`, `fuzz/y_plane_roundtrip_avif2` `e621abf7…96ae` — `promoted_plane_files=12` on **both** hosts, byte-for-byte equal digests across platforms.
+
+All thirteen negatives kept their exact refusals inside isolation: `neg:empty` → `contract.zero_length`; `neg:input_over_20mib` → `contract.max_input_bytes`; `neg:declared_width_8193` → `contract.max_dimension`; `neg:declared_pixels_over_32m` → `contract.max_pixels`; and nine decoder refusals (`random_short`, `ftyp_truncated`, `header_only`, `av1c_only`, `truncated_60pct`, `truncated_85pct`, `tile_corrupt`, `invalid_brand`, `trailing_garbage`). The 20 MiB / 8,192-side / 32,000,000-pixel preconditions still fire with checked `u64` multiplication **before** decoding, and containment never converted a guard violation into an acceptance.
+
+## 4. Dependency, licence and scanner posture (unchanged)
+
+The probe keeps its own `[workspace]`, `publish = false`, `license = "Apache-2.0"` (so the unchanged private-crate licence scan can see it) and `#![forbid(unsafe_code)]` for its Rust sources. The exact three pins are unchanged — `oxideav-avif =0.0.11`, `oxideav-av1 =0.1.23`, `oxideav-core =0.1.43` — resolving to the same 18-package graph (17 third-party, zero duplicate versions), and `Cargo.lock` is byte-identical to the accepted WO-069 lockfile. No new third-party root, no vendored source, no native codec tool.
+
+The pinned, SHA-256-verified `cargo-deny 0.20.2` gate ran against the probe graph with the **unaltered** repository `deny.toml`:
+
+| Host | Archive SHA-256 | RustSec db commit | Result |
 | --- | --- | --- | --- |
-| `oxideav-avif` | `0.0.11` | MIT | `3c9409908f9669e2e16e5c7df885c9d20a8031b49deb505696f567eb73387e91` |
-| `oxideav-av1` | `0.1.23` | MIT | `7dec67272ed34e5108b1c403a1d34ad80b228edec0604fb0f8d0e5d5b561591d` |
-| `oxideav-core` | `0.1.43` | MIT | `ce90bfbe978dfc46d0c98d137b7c4566ac8eaae8c9209585eb53a8aedb0ef53c` |
+| ubuntu-24.04 | `9f12ed4c49936e09b48bf862b595cde2fe64fcbd9d74dfacac6131ca824c8d5f` | `fd6f39814c4d3c359fdbe223d0280dec4933f78f` | advisories ok, bans ok, licences ok, sources ok — **0 errors, 0 warnings** each (16 licence notes) |
+| windows-2025 | `975a22143262fd27476d19ee00c7af67978426e40e1dee94eed6bbade1cf87dc` | `fd6f39814c4d3c359fdbe223d0280dec4933f78f` | same, 0 errors / 0 warnings |
 
-Transitives: `bytemuck 1.25.2`, `itoa 1.0.19`, `memchr 2.8.3`, `proc-macro2 1.0.107`, `quote 1.0.47`, `serde 1.0.229`, `serde_core 1.0.229`, `serde_derive 1.0.229`, `serde_json 1.0.154`, `syn 3.0.10`, `thiserror 2.0.21`, `thiserror-impl 2.0.21`, `unicode-ident 1.0.27`, `zmij 1.0.23`. Every expression holds a branch already allowed by the unchanged `deny.toml` (`MIT`/`Apache-2.0`/`Unlicense`; `unicode-ident` remains `(MIT OR Apache-2.0) AND Unicode-3.0`). No `MPL-2.0`, no GPL/AGPL/SSPL, no commercial expression, no `avif-parse`, no `rav1d`, no `nasm-rs`, no `cc`, no `miniz_oxide`, no `png`/`flate2` — i.e. the three `SOLO-WO-067 R01` blockers are **absent from this graph**, not waived. Committed probe lockfile blob SHA-256: `fe84e1a2f43fc71545462f88d5b36ea279f5b39810756db91b05c73399be2e7e` (163 lines). The per-host working-file hashes differ only because the Windows checkout converts to CRLF; the committed blob is the LF content hashed above.
+The inherited `Unicode-3.0` `license-not-encountered` **note** remains an outstanding, non-suppressed release obligation and stays `UNVERIFIED`; it is a notice duty, not a security finding. Provenance gaps from WO-069 are unchanged and unresolved by an OS sandbox: the three self-descriptions still conflict ("orphan-rebuild scaffold", "partial intra", "stub — real decode pending AV1 tile support"), and an isolation proof says nothing about AVIF conformance or package origin.
 
-**No build scripts, no native, no FFI, no assembly:** none of the three `oxideav` crates ships a `build.rs`, and a whole-graph scan finds no `asm!`/`global_asm!`/`extern "C"`. `unsafe` blocks/fns: `oxideav-avif` 0, `oxideav-av1` 2, `oxideav-core` 7 (arena/bits internals). The proof crate is `#![forbid(unsafe_code)]`.
+## 5. Limitations and measurement gaps (stated, not hidden)
 
-**Candidate-scoped security gate — unchanged policy, both hosts, both green:**
+1. **The CPU cap is periodic on Windows.** `PerProcessUserTimeLimit` was set to 2 s, yet the probe consumed **5.203 s** of job user time before termination (exit `0xC0000044`). Windows enforces job time limits on a periodic check, so a CPU cap is a *strong* bound, not a to-the-second timer. Linux `RLIMIT_CPU` was precise (`2.065 s`). The 15 s wall deadline is the hard outer bound on both hosts.
+2. **Linux `RLIMIT_AS` is virtual address space, not RSS.** It bounds what the process may *address*; it is not a resident-set measurement and is never reported as one. The `/proc/<pid>/status` peaks from WO-069 were observations and are not used here as caps.
+3. **Windows memory accounting is commit-based.** In T03 the process peaked at 12,070,912 bytes of *committed* memory before the 128 MiB reservation was denied by the `67 108 864`-byte job limit — the denial is real, but the peak figure is not the requested allocation size.
+4. **Windows per-child RSS is still not measured** (no native API this order allows). Per-case CPU and commit come from job accounting; RSS is not claimed.
+5. **Quality limits from WO-069 are unchanged.** All twelve positives are **8-bit stills**; **10/12-bit, grid composition and AVIS image sequences remain `UNVERIFIED`** — no permissible vector for them was produced or used.
+6. **`kimono_rotate90` orientation is recorded separately**, not proven: its planes arrive transposed relative to the declared 1024×722 geometry (`geometry_orientation=transposed_relative_to_reported_dimensions`). A digest match inside isolation proves *reproducibility*, **not** geometric correctness.
+7. **No independent alpha or transform golden exists.** The two 4-plane alpha fixtures decode reproducibly and pass geometry checks; that is not an external expectation, and no `PASS` is awarded for alpha/transform correctness.
+8. **A successful decode never cancels an isolation failure**, and every failure above is a distinct typed refusal rather than a codec verdict.
 
-| Host | Scanner | Archive SHA-256 | RustSec db commit | Result |
-| --- | --- | --- | --- | --- |
-| ubuntu-24.04 | `cargo-deny 0.20.2` | `9f12ed4c49936e09b48bf862b595cde2fe64fcbd9d74dfacac6131ca824c8d5f` | `fd6f39814c4d3c359fdbe223d0280dec4933f78f` | `advisories ok`, `bans ok`, `licenses ok` (16 notes), `sources ok` |
-| windows-2025 | `cargo-deny 0.20.2` | `975a22143262fd27476d19ee00c7af67978426e40e1dee94eed6bbade1cf87dc` | `fd6f39814c4d3c359fdbe223d0280dec4933f78f` | all four classes pass |
+## 6. Acceptance ledger
 
-The scanner archive SHA-256 values are byte-identical to the pins already used by `rust-verify.yml`; the advisory database was fetched fresh on each host in that run. The gate ran with `--manifest-path verification/avif-r03-c3/Cargo.toml` against the **unaltered** repository `deny.toml` (`multiple-versions = "deny"`, `wildcards = "deny"`, `yanked = "deny"`, bans list, empty `skip`/`skip-tree`, no ignore, no waiver). Inherited `Unicode-3.0` `license-not-encountered` remains an outstanding, **non-suppressed** release obligation and is reported `UNVERIFIED`, not cleared.
-
-**Provenance — three mutually inconsistent self-descriptions, reconciled by measurement.** Published metadata and tagged upstream source disagree with each other *and* with observed behaviour:
-
-- crates.io `oxideav-av1 0.1.23` description: *"Pure-Rust AV1 codec — orphan-rebuild scaffold pending clean-room re-implementation."*
-- GitHub `OxideAV/oxideav-av1` (MIT, 5 stars, last push 2026-11-11): *"Pure-Rust AV1 decoder — OBU + sequence/frame header parse, range decoder, **partial intra**"*.
-- GitHub `OxideAV/oxideav-avif` (MIT, 1 star, last push 2026-11-10): *"AVIF image codec **stub** — reserves codec id, **real decode pending AV1 tile support**"*.
-
-The shipped tarballs contradict the pessimistic wording: `oxideav-av1 0.1.23` contains a 137 kLoC AV1 implementation (`cdf.rs` alone ≈26 k lines of partition/mode/coefficient/CDF logic, plus frame driver, tile list, CDEF and loop restoration) and 2,104 `#[test]`s; `oxideav-avif 0.0.11` contains 23 kLoC, 804 `#[test]`s and 12 committed AVIF fixtures. The crate's own math modules are annotated `## Derivation (clean-room)`, i.e. the clean-room work the description still says is "pending" has in fact landed. What the descriptions are **right** about is *completeness*: "partial intra" and "pending tile support" are not refuted by this run. **Therefore: decoding is demonstrated for this corpus; AV1/AVIF feature completeness across the format is `UNVERIFIED`, and the component is three days old with 152 downloads at pin time — a provenance risk the Architect must weigh, not something this agent may waive.** Version currency was recorded, not acted on: 0.0.17 exists for `oxideav-avif`, and the order forbids substitution, so the exact ordered pins were used.
-
-## 3. Runtime evidence — real pixels, both hosts, identical bytes
-
-**Positive corpus: 12 of 12 published fixtures decoded to real planes on both hosts** (`TOTAL pass=25 unverified=0 fail=0` on each host). Dimensions, depth and plane bytes are the decoder's own report; the digest is SHA-256 over the full serialized plane sequence (plane index + stride + length + bytes).
-
-| Fixture | Reported | Depth | Plane bytes | Decoded-pixel SHA-256 (identical Linux/Windows) | Independent oracle |
-| --- | --- | --- | --- | --- | --- |
-| `alpha_video.avif` | 640×480 | 8 | 768,000 | `3d26373d70bb0b2f0ced1ec923f1f51a592dd45e6e05706569e9994714e6b123` | none (alpha, 4 planes) |
-| `bbb_alpha.avif` | 3840×2160 | 8 | 20,736,000 | `ad25ae289b08e19c58b27a60a538f82e2085876ee9aa265a922bdffe10844f6f` | none (alpha, 4 planes) |
-| `black420.avif` | 32×32 | 8 | 1,536 | `d7928dbf7570fb114f49e426af9f36e70a9b4450b493cfbf6767826ab1cf63bb` | **PASS** uniform black + neutral chroma |
-| `gray32.avif` | 32×32 | 8 | 1,024 | `ca707edbab56569fcbef9523c0a6661caf2de0f0b7e205169ba2a246a3a3f3d5` | **PASS** constant luma, neutral chroma |
-| `midgray.avif` | 64×64 | 8 | 4,096 | `b4052e7408e5fa2bc3bdcd8aab8d1f85893825d36bb13b13f1112e6b7fce6d8a` | **PASS** constant luma, neutral chroma |
-| `red.avif` | 64×64 | 8 | 12,288 | `205691271feb77cc0f208f495bf466e2fb9a9733d816b2d2355f05eb6c15552c` | **PASS** mean Cr ≫ mean Cb (red direction) |
-| `white16.avif` | 16×16 | 8 | 256 | `dec238c044dec03455ecb89858492569cbd64026adca0a2e824a8dafa906bf42` | **PASS** high constant luma |
-| `monochrome.avif` | 1280×720 | 8 | 921,600 | `458ee397ada68eba9c90e4b7be795e5e5bc32f6f430487d4aecbf03831a18022` | none (single plane) |
-| `kimono_rotate90.avif` | 1024×722 | 8 | 1,108,992 | `efcc7c58f0e80849c9b608d04719fe2b5c05d22349bee554d9501c45db235a5c` | none; transform flagged (below) |
-| `fuzz/y_plane_divergence_match.avif` | 1×1 | 8 | 3 | `3a9b88a38126b58fcb8778dd9dc13b290abbcfeb8a75d979971b7fa0894463ec` | none (1×1) |
-| `fuzz/y_plane_roundtrip_avif1.avif` | 1×1 | 8 | 3 | `e5ebc9d14b9a73377954928bd88a598ec42fb8913fdd12085f735a3f0aa2cdc8` | none (1×1) |
-| `fuzz/y_plane_roundtrip_avif2.avif` | 1×1 | 8 | 3 | `e621abf7fd5963ae4691389eb97719d38963fc74f970f812f7fd179e045096ae` | none (1×1) |
-
-**Cross-host equality was measured, not assumed:** the two hosts' evidence tables were compared case by case — **12 fixture rows each, 0 digest mismatches, 0 missing rows**. Each host additionally hashed the raw plane files it wrote with its own tool (`sha256sum` / `Get-FileHash`) and matched the harness digest **12/12 on both hosts**, so the in-crate SHA-256 (also pinned by NIST/FIPS vectors) cannot be silently wrong on either platform. The probe's own unit tests — contract boundaries, negative-builders, oracles, serialization and the two SHA-256 vectors — passed **7/7 on Linux and 7/7 on Windows**.
-
-**Independent oracles.** For the five synthetic solid-colour fixtures the harness asserts properties derived from AV1/YCbCr colour semantics, not from this decoder's output: uniform luma with bounded value for black/white, constant luma with neutral chroma for the two greys, and a chroma direction (mean Cr ≫ mean Cb) for red. All five passed on both hosts. This is genuine external reasoning about expected pixel content; it is *not* an external decoder comparison, and the eight remaining fixtures have **no independent expected pixels**, which is recorded as `oracle=NONE` rather than claimed as correctness.
-
-**Alpha** was exercised on two fixtures (4-plane Yuva420P, alpha plane at full resolution) — both decoded with consistent geometry. **Transforms**: `kimono_rotate90.avif` decoded to planes whose stride (722) matches the *pre-rotation* height while the container reports 1024×722, so the harness recorded `geometry_orientation=transposed_relative_to_reported_dimensions`. That is a real behavioural property worth recording: a consumer trusting `info.width/height` alone would misinterpret this buffer.
-
-**Mandatory refusal matrix — 13/13 refused, each at the layer that actually caught it:**
-
-| Case | Outcome | Guard reached |
+| Gate | Verdict | Evidence |
 | --- | --- | --- |
-| `neg:empty` | REFUSED_BY_HARNESS_CONTRACT | `contract.zero_length` |
-| `neg:input_over_20mib` (20 MiB + 1) | REFUSED_BY_HARNESS_CONTRACT | `contract.max_input_bytes` |
-| `neg:declared_width_8193` | REFUSED_BY_HARNESS_CONTRACT | `contract.max_dimension` (after a *successful* container inspection reporting 8193, so the dimension gate is provably reachable) |
-| `neg:declared_pixels_over_32m` (8192×8192) | REFUSED_BY_HARNESS_CONTRACT | `contract.max_pixels` (post-inspection) |
-| `neg:random_short` | REFUSED_BY_DECODER | decoder |
-| `neg:ftyp_truncated` | REFUSED_BY_DECODER | decoder |
-| `neg:header_only` | REFUSED_BY_DECODER | decoder |
-| `neg:av1c_only` | REFUSED_BY_DECODER | decoder |
-| `neg:truncated_60pct` / `neg:truncated_85pct` | REFUSED_BY_DECODER | decoder |
-| `neg:tile_corrupt` (mdat payload XOR) | REFUSED_BY_DECODER | decoder |
-| `neg:invalid_brand` (major **and** every compatible brand corrupted) | REFUSED_BY_DECODER | decoder |
-| `neg:trailing_garbage` (+64 bytes 0xA5) | REFUSED_BY_DECODER | decoder |
+| `S070-01` | **PASS** | Verified sole checkout/worktree/`origin`, exact baseline SHA/tree/blobs and the `OWNER-ISSUED — SOLO-WO-070 R01` handoff; ACTIVE-only issuance `e8a90421…` with correct parent/tree/blob and everything else untouched; original `rust-verify` `43157117182` green on both hosts at that SHA. |
+| `S070-02` | **PASS** | One new branch `solo-wo-070-r01`; the five WO-069 proof paths restored per-path from `e6162cdf…` with all staged blobs verified identical; only the seven listed proof paths changed; `solo-wo-061-r01`, `solo-wo-069-r01` and every product path preserved. |
+| `S070-03` | **PASS** | Real pre-exec `RLIMIT_AS`+`RLIMIT_CPU` (soft and hard) inside a new session, un-raiseability proven, child readback `as_hard=536870912`/`cpu_hard=10`, and negative injections T03/T04/T05/T06 all denied (`SIGABRT`; `SIGKILL` at 2.065 s CPU; `SIGTERM` at 2.234 s wall; 0 descendants). |
+| `S070-04` | **PASS** | Job Object with `0x2302` flags, process/job memory and per-process CPU limits set, `QueryInformationJobObject` verified before `ResumeThread`, suspended→assign→`IsProcessInJob`→resume, `TerminateJobObject` on deadline; memory/CPU/wall/descendant denials demonstrated with query evidence and peaks. |
+| `S070-05` | **PASS** | Descendant containment on both hosts with `surviving_descendants=0` (Windows `total_processes=3 → active_processes=0`); every refused case left `final_files=0` and reported the staged bytes it discarded. |
+| `S070-06` | **PASS** | 25/25 corpus cases inside the normal isolation on both hosts, 12/12 exact repeat digests, 13/13 refusals, guards reached before decoding; no claim about 10/12-bit, grid, AVIS, alpha-golden or rotation correctness. |
+| `S070-07` | **PASS** | Exact three-root locked graph unchanged, `Cargo.lock` byte-identical, no new root, pinned verified `cargo-deny 0.20.2` on both hosts with 0 errors **and 0 warnings**, provenance gaps and the continuing `Unicode-3.0` notice obligation reported. |
+| `S070-08` | **PASS** | Branch CI `43162966403` completed successfully at `d270f95c…` with every mandatory step executed on both hosts; no `continue-on-error`, no masked exit, no optional skip. |
+| `S070-09` | **PASS** | One truthful verdict (`OS-ISOLATION-PROVEN`, scoped to the harness); no decoder approval, no product edit, no licence waiver, `R03.C3`/`R03.C`/Stage 03 open. |
+| `S070-10` | **PASS** | Report-only commit on `main` with remote readback, green unchanged `rust-verify` at this HEAD, one clean checkout, three preserved branches, task scratch removed (§7). |
 
-No case panicked, hung, was silently truncated, or returned a partial image; no timeout (15,000 ms hard per-case budget in a separate OS process) was ever reached, and no unlisted/internal input was introduced — every byte came from the published package's own fixtures.
+## 7. Preservation, cleanup and next action
 
-**Coverage honestly bounded.** All decoded fixtures are **8-bit still images**; `has_alpha` was true for 2, `is_grid` was **false for all 12**, and no AVIS sequence was exercised. Therefore **10-bit, 12-bit, grid-composition and image-sequence decoding are `UNVERIFIED`** — the published asset set contains no such case, and this run did not synthesise one. That gap matters for "four-format media verification" and is not glossed over.
+One checkout, one worktree, one `origin`; `main` clean and equal to `origin/main`; four branches only — `main`, preserved `solo-wo-061-r01` (`4371af21…`), preserved `solo-wo-069-r01` (`e6162cdf…`) and the pushed qualification branch `solo-wo-070-r01` (`d270f95c…`) — left intact for independent review. WIP is exactly four files; `plan-*.md`, Architecture, About, SOPs, root `Cargo.toml`/`Cargo.lock`, `deny.toml`, `rust-toolchain.toml`, all product crates and `rust-verify.yml` are byte-identical to the issuance revision. Ignored `target/` and the inherited `.temp/` archives (2 files / 289,253,806 bytes: `mingw.zip`, `rustup-init.exe`) are untouched; task-owned CI logs, local probe scratch and report composition parts were deleted at run end, with no unknown or Owner-owned material removed and no destructive Git command used. Local pre-CI validation was limited to syntax parsing plus supervisor smoke tests in disposable scratch; no local binary was ever built, so **no decode result is claimed from this workstation** — every decode figure in §3 comes from the two CI hosts.
 
-## 4. Resource evidence and the decisive gate
+**Next smallest architectural action** (Architect/Owner decision, not taken here): decide whether this containment model becomes the accepted mechanism for the future AVIF path — per-image invocation of the decoder inside a supervisor that (a) refuses before launch on size/dimension/pixel grounds, (b) installs an OS commit/address-space ceiling, a CPU ceiling and a wall deadline, and (c) promotes output only after an independently verified digest. If accepted, the follow-on order should specify that adapter's contract (which ceilings, who owns the supervisor, how it composes with the unlisted-representation and publication rules) **before** any product code — and it would still leave AVIF conformance, 10/12-bit, grid and AVIS coverage unproven. `R03.C3` cannot be closed on the strength of this order.
 
-**Measured per case, in a separate OS process, with a hard 15,000 ms budget:**
-
-| Case | Wall ms | Peak RSS (Linux, `/proc/<pid>/status` `VmHWM`) |
-| --- | --- | --- |
-| `bbb_alpha.avif` (3840×2160, 20.7 MB planes) | 785 | **87,990,272 B** |
-| `monochrome.avif` (1280×720) | 40 | 13,438,976 B |
-| `kimono_rotate90.avif` (1024×722) | 80 | 13,504,512 B |
-| `alpha_video.avif` (640×480) | 40 | 7,475,200 B |
-| remaining 19 cases | 20–121 | 8–24 KB (negatives), ≤ 45 MB for the 20 MiB+1 oversize input |
-| whole driver process | — | `Maximum resident set size (kbytes): 85912` |
-
-Windows per-*child* peak RSS is not obtainable without a native API this order forbids, so it is recorded `unavailable` per case and only the driver's own peak was measured (`driver_peak_working_set_bytes=4751360`). That asymmetry is disclosed rather than smoothed over. **OS peak RSS is observational only** and is never treated as proof of a library-enforced cap.
-
-The numbers do show real amplification: a 20.7 MB plane output peaked at ≈88 MB, ≈**4.24×** the delivered pixels for one 4-plane 8-bit image. At the contract ceiling (32,000,000 pixels) that implies hundreds of megabytes of working set for a single image, with no in-library ceiling and no cancellation.
-
-**Why the bounded-decoder gate fails — from the exact installed sources:**
-
-- `oxideav-avif 0.0.11`: **zero** occurrences of `DecoderLimits`, `max_pixels`, `max_width`, `with_max*`, `memory_limit` or any cancellation hook anywhere in the crate. There is **no limits-taking decode entry point**: the `DecodeOptions`/`decode_with`/`with_max_bytes` interface cited illustratively in this order **does not exist** in the pinned release. The only still-image path is `AvifDecoder::decode_file(&[u8]) -> Result<AvifInfo>`, which returns owned planes and accepts no budget.
-- `oxideav-av1 0.1.23`: one internal ceiling — `MAX_PICTURE_SIZE = 35_651_584`, enforced pre-allocation at `tile_list.rs:672` — plus `SpecDecodeSession::set_max_picture_size`, which the AVIF container never exposes. No allocation-byte cap, no allocation-count cap, no cancellation.
-- `oxideav-core 0.1.43`: a well-formed `DecoderLimits` (`max_pixels_per_frame`, `max_alloc_bytes_per_frame`, `max_alloc_count_per_frame`, arena count) exists with **zero call sites** in either the container or the AV1 decoder.
-
-Caller-side enforcement *is* achievable and was demonstrated: input-byte, dimension and pixel gates all fired before decoding, and the dimension gates provably fired **after a successful container inspection**, so they are live on real AVIF headers rather than dead code. What cannot be achieved is any bound on the decoder's own planes, scratch, tile buffers or CPU time once a within-contract file is accepted.
-
-Per this order's explicit rule — "if no enforceable memory/CPU limit exists, classify the bounded-decoder requirement `BLOCKED` regardless of ordinary fixtures passing" — and Solo's binding bounded-CPU/working-memory contract, the candidate **fails the mandatory resource gate**.
-
-## 5. Decision
-
-**`BLOCKED`** — for one specific, evidenced reason, and *not* for lack of decoding:
-
-1. **Runtime: PASS.** 12/12 published fixtures decoded to real, non-empty, geometrically consistent planes on Linux **and** Windows with byte-identical digests, 12/12 host-tool re-hashes per host, five independent colour-semantics oracles passing, and 13/13 hostile inputs refused at the correct layer with no panic, hang or partial result.
-2. **Security/policy: PASS for this graph.** The unchanged `deny.toml` policy — advisories, bans, licences, sources — passed on both hosts against the pinned `cargo-deny 0.20.2` archive with a freshly fetched RustSec database; no waiver, ignore, skip or allowance was added. The inherited `Unicode-3.0` notice duty remains open and `UNVERIFIED`.
-3. **Bounded decoder: BLOCKED.** No enforceable allocation, working-set or CPU budget exists anywhere in the invoked path; `DecoderLimits` is declared but unwired, and the measured ≈4.24× amplification shows the working set is real and ungoverned.
-4. **Feature completeness: UNVERIFIED.** 10/12-bit, grid composition and AVIS sequences were not exercised, and the upstream project's own descriptions call the decoder "partial intra" with "real decode pending AV1 tile support" — a claim this corpus cannot refute.
-
-**Next smallest Owner decision (one recommendation).** Ask the Owner to rule on what "bounded" must mean for AVIF specifically:
-(a) **accept a caller-bounded AVIF profile** — pre-decode dimension/pixel/byte gates (already demonstrated) plus per-image process isolation with an OS-enforced address-space and wall-clock limit in a future adapter, with the measured ceiling recorded as the contract's AVIF bound; or
-(b) **require an in-library budget** — defer AVIF until a candidate wires an allocation/cancellation budget, which is an upstream change outside any Solo order; or
-(c) **descope AVIF** from the first release.
-
-This agent does not choose among them, does not approve the codec, and does not treat 25/25 green as media acceptance.
-
-## 6. Acceptance gates
-
-| Gate | Status | Evidence |
-| --- | --- | --- |
-| `S069-01` | **PASS** | §1: exact baseline SHA/tree/report/WIP blobs, one checkout/worktree/`origin`, matching handoff, only the installed ACTIVE differing, divergent `solo-wo-061-r01` preserved. |
-| `S069-02` | **PASS** | Issuance `21eb87dc…` changed **ACTIVE alone**; parent, tree and remote blobs verified; existing `rust-verify` green on both hosts at that SHA. |
-| `S069-03` | **PASS** | Exactly one isolated `verification/avif-r03-c3` probe (own `[workspace]`) and one branch-only read-only workflow; 5 files, 0 product changes; no production code, lock, policy or `rust-verify.yml` edit. |
-| `S069-04` | **PASS for graph/policy; provenance risk recorded** | §2: exact pins, 18-package graph, checksums, licences inside the existing allowlist, no duplicates, no build scripts/asm/FFI, candidate-scoped unchanged-policy scanner green on both hosts, plus the three-way description contradiction and freshness disclosed. |
-| `S069-05` | **PASS with declared gaps** | §3: real pixel decoding on both hosts, reproducible digests, cross-host equality measured, five independent oracles passed; 10/12-bit, grid and sequence coverage explicitly `UNVERIFIED`. |
-| `S069-06` | **FAIL — the deciding gate** | §4: cap/refusal/timeout/OS-memory evidence collected, and the enforceable internal CPU/allocation bound is shown absent (`DecoderLimits` unwired, no limits API in the container). |
-| `S069-07` | **PASS** | §3: all 13 negatives recorded with the exact guard reached and no false credit. |
-| `S069-08` | **PASS** | Branch CI `43154012989` green on `ubuntu-24.04` and `windows-2025` at branch HEAD `e6162cdf…`, including every red attempt on the way (§1). |
-| `S069-09` | **PASS** | One accurate verdict (`BLOCKED` on the resource gate, runtime proven); `R03.C3`/`R03.C`/Stage 03 kept OPEN; no codec approval or product claim. |
-| `S069-10` | **PASS** | Report-only commit on `main`, remote readback, unchanged `rust-verify` green at this HEAD, clean `main`, `solo-wo-061-r01` and `solo-wo-069-r01` preserved, task scratch removed (§7). |
-
-## 7. Preservation, cleanup and handoff
-
-One checkout, one worktree, one `origin`; `main` clean and equal to `origin/main`; three branches only, with the divergent `solo-wo-061-r01` untouched at `4371af21…` and the qualification branch preserved intact at `e6162cdf…` locally and on GitHub for independent review. WIP remains exactly four files; the product workspace, `Cargo.lock`, `deny.toml`, `rust-toolchain.toml` and `rust-verify.yml` are byte-identical to the issuance revision; ignored `target/` and the inherited Solo `.temp/` archives (2 files / 289,253,806 bytes) are untouched. Task-owned scratch from this run — two CI log captures, one lock-blob copy and one temporary YAML validator under `.temp/` — was deleted at run end; no unknown or Owner-owned material was removed, and no `git clean`, reset, force, amend, rebase, cherry-pick, PR, release, deployment or provider action occurred.
-
-**Handoff:** `SOLO-WO-069 R01 — BLOCKED` on the bounded-decoder gate, with AVIF pixel decoding proven on both hosts and the residual feature-completeness gap stated. The Chief Architect should audit this report's exact remote HEAD together with the retained branch `e6162cdf…`, then return `ACCEPT`, `REVISE` or `STOP` for this qualification order only. No next-stage action — and no `R03.C3` implementation — occurs without a new Owner-issued order and matching handoff.
+**Handoff:** `SOLO-WO-070 R01 — OS-ISOLATION-PROVEN` for the bounded harness, with the measured limits, the Windows CPU-overshoot caveat and every remaining `UNVERIFIED` gap above. The Chief Architect should audit this report's exact remote HEAD together with branch `d270f95c…`, then return `ACCEPT`, `REVISE` or `STOP` for this order only. No further work order, product change, release or deployment is initiated here.
