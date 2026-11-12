@@ -38,8 +38,8 @@ pub const APPROVED_DEV_OWNER: &str = "solo-cli";
 /// only for `cfg(target_os = "linux")` and `windows-sys` only for `cfg(windows)` — so a
 /// single host never compiles both, and the locked graph therefore carries exactly one
 /// `windows-sys`, which is what keeps `multiple-versions = "deny"` satisfied.
-pub const APPROVED_ADAPTER_EXTERNAL_NORMAL: [&str; 4] =
-    ["rustix", "serde", "serde_json", "windows-sys"];
+pub const APPROVED_ADAPTER_EXTERNAL_NORMAL: [&str; 5] =
+    ["libc", "rustix", "serde", "serde_json", "windows-sys"];
 
 /// The only package permitted to declare an approved external normal dependency.
 pub const APPROVED_ADAPTER_EXTERNAL_OWNER: &str = "solo-adapters";

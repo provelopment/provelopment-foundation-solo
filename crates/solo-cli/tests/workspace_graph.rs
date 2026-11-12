@@ -50,7 +50,9 @@ fn legal_graph() -> Graph {
             edge("solo-application", "solo-domain", DepKind::Normal),
             edge("solo-adapters", "solo-application", DepKind::Normal),
             edge("solo-adapters", "solo-domain", DepKind::Normal),
-            // The reviewed external normal roots of the outer parsing adapter.
+            // The reviewed external normal roots of the outer parsing adapter, including the
+            // Linux-only `libc` readback root added by `SOLO-WO-076 R01`.
+            edge("solo-adapters", "libc", DepKind::Normal),
             edge("solo-adapters", "serde", DepKind::Normal),
             edge("solo-adapters", "serde_json", DepKind::Normal),
             edge("solo-cli", "solo-adapters", DepKind::Normal),
@@ -341,7 +343,7 @@ fn only_the_approved_external_dependencies_are_declared() {
 }
 
 #[test]
-fn the_real_graph_exposes_exactly_the_two_adapter_external_normal_roots() {
+fn the_real_graph_exposes_exactly_the_reviewed_adapter_external_normal_roots() {
     let value = metadata_value();
     let mut found: Vec<String> = Vec::new();
 

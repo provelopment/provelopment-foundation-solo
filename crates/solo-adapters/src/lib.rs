@@ -24,15 +24,18 @@
 //! Dependency direction is strictly inward: this crate may depend on
 //! `solo-application` and `solo-domain`, and neither of those may depend on it. The reviewed
 //! external roots are normal dependencies of this outer adapter alone: `serde` and
-//! `serde_json` for parsing, and the two target-gated native roots `rustix` (Linux only) and
-//! `windows-sys` (Windows only).
+//! `serde_json` for parsing, and the three target-gated native roots `rustix` and `libc` (Linux
+//! only) and `windows-sys` (Windows only).
 //!
 //! **Unsafe isolation.** This crate denies `unsafe_code` rather than forbidding it, because
-//! one Windows-gated module must call the NT entry point directly. The single allowance below
-//! is scoped to that module and only on Windows; the architecture guard fails the build if any
-//! other file, module or attribute acquires an unsafe capability. The `R03.C3` protocol module
-//! added by `SOLO-WO-072 R01` holds no allowance of its own: it parses supplied bytes only and
-//! starts no process, opens no file and holds no handle.
+//! exactly two platform-gated modules must call the operating system directly: the Windows NT
+//! source reader, and — from `SOLO-WO-076 R01` — the Linux limit-readback seam, which only
+//! *observes* the calling process's existing `RLIMIT_AS` and `RLIMIT_CPU` ceilings with
+//! `getrlimit` and mutates nothing. There are therefore exactly two module-scoped allowances
+//! below, one Windows and one Linux; the architecture guard fails the build if any other file,
+//! module or attribute acquires an unsafe capability. The `R03.C3` protocol module added by
+//! `SOLO-WO-072 R01` holds no allowance of its own: it parses supplied bytes only and starts no
+//! process, opens no file and holds no handle.
 //!
 //! The media-worker half strictly parses **already-supplied** worker metadata into an inert,
 //! untrusted claim. It performs no I/O, cannot execute anything, and authorizes nothing.
@@ -40,6 +43,9 @@
 #![deny(unsafe_code)]
 
 mod bootstrap_cli;
+#[cfg(target_os = "linux")]
+#[cfg_attr(target_os = "linux", allow(unsafe_code))]
+mod media_worker_host_native;
 mod media_worker_protocol;
 mod property_resolution;
 mod publication_manifest;
