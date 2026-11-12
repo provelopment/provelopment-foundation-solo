@@ -69,13 +69,14 @@ const PROCESS_NATIVE_ROOTS: [&str; 2] = ["windows_sys", "libc"];
 const FORBIDDEN_ROOTS: [&str; 5] = ["libloading", "libdl", "dlopen", "dlsym", "LoadLibrary"];
 
 /// Every native root this guard knows about, so an unexpected one is refused rather than ignored.
-const ALL_NATIVE_ROOTS: [&str; 7] = [
+const ALL_NATIVE_ROOTS: [&str; 8] = [
     "windows_sys",
     "rustix",
     "libc",
     "libloading",
     "libdl",
     "dlopen",
+    "dlsym",
     "LoadLibrary",
 ];
 
@@ -276,15 +277,22 @@ fn violations(path: &str, source: &str) -> Vec<String> {
 
     // The keyword and an ungated `allow(unsafe_code)` request are both refusals: a file may not
     // use unsafe, and it may not ask for the allowance that would make using it possible without
-    // a platform gate. A `deny(unsafe_code)` is the opposite of an allowance.
-    let mentions_unsafe = uses_unsafe(&code) || has_ungated_allowance(&code);
-    if mentions_unsafe && role == Role::Ordinary {
+    // a platform gate. A `deny(unsafe_code)` is the opposite of an allowance. This holds at every
+    // path, including the two eligible ones, so an eligible file can never gain a blanket
+    // allowance either.
+    if has_ungated_allowance(&code) {
+        problems.push(format!(
+            "{path}: asks for `allow(unsafe_code)` outside the single approved Windows gate"
+        ));
+    }
+
+    if uses_unsafe(&code) && role == Role::Ordinary {
         problems.push(format!(
             "{path}: uses `unsafe` outside the two approved native boundary modules"
         ));
     }
 
-    if mentions_unsafe && role != Role::Ordinary {
+    if uses_unsafe(&code) && role != Role::Ordinary {
         // The gate decision is the architecture checker's own AST rule. A substring that merely
         // contains the word `windows` or `linux` therefore never stands in for a positive
         // `#[cfg(..)]` proof, and a negated, alternated or malformed predicate never counts.
