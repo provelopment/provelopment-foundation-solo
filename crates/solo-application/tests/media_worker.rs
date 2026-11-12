@@ -93,7 +93,7 @@ fn inventory(entries: &[(&str, Exposure)]) -> GraphicAssetObligationInventoryV1 
         PropertyDeclarationV1::new(Inheritance::Inherit, CurrentContextV1::Values(values));
     let declared = DeclaredOwnerPropertiesV1::new(
         entity_owner(),
-        vec![(PropertyKey::GraphicLogo, declaration)],
+        vec![(PropertyKey::GraphicBackground, declaration)],
     )
     .expect("a valid declaration set");
     let graph = graph();
@@ -362,7 +362,13 @@ fn positive_structure_checks_one_envelope_and_grants_nothing() {
 
     assert_eq!(
         checked_summary(&outcome),
-        vec![(PropertyKey::GraphicLogo.name().to_owned(), 0, 32, 32, 3)],
+        vec![(
+            PropertyKey::GraphicBackground.name().to_owned(),
+            0,
+            32,
+            32,
+            3
+        )],
         "one AVIF obligation yields exactly one checked envelope"
     );
     let record = &outcome.checked().expect("checked envelopes")[0];
@@ -544,7 +550,7 @@ fn host_facts_must_all_be_positive_before_a_claim_is_read() {
                 true,
                 true,
                 false,
-                MediaWorkerLimitsV1::new(512 * 1024 * 1024, 10, 15_000),
+                MediaWorkerLimitsV1::new(256 * 1024 * 1024, 10, 15_000),
                 claim.build(),
                 planes.clone(),
             ),
@@ -865,7 +871,13 @@ fn transposed_orientation_is_accepted_as_a_claim_and_still_length_checked() {
     ))]);
     assert_eq!(
         checked_summary(&inspect_media_worker_source_set_v1(&set, &port)),
-        vec![(PropertyKey::GraphicLogo.name().to_owned(), 0, 32, 32, 3)],
+        vec![(
+            PropertyKey::GraphicBackground.name().to_owned(),
+            0,
+            32,
+            32,
+            3
+        )],
         "a structurally consistent transposed claim is retained as a claim"
     );
 

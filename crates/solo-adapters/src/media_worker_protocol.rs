@@ -20,7 +20,7 @@
 
 use std::fmt;
 
-use serde::de::{self, Deserialize, Deserializer, MapAccess, Visitor};
+use serde::de::{Deserialize, Deserializer, Error as DeError, MapAccess, Visitor};
 use serde_json::error::Category;
 
 use solo_application::{
@@ -209,7 +209,7 @@ impl<'de> Visitor<'de> for EnvelopeFieldVisitor {
         formatter.write_str("a key of the closed version 1 media worker envelope")
     }
 
-    fn visit_str<E: de::Error>(self, value: &str) -> Result<Self::Value, E> {
+    fn visit_str<E: DeError>(self, value: &str) -> Result<Self::Value, E> {
         let field = match value {
             "version" => EnvelopeField::Version,
             "status" => EnvelopeField::Status,
@@ -267,7 +267,7 @@ impl<'de> Visitor<'de> for PlaneFieldVisitor {
         formatter.write_str("a key of the closed version 1 plane claim")
     }
 
-    fn visit_str<E: de::Error>(self, value: &str) -> Result<Self::Value, E> {
+    fn visit_str<E: DeError>(self, value: &str) -> Result<Self::Value, E> {
         let field = match value {
             "ordinal" => PlaneField::Ordinal,
             "stride" => PlaneField::Stride,
@@ -316,7 +316,7 @@ impl<'de> Visitor<'de> for WirePlaneVisitor {
         let mut sha256: Option<String> = None;
         while let Some(field) = map.next_key::<PlaneField>()? {
             if seen & field.bit() != 0 {
-                return Err(de::Error::custom(DUPLICATE_FIELD_MESSAGE));
+                return Err(DeError::custom(DUPLICATE_FIELD_MESSAGE));
             }
             seen |= field.bit();
             match field {
@@ -329,15 +329,14 @@ impl<'de> Visitor<'de> for WirePlaneVisitor {
         }
         Ok(WirePlane {
             ordinal: ordinal
-                .ok_or_else(|| de::Error::custom(format!("{MISSING_FIELD_MESSAGE} `ordinal`")))?,
+                .ok_or_else(|| DeError::custom(format!("{MISSING_FIELD_MESSAGE} `ordinal`")))?,
             stride: stride
-                .ok_or_else(|| de::Error::custom(format!("{MISSING_FIELD_MESSAGE} `stride`")))?,
-            rows: rows
-                .ok_or_else(|| de::Error::custom(format!("{MISSING_FIELD_MESSAGE} `rows`")))?,
+                .ok_or_else(|| DeError::custom(format!("{MISSING_FIELD_MESSAGE} `stride`")))?,
+            rows: rows.ok_or_else(|| DeError::custom(format!("{MISSING_FIELD_MESSAGE} `rows`")))?,
             length: length
-                .ok_or_else(|| de::Error::custom(format!("{MISSING_FIELD_MESSAGE} `length`")))?,
+                .ok_or_else(|| DeError::custom(format!("{MISSING_FIELD_MESSAGE} `length`")))?,
             sha256: sha256
-                .ok_or_else(|| de::Error::custom(format!("{MISSING_FIELD_MESSAGE} `sha256`")))?,
+                .ok_or_else(|| DeError::custom(format!("{MISSING_FIELD_MESSAGE} `sha256`")))?,
         })
     }
 }
@@ -386,7 +385,7 @@ struct PartialEnvelope {
 
 impl PartialEnvelope {
     /// Requires every key to have been present exactly once, then materializes the wire value.
-    fn finish<E: de::Error>(self) -> Result<WireEnvelope, E> {
+    fn finish<E: DeError>(self) -> Result<WireEnvelope, E> {
         let missing = |name: &str| E::custom(format!("{MISSING_FIELD_MESSAGE} `{name}`"));
         Ok(WireEnvelope {
             version: self.version.ok_or_else(|| missing("version"))?,
@@ -429,7 +428,7 @@ impl<'de> Visitor<'de> for WireEnvelopeVisitor {
         let mut partial = PartialEnvelope::default();
         while let Some(field) = map.next_key::<EnvelopeField>()? {
             if seen & field.bit() != 0 {
-                return Err(de::Error::custom(DUPLICATE_FIELD_MESSAGE));
+                return Err(DeError::custom(DUPLICATE_FIELD_MESSAGE));
             }
             seen |= field.bit();
             match field {
