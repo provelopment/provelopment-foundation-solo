@@ -435,9 +435,11 @@ function Invoke-Run {
         $note = "wall_ms=$($job.WallMs) budget_ms=$wall"
       } elseif ($job.ExitCode -eq 0) {
         $outcome = 'OK'
-      } elseif ($job.ExitCode -eq [uint32]0xC0000409 -or $job.ExitCode -eq [uint32]0xC0000017 -or
-                $job.ExitCode -eq [uint32]0xC00000FD -or $job.ExitCode -eq [uint32]0xFFFFFFFF -or
-                $job.ExitCode -eq 3) {
+      } elseif ([long]$job.ExitCode -eq 3221226505 -or [long]$job.ExitCode -eq 3221225495 -or
+                [long]$job.ExitCode -eq 3221225725 -or [long]$job.ExitCode -eq 4294967295 -or
+                [long]$job.ExitCode -eq 3) {
+        # 3221226505 = 0xC0000409 (abort/fast-fail), 3221225495 = 0xC0000017 (no memory),
+        # 3221225725 = 0xC00000FD (stack overflow), 4294967295 = 0xFFFFFFFF, 3 = abort().
         $outcome = 'REFUSED_MEMORY_LIMIT'
         $note = ("exit_code=0x{0:X8} peak_process_bytes={1} limit_bytes={2}" -f $job.ExitCode, $job.PeakProcessBytes, $mem)
       } elseif ($job.PeakProcessBytes -gt 0 -and $job.PeakProcessBytes -ge ([long]$mem * 0.9) -and $job.ExitCode -ne 0) {
