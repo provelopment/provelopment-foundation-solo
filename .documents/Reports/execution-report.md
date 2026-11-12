@@ -1,129 +1,124 @@
 # Execution Report
 
-**Order:** `OWNER-ISSUED — SOLO-WO-079 R01` — R03.C3 Linux pre-exec resource-limit installation and one trusted, harmless child readback (isolated technical-branch proof).
-**Matching handoff:** `SOLO-WO-079 R01`. **Report date (ISO):** 2026-11-12.
+**Order:** `OWNER-ISSUED — SOLO-WO-080 R01` — R03.C3 exact five-blob promotion of the independently proven Linux pre-exec limit smoke onto `main` (integration only).
+**Matching activation ID:** `SOLO-WO-080 R01`. **Report date (ISO):** 2026-11-12.
 
-**Outcome: `LINUX-PREEXEC-LIMIT-SMOKE-PROVEN`, on the dedicated technical branch only.** One fixed, compile-time-configured Linux launch installs a new session and both hard and soft `RLIMIT_AS` = 536 870 912 bytes and `RLIMIT_CPU` = 10 seconds **before `exec`**, and the resulting real child reads those ceilings back from its own kernel view and reports its own pid and a process-group id equal to that pid. The complete, unmodified `rust-verify` workflow is green on **both** hosts at the exact final branch commit. `main` received no native or CLI code: only the Owner-installed ACTIVE issuance and this report.
+**Outcome: `LINUX-PREEXEC-LIMIT-SMOKE-INTEGRATED`.** Exactly five accepted Git blobs were promoted byte-for-byte from technical branch commit `380393ddacf37fc1a6398805235ca2d5dbd9677e` onto `main` by path-scoped staging, in one integration commit with three modified and two added paths and no other change. The unmodified, push-triggered `rust-verify` workflow is green on `ubuntu-24.04` **and** `windows-2025` at that exact integration SHA, and the real Linux child reported the fixed ceilings from its own kernel view on `main` itself.
 
-**What is claimed.** For **one** trusted, harmless child: the fixed ceilings really existed before its image executed, the child observed them from inside itself, the parent validated the whole observation against the compile-time profile, the leader exited zero inside a real 15 000 ms deadline, and the leader was reaped.
+**Scope of the claim.** One **benign, trusted** child, launched once by the parent from the same `solo-cli` executable, received `setsid` plus hard and soft `RLIMIT_AS` = 536 870 912 bytes and `RLIMIT_CPU` = 10 consumed-CPU seconds **before `exec`**; that child read the ceilings and its group identity back from the kernel; the parent revalidated every field, required a normal zero exit inside a 15 000 ms wall deadline and reaped the single leader. Windows compiles only a fail-closed `HOST_UNSUPPORTED` path. The public CLI accepted/refused byte contracts are unchanged.
 
-**What is not claimed.** No stress allocation, no CPU-burning loop, no wall-timeout kill under a 20-second workload, no descendant or process-group sweep, no concurrent aggregate quota, no isolation from a hostile child, no sandbox, no source-trust or TOCTOU proof, no Windows Job Object, no AVIF decode or media correctness, and no publication. `RLIMIT_AS` bounds *virtual address space*, not resident memory and not a child tree; `RLIMIT_CPU` bounds *consumed CPU time*, not elapsed time. `R03.C3`, `R03.C` and Stage 03 remain **OPEN**, and both media-worker publication/correctness authority constants remain `false`.
+**This is not containment.** It is **not** `LINUX-HOST-CONTAINMENT-PROVEN`, **not** `HOST-CONTAINMENT-PROVEN`, **not** `MEDIA-VERIFIED`, not sandboxing, not a released feature and not an AVIF decoder. Limit **enforcement under stress** is not tested. `RLIMIT_AS` bounds virtual address space, not RSS and not aggregate child-tree memory; `RLIMIT_CPU` bounds consumed CPU time, not wall time; creating a process group proves nothing about descendant cleanup. The parent reader threads bound memory after leader exit, but that is **not** an independent proof against a descendant that inherited the pipes. Identity by `current_exe()`, parent attestation, hostile-child behaviour, filesystem/network/credential confinement and process-tree cleanup all remain unverified. `R03.C3`, `R03.C` and Stage 03 remain **OPEN**, and both media-worker publication and media-correctness authority constants remain `false`.
 
-## 1. Preflight — `S079-01` PASS
+## 1. Preflight — `S080-01` PASS
 
-Every anchor was read as a full hash from the single real checkout before any write.
+Read from the single real checkout before any write: `C:\Users\Sean\Documents\Provelopment\00.foundation-solo`, branch `main`, one worktree, one remote `origin=https://github.com/provelopment/provelopment-foundation-solo.git`, exactly four `.documents/WIP/` files.
 
-| Evidence | Required | Observed |
+| Anchor | Required | Observed |
 | --- | --- | --- |
-| `HEAD == main == origin/main` | `aad8fb2d5b371e49e69660eaa518fe34847115af` | exact |
-| `HEAD^{tree}` | `c55923fc1dc70eab47dab1299927f315c6656848` | exact |
-| Canonical report blob (accepted WO-078) | `c7a46b6743509a5b4738ded4c7ec2fe75298bdf9` | exact |
-| Prior ACTIVE blob at HEAD | `f5fa0420e3b1b0d1457551ededafbf479c066002` | exact |
+| `HEAD == main == origin/main` | `7f9ed68348998bef6557c657c0be3580bb8d5fe8` | exact |
+| `HEAD^{tree}` | `b4bee9da3043e9805f917f5431c06fd5fe2bbf4f` | exact |
+| Canonical report blob | `b780054e45ced229cd6774d36527551583e5f66b` | exact |
+| Previous ACTIVE blob | `a8da8eef897ba57d9e097b0a791fd1dfe60cb044` | exact |
 | Architecture Charter | `c941c7f90cc1b1955f9d60b348a3b1092cafe97f` | exact |
 | NEXT / ROADMAP / OUTLOOK | `92fa562b…` / `9d7a8622…` / `cb9c7a61…` | exact |
-| `Cargo.lock` | `b1ee56da60f36536548586528db371b7cbe508e4` | exact |
-| Adapter manifest / root | `47d732f26b18addc67a2fc6d0a4a94939b8ca134` / `bd1d4c58f5a91f38af63e84e143c850d6372ca64` | exact |
-| Existing Linux native readback | `2df6d0e98395f21fc72294606e9a97e954f97c63` | exact |
-| Existing CLI root | `6faa9fae29351123a49d45c5637ac4fbb1b615c8` | exact |
-| Unsafe guard / graph check / workspace graph | `b88e7b42…` / `7a5beada…` / `25a91b2c…` | exact |
 | `rust-verify` workflow | `e1b5ca6e1738a5d5129a8788e24d51aee02421d1`, two `edges=41` assertions | exact |
-| Preserved proof branch `solo-wo-076-r01` | `40a40bab1d017e61340fe53399b49fb2ab335c3b` | unmoved |
+| `Cargo.lock` | `b1ee56da60f36536548586528db371b7cbe508e4` | exact |
+| Adapter manifest / root | `47d732f2…` / `bd1d4c58…` | exact |
+| Mainline native readback-only file | `2df6d0e98395f21fc72294606e9a97e954f97c63` | exact |
+| Mainline CLI root | `6faa9fae29351123a49d45c5637ac4fbb1b615c8` | exact |
+| Graph / unsafe guard / workspace graph | `7a5beada…` / `b88e7b42…` / `25a91b2c…` | exact |
+| `solo-wo-079-r01` local and remote | `380393ddacf37fc1a6398805235ca2d5dbd9677e`, tree `18215c5ad9134e05baab3330bd378ec18b06e6ec` | exact, unmoved |
+| `solo-wo-076-r01` | `40a40bab1d017e61340fe53399b49fb2ab335c3b` | unmoved |
 | Historical branches | `4371af21…`, `e6162cdf…`, `d270f95c…` | unmoved |
-| `solo-wo-079-r01` | absent locally **and** remotely | absent |
+| New files on `main` | `media_worker_host.rs` and `media_worker_host_smoke.rs` **absent** | absent |
+| Dirty tracked paths | only the Owner-installed WO-080 ACTIVE | only that one |
 
-One worktree, one remote `origin=https://github.com/provelopment/provelopment-foundation-solo.git`, exactly four files in `.documents/WIP/`, no unknown tracked or untracked material, and the only initially dirty path was the Owner-installed WO-079 ACTIVE (working blob `a8da8eef897ba57d9e097b0a791fd1dfe60cb044`).
+The Owner-installed ACTIVE was 148 lines beginning `OWNER-ISSUED — SOLO-WO-080 R01` with the matching `SOLO-WO-080 R01` activation, working blob `c8ce3bb9c664a873bc200c6d7fdec2fdb8637a30`. All five accepted branch blobs were independently re-read and matched §3 exactly before staging. `.temp/` had no top-level files; its three inherited directories (`architecture-fixtures`, `solo-wo-073-wip`, `toolchain-installer`) and the retained `solo-wo-073-wip` four files / 46 062 bytes are **untrusted reference only** and were not imported, executed, copied or deleted. The workstation has no usable linker and no Linux target, so **all** compile/test/kernel evidence below comes from remote CI; that absence is not treated as a failure.
 
-## 2. Issuance — `S079-02` PASS
+## 2. Issuance and integration ledger — `S080-02`, `S080-03`, `S080-06` PASS
 
-| Item | Value |
-| --- | --- |
-| Commit | `fa0461a64ddd0573a5b682603d48d64c60e7560a` |
-| Tree | `90760e649ad8212713d0f967f62356aa2ceea5a1` |
-| Parent | `aad8fb2d5b371e49e69660eaa518fe34847115af` |
-| ACTIVE blob | `a8da8eef897ba57d9e097b0a791fd1dfe60cb044`, committed unchanged and alone (one path) |
-| GitHub readback | sha, tree, parent, path list and ACTIVE blob all match |
-| CI | run **`43220157769`** (`push`) at exactly this SHA — `131189344402` (`ubuntu-24.04`) success, `131189344769` (`windows-2025`) success, 33 steps each, **0 failures** |
-
-## 3. The technical branch — `S079-03` PASS
-
-Created once, in the existing checkout, from the verified issuance commit: `solo-wo-079-r01`, preserved at
-
-| Item | Value |
-| --- | --- |
-| Final branch commit | `380393ddacf37fc1a6398805235ca2d5dbd9677e` |
-| Tree | `18215c5ad9134e05baab3330bd378ec18b06e6ec` |
-| Local and remote | `origin/solo-wo-079-r01` = same SHA; normal non-force push |
-| Branch ACTIVE | `a8da8eef…` — exactly the issuance blob, unchanged |
-| Workflow / lock / manifest on branch | `e1b5ca6e…` / `b1ee56da…` / `47d732f2…` — untouched |
-
-Five transparent commits, all inside the §3 ledger:
-
-| Commit | Subject | Paths |
-| --- | --- | --- |
-| `4d84d354b03c6918711a3db4bd2bf2c73d19bd8b` | `feat: add fixed Linux pre-exec limit smoke probe (SOLO-WO-079)` | 5 (§3 items 3–7) |
-| `998631f1d614d41e5213d53ba46c97c7759b18c4` | `fix: re-export the three fixed native entry points and use std-qualified thread paths` | 2 |
-| `d483a5ae9e66c9f501160df636e579572b96db5a` | `fix: use the range pattern Clippy requires for the child refusal statuses` | 1 |
-| `670481452ecfa7686b10804a354abd461495e6f5` | `test: echo the observed Linux evidence line to the CI log` | 1 |
-| `380393ddacf37fc1a6398805235ca2d5dbd9677e` | `fix: scope the Write import to the Linux-only echo helper` | 1 |
-
-`git diff --name-status fa0461a6 380393dd` is exactly the five authorized paths — `M lib.rs`, `A media_worker_host.rs`, `M media_worker_host_native.rs`, `M main.rs`, `A media_worker_host_smoke.rs` — and nothing else.
-
-## 4. Path ledger with blobs — `S079-04`, `S079-05` PASS
-
-| # | Path | `main` (before) | Branch (after) | Status |
+| Step | Commit | Tree | Parent | Paths |
 | --- | --- | --- | --- | --- |
-| 1 | `crates/solo-adapters/src/media_worker_host_native.rs` | `2df6d0e98395f21fc72294606e9a97e954f97c63` | `d10151e40e807c9831491ba0da0eb44d08a81589` | M |
-| 2 | `crates/solo-adapters/src/media_worker_host.rs` | *(absent)* | `97efbbf0c7de425cd00f79f126ed05c9f8b13e8d` | **A** |
-| 3 | `crates/solo-adapters/src/lib.rs` | `bd1d4c58f5a91f38af63e84e143c850d6372ca64` | `1550d34f820642bb5573e06d4fccb758109fd26c` | M |
-| 4 | `crates/solo-cli/src/main.rs` | `6faa9fae29351123a49d45c5637ac4fbb1b615c8` | `b3c89ad0ce256f69e5763855559d20757554c461` | M |
-| 5 | `crates/solo-cli/tests/media_worker_host_smoke.rs` | *(absent)* | `1f127001359e5f0ba941f92906f3280e433d8b9f` | **A** |
+| Issuance (`Issue SOLO-WO-080 R01: integrate proven Linux preexec limit smoke`) | `d40190a562b3a1ff7faf6f25bc613f86b860139f` | `d66637efc48ae099204ba8d80f43d726db74c0b3` | `7f9ed68348998bef6557c657c0be3580bb8d5fe8` | 1 — `.documents/WIP/workorder-active.md` (`M`), ACTIVE blob `c8ce3bb9…` |
+| Integration (`feat: integrate proven Linux preexec limit smoke (SOLO-WO-080)`) | `0c231196e48c51fb60dc9b17bd290db04e276841` | `e56952910b492c3f25b935bda9754e2e68d4e668` | `d40190a562b3a1ff7faf6f25bc613f86b860139f` | 5 — 3 `M` + 2 `A` |
+| Report (this file) | returned in the chat handoff | — | `0c231196e48c51fb60dc9b17bd290db04e276841` | 1 — `.documents/Reports/execution-report.md` |
 
-**Native boundary (`S079-04`).** The already approved Linux-gated file gained exactly two things, both inside the pre-existing positively `#[cfg(target_os = "linux")]`-gated `linux` module, plus a `#[cfg(target_os = "linux")] pub(crate) use linux::{…}` re-export of the three fixed entry points so the safe façade can name them without reopening the module.
+Both pushes were ordinary fast-forwards; `origin/main` was re-read after each and matched the local SHA, and the GitHub API returned the same `sha`, `tree`, `parent` and file list. The five remote blob identities at the integration commit were read back individually from the GitHub contents API and match §3 exactly.
 
-* `install_linux_child_limits_v1(&mut Command)` builds both `libc::rlimit` values **before** the fork (they are `Copy` locals fed from the façade's compile-time constants), then registers the boundary with one `unsafe { command.pre_exec(move || …) }`.
-* `own_process_group_v1()` performs one `unsafe { libc::getpgid(0) }`, returning a closed refusal on a negative status instead of casting or ignoring it.
+**Promotion mechanism.** Exactly the authorized path-scoped command, with the five paths named literally in the pathspec (single PowerShell line, no POSIX continuation copied blindly):
 
-**Concrete `pre_exec` order (source order, not a claim about wall time).**
+`git restore --source=380393ddacf37fc1a6398805235ca2d5dbd9677e --staged --worktree -- <five literal paths>`
 
-1. Parent: `current_exe()` → exists and `is_file()`.
-2. Parent: `Command` with exactly `--internal-media-host-probe-v1` and `child`, `stdin = null`, `stdout = piped`, `stderr = piped`.
-3. Parent: `install_linux_child_limits_v1` registers the boundary — after every command, argument and pipe is built.
-4. Kernel: `fork`.
-5. Child (async-signal-safe only): `setsid()` → `setrlimit(RLIMIT_AS, {536870912, 536870912})` → `setrlimit(RLIMIT_CPU, {10, 10})` → `exec`. Any failure returns `std::io::Error::last_os_error()` and the image is never executed.
-6. Child after `exec`: two `getrlimit` readbacks, exact comparison with the profile, `getpgid(0)`, `pgid == pid`, then one fixed line on stdout.
-7. Parent: two capped reader threads, `try_wait` poll every 10 ms against the 15 000 ms deadline, `kill` + `wait` on timeout, zero-exit requirement, strict parse, profile re-validation, reap.
+No merge, cherry-pick, rebase, whole-tree checkout, wildcard staging, reset, stash, clean, force-push, new branch, clone or extra worktree was used, and the technical branch was neither changed nor superseded.
 
-**All first-party `unsafe` in this order** — four executable occurrences, all in `crates/solo-adapters/src/media_worker_host_native.rs`, all inside the positive Linux gate, each with an adjacent `// SAFETY:` note (the file mentions `// SAFETY:` five times; one is the module doc, four are rationales):
+**Staged verification before committing** — `git diff --cached --name-status` gave exactly `M lib.rs`, `A media_worker_host.rs`, `M media_worker_host_native.rs`, `M main.rs`, `A media_worker_host_smoke.rs`; `git diff --cached --numstat` gave `20/7`, `801/0`, `83/0`, `46/2`, `319/0`; `git diff --cached --check` was empty; `git ls-files -o --exclude-standard` was empty; `git status --porcelain` listed only those five entries.
 
-| # | Occurrence | Purpose | Origin |
+**Blob identity — branch and `main` are identical** (`G080-01`):
+
+| Path | Accepted branch blob | Staged blob | `main` blob | Remote blob at integration | Status |
+| --- | --- | --- | --- | --- | --- |
+| `crates/solo-adapters/src/media_worker_host_native.rs` | `d10151e40e807c9831491ba0da0eb44d08a81589` | same | same | same | M (from `2df6d0e9…`) |
+| `crates/solo-adapters/src/media_worker_host.rs` | `97efbbf0c7de425cd00f79f126ed05c9f8b13e8d` | same | same | same | A |
+| `crates/solo-adapters/src/lib.rs` | `1550d34f820642bb5573e06d4fccb758109fd26c` | same | same | same | M (from `bd1d4c58…`) |
+| `crates/solo-cli/src/main.rs` | `b3c89ad0ce256f69e5763855559d20757554c461` | same | same | same | M (from `6faa9fae…`) |
+| `crates/solo-cli/tests/media_worker_host_smoke.rs` | `1f127001359e5f0ba941f92906f3280e433d8b9f` | same | same | same | A |
+
+**Every other byte is immutable.** `git diff --name-only d40190a5 0c231196` is exactly those five paths, so no other tracked blob changed in the integration commit. Re-read at the integration commit: workflow `e1b5ca6e…`, `Cargo.lock` `b1ee56da…`, adapter manifest `47d732f2…`, unsafe guard `b88e7b42…`, architecture graph `7a5beada…`. No file was patched, rustfmt-rewritten or normalised after copying; the working tree was clean immediately after both commits.
+
+**Behaviour and security review of the imported bytes (`S080-04`).** `media_worker_host_native.rs` remains the sole process-native boundary: two pre-existing `getrlimit`/`assume_init` `unsafe` expressions plus two added ones (`pre_exec` registration, `getpgid`), each inside a positive `#[cfg(target_os = "linux")]` gate with an adjacent `// SAFETY:` rationale; the only pre-exec operations are `setsid` and the two fixed `setrlimit` calls; no global allow, no FFI outside that file, no new native root, no Windows process control, no dynamic loading. The profile is compile-time fixed at 536 870 912 bytes and 10 seconds for both soft and hard halves, and the parent re-checks every field rather than trusting child text, requiring `pgid == pid` with both positive. The parent launches only `current_exe()` with the private two-token mode, closed stdin, capped stdout/stderr, one fixed accepted line, and closed typed refusals for malformed, partial, duplicate, overlong, non-UTF-8, wrong-exit and wrong-value evidence. No new dependency, graph edge, Charter text, workflow line or checker change exists.
+
+## 3. Integration CI on `main` — `S080-05`, `S080-06` PASS
+
+Run **`43231769157`**, event `push`, `head_sha` exactly `0c231196e48c51fb60dc9b17bd290db04e276841`, conclusion `success`.
+
+| Job | ID | Result | Steps |
 | --- | --- | --- | --- |
-| 1 | `unsafe { libc::getrlimit(selector, raw.as_mut_ptr()) }` | read `RLIMIT_AS`/`RLIMIT_CPU` | pre-existing `N076` |
-| 2 | `unsafe { raw.assume_init() }` | make the written `rlimit` readable | pre-existing `N076` |
-| 3 | `unsafe { command.pre_exec(move || …) }` | install session + both ceilings before `exec` | **new** |
-| 4 | `unsafe { libc::getpgid(0) }` | prove `pgid == pid` inside the child | **new** |
+| `verify (ubuntu-24.04)` | `131228772617` | success | 33 configured, **0 failed** |
+| `verify (windows-2025)` | `131228772875` | success | 33 configured, **0 failed** |
 
-The crate root keeps `#![deny(unsafe_code)]`, the pre-existing `#[cfg_attr(windows, allow(unsafe_code))]` source-reader exception and exactly one `#[cfg_attr(target_os = "linux", allow(unsafe_code))]` on the native module. The new safe façade holds no allowance, names no OS constant, no raw handle and no native root, and contains no `unsafe`.
+The only skipped steps are the documented host-inapplicable counterparts (Windows-only steps on the Ubuntu job and Linux/Ubuntu-only steps on the Windows job). No applicable step failed and none was skipped because of an earlier failure.
 
-**Safe façade and CLI (`S079-05`).** `media_worker_host` exposes one closed operation and its bounded helper: `run_internal_linux_limit_smoke_v1() -> Result<SmokeObservationV1, SmokeRefusalV1>`, `run_internal_media_host_probe_v1(&[OsString]) -> Option<InternalProbeReportV1>`, the strict parser `parse_child_observation_v1`, the exit classifier `classify_child_exit_v1`, the profile validator `validate_observation_v1` and the argument classifier `classify_internal_arguments_v1`. No API accepts an executable path, an argument vector, shell text, media bytes, a manifest, a caller-chosen limit, an environment override or a destination. `main.rs` dispatches `--internal-media-host-probe-v1 <parent|child>` **before** the public adapter, and only when that flag is in second position; `bootstrap_cli.rs` is untouched.
+### `G080-02` — real Ubuntu child readback on `main`
 
-## 5. Real kernel evidence at the final branch SHA — `N079-01`, `N079-02` PASS
-
-Run **`43226954406`** at exactly `380393ddacf37fc1a6398805235ca2d5dbd9677e` (`workflow_dispatch`), Ubuntu job `131212490637`, Windows job `131212489774`, both `success` with 33 configured steps and **0 failed** steps.
-
-The parent's own accepted evidence line, written by the real child's validated readback and echoed to the log by the test:
+This value comes from this run's own `main` log, not copied from the branch run:
 
 ```
-n079_observation=media_host_probe=accepted as_soft=536870912 as_hard=536870912 cpu_soft=10 cpu_hard=10 pid=4942 pgid=4942 wall_ms=10
+n079_observation=media_host_probe=accepted as_soft=536870912 as_hard=536870912 cpu_soft=10 cpu_hard=10 pid=4249 pgid=4249 wall_ms=11
 ```
 
-* `as_soft = as_hard = 536870912` — the fixed 512 MiB virtual-address-space ceiling, printed at full width, both halves present.
-* `cpu_soft = cpu_hard = 10` — the fixed 10-second consumed-CPU ceiling, both halves present.
-* `pid = 4942`, `pgid = 4942` — the child is its own session and process-group leader, which only the `setsid` inside the pre-exec boundary can produce.
-* `wall_ms = 10` — the whole launch, readback, validation and reap finished in 10 ms, far inside the 15 000 ms deadline.
+```
+test n079_01_the_real_child_observes_the_installed_limits ... ok
+```
 
-These values are not fabricated by the parent: they are the child's own `getrlimit`/`getpgid` observations, re-parsed strictly and re-validated against the compile-time profile. The runner's default ceilings are unlimited, so equality with the profile can only come from the pre-exec installation. Direct, unsupervised child invocation under the same runner environment produced `n079_direct_child=exit=71` and no stdout at all — the child's own `CHILD_EXIT_LIMITS_MISMATCH` refusal.
+Both ceilings at full width with equal hard and soft halves, `pid = pgid = 4249` (both positive, so the child really is its own session and process-group leader), and `wall_ms = 11` — far inside the 15 000 ms deadline. The reader's default ceilings are unlimited, so equality with the profile can only come from the pre-exec installation, and the values are the child's own `getrlimit`/`getpgid` observations re-parsed and re-validated by the parent.
 
-`N079-01`: `test n079_01_the_real_child_observes_the_installed_limits ... ok`, with the three pre-existing kernel readback tests still green:
+### `G080-03`, `G080-04` — refusals and negatives on `main`
+
+```
+n079_direct_child=exit=71
+test n079_04_a_direct_unsupervised_child_is_refused ... ok
+test n079_03_wrong_internal_arguments_are_refused_by_the_real_binary ... ok
+test media_worker_host::tests::n079_03_the_reserved_flag_is_honoured_only_in_second_position ... ok
+test media_worker_host::tests::n079_03_every_wrong_internal_token_shape_is_a_typed_refusal ... ok
+test media_worker_host::tests::n079_03_only_the_exact_observation_line_is_accepted ... ok
+test media_worker_host::tests::n079_03_malformed_observations_are_refused_without_partial_values ... ok
+test media_worker_host::tests::n079_03_child_exit_statuses_are_classified ... ok
+test media_worker_host::tests::n079_03_values_outside_the_fixed_profile_are_refused ... ok
+test n079_06_the_public_cli_is_unchanged ... ok
+```
+
+The unsupervised direct child exits `71` (one of the three fixed child verification statuses) with empty stdout and empty stderr — no partial or fabricated evidence — and the code claims no parent authentication. `N079-02` remains asserted **inside** `n079_01` (one line, eight `key=value` tokens, fixed field order, full-width values, one `pid`, one `pgid`, `pgid == pid`); it is **not** reported as a separately named test.
+
+### `G080-05` — Windows refusal and unchanged public CLI
+
+```
+test n079_05_both_internal_modes_are_unsupported_before_any_child_exists ... ok
+test n079_06_the_public_cli_is_unchanged ... ok
+```
+
+plus the six platform-independent `n079_03` parser cases. The Windows log contains **zero** occurrences of `n079_01`, `n079_04`, `n079_direct_child`, `n079_observation` or `n076_`: no Linux native module, test or readback was compiled or executed there. Both internal modes return exit `3` with `error: MEDIA_HOST_PROBE_REFUSED: HOST_UNSUPPORTED` before any child exists, and the public CLI still yields `preflight=ok entity_id=entity-7 base=https://example.com/alpha` at exit `0` and `error: PREFLIGHT_ENTITY_ID_INVALID: invalid-start` at exit `2`.
+
+### `G080-06` — previously accepted kernel readback and regression suites intact
 
 ```
 test media_worker_host_native::linux::tests::n076_01_getrlimit_rlimit_as_and_rlimit_cpu_observe_the_real_kernel ... ok
@@ -131,87 +126,76 @@ test media_worker_host_native::linux::tests::n076_02_ceilings_keep_their_full_ra
 test media_worker_host_native::linux::tests::n076_03_a_rejected_status_is_a_typed_refusal_not_a_partial_observation ... ok
 ```
 
-`N079-02` is proved by the assertions *inside* `n079_01` rather than by a separately named case: exactly one evidence line, exactly eight `key=value` tokens in fixed order, every field at full width (`as_soft=536870912 as_hard=536870912 cpu_soft=10 cpu_hard=10 `), one `pid`, one `pgid`, `pgid == pid`, `pid > 0`, `wall_ms < 15000`, empty stderr, zero exit.
+Every earlier source-read, protocol, media-worker, staging and CLI suite still passes on both hosts.
 
-## 6. Refusals and negatives — `N079-03`, `N079-04`, `N079-05` PASS
-
-`N079-03` — pure parser and classifier cases (no untrusted executable is ever spawned), all `ok` on both hosts:
-
-```
-test media_worker_host::tests::n079_03_the_reserved_flag_is_honoured_only_in_second_position ... ok
-test media_worker_host::tests::n079_03_every_wrong_internal_token_shape_is_a_typed_refusal ... ok
-test media_worker_host::tests::n079_03_only_the_exact_observation_line_is_accepted ... ok
-test media_worker_host::tests::n079_03_malformed_observations_are_refused_without_partial_values ... ok
-test media_worker_host::tests::n079_03_child_exit_statuses_are_classified ... ok
-test media_worker_host::tests::n079_03_values_outside_the_fixed_profile_are_refused ... ok
-```
-
-Those cover: a reserved flag hidden behind a public subcommand; missing, unknown, empty, duplicated and extra sub-mode tokens; fourteen malformed observation forms (no trailing newline, second line, CRLF, tab, doubled space, wrong marker, reordered fields, sign, empty value, overflow, extra field, missing field); exit statuses `0`, `71`, `72`, `73`, `1`, `2`, `3`, `70`, `74`, `137`, `255` and a signal death; and a hard-ceiling, CPU-ceiling and group-identity mismatch.
-
-`N079-03` also has one real-binary case on Ubuntu: `test n079_03_wrong_internal_arguments_are_refused_by_the_real_binary ... ok` — exit `3`, empty stdout, stderr exactly `error: MEDIA_HOST_PROBE_REFUSED: INTERNAL_MODE_INVALID`.
-
-`N079-04`: `test n079_04_a_direct_unsupervised_child_is_refused ... ok` — exit `71`, empty stdout, empty stderr, `n079_direct_child=exit=71`. This proves the harness does not hand out accepted evidence; it deliberately does **not** claim parent authentication against a process that arranged the same ceilings itself.
-
-`N079-05` (Windows): `test n079_05_both_internal_modes_are_unsupported_before_any_child_exists ... ok`, plus `test n079_06_the_public_cli_is_unchanged ... ok`. Both modes return exit `3` with stderr exactly `error: MEDIA_HOST_PROBE_REFUSED: HOST_UNSUPPORTED` and empty stdout, and the Windows log contains **zero** occurrences of `n079_01`, `n079_04`, `n079_direct_child`, `n079_observation` or `n076_`: no Linux native module, test or readback is compiled or executed there.
-
-`N079-06` (both hosts): `test n079_06_the_public_cli_is_unchanged ... ok` — accepted `preflight=ok entity_id=entity-7 base=https://example.com/alpha` at exit `0`, refused `error: PREFLIGHT_ENTITY_ID_INVALID: invalid-start` at exit `2`, byte-exact.
-
-## 7. Two-host regression and security gates — `N079-07`, `N079-08` PASS
+### `G080-07`, `G080-08` — architecture, guards, toolchain and security gate on both hosts
 
 | Gate | Ubuntu | Windows |
 | --- | --- | --- |
 | Real-tree architecture | `architecture=legal packages=4 targets=33 files=60 edges=41` | identical |
-| 29-case refusal self-test | `self-check=passed cases=29` | identical, under its own `-notmatch` guard |
-| Format / strict Clippy / all-target tests | pass | pass |
-| Pinned component security gate | `cargo-deny 0.20.2`, archive sha256 `9f12ed4c…`, RustSec `5fe96cf5…` fetched `2026-11-12T13:24:30Z`, advisories/bans/licenses/sources ok | same version, Windows archive sha256 `975a2214…`, RustSec `5fe96cf5…` fetched `2026-11-12T13:24:56Z`, all ok |
-| Lock unchanged during the job | `lock_sha256=bf421c6e17034eb642cccfceeba22e01b5bea5ed138f03a3e5daf1c833086723` before and after | `DENY_LOCK_SHA256` re-checked the same way |
-| Release build and CLI smoke | `release_smoke=verified accepted_exit=0 refused_exit=2` | `release_smoke=verified accepted_exit=0 refused_exit=2` |
-| Failure tripwires | normal pass plus required injected failure | normal pass plus required injected failure |
-| Forbidden-import probe, guaranteed restore | `forbidden_import_probe=verified …` | n/a — Ubuntu-only step |
-| Two clean release builds, raw bytes | identical | n/a — Ubuntu-only step |
-| Toolchain | `rustc 1.99.1` / `cargo 1.99.1` asserted | same, asserted |
+| Workflow `edges=41` assertions | both unchanged literal checks passed | both unchanged literal checks passed |
+| Refusal self-test | `self-check=passed cases=29` | identical, under its own `-notmatch` guard |
+| Negative controls | `ok dynamic-load refused as dynamic-loading (1 finding(s))`, `ok checker-bypass refused as layer-outward-reference (1 finding(s))`, plus the outward/alias/re-export/qualified/private/undeclared/`#[path]`/`include!`/missing-module refusals | same matrix |
+| Format / strict Clippy / all-target tests | `cargo fmt --all -- --check`, `cargo clippy … -D warnings`, `cargo test --workspace --all-targets --locked` | same commands |
+| Pinned toolchain | `rustc 1.99.1`, `cargo 1.99.1` asserted | same, asserted |
+| Component security gate | `cargo-deny 0.20.2`, archive sha256 `9f12ed4c49936e09b48bf862b595cde2fe64fcbd9d74dfacac6131ca824c8d5f`, RustSec `5fe96cf51fde2fd4e749d51ac8bdc59edbdce77b` fetched `2026-11-12T13:54:58Z`, advisories/bans/licenses/sources ok | same version, archive sha256 `975a22143262fd27476d19ee00c7af67978426e40e1dee94eed6bbade1cf87dc`, same RustSec commit fetched `2026-11-12T13:55:29Z`, all ok |
 
-`N079-07`: the Cargo graph is unchanged at **41 edges** and **four** crates; `Cargo.lock` is still `b1ee56da…`, the adapter manifest is still `47d732f2…`, and no dependency, feature, toolchain, policy or workflow file was touched. `targets` rose 32 → 33 and `files` 58 → 60 because one integration-test target and two source files were added, which is exactly what the authorized ledger permits; the workflow's `packages=4` and `edges=41` assertions are untouched and pass on both hosts.
+No dependency, lock, feature, toolchain, policy, workflow, Charter or checker file changed: the graph stays at **41 edges** and **four** crates, and `targets`/`files` moved 32→33 and 58→60 only because one integration-test target and two source files were added, which is precisely the authorized ledger.
 
-`N079-08`: the complete original 33-step-per-host `rust-verify` is green at the final branch SHA, with no applicable step skipped and no workflow edit.
+### `G080-09` — tripwires, release gates and reproducibility
 
-## 8. Every CI run, including the three non-passing ones
+| Proof | Ubuntu | Windows |
+| --- | --- | --- |
+| Test-failure tripwire | normal pass plus required injected failure | same |
+| Architecture/advisory refusal tripwires | injected forbidden import refused as `undeclared-crate` with exit 1 | same |
+| Forbidden-import restore | `forbidden_import_probe=verified injected_exit=1 restored_sha256=8b627ffeadd231f36515ada4ee691e401c2aa0de7cdec3619f736280c837b4ba` | n/a — Ubuntu-only step |
+| Locked release build | pass | pass |
+| Release CLI smoke | `release_smoke=verified accepted_exit=0 refused_exit=2` | `release_smoke=verified accepted_exit=0 refused_exit=2` |
+| Two clean rebuilds, raw bytes | `clean_release_sha256_a = clean_release_sha256_b = 49b066056a333e3d67e3b1f384c456b07a8ea65c485ad71d064313cb8b053fbe`, `clean_release_bytes=623472`, `reproducibility=verified` | n/a — Ubuntu-only step |
 
-| # | Run | Commit | Result |
-| --- | --- | --- | --- |
-| 1 | `43222538133` | `4d84d354` | **failed** — Ubuntu strict Clippy `E0432`: the façade imported the three native entry points from the module root although they live inside the private `linux` module; Windows `check-architecture` refused `thread::sleep`/`thread::spawn` because the `use std::thread::{self, …}` alias root is unresolvable to the AST checker |
-| 2 | `43223943218` | `998631f1` | **failed** — Windows fully green; Ubuntu strict Clippy `clippy::manual_range_patterns` on `matches!(code, 71 \| 72 \| 73)` |
-| 3 | `43224923260` | `d483a5ae` | **success** both hosts |
-| 4 | `43225983960` | `67048145` | **failed** — Ubuntu fully green including the real readback; Windows strict Clippy `unused-imports` for the `Write` import that only the Linux-gated echo helper uses |
-| 5 | `43226954406` | `380393dd` | **success** both hosts — the final reviewed SHA |
+`Cargo.lock` identity, recorded honestly as two different kinds of value: the **shared Git blob** is `b1ee56da60f36536548586528db371b7cbe508e4` on both hosts, while the **host checkout bytes** differ by line-ending handling — Ubuntu raw SHA-256 `bf421c6e17034eb642cccfceeba22e01b5bea5ed138f03a3e5daf1c833086723`, Windows raw SHA-256 `afffb921f61318c10308fd087266f764960ab914a8b2f5a34996809755dfb70e`. Each job re-hashed the file before and after its security gate to prove the gate itself changed nothing. The two raw values are **not** equated with the blob, and neither is presented as corruption.
 
-All three corrections were strictly additive, inside the §3 ledger, and each was pushed with a transparent message. No checker, workflow, assertion, dependency or test was weakened, removed or skipped, and no correction changed an implementation byte outside that ledger. The first two failures also confirmed that the guards are load-bearing: the source checker caught a real alias-form that the compiler accepts, and the unsafe/architecture guards kept every new native call inside the one approved Linux file.
+### `G080-10` — CI revisions
 
-## 9. Gates
+The original push-triggered workflow is successful at the exact integration SHA `0c231196…` (run `43231769157`), and its success is required again at the report-only SHA; that run and its job IDs are returned in the chat handoff because this report cannot embed its own future commit. The narrow nonpublishing claim is preserved: nothing was published, released or deployed.
 
-| Gate | Status |
+## 4. Gate table — stated honestly
+
+| Gate | Status | Basis |
+| --- | --- | --- |
+| `S080-01` | **PASS** | §1 — every anchor, blob and reference exact; one checkout/remote/worktree; four WIP files; clean unknown-state inventory; branch unmoved |
+| `S080-02` | **PASS** | §2 — ACTIVE-only issuance `d40190a5…`, remote readback exact, run `43230869669` green both hosts |
+| `S080-03` | **PASS** | §2 — five path-scoped promotions, staged and remote blobs all five accepted values, branch `380393dd…` preserved, no whole-branch merge |
+| `S080-04` | **PASS** | §2 — four Linux-gated `unsafe` expressions with local rationales, fixed compile-time profile, imported files unchanged from the branch, no dependency/graph/Charter/workflow change |
+| `S080-05` | **PASS** | §3 — real Ubuntu parent/child and negatives, Windows unsupported refusal, ten `G080` proofs observed in this run's `main` logs |
+| `S080-06` | **PASS** | §2/§3 — one integration commit with five paths, push-triggered full CI green both hosts at the exact SHA |
+| `S080-07` | **PASS** | §5 — this is its own one-path commit; its blob/tree/parent and the report-head CI are returned in the chat handoff |
+| `S080-08` | **PASS** | §5 — no branch, worktree, clone or remote change; clean `main`; nothing unknown or Owner-owned erased; task scratch removed; inherited scratch inventoried |
+| `S080-09` | **PASS** | `LINUX-PREEXEC-LIMIT-SMOKE-INTEGRATED` only; one harmless trusted child; `R03.C3`, `R03.C`, Stage 03 and all unimplemented safety/media gates OPEN |
+
+| Proof | Status |
 | --- | --- |
-| `S079-01` identity & authority | **PASS** — §1, all anchors exact, sole checkout/remote, four WIP files, branch absent beforehand |
-| `S079-02` issuance | **PASS** — §2, `fa0461a6…`, run `43220157769` green on both hosts |
-| `S079-03` one technical branch, ledger only | **PASS** — §3, five commits, exactly the five authorized paths, remote branch equal, ACTIVE unchanged |
-| `S079-04` fixed pre-exec install | **PASS** — §4/§5, `setsid` + hard/soft `setrlimit` before `exec`, async-signal-safe, adjacent `SAFETY`, child self-readback proven |
-| `S079-05` safe façade, private dispatch, bounds | **PASS** — §4, one fixed operation, exact argument shape, capped pipes, 15 000 ms deadline, reaped leader, no untrusted input |
-| `S079-06` actual test evidence | **PASS** — §5/§6, `N079-01..04` and the real-binary refusal case on Ubuntu, `N079-05` on Windows, `N079-06` on both |
-| `S079-07` exact final SHA, complete CI | **PASS** — §7, run `43226954406` at `380393dd…`, 33 steps each, no workflow edit |
-| `S079-08` code on its own branch only | **PASS** — §10, `main` has no native/CLI code, no merge, no PR; old branches untouched |
-| `S079-09` report-only commit and clean state | **PASS** — exactly one report-only commit replaces this single canonical report and `main` is otherwise untouched; that commit's own SHA, tree, parent, blob and two-host run are returned in the chat handoff, because a report cannot cite its own uncreated commit |
-| `S079-10` limited vocabulary | **PASS** — `LINUX-PREEXEC-LIMIT-SMOKE-PROVEN` only; no containment, sandbox, media, publication or Stage closure claim |
+| `G080-01` blob equality, 3 M / 2 A, refs preserved | **PASS** — §2 |
+| `G080-02` real Ubuntu readback at this `main` SHA | **PASS** — `pid=4249 pgid=4249 wall_ms=11` from run `43231769157` |
+| `G080-03` direct unsupervised refusal | **PASS** — exit `71`, empty stdout, no accepted evidence |
+| `G080-04` internal-argument, parser, profile, exit-status and binary refusals | **PASS** — nine real cases on Ubuntu, six on Windows, `N079-02` inside `n079_01` |
+| `G080-05` Windows unsupported, no Linux execution, public CLI unchanged | **PASS** — zero Linux test names in the Windows log |
+| `G080-06` `N076-01..03` and earlier regressions | **PASS** |
+| `G080-07` architecture/graph on both hosts | **PASS** — `packages=4 targets=33 files=60 edges=41`, `cases=29`, negative controls refusing |
+| `G080-08` fmt/Clippy/test/toolchain/deny on both hosts | **PASS** — fresh RustSec on each host |
+| `G080-09` tripwires, release, smoke, reproducibility, lock identity | **PASS** — with the Git-blob versus host-bytes distinction recorded |
+| `G080-10` both CI revisions | **PASS** at the integration SHA; report-head run returned in chat |
 
-## 10. Final state, honest limitations and cleanup
+Nothing in this order reached `FAIL` or `NOT RUN`. There was no late CI failure, so no corrective source change was needed or made, and no sixth path was touched.
 
-**`main` carries no code from this order.** After the branch work the worktree was switched back to `main` without discarding anything: `HEAD == main == origin/main == fa0461a64ddd0573a5b682603d48d64c60e7560a`, tree `90760e649ad8212713d0f967f62356aa2ceea5a1`. Both new source files are absent from `main`, the native module is still the accepted readback-only blob `2df6d0e9…`, `lib.rs` is still `bd1d4c58…`, `main.rs` is still `6faa9fae…`, and the workflow is still the original `e1b5ca6e…` with its two `edges=41` assertions. No merge, no cherry-pick, no pull request, no tag, no release and no deployment was performed.
+## 5. Final state, limitations and cleanup
 
-**Branch divergence is deliberate.** `solo-wo-079-r01` = `380393ddacf37fc1a6398805235ca2d5dbd9677e` (tree `18215c5a…`) exists locally and on `origin`, preserved exactly for independent review, and it contains native code and `unsafe` that has **not** been promoted, reviewed for integration or merged. `solo-wo-076-r01` remains `40a40bab1d017e61340fe53399b49fb2ab335c3b`; `solo-wo-061-r01`, `solo-wo-069-r01` and `solo-wo-070-r01` remain at `4371af21…`, `e6162cdf…` and `d270f95c…`. One checkout, one worktree, one remote, four WIP files.
+**State.** `main` now carries exactly the five accepted blobs on top of the Owner-issued ACTIVE; `main == origin/main == 0c231196e48c51fb60dc9b17bd290db04e276841` (tree `e56952910b492c3f25b935bda9754e2e68d4e668`) before this report, with a clean working tree, one worktree and one remote. The technical branch `solo-wo-079-r01` remains `380393ddacf37fc1a6398805235ca2d5dbd9677e` locally and on `origin`, and `solo-wo-076-r01` (`40a40bab…`), `solo-wo-061-r01` (`4371af21…`), `solo-wo-069-r01` (`e6162cdf…`) and `solo-wo-070-r01` (`d270f95c…`) are byte-for-byte unchanged. No new branch, pull request, tag, release or deployment exists, and no history was rewritten or force-pushed.
 
-**Local toolchain limitation (important).** This Owner-local workstation still has **no usable linker and no Linux target**, so `cargo check`, `cargo build` and `cargo test` cannot run here — even `cargo check` fails, because dependency build scripts must be linked. **Every** compile, lint, guard, test and kernel-readback result in this report therefore comes from remote two-host CI, and no local compilation is claimed. `rustfmt 1.10.0-stable` *is* available and was used locally: `cargo fmt --all -- --check` passed before every push, which is why the format gate never failed in any run.
+**Toolchain limitation.** This Owner-local workstation still has no usable linker and no Linux target, so `cargo check`, `cargo build` and `cargo test` cannot run locally — even `cargo check` fails because dependency build scripts must be linked. Every compile, lint, guard, test and kernel-readback statement above comes from remote two-host CI. `target/` and all unrelated local files were left untouched.
 
-**Known limits of the proof.** The ceilings were installed and observed; they were deliberately not exercised against a stress allocation, a CPU-burning loop or a wall-clock overrun, so nothing here shows that an over-large request is actually rejected. `setsid` was proved by `pgid == pid`, but no descendant was spawned and no process-tree sweep was attempted, so group cleanup is explicitly **not** claimed. `current_exe()` is a trusted re-execution assumption for a test harness, not proof of immutable executable identity. The internal modes are not a credential: a process that arranged the same ceilings itself would satisfy the child's own check, so no parent attestation is claimed. `RLIMIT_AS` is virtual address space, not RSS and not a child-tree total; `RLIMIT_CPU` is consumed CPU time, not elapsed time. No Windows Job Object, media validation, publication path or Stage 03 closure was added.
+**Cleanup.** The only task-owned material created by this run was disposable report scratch in the ignored `.temp/`, which was deleted after assembly, so `.temp/` again has no top-level files. Its three inherited directories and the `solo-wo-073-wip` four files / 46 062 bytes are preserved exactly as found and remain unaccepted reference only, with their future cleanup still belonging to a later separately authorized native-containment order. No Owner data was deleted, moved or reinterpreted, and no `git reset`, `git clean`, stash or destructive checkout was used.
 
-**Cleanup.** Every task-owned temporary artefact was report and log scratch inside the ignored `.temp/`: the assembled report fragments and short-lived log captures were deleted after use, so `.temp/` has no top-level files left. The inherited `.temp/solo-wo-073-wip/` research material is preserved untouched at **4 files / 46 062 bytes** — unverified reference only, with its cleanup trigger deferred to a later native containment order, and it was not copied, executed or treated as approved code. No Owner archive was present in `.temp/`, and none was fabricated, moved or deleted. No `git clean`, destructive `reset`, stash, rebase, force-push, secondary worktree, clone or alternate remote was used, and nothing outside the §3 ledger was staged, committed or pushed.
+**Remaining risks and explicitly open work.** Limit enforcement under stress, smaller resource-cap trip tests, descendant spawn and kill/sweep coverage, an independent wall-watchdog negative, concurrent aggregate quotas, Windows Job Objects, decoder quality and media correctness, source-confinement least privilege, `current_exe()` identity and anti-replacement, hostile-child behaviour, and whole-publication validation are all **future Owner-issued work**, not hidden acceptance criteria of this integration. A green mainline integration must never be described as full host containment.
 
-The Implementation Agent has not self-ACCEPTed, has not begun another order, and stops here for independent Chief Master Architect disposition against this report and the preserved branch: **ACCEPT / REVISE / STOP**.
+The Implementation Agent has not self-ACCEPTed, has not merged or released anything, and has not begun another order. It stops here for independent Chief Master Architect disposition against this report and the exact revisions named above: **ACCEPT / REVISE / STOP**.
