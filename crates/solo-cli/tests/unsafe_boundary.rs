@@ -1,25 +1,83 @@
-//! Load-bearing guard: `unsafe` is confined to one Windows-gated module.
+//! Load-bearing guard: `unsafe` is confined to two exact, platform-gated native modules.
 //!
-//! The architecture allows exactly one project-owned `unsafe` region, because the Windows
-//! source reader must call `NtCreateFile` directly. Everywhere else the code is safe Rust. A
-//! comment in a crate header cannot enforce that, so this file does it mechanically:
+//! The architecture allows exactly one project-owned `unsafe` region today — the Windows source
+//! reader must call `NtCreateFile` directly — and `SOLO-WO-074 R01` reserves exactly one further
+//! path, `crates/solo-adapters/src/media_worker_host_native.rs`, for a later separately issued
+//! Linux/Windows process-control implementation. The reserved file does not exist yet. Everywhere
+//! else the code is safe Rust. A comment in a crate header cannot enforce that, so this file does
+//! it mechanically:
 //!
-//! * every first-party `.rs` file is scanned after comments and string literals are removed,
-//!   so a *mention* of the word never counts as a use of it;
-//! * only `crates/solo-adapters/src/source_read_native.rs` may use the keyword or import the
-//!   native crates;
-//! * every `unsafe` block in that one file must carry an adjacent `// SAFETY:` rationale;
+//! * every first-party `.rs` file is scanned after comments and string literals are removed, so a
+//!   *mention* of the word never counts as a use of it;
+//! * only those two exact paths may use the keyword at all;
+//! * whether an occurrence is genuinely inside a **positive** platform gate is decided by the
+//!   architecture checker's own `syn` AST rule, not by substring matching, so a negated,
+//!   `any`-alternated, malformed or merely textual `windows`/`linux` mention never counts;
+//! * every `unsafe` block in an eligible file must carry an adjacent `// SAFETY:` rationale;
 //! * the adapter's lint arrangement must be exactly `#![deny(unsafe_code)]` plus a single
-//!   `#[cfg_attr(windows, allow(unsafe_code))]` on the native module.
+//!   `#[cfg_attr(windows, allow(unsafe_code))]` on the existing native module, with no second
+//!   allowance and no crate-wide one;
+//! * the native roots each eligible path may name are fixed: the source reader may use
+//!   `windows_sys`/`rustix`, the reserved process path may use `windows_sys`/`libc`, and every
+//!   other file may use none of them — `libloading`, `dlopen` and `LoadLibrary` never.
 //!
 //! The final tests feed deliberately bad sources through the same functions, so the guard is
 //! proven to refuse rather than merely to pass.
 
+mod architecture_checks;
+
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// The single file permitted to contain `unsafe` and to import the native crates.
+/// The pre-existing file permitted to contain `unsafe` and to import its native roots.
 const NATIVE_MODULE: &str = "crates/solo-adapters/src/source_read_native.rs";
+
+/// The reserved future process-native path (`SOLO-WO-074 R01`). It does not exist yet.
+const RESERVED_PROCESS_MODULE: &str = "crates/solo-adapters/src/media_worker_host_native.rs";
+
+/// Which exception, if any, one repository-relative path may claim.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Role {
+    /// No native exception: no `unsafe` and no native root.
+    Ordinary,
+    /// The Windows-only source reader.
+    SourceRead,
+    /// The reserved Linux/Windows process-control boundary.
+    ProcessNative,
+}
+
+/// The role of one repository-relative path.
+fn role_of(path: &str) -> Role {
+    if path == NATIVE_MODULE {
+        Role::SourceRead
+    } else if path == RESERVED_PROCESS_MODULE {
+        Role::ProcessNative
+    } else {
+        Role::Ordinary
+    }
+}
+
+/// The native roots the source reader may name: the audited Windows and Linux source-read crates.
+const SOURCE_READ_ROOTS: [&str; 2] = ["windows_sys", "rustix"];
+
+/// The native roots the reserved process boundary may name: process control only.
+const PROCESS_NATIVE_ROOTS: [&str; 2] = ["windows_sys", "libc"];
+
+/// Roots that would reach a dynamically loaded object, or an unapproved native API, from any
+/// file. `libc` is here on purpose: it is not a general-purpose door, and the only file that may
+/// name it is the reserved process boundary above.
+const FORBIDDEN_ROOTS: [&str; 5] = ["libloading", "libdl", "dlopen", "dlsym", "LoadLibrary"];
+
+/// Every native root this guard knows about, so an unexpected one is refused rather than ignored.
+const ALL_NATIVE_ROOTS: [&str; 7] = [
+    "windows_sys",
+    "rustix",
+    "libc",
+    "libloading",
+    "libdl",
+    "dlopen",
+    "LoadLibrary",
+];
 
 /// The adapter crate root that must carry the approved lint arrangement.
 const ADAPTER_ROOT: &str = "crates/solo-adapters/src/lib.rs";
@@ -214,23 +272,27 @@ fn has_ungated_allowance(code: &str) -> bool {
 fn violations(path: &str, source: &str) -> Vec<String> {
     let code = code_only(source);
     let mut problems = Vec::new();
-    let native = path == NATIVE_MODULE;
+    let role = role_of(path);
 
-    // The keyword and an ungated `allow(unsafe_code)` request are both refusals: a file may
-    // not use unsafe, and it may not ask for the allowance that would make using it possible
-    // without the Windows gate. A `deny(unsafe_code)` is the opposite of an allowance.
+    // The keyword and an ungated `allow(unsafe_code)` request are both refusals: a file may not
+    // use unsafe, and it may not ask for the allowance that would make using it possible without
+    // a platform gate. A `deny(unsafe_code)` is the opposite of an allowance.
     let mentions_unsafe = uses_unsafe(&code) || has_ungated_allowance(&code);
-    if mentions_unsafe && !native {
-        problems.push(format!("{path}: uses `unsafe` outside the approved module"));
-    }
-    if (code.contains("windows_sys") || code.contains("rustix")) && !native {
+    if mentions_unsafe && role == Role::Ordinary {
         problems.push(format!(
-            "{path}: imports a native crate outside the approved module"
+            "{path}: uses `unsafe` outside the two approved native boundary modules"
         ));
     }
-    if native {
-        // Every unsafe block must be justified, so a new block cannot arrive without
-        // explaining the invariants it relies on.
+
+    if mentions_unsafe && role != Role::Ordinary {
+        // The gate decision is the architecture checker's own AST rule. A substring that merely
+        // contains the word `windows` or `linux` therefore never stands in for a positive
+        // `#[cfg(..)]` proof, and a negated, alternated or malformed predicate never counts.
+        if let Err(reason) = architecture_checks::source::classify_unsafe_scope(path, source) {
+            problems.push(format!("{path}: {reason}"));
+        }
+        // Every unsafe block must be justified, so a new block cannot arrive without explaining
+        // the invariants it relies on.
         let blocks = code.matches("unsafe {").count() + code.matches("unsafe{").count();
         let notes = source.matches("// SAFETY:").count();
         if blocks > notes {
@@ -239,6 +301,25 @@ fn violations(path: &str, source: &str) -> Vec<String> {
             ));
         }
     }
+
+    // Native roots are fixed per exception. A root that is not in the file's own list — or that
+    // is a dynamic-loading root — is refused wherever it appears.
+    let permitted: &[&str] = match role {
+        Role::Ordinary => &[],
+        Role::SourceRead => &SOURCE_READ_ROOTS,
+        Role::ProcessNative => &PROCESS_NATIVE_ROOTS,
+    };
+    for root in ALL_NATIVE_ROOTS {
+        if !code.contains(root) {
+            continue;
+        }
+        if FORBIDDEN_ROOTS.contains(&root) || !permitted.contains(&root) {
+            problems.push(format!(
+                "{path}: imports a native crate `{root}` outside the roots its exception permits"
+            ));
+        }
+    }
+
     problems
 }
 
@@ -363,5 +444,171 @@ fn the_guard_ignores_mentions_in_comments_strings_and_lifetimes() {
         violations("crates/solo-domain/src/prose.rs", prose).is_empty(),
         "a mention must never be mistaken for a use: {}",
         code_only(prose)
+    );
+}
+
+// ---------------------------------------------------------------------------
+// `SOLO-WO-074 R01`: the reserved second path, its OS gates and its native roots.
+// ---------------------------------------------------------------------------
+
+/// One gated `unsafe` block with an adjacent rationale, under `attribute`.
+fn gated_block(attribute: &str) -> String {
+    format!(
+        "{attribute}\nfn f() {{\n    // SAFETY: the test only observes an address, never dereferences it.\n    let _ = unsafe {{ core::ptr::null::<u8>() }};\n}}\n"
+    )
+}
+
+#[test]
+fn the_reserved_process_module_does_not_exist_in_the_real_tree() {
+    let root = repository_root();
+    assert!(
+        root.join(NATIVE_MODULE).is_file(),
+        "the existing source-read module must still be present"
+    );
+    assert!(
+        !root.join(RESERVED_PROCESS_MODULE).exists(),
+        "the reserved process-native file must not exist until a separate code order adds it"
+    );
+
+    let adapter_root =
+        fs::read_to_string(root.join(ADAPTER_ROOT)).expect("the adapter root exists");
+    assert!(
+        !adapter_root.contains("media_worker_host_native"),
+        "no allowance may be added for a file that does not exist yet"
+    );
+}
+
+#[test]
+fn the_guard_accepts_a_positively_gated_reserved_process_module() {
+    for attribute in [
+        "#[cfg(target_os = \"linux\")]",
+        "#[cfg(windows)]",
+        "#[cfg(all(test, windows))]",
+        "#[cfg(all(test, target_os = \"linux\"))]",
+    ] {
+        let problems = violations(RESERVED_PROCESS_MODULE, &gated_block(attribute));
+        assert!(
+            problems.is_empty(),
+            "{attribute} must be a positive gate for the reserved path: {problems:?}"
+        );
+    }
+}
+
+#[test]
+fn the_guard_refuses_an_unproven_gate_in_the_reserved_process_module() {
+    let unproven = [
+        "#[cfg(any(windows, feature = \"x\"))]",
+        "#[cfg(any(target_os = \"linux\", feature = \"x\"))]",
+        "#[cfg(not(windows))]",
+        "#[cfg(not(test))]",
+        "#[cfg(target_os = \"macos\")]",
+        "#[cfg_attr(windows, allow(dead_code))]",
+        "",
+    ];
+    for attribute in unproven {
+        let problems = violations(RESERVED_PROCESS_MODULE, &gated_block(attribute));
+        assert!(
+            !problems.is_empty(),
+            "`{attribute}` must never be accepted as an OS proof"
+        );
+    }
+
+    // A block without its rationale is refused even when correctly gated.
+    let unjustified = "#[cfg(windows)]\nfn f() { let _ = unsafe { core::ptr::null::<u8>() }; }\n";
+    assert!(
+        violations(RESERVED_PROCESS_MODULE, unjustified)
+            .iter()
+            .any(|problem| problem.contains("SAFETY")),
+        "a gated block still needs its local rationale"
+    );
+}
+
+#[test]
+fn the_guard_refuses_a_copied_or_aliased_native_module() {
+    let gated = gated_block("#[cfg(windows)]");
+    for path in [
+        "crates/solo-adapters/src/media_worker_host_native_copy.rs",
+        "crates/solo-adapters/src/media_worker_host_native.rs.bak",
+        "crates/solo-application/src/media_worker_host_native.rs",
+        "crates/solo-cli/src/media_worker_host_native.rs",
+        "crates/solo-domain/src/media_worker_host_native.rs",
+        "media_worker_host_native.rs",
+    ] {
+        assert!(
+            !violations(path, &gated).is_empty(),
+            "a copied module at `{path}` must be refused"
+        );
+    }
+}
+
+#[test]
+fn the_guard_refuses_native_roots_outside_their_own_exception() {
+    // `libc` is a process-control root: never in an ordinary file, and never on the source reader.
+    for path in [
+        "crates/solo-domain/src/lib.rs",
+        "crates/solo-application/src/media_worker.rs",
+        "crates/solo-adapters/src/lib.rs",
+        "crates/solo-cli/src/main.rs",
+        NATIVE_MODULE,
+    ] {
+        assert!(
+            violations(path, "use libc::rlimit;\n")
+                .iter()
+                .any(|problem| problem.contains("native crate")),
+            "`libc` must be refused at `{path}`"
+        );
+    }
+
+    // `rustix` belongs to the source reader only.
+    assert!(
+        violations(RESERVED_PROCESS_MODULE, "use rustix::io::Errno;\n")
+            .iter()
+            .any(|problem| problem.contains("native crate")),
+        "`rustix` is not a process-control root"
+    );
+
+    // Dynamic loading never, anywhere, in any file, under any gate.
+    for path in [
+        RESERVED_PROCESS_MODULE,
+        NATIVE_MODULE,
+        "crates/solo-domain/src/lib.rs",
+    ] {
+        for root in ["libloading", "dlopen", "dlsym", "libdl", "LoadLibrary"] {
+            let source = format!("use {root}::Thing;\n");
+            assert!(
+                violations(path, &source)
+                    .iter()
+                    .any(|problem| problem.contains("native crate")),
+                "`{root}` must be refused at `{path}`"
+            );
+        }
+    }
+}
+
+#[test]
+fn the_guard_refuses_an_allowance_that_is_not_the_single_approved_one() {
+    let forms = [
+        "#[allow(unsafe_code)]\nfn f() {}\n",
+        "#[cfg_attr(any(target_os = \"linux\", windows), allow(unsafe_code))]\nfn f() {}\n",
+        "#[cfg_attr(not(windows), allow(unsafe_code))]\nfn f() {}\n",
+        "#![allow(unsafe_code)]\nfn f() {}\n",
+    ];
+    for source in forms {
+        for path in [ADAPTER_ROOT, RESERVED_PROCESS_MODULE, NATIVE_MODULE] {
+            assert!(
+                !violations(path, source).is_empty(),
+                "an unapproved allowance form must be refused at `{path}`"
+            );
+        }
+    }
+
+    // The one approved form stays legal at the adapter root.
+    assert!(
+        violations(
+            ADAPTER_ROOT,
+            "#[cfg_attr(windows, allow(unsafe_code))]\nmod native;\n"
+        )
+        .is_empty(),
+        "the single documented Windows-gated allowance must remain legal"
     );
 }

@@ -367,10 +367,10 @@ struct FileCtx {
     is_crate_root: bool,
     stem: String,
     test_context: bool,
-    /// True when this file's items sit inside a positive `#[cfg(windows)]` scope. This is
-    /// what makes the single approved `unsafe` exception reachable at all, so it travels
-    /// with the context instead of being re-derived from an item's own attributes.
-    windows_gated: bool,
+    /// The platform restriction this file's items inherit from enclosing gates. A *positive*
+    /// gate is what makes an approved `unsafe` exception reachable at all, so it travels with
+    /// the context instead of being re-derived from an item's own attributes.
+    os_gate: OsGate,
     /// Imported name -> full used path, propagated into nested modules.
     aliases: BTreeMap<String, Vec<String>>,
 }
@@ -410,7 +410,7 @@ pub fn check_unit(spec: &UnitSpec, reader: &dyn SourceReader) -> Vec<Violation> 
         stem: file_stem(&root),
         is_crate_root: true,
         test_context: spec.kind.is_test_context(),
-        windows_gated: false,
+        os_gate: OsGate::UNRESTRICTED,
         aliases: BTreeMap::new(),
         path: root.clone(),
     });
@@ -429,7 +429,7 @@ pub fn check_unit(spec: &UnitSpec, reader: &dyn SourceReader) -> Vec<Violation> 
         stem: file_stem(&root),
         is_crate_root: true,
         test_context: spec.kind.is_test_context(),
-        windows_gated: false,
+        os_gate: OsGate::UNRESTRICTED,
         aliases: BTreeMap::new(),
         path: root,
     });
@@ -560,7 +560,7 @@ fn visited_files(spec: &UnitSpec, reader: &dyn SourceReader) -> BTreeSet<PathBuf
             stem: file_stem(&root),
             is_crate_root: true,
             test_context: spec.kind.is_test_context(),
-            windows_gated: false,
+            os_gate: OsGate::UNRESTRICTED,
             aliases: BTreeMap::new(),
             path: root,
         });
@@ -664,7 +664,7 @@ impl Scanner<'_> {
             is_crate_root: ctx.is_crate_root,
             stem: ctx.stem.clone(),
             test_context: ctx.test_context || cfg_is_test(&module.attrs),
-            windows_gated: ctx.windows_gated || is_cfg_windows(&module.attrs),
+            os_gate: ctx.os_gate.intersect(cfg_os_gate(&module.attrs)),
             aliases: ctx.aliases.clone(),
         };
         child.aliases.extend(facts.aliases.clone());
@@ -717,7 +717,7 @@ impl Scanner<'_> {
             },
             is_crate_root: is_mod_file,
             test_context: child.test_context,
-            windows_gated: child.windows_gated,
+            os_gate: child.os_gate,
             aliases: child.aliases.clone(),
             path: resolved,
         };
@@ -854,7 +854,9 @@ impl Scanner<'_> {
         // The gate is a property of the enclosing scope, and `scan_module` descends without
         // visiting the module as an item, so it is seeded here from the context.
         let mut facts = Facts {
-            windows_scope_depth: usize::from(ctx.windows_gated),
+            windows_scope_depth: usize::from(ctx.os_gate.is_windows_only()),
+            linux_scope_depth: usize::from(ctx.os_gate.is_linux_only()),
+            unguaranteed_depth: usize::from(ctx.os_gate == OsGate::NONE),
             ..Facts::default()
         };
         facts.visit_item(item);
@@ -873,6 +875,7 @@ impl Scanner<'_> {
             &location,
             facts.unsafe_unscoped,
             facts.unsafe_windows_scoped,
+            facts.unsafe_linux_scoped,
         ) {
             self.violation(Category::UnsafeCode, location.clone(), reason);
         }
@@ -891,11 +894,11 @@ impl Scanner<'_> {
             );
         }
 
-        for path in &facts.paths {
-            self.classify(path, ctx);
+        for (path, gate) in &facts.paths {
+            self.classify(path, *gate, ctx);
         }
-        for segments in &facts.use_paths {
-            self.classify_segments(segments, ctx);
+        for (segments, gate) in &facts.use_paths {
+            self.classify_segments(segments, *gate, ctx);
         }
 
         let mut pending: VecDeque<syn::Macro> = facts.macros.iter().cloned().collect();
@@ -1002,11 +1005,11 @@ impl Scanner<'_> {
             }
         }
 
-        for path in &facts.paths {
-            self.classify(path, ctx);
+        for (path, gate) in &facts.paths {
+            self.classify(path, *gate, ctx);
         }
-        for segments in &facts.use_paths {
-            self.classify_segments(segments, ctx);
+        for (segments, gate) in &facts.use_paths {
+            self.classify_segments(segments, *gate, ctx);
         }
         pending.extend(facts.macros);
     }
@@ -1061,18 +1064,18 @@ impl Scanner<'_> {
         self.scan_items(&file.items, &mut inner);
     }
 
-    fn classify(&mut self, path: &syn::Path, ctx: &FileCtx) {
+    fn classify(&mut self, path: &syn::Path, gate: OsGate, ctx: &FileCtx) {
         let segments: Vec<String> = path
             .segments
             .iter()
             .map(|segment| segment.ident.to_string())
             .collect();
-        self.classify_segments(&segments, ctx);
+        self.classify_segments(&segments, gate, ctx);
     }
 
     /// Classifies one path, after substituting every `use`/`extern crate` alias so a
     /// renamed import cannot disguise its real root.
-    fn classify_segments(&mut self, segments: &[String], ctx: &FileCtx) {
+    fn classify_segments(&mut self, segments: &[String], gate: OsGate, ctx: &FileCtx) {
         if segments.is_empty() {
             return;
         }
@@ -1091,6 +1094,18 @@ impl Scanner<'_> {
 
         // A module declared inside this crate is a local path root, not a dependency.
         if self.local_modules.contains(root) {
+            return;
+        }
+
+        // The one reserved native-API exception (`SOLO-WO-074 R01`): direct `libc` access is
+        // permitted only in the reserved process-native file, only inside a positively proven
+        // Linux gate, and only for that fixed process-control purpose. It is not a waiver for
+        // `libloading`, `dlopen`, `LoadLibrary`, an alias, a macro or any other file, and no
+        // crate declares `libc` yet, so this branch can only fire for a synthetic source.
+        if root.as_str() == "libc"
+            && location == APPROVED_PROCESS_NATIVE_MODULE
+            && gate.is_linux_only()
+        {
             return;
         }
 
@@ -1254,18 +1269,27 @@ impl Scanner<'_> {
 /// Everything one item (or one parsed macro argument list) contributes to the check.
 #[derive(Default)]
 struct Facts {
-    paths: Vec<syn::Path>,
-    use_paths: Vec<Vec<String>>,
+    /// Each referenced path with the platform gate that surrounded it, so the reserved
+    /// native-API exception can never be granted to code outside a positive gate.
+    paths: Vec<(syn::Path, OsGate)>,
+    use_paths: Vec<(Vec<String>, OsGate)>,
     /// Imported name -> the full used path, so an alias resolves to its real root and a
     /// re-exported type keeps its owning crate.
     aliases: BTreeMap<String, Vec<String>>,
     macros: Vec<syn::Macro>,
-    /// Unsafe occurrences that sit inside a `#[cfg(windows)]`-gated scope.
+    /// Unsafe occurrences that sit inside a positive `#[cfg(windows)]`-gated scope.
     unsafe_windows_scoped: usize,
-    /// Unsafe occurrences that sit outside any `#[cfg(windows)]`-gated scope.
+    /// Unsafe occurrences that sit inside a positive `#[cfg(target_os = "linux")]`-gated scope.
+    unsafe_linux_scoped: usize,
+    /// Unsafe occurrences that sit outside any positive platform gate.
     unsafe_unscoped: usize,
-    /// Nesting depth of the `#[cfg(windows)]`-gated items currently being visited.
+    /// Nesting depth of positively Windows-gated items currently being visited.
     windows_scope_depth: usize,
+    /// Nesting depth of positively Linux-gated items currently being visited.
+    linux_scope_depth: usize,
+    /// Nesting depth of items whose `cfg` guarantees no single platform (`any`, `not`, an
+    /// unknown value or a malformed predicate). Inside such a scope nothing is proved.
+    unguaranteed_depth: usize,
     foreign_found: bool,
     verbatim_found: bool,
 }
@@ -1278,22 +1302,178 @@ struct Facts {
 /// code, inner crates and every other first-party file keep the unconditional refusal.
 pub const APPROVED_NATIVE_MODULE: &str = "crates/solo-adapters/src/source_read_native.rs";
 
-/// Whether an attribute list carries a positive `#[cfg(windows)]` gate.
-fn is_cfg_windows(attributes: &[syn::Attribute]) -> bool {
-    attributes.iter().any(|attribute| {
-        if !attribute.path().is_ident("cfg") {
-            return false;
+/// The one **reserved future** process-native path, and the only other file that may ever
+/// hold platform-native calls.
+///
+/// `SOLO-WO-074 R01` reserves this exact path for a later, separately issued Linux/Windows
+/// process-control implementation: process launch, per-child resource-limit installation,
+/// bounded lifecycle/termination and OS accounting. Nothing else is eligible there. The file
+/// does not exist yet, so this constant only ever matches an in-memory synthetic source in the
+/// tests below; it can never admit a real file by accident, and it grants no Cargo edge, no
+/// crate-wide allowance and no dynamic-loading waiver.
+pub const APPROVED_PROCESS_NATIVE_MODULE: &str =
+    "crates/solo-adapters/src/media_worker_host_native.rs";
+
+/// The operating systems one attribute scope is *positively proven* to be restricted to.
+///
+/// A gate is the set of platforms the compiler provably must be building for:
+///
+/// * `{windows}` — a positive Windows gate;
+/// * `{linux}` — a positive Linux gate;
+/// * `{windows, linux}` — no platform restriction at all (an ordinary, ungated scope);
+/// * `{}` — no platform is guaranteed (a negated, `any`-alternated, conditional or malformed
+///   predicate), which is treated exactly as "no gate" rather than as a proof.
+///
+/// Only the two singleton sets are gates. Everything else refuses `unsafe`, which is what keeps
+/// the rule fail-closed for conditional, negated and ambiguous predicates.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct OsGate {
+    windows: bool,
+    linux: bool,
+}
+
+impl OsGate {
+    /// No platform restriction: the ordinary scope of an ungated item.
+    pub const UNRESTRICTED: Self = Self {
+        windows: true,
+        linux: true,
+    };
+    /// No platform guaranteed: a negated, alternated, conditional or malformed predicate.
+    pub const NONE: Self = Self {
+        windows: false,
+        linux: false,
+    };
+    /// Provably built only for Windows.
+    pub const WINDOWS_ONLY: Self = Self {
+        windows: true,
+        linux: false,
+    };
+    /// Provably built only for Linux.
+    pub const LINUX_ONLY: Self = Self {
+        windows: false,
+        linux: true,
+    };
+
+    /// Narrows two restrictions that must *both* hold.
+    #[must_use]
+    fn intersect(self, other: Self) -> Self {
+        Self {
+            windows: self.windows && other.windows,
+            linux: self.linux && other.linux,
         }
-        let syn::Meta::List(list) = &attribute.meta else {
-            return false;
-        };
-        let text = list.tokens.to_string();
-        let words: Vec<&str> = text
-            .split(|character: char| !(character.is_alphanumeric() || character == '_'))
-            .filter(|word| !word.is_empty())
-            .collect();
-        words.contains(&"windows") && !words.contains(&"not")
-    })
+    }
+
+    /// Whether the scope is provably Windows-only.
+    #[must_use]
+    pub fn is_windows_only(self) -> bool {
+        self == Self::WINDOWS_ONLY
+    }
+
+    /// Whether the scope is provably Linux-only.
+    #[must_use]
+    pub fn is_linux_only(self) -> bool {
+        self == Self::LINUX_ONLY
+    }
+}
+
+/// The combined gate of one attribute list.
+///
+/// Every attribute must hold, so the gates intersect. An attribute that carries no platform
+/// information — `#[derive(..)]`, `#[allow(..)]`, `#[cfg_attr(..)]`, `#[inline]` — is the
+/// identity here, which is exactly why a `cfg_attr` can never *establish* a gate.
+#[must_use]
+fn cfg_os_gate(attributes: &[syn::Attribute]) -> OsGate {
+    attributes
+        .iter()
+        .fold(OsGate::UNRESTRICTED, |gate, attribute| {
+            gate.intersect(attribute_os_gate(attribute))
+        })
+}
+
+/// The platform set implied by one attribute on its own.
+///
+/// Only a `#[cfg(..)]` whose predicate *necessarily* restricts the build to one platform
+/// establishes a gate. A textual mention of `windows` or `linux` inside a larger predicate is
+/// never enough: the predicate is parsed, not substring-matched.
+#[must_use]
+fn attribute_os_gate(attribute: &syn::Attribute) -> OsGate {
+    if !attribute.path().is_ident("cfg") {
+        return OsGate::UNRESTRICTED;
+    }
+    let syn::Meta::List(list) = &attribute.meta else {
+        return OsGate::NONE;
+    };
+    syn::parse2::<CfgPredicate>(list.tokens.clone())
+        .map_or(OsGate::NONE, |predicate| meta_os_gate(&predicate.0))
+}
+
+/// One parsed `cfg` predicate, so the rule sees predicate structure rather than text.
+struct CfgPredicate(syn::Meta);
+
+impl syn::parse::Parse for CfgPredicate {
+    fn parse(input: syn::parse::ParseStream<'_>) -> syn::Result<Self> {
+        input.parse().map(Self)
+    }
+}
+
+/// The platform set implied by one parsed `cfg` predicate.
+///
+/// `all(..)` requires every branch, so the sets intersect and a platform that *every* branch
+/// demands survives. `any(..)` and `not(..)` guarantee nothing about a single platform, so they
+/// yield [`OsGate::NONE`]; so does an exact `target_os` naming another platform, and any
+/// unknown or malformed list form.
+///
+/// A predicate that simply says nothing about the platform — `test`, `unix`, `feature = "x"`,
+/// `target_arch = ".."` — is orthogonal to the OS and is the identity, so it can neither
+/// establish nor destroy a platform proof. That is what keeps `#[cfg(all(test, windows))]`, which
+/// the real source-read module legitimately uses, a positive Windows gate.
+#[must_use]
+fn meta_os_gate(meta: &syn::Meta) -> OsGate {
+    match meta {
+        syn::Meta::Path(path) => {
+            if path.is_ident("windows") {
+                OsGate::WINDOWS_ONLY
+            } else {
+                OsGate::UNRESTRICTED
+            }
+        }
+        syn::Meta::NameValue(pair) => {
+            if !pair.path.is_ident("target_os") {
+                return OsGate::UNRESTRICTED;
+            }
+            let syn::Expr::Lit(literal) = &pair.value else {
+                return OsGate::NONE;
+            };
+            let syn::Lit::Str(platform) = &literal.lit else {
+                return OsGate::NONE;
+            };
+            match platform.value().as_str() {
+                "windows" => OsGate::WINDOWS_ONLY,
+                "linux" => OsGate::LINUX_ONLY,
+                _ => OsGate::NONE,
+            }
+        }
+        syn::Meta::List(list) => {
+            if !list.path.is_ident("all") {
+                return OsGate::NONE;
+            }
+            meta_list_items(list).map_or(OsGate::NONE, |items| {
+                items.iter().fold(OsGate::UNRESTRICTED, |gate, item| {
+                    gate.intersect(meta_os_gate(item))
+                })
+            })
+        }
+    }
+}
+
+/// Parses the comma-separated predicate list of `all(..)`, refusing anything unparseable.
+#[must_use]
+fn meta_list_items(list: &syn::MetaList) -> Option<Vec<syn::Meta>> {
+    use syn::parse::Parser;
+    syn::punctuated::Punctuated::<syn::Meta, syn::token::Comma>::parse_terminated
+        .parse2(list.tokens.clone())
+        .ok()
+        .map(|items| items.into_iter().collect())
 }
 
 /// The attributes of an item, for the kinds that can carry a `cfg` gate.
@@ -1315,17 +1495,17 @@ fn item_attributes(item: &syn::Item) -> &[syn::Attribute] {
 }
 
 impl Facts {
-    fn record_use(&mut self, tree: &syn::UseTree, prefix: &mut Vec<String>) {
+    fn record_use(&mut self, tree: &syn::UseTree, prefix: &mut Vec<String>, gate: OsGate) {
         match tree {
             syn::UseTree::Path(segment) => {
                 prefix.push(segment.ident.to_string());
-                self.record_use(&segment.tree, prefix);
+                self.record_use(&segment.tree, prefix, gate);
                 prefix.pop();
             }
             syn::UseTree::Name(name) => {
                 let mut segments = prefix.clone();
                 segments.push(name.ident.to_string());
-                self.record_leaf(&segments);
+                self.record_leaf(&segments, gate);
             }
             syn::UseTree::Rename(rename) => {
                 let mut segments = prefix.clone();
@@ -1334,35 +1514,56 @@ impl Facts {
                 // the disguise resolves to the forbidden crate.
                 self.aliases
                     .insert(rename.rename.to_string(), segments.clone());
-                self.use_paths.push(segments);
+                self.use_paths.push((segments, gate));
             }
             syn::UseTree::Glob(_) => {
                 if !prefix.is_empty() {
-                    self.use_paths.push(prefix.clone());
+                    self.use_paths.push((prefix.clone(), gate));
                 }
             }
             syn::UseTree::Group(group) => {
                 for item in &group.items {
-                    self.record_use(item, prefix);
+                    self.record_use(item, prefix, gate);
                 }
             }
         }
     }
 
-    fn record_leaf(&mut self, segments: &[String]) {
+    fn record_leaf(&mut self, segments: &[String], gate: OsGate) {
         if let Some(leaf) = segments.last() {
             self.aliases.insert(leaf.clone(), segments.to_vec());
         }
-        self.use_paths.push(segments.to_vec());
+        self.use_paths.push((segments.to_vec(), gate));
     }
 
-    /// Records one unsafe occurrence together with the scope it sits in.
+    /// The platform gate that applies to an occurrence at the current nesting depth.
     ///
-    /// The scope is the whole decision: an occurrence inside a `#[cfg(windows)]` item is
-    /// eligible for the single approved exception, and one outside it never is.
-    fn record_unsafe(&mut self) {
+    /// A Windows gate and a Linux gate can only be nested inside one another by a pair of
+    /// predicates that never both hold, so a doubly gated scope proves nothing and refuses.
+    fn scope_gate(&self) -> OsGate {
+        if self.unguaranteed_depth > 0
+            || (self.windows_scope_depth > 0 && self.linux_scope_depth > 0)
+        {
+            return OsGate::NONE;
+        }
         if self.windows_scope_depth > 0 {
+            return OsGate::WINDOWS_ONLY;
+        }
+        if self.linux_scope_depth > 0 {
+            return OsGate::LINUX_ONLY;
+        }
+        OsGate::UNRESTRICTED
+    }
+
+    /// Records one unsafe occurrence together with the gate it sits in.
+    ///
+    /// The gate is the whole decision: a positive platform gate is eligible for the matching
+    /// approved exception, and anything else never is.
+    fn record_unsafe(&mut self) {
+        if self.scope_gate().is_windows_only() {
             self.unsafe_windows_scoped += 1;
+        } else if self.scope_gate().is_linux_only() {
+            self.unsafe_linux_scoped += 1;
         } else {
             self.unsafe_unscoped += 1;
         }
@@ -1381,19 +1582,39 @@ pub fn unsafe_scope_verdict(
     location: &str,
     unsafe_unscoped: usize,
     unsafe_windows_scoped: usize,
+    unsafe_linux_scoped: usize,
 ) -> Result<(), String> {
     let normalised = location.replace('\\', "/");
-    let approved = normalised == APPROVED_NATIVE_MODULE;
     if unsafe_unscoped > 0 {
         return Err(
-            "unsafe code outside a `#[cfg(windows)]` scope is forbidden in this workspace"
+            "unsafe code outside a `#[cfg(windows)]` scope is forbidden in this workspace, and \
+             outside a positive `#[cfg(target_os = \"linux\")]` scope too"
                 .to_owned(),
         );
     }
-    if unsafe_windows_scoped > 0 && !approved {
+
+    // The original source-read boundary stays Windows-only: admitting Linux-scoped unsafe
+    // there would silently widen a rule the Owner approved for a different purpose.
+    if normalised == APPROVED_NATIVE_MODULE {
+        if unsafe_linux_scoped > 0 {
+            return Err(format!(
+                "`{APPROVED_NATIVE_MODULE}` is the Windows-only source-read boundary, so \
+                 Linux-scoped unsafe is forbidden there"
+            ));
+        }
+        return Ok(());
+    }
+
+    // The reserved future process-native path is the only other eligible file, and its caller
+    // has already proved each occurrence sits in a positive Windows or Linux gate.
+    if normalised == APPROVED_PROCESS_NATIVE_MODULE {
+        return Ok(());
+    }
+
+    if unsafe_windows_scoped > 0 || unsafe_linux_scoped > 0 {
         return Err(format!(
-            "unsafe code is forbidden outside the approved Windows-gated native module \
-             `{APPROVED_NATIVE_MODULE}`"
+            "unsafe code is forbidden outside the two approved native boundary modules \
+             `{APPROVED_NATIVE_MODULE}` and `{APPROVED_PROCESS_NATIVE_MODULE}`"
         ));
     }
     Ok(())
@@ -1411,12 +1632,17 @@ pub fn classify_unsafe_scope(location: &str, source: &str) -> Result<(), String>
     for item in &file.items {
         facts.visit_item(item);
     }
-    unsafe_scope_verdict(location, facts.unsafe_unscoped, facts.unsafe_windows_scoped)
+    unsafe_scope_verdict(
+        location,
+        facts.unsafe_unscoped,
+        facts.unsafe_windows_scoped,
+        facts.unsafe_linux_scoped,
+    )
 }
 
 impl<'ast> Visit<'ast> for Facts {
     fn visit_path(&mut self, node: &'ast syn::Path) {
-        self.paths.push(node.clone());
+        self.paths.push((node.clone(), self.scope_gate()));
         syn::visit::visit_path(self, node);
     }
 
@@ -1427,7 +1653,8 @@ impl<'ast> Visit<'ast> for Facts {
 
     fn visit_item_use(&mut self, node: &'ast syn::ItemUse) {
         let mut prefix: Vec<String> = Vec::new();
-        self.record_use(&node.tree, &mut prefix);
+        let gate = self.scope_gate();
+        self.record_use(&node.tree, &mut prefix, gate);
         syn::visit::visit_item_use(self, node);
     }
 
@@ -1455,10 +1682,20 @@ impl<'ast> Visit<'ast> for Facts {
         if matches!(node, syn::Item::Verbatim(_)) {
             self.verbatim_found = true;
         }
-        let gated = is_cfg_windows(item_attributes(node));
-        if gated {
-            self.windows_scope_depth += 1;
+        let gate = cfg_os_gate(item_attributes(node));
+        let mut windows = 0usize;
+        let mut linux = 0usize;
+        let mut unguaranteed = 0usize;
+        if gate.is_windows_only() {
+            windows = 1;
+        } else if gate.is_linux_only() {
+            linux = 1;
+        } else if gate == OsGate::NONE {
+            unguaranteed = 1;
         }
+        self.windows_scope_depth += windows;
+        self.linux_scope_depth += linux;
+        self.unguaranteed_depth += unguaranteed;
         match node {
             syn::Item::Fn(item) if matches!(item.sig.safety, syn::Safety::Unsafe(_)) => {
                 self.record_unsafe();
@@ -1468,9 +1705,9 @@ impl<'ast> Visit<'ast> for Facts {
             _ => {}
         }
         syn::visit::visit_item(self, node);
-        if gated {
-            self.windows_scope_depth -= 1;
-        }
+        self.windows_scope_depth -= windows;
+        self.linux_scope_depth -= linux;
+        self.unguaranteed_depth -= unguaranteed;
     }
 
     fn visit_impl_item_fn(&mut self, node: &'ast syn::ImplItemFn) {
@@ -1491,7 +1728,9 @@ impl<'ast> Visit<'ast> for Facts {
                 syn::punctuated::Punctuated::<syn::Path, syn::token::Comma>::parse_terminated
                     .parse2(list.tokens.clone())
             {
-                self.paths.extend(paths);
+                let gate = self.scope_gate();
+                self.paths
+                    .extend(paths.into_iter().map(|path| (path, gate)));
             }
         }
         syn::visit::visit_attribute(self, node);

@@ -1555,3 +1555,182 @@ fn the_checker_refuses_unsafe_outside_a_positive_windows_gate() {
         "an ungated unsafe fn must be refused even in the approved module"
     );
 }
+
+// ---------------------------------------------------------------------------
+// `SOLO-WO-074 R01`: the two-path native scope and positive-gate semantics,
+// proved against the real AST verdict rather than a duplicate rule.
+// ---------------------------------------------------------------------------
+
+/// The pre-existing Windows-only source-read boundary.
+const SOURCE_READ_MODULE: &str = architecture_checks::source::APPROVED_NATIVE_MODULE;
+
+/// The reserved future process-native boundary. The file does not exist yet.
+const RESERVED_PROCESS_MODULE: &str = architecture_checks::source::APPROVED_PROCESS_NATIVE_MODULE;
+
+/// One module whose body contains exactly one `unsafe` block, under `attribute`.
+fn gated_unsafe(attribute: &str) -> String {
+    format!(
+        "{attribute}\nmod sys {{\n    fn f() {{\n        let _ = unsafe {{ core::ptr::null::<u8>() }};\n    }}\n}}\n"
+    )
+}
+
+/// The real, single unsafe-scope rule, applied to one synthetic source.
+fn verdict(location: &str, source: &str) -> Result<(), String> {
+    architecture_checks::source::classify_unsafe_scope(location, source)
+}
+
+#[test]
+fn g074_02_the_source_read_module_remains_windows_only() {
+    assert!(
+        verdict(SOURCE_READ_MODULE, &gated_unsafe("#[cfg(windows)]")).is_ok(),
+        "the source-read boundary must keep accepting Windows-gated unsafe"
+    );
+    for (label, attribute) in [
+        ("Linux", "#[cfg(target_os = \"linux\")]"),
+        ("negated Windows", "#[cfg(not(windows))]"),
+        ("negated Linux", "#[cfg(not(target_os = \"linux\"))]"),
+        ("wrong platform", "#[cfg(target_os = \"macos\")]"),
+    ] {
+        assert!(
+            verdict(SOURCE_READ_MODULE, &gated_unsafe(attribute)).is_err(),
+            "the source-read boundary must refuse {label} unsafe, because it is Windows-only"
+        );
+    }
+    assert!(
+        verdict(
+            SOURCE_READ_MODULE,
+            "fn f() { let _ = unsafe { core::ptr::null::<u8>() }; }"
+        )
+        .is_err(),
+        "the source-read boundary must refuse unscoped unsafe"
+    );
+    let reason = verdict(
+        SOURCE_READ_MODULE,
+        &gated_unsafe("#[cfg(target_os = \"linux\")]"),
+    )
+    .expect_err("a Linux gate must be refused on the Windows-only file");
+    assert!(
+        reason.contains("Windows-only source-read boundary"),
+        "{reason}"
+    );
+}
+
+#[test]
+fn g074_03_the_reserved_process_path_accepts_only_positive_os_gates() {
+    for (label, attribute) in [
+        ("Linux", "#[cfg(target_os = \"linux\")]"),
+        ("Windows", "#[cfg(windows)]"),
+        ("all(test, windows)", "#[cfg(all(test, windows))]"),
+        (
+            "all(test, Linux)",
+            "#[cfg(all(test, target_os = \"linux\"))]",
+        ),
+        (
+            "all(any, Linux)",
+            "#[cfg(all(any(unix, windows), target_os = \"linux\"))]",
+        ),
+    ] {
+        assert!(
+            verdict(RESERVED_PROCESS_MODULE, &gated_unsafe(attribute)).is_ok(),
+            "the reserved process path must accept {label}-gated unsafe"
+        );
+    }
+    assert!(
+        verdict(
+            RESERVED_PROCESS_MODULE,
+            "fn f() { let _ = unsafe { core::ptr::null::<u8>() }; }"
+        )
+        .is_err(),
+        "the reserved process path must refuse unscoped unsafe"
+    );
+    assert!(
+        verdict(
+            RESERVED_PROCESS_MODULE,
+            "pub unsafe fn f() {}\n#[cfg(windows)]\npub unsafe fn g() {}"
+        )
+        .is_err(),
+        "one ungated unsafe fn is enough to refuse the whole file"
+    );
+}
+
+#[test]
+fn g074_04_no_ambiguous_predicate_establishes_an_os_proof() {
+    for (label, attribute) in [
+        (
+            "any(windows, feature)",
+            "#[cfg(any(windows, feature = \"x\"))]",
+        ),
+        (
+            "any(Linux, feature)",
+            "#[cfg(any(target_os = \"linux\", feature = \"x\"))]",
+        ),
+        ("any(windows, unix)", "#[cfg(any(windows, unix))]"),
+        ("not(test)", "#[cfg(not(test))]"),
+        ("not(windows)", "#[cfg(not(windows))]"),
+        ("target_os = macos", "#[cfg(target_os = \"macos\")]"),
+        ("target_family", "#[cfg(target_family = \"windows\")]"),
+        ("cfg_attr only", "#[cfg_attr(windows, allow(dead_code))]"),
+        ("malformed all()", "#[cfg(all())]"),
+    ] {
+        for location in [RESERVED_PROCESS_MODULE, SOURCE_READ_MODULE] {
+            assert!(
+                verdict(location, &gated_unsafe(attribute)).is_err(),
+                "{label} must not be treated as an OS proof at `{location}`"
+            );
+        }
+    }
+}
+
+#[test]
+fn g074_05_unsafe_outside_the_two_modules_is_always_refused() {
+    let gated = gated_unsafe("#[cfg(windows)]");
+    let linux = gated_unsafe("#[cfg(target_os = \"linux\")]");
+    for location in [
+        "crates/solo-domain/src/lib.rs",
+        "crates/solo-application/src/media_worker.rs",
+        "crates/solo-adapters/src/media_worker_host.rs",
+        "crates/solo-adapters/src/lib.rs",
+        "crates/solo-cli/src/main.rs",
+        "crates/solo-cli/tests/unsafe_boundary.rs",
+        "crates/solo-adapters/src/media_worker_host_native_copy.rs",
+        "crates/solo-adapters/src/media_worker_host_native.rs.bak",
+        "crates/solo-adapters/src/source_read_native_extra.rs",
+        "src/media_worker_host_native.rs",
+    ] {
+        assert!(
+            verdict(location, &gated).is_err(),
+            "Windows-gated unsafe must be refused at `{location}`"
+        );
+        assert!(
+            verdict(location, &linux).is_err(),
+            "Linux-gated unsafe must be refused at `{location}`"
+        );
+    }
+    assert!(
+        verdict(
+            "crates/solo-domain/src/lib.rs",
+            "fn f() { let _ = unsafe { core::ptr::null::<u8>() }; }"
+        )
+        .is_err(),
+        "unscoped unsafe is refused everywhere"
+    );
+
+    // A path that arrives with Windows separators must be normalised before the comparison, so
+    // an ineligible file cannot become eligible and the exact reserved path still matches.
+    assert!(
+        verdict(
+            "crates\\solo-adapters\\src\\media_worker_host_native_extra.rs",
+            &linux
+        )
+        .is_err(),
+        "a normalised-ineligible path must stay ineligible"
+    );
+    assert!(
+        verdict(
+            "crates\\solo-adapters\\src\\media_worker_host_native.rs",
+            &linux
+        )
+        .is_ok(),
+        "the exact reserved path is recognised after separator normalisation"
+    );
+}
