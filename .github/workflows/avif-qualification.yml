@@ -81,19 +81,21 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           set -euo pipefail
-          rustc -Vv | tee rustc-identity.txt
+          IDENTITY="$RUNNER_TEMP/rustc-identity.txt"
+          rustc -Vv | tee "$IDENTITY"
           cargo -V
-          grep -q '^release: 1.99.1$' rustc-identity.txt
-          grep -q '^host: x86_64-unknown-linux-gnu$' rustc-identity.txt
+          grep -q '^release: 1.99.1$' "$IDENTITY"
+          grep -q '^host: x86_64-unknown-linux-gnu$' "$IDENTITY"
           echo "host_os=${{ runner.os }} runner=${{ matrix.os }} sha=${GITHUB_SHA} ref=${GITHUB_REF_NAME} run=${GITHUB_RUN_ID}"
 
       - name: Assert pinned compiler identity (Windows)
         if: runner.os == 'Windows'
         run: |
           $ErrorActionPreference = 'Stop'
-          rustc -Vv | Tee-Object -FilePath rustc-identity.txt
+          $identity = Join-Path $env:RUNNER_TEMP 'rustc-identity.txt'
+          rustc -Vv | Tee-Object -FilePath $identity
           cargo -V
-          $text = (Get-Content rustc-identity.txt -Raw).Replace("`r", "")
+          $text = (Get-Content $identity -Raw).Replace("`r", "")
           if ($text -notmatch '(?m)^release: 1\.99\.1$') { throw 'unexpected rustc release' }
           if ($text -notmatch '(?m)^host: x86_64-pc-windows-msvc$') { throw 'unexpected rustc host triple' }
           Write-Output "host_os=${{ runner.os }} runner=${{ matrix.os }} sha=$env:GITHUB_SHA ref=$env:GITHUB_REF_NAME run=$env:GITHUB_RUN_ID"
