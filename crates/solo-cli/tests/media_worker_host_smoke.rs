@@ -33,12 +33,30 @@ const PROFILE_CPU_SECONDS: u64 = 10;
 #[cfg(target_os = "linux")]
 const SMOKE_WALL_DEADLINE_MS: u64 = 15_000;
 
+/// The wall watchdog of the deadline negative, exactly as `SOLO-WO-081 R01` fixes it.
+#[cfg(target_os = "linux")]
+const WALL_DEADLINE_MS: u64 = 2_000;
+
+/// The child's fixed overdue sleep, which this negative must terminate well before.
+#[cfg(target_os = "linux")]
+const WALL_CHILD_SLEEP_MS: u64 = 20_000;
+
+/// A robust lower bound: the watchdog really had to wait for its own 2 000 ms deadline.
+#[cfg(target_os = "linux")]
+const WALL_MIN_ELAPSED_MS: u64 = 1_500;
+
+/// A bounded upper check: generous for CI scheduling, far below the child's 20-second sleep.
+#[cfg(target_os = "linux")]
+const WALL_MAX_ELAPSED_MS: u64 = 10_000;
+
 /// One bounded observation of one real invocation.
 struct Run {
     exit_code: Option<i32>,
     stdout: String,
     stderr: String,
     timed_out: bool,
+    /// The wall time this case itself measured, from spawn to reap or to its own budget.
+    elapsed_ms: u64,
 }
 
 /// Runs the compiled binary with `args` and returns its bounded observation.
@@ -94,6 +112,7 @@ fn run(args: &[&str]) -> Run {
         stdout,
         stderr,
         timed_out,
+        elapsed_ms: u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX),
     }
 }
 
@@ -316,4 +335,240 @@ fn n079_06_the_public_cli_is_unchanged() {
         refused.stderr,
         "error: PREFLIGHT_ENTITY_ID_INVALID: invalid-start\n"
     );
+}
+
+/// `N081-01`: the real parent starts exactly one pre-exec-limited overdue child, kills only its own
+/// child at the 2 000 ms deadline, obtains `SIGKILL` and reaps the leader.
+#[cfg(target_os = "linux")]
+#[test]
+fn n081_01_the_wall_parent_kills_and_reaps_its_own_overdue_child() {
+    let observed = run(&["--internal-media-host-probe-v1", "wall-parent"]);
+    assert!(
+        !observed.timed_out,
+        "the negative must finish inside the case budget"
+    );
+    assert_eq!(
+        observed.exit_code,
+        Some(0),
+        "the negative itself must succeed: stdout={:?} stderr={:?}",
+        observed.stdout,
+        observed.stderr
+    );
+    assert!(
+        observed.stderr.is_empty(),
+        "a proven negative says nothing on stderr"
+    );
+    assert!(
+        observed.stdout.starts_with("media_host_wall=terminated "),
+        "the marker must state termination: {:?}",
+        observed.stdout
+    );
+    assert_eq!(
+        observed.stdout.matches('\n').count(),
+        1,
+        "exactly one evidence line"
+    );
+    assert!(
+        !observed.stdout.contains("media_host_probe=accepted"),
+        "a killed child must never be reported as an accepted run"
+    );
+
+    let fields = evidence_fields(&observed.stdout);
+    report_observation("n081_wall", &observed.stdout);
+    assert_eq!(
+        fields.len(),
+        10,
+        "the marker plus nine fixed fields: {fields:?}"
+    );
+    assert_eq!(fields[0].0, "media_host_wall");
+    assert_eq!(fields[0].1, "terminated");
+
+    // The child's own kernel readback, re-checked by the parent, at full width.
+    assert_eq!(numeric(&fields, "as_soft"), PROFILE_AS_BYTES);
+    assert_eq!(numeric(&fields, "as_hard"), PROFILE_AS_BYTES);
+    assert_eq!(numeric(&fields, "cpu_soft"), PROFILE_CPU_SECONDS);
+    assert_eq!(numeric(&fields, "cpu_hard"), PROFILE_CPU_SECONDS);
+    assert!(
+        observed
+            .stdout
+            .contains("as_soft=536870912 as_hard=536870912 cpu_soft=10 cpu_hard=10 "),
+        "every value must be printed at full width: {}",
+        observed.stdout
+    );
+
+    let pid = numeric(&fields, "pid");
+    let pgid = numeric(&fields, "pgid");
+    assert!(pid > 0, "the child reported its own pid");
+    assert_eq!(
+        pgid, pid,
+        "the child verified its own group identity before sleeping"
+    );
+
+    assert_eq!(
+        numeric(&fields, "signal"),
+        9,
+        "the reaped leader died of SIGKILL"
+    );
+    assert_eq!(
+        numeric(&fields, "reaped"),
+        1,
+        "Child::wait returned the leader's real status"
+    );
+    let wall_ms = numeric(&fields, "wall_ms");
+    assert!(
+        (WALL_MIN_ELAPSED_MS..WALL_MAX_ELAPSED_MS).contains(&wall_ms),
+        "the parent's own measurement must match the short deadline: {wall_ms}"
+    );
+}
+
+/// `N081-02`: the observed duration belongs to the short watchdog and is materially below the
+/// child's 20-second sleep, so a normal completion can never substitute for the termination.
+#[cfg(target_os = "linux")]
+#[test]
+fn n081_02_the_termination_is_the_short_deadline_not_the_full_sleep() {
+    let observed = run(&["--internal-media-host-probe-v1", "wall-parent"]);
+    assert!(!observed.timed_out, "the case must stay inside its budget");
+    assert_eq!(
+        observed.exit_code,
+        Some(0),
+        "stdout={:?} stderr={:?}",
+        observed.stdout,
+        observed.stderr
+    );
+
+    let fields = evidence_fields(&observed.stdout);
+    let wall_ms = numeric(&fields, "wall_ms");
+    let signal = numeric(&fields, "signal");
+    let reaped = numeric(&fields, "reaped");
+    report_observation(
+        "n081_wall_timing",
+        &format!(
+            "wall_ms={wall_ms} case_elapsed_ms={} signal={signal} reaped={reaped}",
+            observed.elapsed_ms
+        ),
+    );
+
+    assert_eq!(
+        WALL_DEADLINE_MS, 2_000,
+        "the configured deadline stays 2 000 ms"
+    );
+    assert!(
+        wall_ms >= WALL_MIN_ELAPSED_MS,
+        "the watchdog really waited for its deadline: {wall_ms}"
+    );
+    assert!(
+        wall_ms < WALL_MAX_ELAPSED_MS,
+        "the watchdog did not overrun its bound: {wall_ms}"
+    );
+    assert!(
+        wall_ms < WALL_CHILD_SLEEP_MS,
+        "the child could not have finished on its own: {wall_ms}"
+    );
+    assert!(
+        observed.elapsed_ms < WALL_CHILD_SLEEP_MS,
+        "the whole case is shorter than the child's sleep: {} ms",
+        observed.elapsed_ms
+    );
+
+    // A reap is required, and only the real wait status can evidence it.
+    assert_eq!(reaped, 1, "the leader was reaped, not merely abandoned");
+    assert_eq!(
+        signal, 9,
+        "the leader's status is SIGKILL, not a normal exit"
+    );
+}
+
+/// `N081-03`: a direct `wall-child` refuses before its sleep, every wrong wall token is refused,
+/// and the legacy child mode keeps its exact prior behavior.
+#[cfg(target_os = "linux")]
+#[test]
+fn n081_03_a_direct_wall_child_and_every_wrong_wall_token_are_refused() {
+    let direct = run(&["--internal-media-host-probe-v1", "wall-child"]);
+    assert!(
+        !direct.timed_out,
+        "an unsupervised wall child must never reach its 20 s sleep"
+    );
+    assert!(
+        direct.elapsed_ms < 5_000,
+        "it must refuse promptly: {} ms",
+        direct.elapsed_ms
+    );
+    assert!(
+        direct.stdout.is_empty(),
+        "no readiness line without the installed limits: {:?}",
+        direct.stdout
+    );
+    assert_eq!(direct.stderr, "", "the child prints nothing at all");
+    let code = direct
+        .exit_code
+        .expect("the child must exit with a status, not a signal");
+    report_observation("n081_direct_wall_child", &format!("exit={code}"));
+    assert!(
+        matches!(code, 71..=73),
+        "the child's own verification refusal is one of its three fixed statuses: {code}"
+    );
+
+    let cases = [
+        vec!["--internal-media-host-probe-v1", "wall"],
+        vec!["--internal-media-host-probe-v1", "WALL-CHILD"],
+        vec![
+            "--internal-media-host-probe-v1",
+            "wall-parent",
+            "wall-parent",
+        ],
+        vec!["--internal-media-host-probe-v1", "wall-child", "extra"],
+        vec!["--internal-media-host-probe-v1"],
+    ];
+    for args in cases {
+        let observed = run(&args);
+        assert!(!observed.timed_out, "{args:?} must not hang");
+        assert_eq!(observed.exit_code, Some(3), "{args:?} must refuse");
+        assert!(
+            observed.stdout.is_empty(),
+            "a refusal never emits evidence: {args:?}"
+        );
+        assert_eq!(
+            observed.stderr, "error: MEDIA_HOST_PROBE_REFUSED: INTERNAL_MODE_INVALID\n",
+            "{args:?} must name its own closed refusal"
+        );
+    }
+
+    // The legacy child mode is byte-exactly what it was before this order.
+    let legacy = run(&["--internal-media-host-probe-v1", "child"]);
+    assert!(!legacy.timed_out);
+    assert!(legacy.stdout.is_empty());
+    assert_eq!(legacy.stderr, "");
+    let legacy_code = legacy.exit_code.expect("a status, not a signal");
+    assert!(
+        matches!(legacy_code, 71..=73),
+        "the legacy child refusal is unchanged: {legacy_code}"
+    );
+}
+
+/// `N081-05`: on a host without the approved pre-exec boundary both wall modes refuse before any
+/// child exists, and no Linux wall test name can execute here.
+#[cfg(not(target_os = "linux"))]
+#[test]
+fn n081_05_both_wall_modes_are_unsupported_before_any_child_exists() {
+    for mode in ["wall-parent", "wall-child"] {
+        let observed = run(&["--internal-media-host-probe-v1", mode]);
+        assert!(!observed.timed_out, "{mode} must not hang");
+        assert!(
+            observed.elapsed_ms < 10_000,
+            "a refusal is prompt and never waits for a deadline: {mode}"
+        );
+        assert_eq!(
+            observed.exit_code,
+            Some(3),
+            "the {mode} mode must refuse on this host"
+        );
+        assert!(
+            observed.stdout.is_empty(),
+            "no Linux termination may be claimed on this host: {mode}"
+        );
+        assert_eq!(
+            observed.stderr, "error: MEDIA_HOST_PROBE_REFUSED: HOST_UNSUPPORTED\n",
+            "the {mode} mode must name HOST_UNSUPPORTED"
+        );
+    }
 }
