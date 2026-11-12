@@ -558,7 +558,7 @@ fn map_envelope_v1(
 fn classify(error: &serde_json::Error) -> MediaWorkerProtocolRefusalKindV1 {
     match error.classify() {
         Category::Data => {
-            let message = error.message();
+            let message = error.to_string();
             if message.starts_with(DUPLICATE_FIELD_MESSAGE) {
                 MediaWorkerProtocolRefusalKindV1::DuplicateField
             } else if message.starts_with(UNKNOWN_FIELD_MESSAGE) {
