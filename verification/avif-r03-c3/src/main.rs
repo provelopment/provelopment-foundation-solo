@@ -101,7 +101,7 @@ fn run() -> i32 {
     // Containment probes never need fixtures, a package directory or a case list:
     // they exist only to be launched under an already-installed hard OS limit.
     if report_limits {
-        return run_report_limits();
+        return run_report_limits(out.as_deref());
     }
     if let Some(bytes) = stress_allocate {
         return run_stress_allocate(bytes, out.as_deref());
@@ -397,7 +397,7 @@ fn run_all(
     if fail > 0 { 1 } else { 0 }
 }
 
-fn run_report_limits() -> i32 {
+fn run_report_limits(out: Option<&Path>) -> i32 {
     #[cfg(target_os = "linux")]
     {
         let table = match std::fs::read_to_string("/proc/self/limits") {
@@ -431,18 +431,34 @@ fn run_report_limits() -> i32 {
             }
         }
         let escaped = table.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', "\\n");
-        println!(
+        let json = format!(
             "{{\"mode\":\"report-limits\",\"platform\":\"linux\",\"as_soft\":\"{as_soft}\",\"as_hard\":\"{as_hard}\",\"cpu_soft_s\":\"{cpu_soft}\",\"cpu_hard_s\":\"{cpu_hard}\",\"limits_table\":\"{escaped}\"}}"
         );
+        println!("{json}");
+        if let Some(dir) = out {
+            let _ = std::fs::create_dir_all(dir);
+            if std::fs::write(dir.join("limits.json"), format!("{json}\n")).is_err() {
+                eprintln!("limits-write-failed");
+                return 6;
+            }
+        }
         0
     }
     #[cfg(not(target_os = "linux"))]
     {
         // On Windows the effective limits live on the Job Object, which only the
         // supervisor can query; the child reports that plainly instead of guessing.
-        println!(
-            "{{\"mode\":\"report-limits\",\"platform\":\"windows\",\"note\":\"job limits are installed and queried by the supervisor\"}}"
+        let json = String::from(
+            "{\"mode\":\"report-limits\",\"platform\":\"windows\",\"note\":\"job limits are installed and queried by the supervisor\"}",
         );
+        println!("{json}");
+        if let Some(dir) = out {
+            let _ = std::fs::create_dir_all(dir);
+            if std::fs::write(dir.join("limits.json"), format!("{json}\n")).is_err() {
+                eprintln!("limits-write-failed");
+                return 6;
+            }
+        }
         0
     }
 }
@@ -527,8 +543,8 @@ fn run_stress_descendant(ms: u64, out: Option<&Path>) -> i32 {
     let pid = child.id();
     let _ = std::fs::write(dir.join("descendant.pid"), format!("{pid}\n"));
     println!("descendant-pid={pid}");
-    // Leave the descendant running and exit: a correct supervisor must terminate the
-    // whole job/process group, so the descendant must not outlive this process.
-    std::thread::sleep(Duration::from_millis(300));
+    // Stay alive for the requested period so the supervisor's own wall deadline (not
+    // a voluntary exit) is what terminates the contained group, descendant included.
+    std::thread::sleep(Duration::from_millis(ms));
     0
 }

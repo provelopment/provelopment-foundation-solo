@@ -792,7 +792,7 @@ $rest = @()
 if ($Arguments.Count -gt 1) { $rest = @($Arguments[1..($Arguments.Count - 1)]) }
 $script:Arguments = $rest
 switch ($mode) {
-  'run' { Invoke-Run | Out-Null; exit 0 }
-  'suite' { Invoke-Suite | Out-Null; exit $script:ExitCode }
+  'run' { $null = Invoke-Run; exit 0 }
+  'suite' { Invoke-Suite; exit $script:ExitCode }
   default { Write-Error 'usage: limit-windows.ps1 run|suite -- ...'; exit 2 }
 }

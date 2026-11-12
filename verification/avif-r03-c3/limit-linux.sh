@@ -453,6 +453,9 @@ run_mode() {
     done
     wait "$pid" 2>/dev/null
     exit_code=$?
+    # Sweep any surviving members of the contained process group: nothing may outlive
+    # the supervisor, on the normal-exit path as well as the timeout path.
+    kill -KILL -"$pid" 2>/dev/null
     wall_ms_observed=$(( $(now_ms) - started_ms ))
     local tfile="${TMPDIR:-/tmp}/wo070-times-$$-${RANDOM}"
     times > "$tfile"
