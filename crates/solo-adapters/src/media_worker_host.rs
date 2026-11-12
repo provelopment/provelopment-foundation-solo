@@ -1350,26 +1350,32 @@ mod tests {
     }
 
     /// `N081-01`: the fixed numbers this order requires cannot drift unnoticed.
+    ///
+    /// These are `const` assertions, so the compiler evaluates them for every build of this crate
+    /// on every host; the same numbers are also checked against what the real child reported in
+    /// the integration suite.
     #[test]
     fn n081_01_the_wall_negative_uses_the_fixed_deadline_and_profile() {
-        assert_eq!(WALL_DEADLINE_MS, 2_000, "the watchdog is exactly 2 000 ms");
-        assert_eq!(WALL_CHILD_SLEEP_MS, 20_000, "the child sleeps 20 seconds");
-        assert!(
-            WALL_DEADLINE_MS < WALL_CHILD_SLEEP_MS,
-            "the deadline must expire before the child could ever finish"
-        );
-        assert_eq!(
-            SMOKE_WALL_DEADLINE_MS, 15_000,
-            "the positive smoke is unchanged"
-        );
-        assert_eq!(PROFILE_V1_AS_BYTES, 536_870_912);
-        assert_eq!(PROFILE_V1_CPU_SECONDS, 10);
-        assert_eq!(
-            WALL_TERMINATION_SIGNAL_V1, 9,
-            "a proven kill reports SIGKILL"
-        );
-        assert_eq!(MAX_CHILD_STDOUT_BYTES, 1024);
-        assert_eq!(MAX_CHILD_STDERR_BYTES, 512);
+        const {
+            assert!(
+                WALL_DEADLINE_MS == 2_000,
+                "the watchdog is exactly 2 000 ms"
+            );
+            assert!(WALL_CHILD_SLEEP_MS == 20_000, "the child sleeps 20 seconds");
+            assert!(WALL_DEADLINE_MS < WALL_CHILD_SLEEP_MS);
+            assert!(
+                SMOKE_WALL_DEADLINE_MS == 15_000,
+                "the positive smoke deadline is unchanged"
+            );
+            assert!(PROFILE_V1_AS_BYTES == 536_870_912);
+            assert!(PROFILE_V1_CPU_SECONDS == 10);
+            assert!(
+                WALL_TERMINATION_SIGNAL_V1 == 9,
+                "a proven kill reports SIGKILL"
+            );
+            assert!(MAX_CHILD_STDOUT_BYTES == 1024);
+            assert!(MAX_CHILD_STDERR_BYTES == 512);
+        }
     }
 
     /// `N081-04`: every malformed, duplicated, oversized, negative, overflowing or out-of-profile
