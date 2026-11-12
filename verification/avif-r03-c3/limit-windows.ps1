@@ -22,6 +22,9 @@ $MaxInputBytes = 20971520
 $DefaultMemBytes = 536870912
 $DefaultCpuSec = 10
 $DefaultWallMs = 15000
+# Re-invocations (the parallel probes) must use the same PowerShell host that is
+# running this script, so the compiled C# interop surface is identical.
+$hostExe = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
 
 $NativeSource = @'
 using System;
@@ -277,14 +280,14 @@ public static class SoloJobRunner
             r.SetupOk = true;
             r.Stage = "running";
 
-            long started = Environment.TickCount64;
+            System.Diagnostics.Stopwatch clock = System.Diagnostics.Stopwatch.StartNew();
             uint wait = WaitForSingleObject(pi.hProcess, wallMs);
             if (wait == WAIT_TIMEOUT)
             {
                 r.Terminated = TerminateJobObject(job, 1);
                 WaitForSingleObject(pi.hProcess, 10000);
             }
-            r.WallMs = Environment.TickCount64 - started;
+            r.WallMs = clock.ElapsedMilliseconds;
 
             uint exitCode;
             if (!GetExitCodeProcess(pi.hProcess, out exitCode)) return Fail(r, "get-exit", Marshal.GetLastWin32Error());
@@ -763,8 +766,8 @@ function Invoke-Suite {
       '--json', (Join-Path $root "T12$sfx.json"), '--test', "T12-parallel-$sfx", '--',
       $bin, '--stress-allocate-bytes', '134217728', '--out', (Join-Path $d "stage$sfx"))
   }
-  $pa = Start-Process -FilePath 'powershell.exe' -ArgumentList (& $mk 'A') -PassThru -WindowStyle Hidden
-  $pb = Start-Process -FilePath 'powershell.exe' -ArgumentList (& $mk 'B') -PassThru -WindowStyle Hidden
+  $pa = Start-Process -FilePath $hostExe -ArgumentList (& $mk 'A') -PassThru -WindowStyle Hidden
+  $pb = Start-Process -FilePath $hostExe -ArgumentList (& $mk 'B') -PassThru -WindowStyle Hidden
   $pa.WaitForExit()
   $pb.WaitForExit()
   $r12a = $null
