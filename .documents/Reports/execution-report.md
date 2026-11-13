@@ -2,94 +2,59 @@
 
 **status=COMPLETE**
 
-**Order:** `OWNER-ISSUED — SOLO-WO-095 R01` — INTEGRATE ACCEPTED LINUX GROUP/DESCENDANT LIFECYCLE PROOF. **Matching Owner activation:** `SOLO-WO-095 R01`. **Claimed outcome:** `LINUX-FIXED-GROUP-DESCENDANT-LIFECYCLE-INTEGRATED` — **pending independent Chief Master Architect `ACCEPT / REVISE / STOP`**. The Implementation Agent does not self-accept.
+**Order:** `OWNER-ISSUED — SOLO-WO-096 R01` — close accepted WO-095 and select the next bounded R03.C image-inspection candidate. **Matching Owner activation:** `SOLO-WO-096 R01`. **Required outcome:** `WO-095-CLOSED-R03C-IMAGE-INSPECTION-NEXT-SELECTED` — **pending independent Chief Master Architect review**. No self-acceptance is claimed.
 
-**Character of this run: integration only, zero new source authorship.** The three technical files were promoted as **exact pre-existing Git objects** from the accepted green branch commit `0dc45185110e6136bd63dc7edf774bc52b753c9e`. No file was edited, reformatted, regenerated, retyped, normalized, cherry-picked or patched; no dependency, toolchain, workflow, guard, architecture or roadmap change was made. Nothing was merged from a PR, released or deployed.
+**Nature of this run: administrative closure and four-slot WIP reconciliation only.** No code, test, fixture, asset, manifest, dependency, toolchain, workflow, guard, licence, release, deployment or provider change. The next candidate is a **non-executable proposal**; nothing in `R03.C` was implemented, and no implementation permission is conferred.
 
-**Provenance status preserved.** `SOLO-WO-093 R01` remains **STOPPED / NOT ACCEPTED**; `SOLO-WO-094 R01` remains **ACCEPTED only on its green technical branch**; `solo-wo-094-negative-r01` remains **intentionally RED / evidence only**, and its one-guard mutation is **absent** from `main`; `SOLO-WO-089 R01` remains permanently **STOPPED / NOT ACCEPTED**; the `SOLO-WO-090 R01` corrective branch is unchanged.
+## 1. Baseline verified before any permanent write
 
-## 1. Starting state — all pins exact
-
-Sole verified checkout, `main` checked out, one worktree, one `origin` whose fetch **and** push URL are both `https://github.com/provelopment/provelopment-foundation-solo.git`, empty stash, exactly four `.documents/WIP/` files, 14 remote branch refs (14 local), and the only dirty path the complete Owner-installed unstaged ` M .documents/WIP/workorder-active.md` (21,794 bytes, blob `18826717b609209e0b1aefbd92239024fb858c40`, matching activation). It was neither edited nor normalized before staging.
-
-| Pinned item | Required | Observed |
+| Item | Required | Observed |
 | --- | --- | --- |
-| `HEAD`/`main`/`origin/main`/`ls-remote main` | `2ef0f26bd85259a2a0e97a8a5a55125a28b5ad12` | exact |
-| main tree / sole parent | `6e8e3e82a34625e62f090be2fe88802abb625c07` / `8b643f7f9506f9602714fc62bd9f08d539851d15` | exact |
-| tracked ACTIVE / report | `178818bd779cb2299afb4ab52d6220a2268882f3` / `a437b5832199fec480a5615ef04ff1aec3ef6758` | exact |
+| `HEAD`/`main`/`origin/main`/`ls-remote main` | `2883e57d302cc3ce7d01556ef6587596e15afb23` | exact |
+| tree / sole parent | `0ff781194c6fc428434418504ef3aff1d86205e4` / `eedffc76408db8ecbd59f4d72d6dc635e030e7e2` | exact |
+| tracked ACTIVE (WO-095) | `18826717b609209e0b1aefbd92239024fb858c40` | exact |
 | NEXT / ROADMAP / OUTLOOK | `92fa562b1af0c54391851aa5c79deb1631127069` / `9d7a86226878f490fd5e26c6813a81e5f73f3f37` / `cb9c7a610cf3c537557e060ca9656e44a053e69d` | exact |
-| Architecture / `Cargo.lock` / toolchain | `c941c7f90cc1b1955f9d60b348a3b1092cafe97f` / `b1ee56da60f36536548586528db371b7cbe508e4` / `9ec55b3b621dbc75fc68817cd51b96e407d3c94c` | exact |
-| workflow / architecture checker entry | `e1b5ca6e1738a5d5129a8788e24d51aee02421d1` / `0bad0e027f41b6cf6029df38174fc15531c187da` | exact |
-| baseline main façade / native / smoke | `a1f2bdb9960a4befc44efab746640e4d19bb624b` / `1e698245493f6d10ebb9636282698a797a242865` / `5444013571a71efde758422fdf9d8fada79ef53a` | exact |
-| green source `solo-wo-093-r01` | `0dc45185110e6136bd63dc7edf774bc52b753c9e`, tree `60f986ddddd2f6b6bd6ab201a6e336aee8c501c7`, parent `64054a19df44ea728be2db2c791117a5db4a117c` | exact |
-| negative `solo-wo-094-negative-r01` | `0e9b3677cf774b9e31ac8fc52605e88112522be6`, tree `84c8d55a38767a287f6203faf563b7e116ec4977` | exact |
+| report / Architecture / workflow | `9eebd358282ac8354ccea1143b56135b482566da` / `c941c7f90cc1b1955f9d60b348a3b1092cafe97f` / `e1b5ca6e1738a5d5129a8788e24d51aee02421d1` | exact |
+| `Cargo.lock` / `rust-toolchain.toml` | `b1ee56da60f36536548586528db371b7cbe508e4` / `9ec55b3b621dbc75fc68817cd51b96e407d3c94c` | exact |
+| integrated `media_worker_host.rs` / `_native.rs` / `_smoke.rs` | `7eed6e158c9374a6c2055ddd98dd3287357b814a` / `eacf51c5353ab3278969961aa136a0951cb7ad67` / `22ee67e94cc96a70e8e3a47db9e575464b53cd07` | exact |
 
-Accepted source blobs verified present and mutation-free: façade `7eed6e158c9374a6c2055ddd98dd3287357b814a` (contains `!attempt.descendant_nonrunning`, **0** occurrences of `MUTATION ONLY`), native `eacf51c5353ab3278969961aa136a0951cb7ad67`, smoke `22ee67e94cc96a70e8e3a47db9e575464b53cd07`.
+One worktree, one `origin` (fetch and push both `https://github.com/provelopment/provelopment-foundation-solo.git`), empty stash, no pending merge/rebase/cherry-pick, exactly four `.documents/WIP/` files and no subdirectory, and the only dirty path the complete Owner-installed ` M .documents/WIP/workorder-active.md` (WO-096, blob `b23c2a6adebb4794fd058360f36bcedfc376ab32`, preserved byte-for-byte — never normalized, shortened or substituted). All 14 remote refs matched their pinned identities, including `solo-wo-093-r01 = 0dc45185110e6136bd63dc7edf774bc52b753c9e`, `solo-wo-094-negative-r01 = 0e9b3677cf774b9e31ac8fc52605e88112522be6`, stopped `solo-wo-089-r01 = 1236915cab6e87b17ce84813430897b273fc3230` and accepted `solo-wo-090-r01 = 0eb3fcf645851ae752bd59e12fe32b69604197d2`.
 
-Prior accepted evidence re-verified on GitHub, not assumed: green dispatch run **`43419376192`** — `workflow_dispatch`, `solo-wo-093-r01`, `0dc45185…`, attempt 1, success (Ubuntu `131865233532`, Windows `131865233959`); intentionally red run **`43419899358`** — `0e9b3677…`, both hosts failing at `Test (workspace, all targets, locked)` on `n093_05_signal_reap_observation_and_deadline_facts_stay_distinct`. The old uncompiled `f85caf35…` and the failed correction `64054a19…` remain intact in history.
+**Closure basis.** The Chief Master Architect independently **ACCEPTED** `SOLO-WO-095 R01` at `2883e57d…`. That order integrated, as exact accepted Git blobs, one **bounded Linux process-group/descendant lifecycle harness** — a prerequisite, not complete AVIF correctness, decoder confinement, platform-catalogue delivery, whole-candidate validation or publication. Consequently `R03.C3`, `R03.C` and Stage 03 stay **OPEN**. The ROADMAP already states only the unfinished composite `R03.C` package, and no independently finished ROADMAP line could be removed without losing outstanding requirements, so **ROADMAP remains byte-identical** rather than carrying completion commentary or premature truncation. **OUTLOOK also remains byte-identical.** The historical STOPPED `SOLO-WO-093 R01` and `SOLO-WO-089 R01` are never rehabilitated.
 
 ## 2. Commit A — issued-order record
 
-`fe76130c1422377c42af22f08ba9b5e5f8cc8b84`, tree `66fbde6813d11866b446e6cecaa428ac25a091c2`, **sole parent** `2ef0f26bd85259a2a0e97a8a5a55125a28b5ad12`, exactly **one** `M` path `.documents/WIP/workorder-active.md` (`+123/−119`), committed ACTIVE blob `18826717b609209e0b1aefbd92239024fb858c40` identical to the Owner-installed bytes; `git diff --cached --check` clean (no complaint to record); ordinary fast-forward push; GitHub readback matched. Fresh `push`-triggered run **`43422195416`** green at that exact SHA: Ubuntu `131874663878` and Windows `131874663577`, **33 steps** each.
+`30b7e12bfc4191c771d9f53744181c6d744c1fda`, tree `50985bef3555c1133cb5dbf19757fe30d62861d4`, **sole parent** `2883e57d302cc3ce7d01556ef6587596e15afb23`; exactly **one** `M` path `.documents/WIP/workorder-active.md`, `+61/−146`, committed blob `b23c2a6adebb4794fd058360f36bcedfc376ab32` equal to the Owner-installed bytes. `git diff --cached --check` reported **4 trailing-whitespace findings on order lines 3–6 and nothing else** (`exit 2`); these are the Owner-authored Markdown hard line breaks, disclosed rather than edited, and the order was committed unmodified. Ordinary fast-forward push; GitHub readback matched (one-path diff). Fresh `push` run **`43425994755`** — `main`, attempt 1, success: Ubuntu **`131887421474`**, Windows **`131887421743`**, 33 steps each.
 
-## 3. Commit B — exact-blob promotion
+## 3. Commit B — ACTIVE cleared, one NEXT selected
 
-Promotion used `git restore --source=0dc45185… --staged --worktree -- <three paths>` only. Staged ledger: exactly three `M` paths, no extra path. Index Git blobs equal the accepted source blobs (0 mismatches), checked by Git object identity rather than worktree hashing:
+Exactly two `M` paths, `git diff --cached --check` **exit 0**:
 
-```text
-blob_exact crates/solo-adapters/src/media_worker_host.rs        7eed6e158c9374a6c2055ddd98dd3287357b814a
-blob_exact crates/solo-adapters/src/media_worker_host_native.rs eacf51c5353ab3278969961aa136a0951cb7ad67
-blob_exact crates/solo-cli/tests/media_worker_host_smoke.rs     22ee67e94cc96a70e8e3a47db9e575464b53cd07
-```
+- `.documents/WIP/workorder-active.md` → precisely `# Foundation Solo — workorder-active (Active Work Order)` plus one final LF, reproducing the canonical neutral Git blob **`2ef2db63df17cdb00513f47beca1bc199d381e06`** byte-for-byte (`+1/−101`).
+- `.documents/WIP/plan-next.md` → the order's literal §4 candidate text, UTF-8/LF, one final newline, H1 plus **exactly one** H2 candidate `## R03.C — Confined Entity image-byte verification (PNG/JPEG/WebP first)`, blob `12ecc6d179fcd5f3baa790c27e5c3b5617ea273c` (`+12/−0`, the shared H1 line unchanged from the neutral file).
 
-Filter-aware `git hash-object --path=<path>` reproduced the same three identifiers. The **physical `--no-filters`** worktree hashes differ as expected for CRLF/LF mapping and are disclosed without "repair": `63caa82e3ead882b6d464abe2b63b9187311a8a7`, `5c5ff76ff604fdd34e63cf94dcba084b2f598341`, `88d7198086535dbb2cb86ccede7062521aca8722`.
+Commit B `49df191f6354d66c56239d79596dac1661af6909`, tree `cbfd2eff0fc6f5d656c7698efec0d8353050ff1d`, **sole parent** `30b7e12b…`; GitHub readback confirmed the two-file ledger. Fresh `push` run **`43426603644`** — `main`, attempt 1, success: Windows **`131889427585`**, Ubuntu **`131889427925`**, 33 steps each.
 
-**Commit B** `eedffc76408db8ecbd59f4d72d6dc635e030e7e2`, tree `6130437a179a6ddcacc8a180abe13f36997e0b82`, **sole parent** `fe76130c…`, exactly the three technical paths, numstat exactly `1579 129` / `229 7` / `262 0`, `--check` clean, fast-forward push, GitHub readback equal (files `modified` with the same additions/deletions). Post-integration `main` blobs are the accepted ones above, so the negative branch's mutation is **absent** and no source was authored at integration.
+**The selected candidate is strictly a proposal.** It proposes the earliest actionable remainder of `R03.C` — a bounded PNG/JPEG/WebP integrity gate over already-confined Entity source bytes (≤20 MiB, exact extension/MIME/magic/decoded-format agreement, complete bounded decode, 1–8192 per side and ≤32,000,000 pixels, whole-inventory refusal). It does **not** authorize implementation, a codec/decoder dependency, Windows resource controls or publication; any such step needs its own exact Owner-issued code-bearing order.
 
-## 4. Fresh exact-head CI at the integrated commit — PASS
+## 4. Unchanged-workflow verification at both heads
 
-Run **`43422607529`** — `event=push`, `head_branch=main`, `head_sha=eedffc76…`, `run_attempt=1`, **conclusion success**; not the earlier branch dispatch. Ubuntu job **`131876024691`** (33 steps: 22 executed success, 9 skipped, all Linux-only steps run), Windows job **`131876025228`** (33 steps: 14 skipped). Every skip is the host-inapplicable cross-pair (`cargo-deny`, advisory fixture, byte-reproducible build, R03 snapshot filesystems on Windows; the mirrored Windows steps on Ubuntu); no mandatory gate was skipped on its own host.
+Both runs executed the **unchanged** pinned workflow (`.github/workflows/rust-verify.yml`, still `e1b5ca6e…`), not a new obligation. At Commit B the Ubuntu log still shows the full gate set: `architecture=legal packages=4 targets=33 files=60 edges=41`, `self-check=passed cases=29`, format, strict Clippy, all-target locked tests, architecture and tripwire checks, `release_smoke=verified accepted_exit=0 refused_exit=2`, `reproducibility=verified`, and the previously accepted integration evidence remains live — `n093_group=terminated leader_pid=4486 descendant_pid=4491 pgid=4486 sid=4486 signal=9 leader_reaped=1 descendant_nonrunning=1 wall_ms=2` and `n090_reap=reaped_before_join pid=4480 wall_ms=4007`. Nothing regressed.
 
-Real integrated Linux evidence, copied from the Ubuntu log:
+**Skip and warning classification.** Each job runs 33 configured steps; Ubuntu skipped 9 and Windows skipped 14 — entirely the host-inapplicable cross-pairs (Linux-only cargo-deny gate, advisory-negative probe, byte-reproducible build, R03 snapshot-test filesystems on Windows; the mirrored Windows variants on Ubuntu). No mandatory gate was skipped on its own host and no job was red, retried or re-run to mask anything. The security gate likewise reports advisories, bans and sources `ok` and licenses `ok` with the pre-existing, deliberately unsilenced `license-not-encountered` allowance for `Unicode-3.0` — an **unused-allowance configuration warning, not a vulnerability** — so no run is described as warning-free.
 
-```text
-n093_group=terminated leader_pid=4483 descendant_pid=4486 pgid=4483 sid=4483 signal=9 leader_reaped=1 descendant_nonrunning=1 wall_ms=2
-n093_refusal=invalid_readiness=HOST_OUTPUT_INVALID stdout_bytes=0 group_signal=none leader_cleanup=checked wall_ms=10
-n093_direct=group-leader exit=71
-n093_direct=group-invalid-leader exit=71
-n090_reap=reaped_before_join pid=4476 wall_ms=4005
-```
+## 5. Final state and preservation
 
-Distinct leader/descendant PIDs `4483`/`4486`, `leader_pid == pgid == sid == 4483`, `signal=9`, `leader_reaped=1`, `descendant_nonrunning=1`, `0 < wall_ms = 2 < 15000`; the refusal path emitted **no** group signal and no evidence. Passing on Linux: `n093_01`, `n093_02`, `n093_03`, `n093_06`, all four `n093_05` units, `n093_07`, `n090_01`, plus regressions N079 (4), N081 (3), N083 (3), N085 (3), N087 (3), N089 (3) — **0** failed or ignored in each family.
+Cumulative baseline→C changed-path set is **exactly three** paths — ACTIVE, NEXT and the canonical report — with no deletion and no new tracked file. `HEAD == main == origin/main == ls-remote origin main`; working tree clean, stash empty, one worktree, one `origin`, four WIP files, ACTIVE neutral at `2ef2db63…`, NEXT at `12ecc6d1…` with one H2, and ROADMAP `9d7a86226878f490fd5e26c6813a81e5f73f3f37`, OUTLOOK `cb9c7a610cf3c537557e060ca9656e44a053e69d`, Architecture `c941c7f90cc1b1955f9d60b348a3b1092cafe97f`, `Cargo.lock` `b1ee56da60f36536548586528db371b7cbe508e4`, toolchain `9ec55b3b621dbc75fc68817cd51b96e407d3c94c`, workflow `e1b5ca6e1738a5d5129a8788e24d51aee02421d1` and the three accepted technical blobs `7eed6e158c9374a6c2055ddd98dd3287357b814a` / `eacf51c5353ab3278969961aa136a0951cb7ad67` / `22ee67e94cc96a70e8e3a47db9e575464b53cd07` all byte-identical to baseline.
 
-Windows executed `n093_04_every_group_mode_is_unsupported_before_any_child_exists`, `n093_06`, all four `n093_05` units and `n090_01`–`n090_05` — and emitted **0** `n093_group=` lines, i.e. no Linux group success is claimed on a host that must refuse before any child exists.
+Only `main` advanced, by three linear commits. All 13 other branches kept their exact starting SHAs: `solo-wo-093-r01` `0dc45185…` (green accepted technical branch) and `solo-wo-094-negative-r01` `0e9b3677…` (intentionally red mutation, still excluded) were retained untouched, as were the eleven earlier branches. No branch was created, deleted, reset or moved.
 
-Unchanged workflow gates, as executed: four-crate graph `architecture=legal packages=4 targets=33 files=60 edges=41`; refusal self-test `self-check=passed cases=29`; format; strict Clippy (`-D warnings`); all-target locked tests; test-injection tripwire (`the_ci_tripwire_reports_an_injected_fault ... ok`); `release_smoke=verified accepted_exit=0 refused_exit=2`; `reproducibility=verified` with two clean release builds both `clean_release_sha256_a = clean_release_sha256_b = a8dfb4c4f5c12dd015adbe948f5a6c5702449c280963802f1700287786a6c77a`; `lock_sha256=bf421c6e17034eb642cccfceeba22e01b5bea5ed138f03a3e5daf1c833086723` unchanged.
+Local-only observations, which GitHub cannot independently prove: ignored Owner material was inspected and left intact — `.temp/solo-wo-073-wip/` at **4 files / 46,062 bytes**, `architecture-fixtures/` (present, no regular files), `toolchain-installer/` (2 files), `target/`, and prior Cline logs. Task-owned scratch was limited to one disposable extraction file in the Cline-provided OS temp area, and it was deleted by exact path; nothing in Solo `.temp/` was created or removed. No local build was claimed: this workstation still has no linker, none was installed, and all gate evidence above came from GitHub's Ubuntu and Windows runners.
 
-Security: `cargo-deny 0.20.2` (archive sha256 `9f12ed4c49936e09b48bf862b595cde2fe64fcbd9d74dfacac6131ca824c8d5f`) against a **fresh** RustSec database `af7b3ec33460b8e2de8d422e16d628518891a519` fetched `2026-11-13T12:08:17Z` — advisories `ok` (0 errors / 0 warnings / 0 notes), bans `ok`, sources `ok`, licenses `ok` with **1 warning**: `license-not-encountered` for `Unicode-3.0`. That is an **unused allowance** in `deny.toml`, not a vulnerability, not new, and deliberately not silenced; this run is therefore **not** described as warning-free. The `advisories FAILED: 1 error` line belongs to the intentional `RUSTSEC-2026-0009` negative probe that must fail closed. **No new material finding** appeared.
+## 6. Nonclaims and handoff
 
-## 5. Provenance and preservation ledger
+**No change in** product functionality, stage completion, media correctness, AVIF, Windows Job Object support, source catalogue, public projection, publication, HTTP/browser behaviour, release or deployment. **Explicitly still outstanding:** AVIF worker decoding and complete Linux/Windows fail-closed containment; approved video/WebVTT media; the lawful version-pinned `platform/assets/` catalogue and provenance; whole publishable-candidate validation, derived immutable outputs and privacy-safe public projection.
 
-| Ref | Status after this order |
-| --- | --- |
-| `main` | advanced `2ef0f26b` → `fe76130c` → `eedffc76` → report commit (three linear commits) |
-| `solo-wo-093-r01` | unchanged at `0dc45185110e6136bd63dc7edf774bc52b753c9e` (accepted source, frozen) |
-| `solo-wo-094-negative-r01` | unchanged at `0e9b3677cf774b9e31ac8fc52605e88112522be6` (intentional red evidence) |
-| 11 older branches | unchanged, `0/11` mismatches, including stopped `solo-wo-089-r01` `1236915cab6e87b17ce84813430897b273fc3230` and accepted `solo-wo-090-r01` `0eb3fcf645851ae752bd59e12fe32b69604197d2` |
+WO-095 was previously **independently ACCEPTED**; this administrative closure records that acceptance and clears the slot — it does **not** independently complete `R03.C3`, `R03.C` or Stage 03, and it does not accept the new candidate or execute it.
 
-Exactly **five distinct permanent paths** changed across the whole run: ACTIVE (A), the three accepted technical paths (B), the report (C). ROADMAP, NEXT, OUTLOOK, About/Architecture/SOP, `README.md`, `AGENTS.md`, every manifest, `Cargo.lock`, `rust-toolchain.toml`, `deny.toml`, the workflow, both architecture checker files and fixtures, `main.rs`, `lib.rs`, root policy/licence files and all unrelated source/tests remain blob-identical. No permanent file was created or deleted; no branch, PR, tag, merge, cherry-pick, rebase, stash, amend, reset, clean or force-push occurred. The original WO-093 dispatch (`43419376192`) and the red mutation run (`43419899358`) are immutable provenance and are **not** presented as integration tests.
-
-
-## 6. Honest limits, preservation and cleanup
-
-**Explicit nonclaims.** The integrated proof remains exactly the accepted bounded harness: one group leader, one descendant, a checked leader reap, one bounded group-directed signal after identity checks, an observed descendant **non-running** state under the same pre-signal start-time identity, and Windows refusal before any child exists. There is **no** descendant reap (the parent holds no handle for it), **no** race-free PID/PGID identity control (the pre-call `try_wait` narrows but does not pin the reuse window), **no** hostile-worker sandbox, **no** aggregate resource guarantee, **no** process-tree containment, **no** Windows group support, **no** complete AVIF media correctness, and **no** publication, release or production capability. `R03.C3`, `R03.C` and Stage 03 remain **OPEN**; ROADMAP/NEXT/OUTLOOK were not edited and ACTIVE was not neutralized.
-
-Ignored material inspected and preserved, never deleted: `.temp/solo-wo-073-wip/` at **4 files / 46,062 bytes**, `architecture-fixtures/` (present, no regular files), `toolchain-installer/` (2 files), `target/`, and prior Cline logs. No task-owned scratch file or folder was created in Solo `.temp/` or the Cline task area for this order, so no cleanup deletion was required and none was performed. These local inventory facts are **agent-observed** and are not independently GitHub-provable, unlike the commit, ref and CI identities above.
-
-No local compile or test was claimed: this workstation has no linker, none was installed, and every mandatory gate above came from GitHub's Ubuntu and Windows runners at the exact commits named.
-
-## 7. Handoff
-
-Submitted for the Chief Master Architect's independent **ACCEPT / REVISE / STOP** against this report's exact revision. `main` carries the canonical report, the issued `SOLO-WO-095 R01` ACTIVE and the integrated accepted blobs; the technical source branch and the intentionally red mutation branch remain frozen as evidence. The Agent does not self-accept; the Owner alone authorizes any later closure, roadmap reconciliation, next order, release or deployment.
-
-**This report deliberately contains no identifier of its own commit, tree or CI run.** Those are supplied in the chat handoff.
+Submitted for independent Chief Master Architect `ACCEPT / REVISE / STOP`. The Owner alone may install a subsequent implementation work order or authorize any merge, release or deployment. This report deliberately contains **no identifier of its own commit, tree, blob or CI run**; those are supplied in the chat handoff.
