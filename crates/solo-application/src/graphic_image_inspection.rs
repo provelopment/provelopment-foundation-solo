@@ -863,8 +863,10 @@ mod contract_tests {
 
     #[test]
     fn n097_01_publication_authority_is_never_granted() {
-        assert!(!GRAPHIC_IMAGE_INSPECTION_GRANTS_PUBLICATION_AUTHORITY);
-        assert!(!GRAPHIC_IMAGE_INSPECTION_PROVES_MEDIA_CORRECTNESS);
+        const {
+            assert!(!GRAPHIC_IMAGE_INSPECTION_GRANTS_PUBLICATION_AUTHORITY);
+            assert!(!GRAPHIC_IMAGE_INSPECTION_PROVES_MEDIA_CORRECTNESS);
+        }
 
         let empty = GraphicImageInspectionSetV1::default();
         assert!(empty.is_empty());
