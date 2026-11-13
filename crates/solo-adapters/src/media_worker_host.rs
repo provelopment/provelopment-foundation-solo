@@ -1194,6 +1194,31 @@ pub fn validate_session_child_v1(
     Ok(observation)
 }
 
+/// Validates one **received** readiness line as the sole gate for the parent's kernel query.
+///
+/// It applies exactly the strict pair the complete stream is judged by —
+/// [`parse_session_child_readiness_v1`] and then [`validate_session_child_v1`] — plus the one fact
+/// only the parent can know: the line's reported child pid must be the exact positive pid of this
+/// parent's own child handle. A parent that has not obtained `Ok` from this function has no
+/// authority to ask the kernel anything about that child.
+///
+/// # Errors
+///
+/// [`SmokeRefusalV1::HostOutputInvalid`] for non-UTF-8 or any shape defect, and
+/// [`SmokeRefusalV1::HostLimitUnavailable`] for an off-profile ceiling or a reported pid that is
+/// not the handle's own.
+pub fn validate_session_readiness_v1(
+    line: &[u8],
+    expected_pid: u64,
+) -> Result<SessionChildObservationV1, SmokeRefusalV1> {
+    let text = std::str::from_utf8(line).map_err(|_| SmokeRefusalV1::HostOutputInvalid)?;
+    let observation = validate_session_child_v1(parse_session_child_readiness_v1(text)?)?;
+    if expected_pid == 0 || observation.pid != expected_pid {
+        return Err(SmokeRefusalV1::HostLimitUnavailable);
+    }
+    Ok(observation)
+}
+
 /// The parent's raw, unvalidated material for one live-child session attestation.
 ///
 /// It carries what the parent itself observed — its live-child kernel query, the two liveness
@@ -1223,6 +1248,18 @@ pub struct SessionAttemptV1 {
     pub parent_killed: bool,
     /// The wall time the parent measured from before `spawn` to the completed leader reap.
     pub wall_ms: u64,
+    /// Whether this parent received and strictly validated a complete readiness line from its own
+    /// child **before** it performed the kernel identity query.
+    ///
+    /// This is the only value that can authorize the ordering claim, and it is set on exactly one
+    /// path in [`run_internal_session_attempt_v1`]: after the bounded handoff delivered a line and
+    /// after [`validate_session_readiness_v1`] accepted it, and only then before the query.
+    pub readiness_validated: bool,
+    /// The exact readiness line the parent gated on, or `None` when no complete line ever arrived.
+    ///
+    /// The parent requires it to equal the whole captured stream byte for byte, so a partial early
+    /// prefix, a duplicate line or any trailing output cannot become accepted evidence.
+    pub readiness_line: Option<Vec<u8>>,
 }
 
 /// The complete, validated live-child session attestation.
@@ -1279,9 +1316,20 @@ pub fn validate_session_attempt_v1(
         return Err(SmokeRefusalV1::HostWallTimeout);
     }
 
+    // The readiness gate is mandatory: an attempt whose parent never received and validated a
+    // complete readiness line cannot describe an ordered observation, so it is refused before any
+    // of its text is consulted.
+    if !attempt.readiness_validated {
+        return Err(SmokeRefusalV1::HostOutputInvalid);
+    }
+    let early = attempt.readiness_line.ok_or(SmokeRefusalV1::HostOutputInvalid)?;
     let bytes = attempt.stdout.ok_or(SmokeRefusalV1::HostOutputInvalid)?;
-    let text = String::from_utf8(bytes).map_err(|_| SmokeRefusalV1::HostOutputInvalid)?;
-    let observation = validate_session_child_v1(parse_session_child_readiness_v1(&text)?)?;
+    // The early prefix the parent gated on and the complete stream captured through EOF must be the
+    // same bytes, so trailing, duplicated or late output can never be folded into a success.
+    if early != bytes {
+        return Err(SmokeRefusalV1::HostOutputInvalid);
+    }
+    let observation = validate_session_readiness_v1(&bytes, attempt.child_pid)?;
 
     // The child's reported pid must be the exact pid this parent's own handle gave, and the
     // parent's independent kernel observation must agree with it on both identities.
@@ -2377,27 +2425,90 @@ mod linux {
             return Err(SmokeRefusalV1::HostSpawnFailed);
         }
 
-        let out_reader = child
-            .stdout
-            .take()
-            .map(|stream| std::thread::spawn(move || read_bounded(stream, MAX_CHILD_STDOUT_BYTES)));
+        // One bounded, one-shot readiness handoff. The sender lives inside the capped stdout
+        // reader and is dropped with it, so a closed stream, an early exit or a failed read
+        // disconnects this receiver instead of leaving the parent waiting on a silent child.
+        let (ready_tx, ready_rx) = std::sync::mpsc::channel::<Option<Vec<u8>>>();
+        let out_reader = match child.stdout.take() {
+            Some(stream) => Some(std::thread::spawn(move || {
+                read_session_stdout(stream, MAX_CHILD_STDOUT_BYTES, ready_tx)
+            })),
+            None => {
+                drop(ready_tx);
+                None
+            }
+        };
         let err_reader = child
             .stderr
             .take()
             .map(|stream| std::thread::spawn(move || read_bounded(stream, MAX_CHILD_STDERR_BYTES)));
 
-        // Immediately before the query, the child must still be running.
-        let live_before = matches!(child.try_wait(), Ok(None));
-        // The read-only kernel observation of that still-live, directly owned child.
-        let observed = if live_before {
-            observe_process_identity_v1(Some(handle_pid)).ok()
+        // This bounded wait consumes only what is left of the one deadline that already started
+        // before `spawn`. It never opens a second budget and never resets the measured window.
+        let deadline = Duration::from_millis(SESSION_DEADLINE_MS);
+        let remaining = deadline.saturating_sub(started.elapsed());
+        let mut readiness_failure = None;
+        let readiness_line = if remaining.is_zero() {
+            readiness_failure = Some(SmokeRefusalV1::HostWallTimeout);
+            None
+        } else {
+            match ready_rx.recv_timeout(remaining) {
+                Ok(Some(line)) => {
+                    let pid = u64::from(handle_pid);
+                    match validate_session_readiness_v1(&line, pid) {
+                        Ok(_) => Some(line),
+                        Err(refusal) => {
+                            readiness_failure = Some(refusal);
+                            None
+                        }
+                    }
+                }
+                Ok(None) => {
+                    readiness_failure = Some(SmokeRefusalV1::HostOutputInvalid);
+                    None
+                }
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                    readiness_failure = Some(SmokeRefusalV1::HostWallTimeout);
+                    None
+                }
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                    readiness_failure = Some(SmokeRefusalV1::HostOutputInvalid);
+                    None
+                }
+            }
+        };
+
+        // The bracketed liveness readbacks and the single read-only kernel query exist only behind
+        // a validated readiness line. Without that line the query is never reached at all, so no
+        // spawn, reader, timer or `try_wait` success can substitute for the child's own readiness.
+        let mut live_before = false;
+        let mut live_after = false;
+        let observed = if readiness_line.is_some() {
+            // Immediately before the query, the child must still be running.
+            live_before = matches!(child.try_wait(), Ok(None));
+            // The read-only kernel observation of that still-live, directly owned child.
+            let identity = if live_before {
+                observe_process_identity_v1(Some(handle_pid)).ok()
+            } else {
+                None
+            };
+            // Immediately after the query, the same handle must still be running.
+            live_after = matches!(child.try_wait(), Ok(None));
+            identity
         } else {
             None
         };
-        // Immediately after the query, the same handle must still be running.
-        let live_after = matches!(child.try_wait(), Ok(None));
 
-        let deadline = Duration::from_millis(SESSION_DEADLINE_MS);
+        // A refusal before the query is bounded cleanup of this parent's own handle only: that
+        // leader is signalled and reaped, the readers are joined once it is gone, and no partial
+        // readiness prefix is ever reported as success.
+        if let Some(refusal) = readiness_failure {
+            let _ = child.kill();
+            let _ = child.wait();
+            let _ = join_reader(out_reader);
+            let _ = join_reader(err_reader);
+            return Err(refusal);
+        }
         let outcome = loop {
             match child.try_wait() {
                 // A normal, self-chosen exit before any kill by this parent.
@@ -2446,6 +2557,8 @@ mod linux {
                 reaped: true,
                 parent_killed: false,
                 wall_ms,
+                readiness_validated: true,
+                readiness_line: readiness_line.clone(),
             }),
             SessionSupervision::ParentKilled(reaped) => Ok(SessionAttemptV1 {
                 stdout: stdout.and_then(Result::ok),
@@ -2458,6 +2571,8 @@ mod linux {
                 reaped,
                 parent_killed: true,
                 wall_ms,
+                readiness_validated: true,
+                readiness_line: readiness_line.clone(),
             }),
             SessionSupervision::Unobservable => Err(SmokeRefusalV1::HostReapFailed),
         }
@@ -2516,6 +2631,66 @@ mod linux {
         std::thread::sleep(Duration::from_millis(SESSION_CHILD_SLEEP_MS));
 
         Ok(())
+    }
+
+    /// Reads the session child's whole capped stdout stream and hands its first complete line out.
+    ///
+    /// At the **first complete newline** this sends that exact prefix to the parent over the
+    /// one-shot channel, without waiting for the parent and without waiting for EOF, so the parent
+    /// can order its kernel query after the child's own flushed readiness. It keeps capturing under
+    /// the same single [`MAX_CHILD_STDOUT_BYTES`] total cap until EOF, so the parent can reject
+    /// trailing, duplicated or over-cap output after the leader is gone instead of trusting a
+    /// partial early prefix. A read error, a closed stream without any newline, or one byte beyond
+    /// the cap is a refusal, never a silent truncation.
+    fn read_session_stdout(
+        mut stream: impl Read,
+        cap: usize,
+        ready: std::sync::mpsc::Sender<Option<Vec<u8>>>,
+    ) -> BoundedRead {
+        let limit = u64::try_from(cap).map_err(|_| ())?.saturating_add(1);
+        let mut buffer: Vec<u8> = Vec::new();
+        let mut chunk = [0_u8; 128];
+        let mut announced = false;
+        let mut consumed: u64 = 0;
+        loop {
+            let remaining = limit.saturating_sub(consumed);
+            if remaining == 0 {
+                break;
+            }
+            let want = usize::try_from(remaining).unwrap_or(usize::MAX).min(chunk.len());
+            match stream.read(&mut chunk[..want]) {
+                Ok(0) => break,
+                Ok(read) => {
+                    consumed = consumed.saturating_add(u64::try_from(read).unwrap_or(u64::MAX));
+                    buffer.extend_from_slice(&chunk[..read]);
+                    if buffer.len() > cap {
+                        if !announced {
+                            let _ = ready.send(None);
+                        }
+                        return Err(());
+                    }
+                    if !announced {
+                        let newline = buffer.iter().position(|byte| *byte == b'\n');
+                        if let Some(end) = newline {
+                            announced = true;
+                            let _ = ready.send(Some(buffer[..=end].to_vec()));
+                        }
+                    }
+                }
+                Err(ref error) if error.kind() == std::io::ErrorKind::Interrupted => {}
+                Err(_) => {
+                    if !announced {
+                        let _ = ready.send(None);
+                    }
+                    return Err(());
+                }
+            }
+        }
+        // A stream that closed before any newline never granted readiness.
+        if !announced {
+            let _ = ready.send(None);
+        }
+        Ok(buffer)
     }
 
     /// Reads at most `cap` bytes; one byte more is a refusal rather than a silent truncation.
@@ -3835,6 +4010,8 @@ mod tests {
             reaped: true,
             parent_killed: false,
             wall_ms: 4_050,
+            readiness_validated: true,
+            readiness_line: Some(WELL_FORMED_SESSION.as_bytes().to_vec()),
         }
     }
 
@@ -4141,6 +4318,126 @@ mod tests {
         assert!(
             window_ms < SESSION_DEADLINE_MS,
             "the child's window must close inside the parent's deadline"
+        );
+    }
+
+    /// `N089-01`: the readiness gate is mandatory. An attempt whose parent never validated a
+    /// complete readiness line is refused before its text is even parsed, so an attempt that lacks
+    /// the ordering event can never be reported as evidence.
+    #[test]
+    fn n089_01_an_attempt_without_the_readiness_gate_is_refused() {
+        // The flag alone authorizes the ordering claim: cleared, even a perfectly formed line and
+        // an agreeing query cannot become evidence.
+        let mut ungated = session_attempt();
+        ungated.readiness_validated = false;
+        assert_eq!(
+            validate_session_attempt_v1(ungated),
+            Err(SmokeRefusalV1::HostOutputInvalid)
+        );
+
+        // The gated line itself is likewise required, not merely implied by the flag.
+        let mut lineless = session_attempt();
+        lineless.readiness_line = None;
+        assert_eq!(
+            validate_session_attempt_v1(lineless),
+            Err(SmokeRefusalV1::HostOutputInvalid)
+        );
+    }
+
+    /// `N089-02`: the early prefix the parent gated on and the whole stream captured through EOF
+    /// must be identical, so trailing or duplicated output discovered after the query still refuses.
+    #[test]
+    fn n089_02_the_gated_line_and_the_full_stream_must_agree_exactly() {
+        let mut trailing = session_attempt();
+        let mut with_trailer = WELL_FORMED_SESSION.as_bytes().to_vec();
+        with_trailer.extend_from_slice(b"late\n");
+        trailing.stdout = Some(with_trailer);
+        assert_eq!(
+            validate_session_attempt_v1(trailing),
+            Err(SmokeRefusalV1::HostOutputInvalid)
+        );
+
+        let mut duplicated = session_attempt();
+        let mut twice = WELL_FORMED_SESSION.as_bytes().to_vec();
+        twice.extend_from_slice(WELL_FORMED_SESSION.as_bytes());
+        duplicated.stdout = Some(twice);
+        assert_eq!(
+            validate_session_attempt_v1(duplicated),
+            Err(SmokeRefusalV1::HostOutputInvalid)
+        );
+
+        // The exact single line stays accepted, so the two refusals above are meaningful.
+        validate_session_attempt_v1(session_attempt()).expect("one exact line is evidence");
+    }
+
+    /// `N089-03`: readiness is accepted only for this parent's own positive handle pid, and every
+    /// malformed, unterminated or duplicated line is the same closed refusal.
+    #[test]
+    fn n089_03_readiness_must_report_this_handles_own_pid() {
+        let line = WELL_FORMED_SESSION.as_bytes();
+        assert!(validate_session_readiness_v1(line, 4242).is_ok());
+        assert_eq!(
+            validate_session_readiness_v1(line, 4243),
+            Err(SmokeRefusalV1::HostLimitUnavailable)
+        );
+        assert_eq!(
+            validate_session_readiness_v1(line, 0),
+            Err(SmokeRefusalV1::HostLimitUnavailable)
+        );
+
+        // A line without its newline was never complete, so it never granted readiness.
+        let unterminated = WELL_FORMED_SESSION.trim_end_matches('\n');
+        assert_eq!(
+            validate_session_readiness_v1(unterminated.as_bytes(), 4242),
+            Err(SmokeRefusalV1::HostOutputInvalid)
+        );
+
+        let doubled = format!("{WELL_FORMED_SESSION}{WELL_FORMED_SESSION}");
+        assert_eq!(
+            validate_session_readiness_v1(doubled.as_bytes(), 4242),
+            Err(SmokeRefusalV1::HostOutputInvalid)
+        );
+        assert_eq!(
+            validate_session_readiness_v1(&[0xFF_u8, b'\n'], 4242),
+            Err(SmokeRefusalV1::HostOutputInvalid)
+        );
+    }
+
+    /// `N089-04`: the readiness line is bounded by the same single total stdout cap as the whole
+    /// stream, so an over-cap line is refused rather than truncated into a shorter success.
+    #[test]
+    fn n089_04_the_readiness_line_is_bounded_by_the_total_stdout_cap() {
+        assert!(WELL_FORMED_SESSION.len() < MAX_CHILD_STDOUT_BYTES);
+        let oversized = format!("{}\n", "a".repeat(MAX_CHILD_STDOUT_BYTES));
+        assert!(oversized.len() > MAX_CHILD_STDOUT_BYTES);
+        assert_eq!(
+            validate_session_readiness_v1(oversized.as_bytes(), 4242),
+            Err(SmokeRefusalV1::HostOutputInvalid)
+        );
+    }
+
+    /// `N089-05`: the gate applies exactly the pair the final stream is judged by, so its refusal
+    /// or acceptance can never diverge from the end-of-run validation.
+    #[test]
+    fn n089_05_the_gate_is_the_same_strict_pair_as_the_final_stream() {
+        let parsed = parse_session_child_readiness_v1(WELL_FORMED_SESSION).expect("shape");
+        assert_eq!(
+            validate_session_readiness_v1(WELL_FORMED_SESSION.as_bytes(), 4242),
+            validate_session_child_v1(parsed)
+        );
+
+        let off_profile = concat!(
+            "SOLO-MEDIA-HOST-SESSION-V1 as_soft=1 as_hard=536870912 cpu_soft=10 ",
+            "cpu_hard=10 pid=4242 pgid=4242 sid=4242\n"
+        );
+        let parsed_off = parse_session_child_readiness_v1(off_profile).expect("shape");
+        assert_eq!(
+            validate_session_readiness_v1(off_profile.as_bytes(), 4242),
+            validate_session_child_v1(parsed_off)
+        );
+        assert_eq!(
+            validate_session_readiness_v1(off_profile.as_bytes(), 4242),
+            Err(SmokeRefusalV1::HostLimitUnavailable)
         );
     }
 }

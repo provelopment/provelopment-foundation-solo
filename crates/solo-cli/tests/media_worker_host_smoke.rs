@@ -1263,3 +1263,169 @@ fn n087_04_both_session_modes_are_unsupported_before_any_child_exists() {
         );
     }
 }
+
+/// `N089-01`: the real parent performs its single read-only kernel group/session query only after it
+/// has received and strictly validated its own child's flushed readiness line, and the accepted
+/// record is still the unchanged N087 schema.
+///
+/// The ordering itself is carried by the façade source — the bounded early handoff and
+/// `validate_session_readiness_v1` gate the query unconditionally, and that crate's pure N089 tests
+/// show no attempt without the gate can become evidence — while this case proves the real binary
+/// built from that new source still produces one exact, complete record and refuses any partial one.
+#[cfg(target_os = "linux")]
+#[test]
+fn n089_01_the_real_parent_orders_its_query_after_validated_readiness() {
+    let observed = run(&["--internal-media-host-probe-v1", "session-parent"]);
+    assert!(
+        !observed.timed_out,
+        "the ordered attestation must finish inside the ordinary 20 000 ms case budget"
+    );
+    assert_eq!(
+        observed.exit_code,
+        Some(0),
+        "the ordered proof must succeed: stdout={:?} stderr={:?}",
+        observed.stdout,
+        observed.stderr
+    );
+    assert!(
+        observed.stderr.is_empty(),
+        "a live, ordered run says nothing on stderr"
+    );
+    assert!(
+        observed
+            .stdout
+            .starts_with("media_host_session=live_attested "),
+        "the accepted marker must be unchanged: {:?}",
+        observed.stdout
+    );
+    assert_eq!(
+        observed.stdout.matches('\n').count(),
+        1,
+        "exactly one evidence line, never a partial one first"
+    );
+    assert!(
+        !observed.stdout.contains("SOLO-MEDIA-HOST-SESSION-V1"),
+        "the consumed readiness record must not leak into the accepted line"
+    );
+
+    let fields = evidence_fields(&observed.stdout);
+    assert_eq!(
+        fields.len(),
+        12,
+        "the marker plus eleven fixed fields: {fields:?}"
+    );
+    assert_eq!(fields[0].0, "media_host_session");
+    assert_eq!(fields[0].1, "live_attested");
+    assert_eq!(numeric(&fields, "as_soft"), PROFILE_AS_BYTES);
+    assert_eq!(numeric(&fields, "as_hard"), PROFILE_AS_BYTES);
+    assert_eq!(numeric(&fields, "cpu_soft"), PROFILE_CPU_SECONDS);
+    assert_eq!(numeric(&fields, "cpu_hard"), PROFILE_CPU_SECONDS);
+
+    let pid = numeric(&fields, "pid");
+    assert!(pid > 0, "a real child has a positive pid");
+    assert_eq!(numeric(&fields, "pgid"), pid, "setsid made it the leader");
+    assert_eq!(numeric(&fields, "sid"), pid, "setsid made it the session");
+    assert_eq!(
+        numeric(&fields, "observed_pgid"),
+        pid,
+        "the parent's own group query must agree with the child"
+    );
+    assert_eq!(
+        numeric(&fields, "observed_sid"),
+        pid,
+        "the parent's own session query must agree with the child"
+    );
+    assert_eq!(numeric(&fields, "reaped"), 1, "the leader was reaped");
+
+    let wall_ms = numeric(&fields, "wall_ms");
+    assert!(
+        wall_ms > 0 && wall_ms < SESSION_DEADLINE_MS,
+        "the run decided itself strictly inside the 15 000 ms deadline: {wall_ms}"
+    );
+    report_observation(
+        "n089_readiness",
+        &format!("validated_before_query pid={pid} wall_ms={wall_ms}"),
+    );
+}
+
+/// `N089-02`: a direct, unsupervised `session-child` still refuses from its own limit/identity check
+/// before its four-second sleep and before it can write any readiness line, so the parent's ordered
+/// observation cannot be produced from outside the parent.
+#[cfg(target_os = "linux")]
+#[test]
+fn n089_02_a_direct_session_child_grants_no_readiness() {
+    let direct = run(&["--internal-media-host-probe-v1", "session-child"]);
+    assert!(!direct.timed_out, "the child must exit promptly");
+    assert!(
+        direct.elapsed_ms < SESSION_CHILD_SLEEP_MS,
+        "the refusal must precede the fixed four-second window: {} ms",
+        direct.elapsed_ms
+    );
+    assert!(
+        direct.stdout.is_empty(),
+        "a refused child grants no readiness line: {:?}",
+        direct.stdout
+    );
+    assert!(
+        direct.stderr.is_empty(),
+        "a refused child writes no diagnostic of its own: {:?}",
+        direct.stderr
+    );
+    let code = direct
+        .exit_code
+        .expect("the child must exit with a status, not a signal");
+    report_observation("n089_direct_session_child", &format!("exit={code}"));
+    assert!(
+        matches!(code, 71..=73 | 76 | 77),
+        "the child's own verification refusal is one of its fixed statuses: {code}"
+    );
+}
+
+/// `N089-03`: the readiness path stays unreachable behind the public CLI on either host, so this
+/// proof added no unapproved mode, flag or environment control.
+#[test]
+fn n089_03_the_readiness_path_is_unreachable_from_the_public_cli() {
+    for mode in ["session-parent", "session-child"] {
+        let hidden = run(&[
+            "bootstrap-preflight",
+            "--internal-media-host-probe-v1",
+            mode,
+        ]);
+        assert!(
+            !hidden.timed_out,
+            "{mode} must not hang behind a public subcommand"
+        );
+        assert!(
+            !hidden.stdout.contains("media_host_session=live_attested"),
+            "a public subcommand must never reach the session parent: {mode}"
+        );
+        assert!(
+            !hidden.stdout.contains("SOLO-MEDIA-HOST-SESSION-V1"),
+            "a public subcommand must never reach the session child: {mode}"
+        );
+    }
+}
+
+/// `N089-04`: on a host without the approved pre-exec boundary both session modes still refuse
+/// before any child exists, so no readiness worker, pipe or Linux-only case runs here.
+#[cfg(not(target_os = "linux"))]
+#[test]
+fn n089_04_no_readiness_worker_runs_where_the_boundary_is_unsupported() {
+    for mode in ["session-parent", "session-child"] {
+        let observed = run(&["--internal-media-host-probe-v1", mode]);
+        assert!(!observed.timed_out, "{mode} must not hang");
+        assert_eq!(
+            observed.exit_code,
+            Some(3),
+            "the {mode} mode must refuse on this host"
+        );
+        assert!(
+            observed.stdout.is_empty(),
+            "no readiness line and no evidence without a child: {mode}"
+        );
+        assert_eq!(
+            observed.stderr, "error: MEDIA_HOST_PROBE_REFUSED: HOST_UNSUPPORTED\n",
+            "the {mode} mode must name HOST_UNSUPPORTED"
+        );
+    }
+}
