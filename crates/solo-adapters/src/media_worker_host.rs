@@ -60,6 +60,34 @@
 //! and nothing at all about media correctness or publication. The one signal number named below is
 //! the Linux `SIGKILL` value the order requires in the evidence; every runtime part that touches a
 //! process stays inside the Linux-gated sections.
+//!
+//! # The address-space reservation refusal (`SOLO-WO-083 R01`)
+//!
+//! Reading ceilings and terminating an overdue child still prove nothing about *enforcement of the
+//! ceiling itself*. This module therefore owns exactly one further negative on the same seam:
+//!
+//! * `as-parent` re-executes this same executable in the fixed `as-child` mode through the
+//!   **unchanged** pre-exec installer, supervises it under the existing 15 000 ms deadline and
+//!   validates one strictly parsed denial line;
+//! * `as-child` performs the identical kernel readback first — all four ceiling halves and a
+//!   positive `pgid == pid` — and only then makes **one** fallible capacity reservation of
+//!   805 306 368 bytes (768 MiB), which is larger than the whole 512 MiB `RLIMIT_AS` ceiling. The
+//!   reservation is a capacity request only: no byte is initialised, indexed, filled, read, written
+//!   or otherwise touched, no second attempt is made and no size is derived at runtime;
+//! * a returned `Err` from that one request is the kernel/allocator refusal the negative exists to
+//!   prove, and only then does the child print its single denial line and exit zero. An unexpected
+//!   success is dropped untouched and refused with its own distinct status, so a host whose ceiling
+//!   did not hold can never produce accepted evidence;
+//! * the parent requires a normally exited, reaped leader inside its deadline, re-validates every
+//!   value, and emits one bounded `media_host_as=limit_enforced … reserve=denied …` record. Every
+//!   other outcome is a typed refusal with no evidence;
+//! * Windows and every other non-Linux target refuse both modes as `HOST_UNSUPPORTED` before any
+//!   child exists and without attempting any reservation.
+//!
+//! This proves one **virtual-address-space capacity request** was refused under the child's exact
+//! address-space ceiling. It proves nothing about page touching, resident memory or RSS, aggregate
+//! memory, the OOM killer, arbitrary allocators, `RLIMIT_CPU` exhaustion, a child tree, a sandbox
+//! or any release artifact.
 
 use std::ffi::{OsStr, OsString};
 
@@ -106,6 +134,36 @@ pub const WALL_EVIDENCE_MARKER_V1: &str = "media_host_wall=terminated";
 /// The Linux `SIGKILL` number a proven watchdog termination must report.
 pub const WALL_TERMINATION_SIGNAL_V1: i32 = 9;
 
+/// The one fixed sub-mode token that asks for the address-space reservation parent.
+pub const INTERNAL_PROBE_AS_PARENT_TOKEN_V1: &str = "as-parent";
+
+/// The one fixed sub-mode token that asks for the reservation-refusal child.
+pub const INTERNAL_PROBE_AS_CHILD_TOKEN_V1: &str = "as-child";
+
+/// The one fixed capacity the child requests: 805 306 368 bytes (768 MiB).
+///
+/// It is deliberately larger than the **whole** `RLIMIT_AS` ceiling the child verified, so one
+/// fallible reservation must be refused by the kernel rather than by an arithmetic check here.
+pub const AS_REQUEST_BYTES_V1: u64 = 805_306_368;
+
+/// The exact marker that begins the reserved child's single denial line.
+pub const AS_CHILD_MARKER_V1: &str = "SOLO-MEDIA-HOST-AS-V1";
+
+/// The literal refusal result the child is required to report.
+///
+/// The only accepted value is this literal. A reservation that unexpectedly succeeded reports
+/// `reserve=granted`, which is never accepted evidence.
+pub const AS_DENIED_TOKEN_V1: &str = "reserve=denied";
+
+/// The exact marker that begins the parent's single address-space evidence line.
+pub const AS_EVIDENCE_MARKER_V1: &str = "media_host_as=limit_enforced";
+
+/// The fixed parent watchdog of the reservation refusal: 15 000 milliseconds.
+///
+/// It is the same bounded interval as the positive smoke, reused rather than re-tuned: a child
+/// that cannot reach its own denial inside this interval is a refusal, never accepted evidence.
+pub const AS_DEADLINE_MS: u64 = SMOKE_WALL_DEADLINE_MS;
+
 /// The fixed `RLIMIT_AS` profile: 536 870 912 bytes (512 MiB), soft **and** hard.
 ///
 /// This is the single source of truth: the Linux pre-exec closure in
@@ -145,6 +203,12 @@ const CHILD_EXIT_GROUP_MISMATCH: u8 = 72;
 
 /// Child exit status: a required `getrlimit`/`getpgid` observation failed.
 const CHILD_EXIT_READBACK_FAILED: u8 = 73;
+
+/// Child exit status: the fixed over-ceiling reservation unexpectedly **succeeded**.
+///
+/// The child drops that reservation without touching a byte and refuses with this distinct
+/// status, so a host whose ceiling did not hold can never produce accepted evidence.
+const CHILD_EXIT_RESERVE_GRANTED: u8 = 74;
 
 /// The closed refusal vocabulary of the limit smoke probe.
 ///
@@ -224,6 +288,10 @@ pub enum InternalProbeModeV1 {
     WallParent,
     /// Run the one fixed, deliberately overdue child of the wall-deadline negative.
     WallChild,
+    /// Run the one fixed supervising parent of the address-space reservation refusal.
+    AsParent,
+    /// Run the one fixed child that attempts the single over-ceiling reservation.
+    AsChild,
 }
 
 /// What the composition root must emit for an internal mode, and with which exit status.
@@ -262,6 +330,10 @@ pub fn classify_internal_arguments_v1(
         Ok(InternalProbeModeV1::WallParent)
     } else if mode == OsStr::new(INTERNAL_PROBE_WALL_CHILD_TOKEN_V1) {
         Ok(InternalProbeModeV1::WallChild)
+    } else if mode == OsStr::new(INTERNAL_PROBE_AS_PARENT_TOKEN_V1) {
+        Ok(InternalProbeModeV1::AsParent)
+    } else if mode == OsStr::new(INTERNAL_PROBE_AS_CHILD_TOKEN_V1) {
+        Ok(InternalProbeModeV1::AsChild)
     } else {
         Err(SmokeRefusalV1::InternalModeInvalid)
     }
@@ -512,6 +584,171 @@ pub fn validate_wall_attempt_v1(
     })
 }
 
+/// One validated address-space reservation refusal: the child's own denial observation.
+///
+/// It exists only after the child exited normally with status zero, its single denial line parsed
+/// exactly, every value matched the fixed profile, the literal `reserve=denied` was present, the
+/// fixed request size was present and the leader was reaped inside the parent's deadline.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct AsRefusalV1 {
+    /// The child's own observation: four ceiling halves, its pid, its matching pgid and wall time.
+    pub observation: SmokeObservationV1,
+    /// The exact capacity the child requested when the kernel refused it.
+    pub request_bytes: u64,
+}
+
+/// The raw, still-unvalidated material one address-space supervision produced.
+///
+/// It carries inert data only. Nothing in it is believed until [`validate_as_attempt_v1`] has
+/// classified the exit status, parsed the denial bytes and bounded the measured interval, which is
+/// why that validation lives in the platform-neutral layer rather than next to the Linux code.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AsAttemptV1 {
+    /// The child's captured stdout bytes, or `None` when the reader failed, overflowed or panicked.
+    pub stdout: Option<Vec<u8>>,
+    /// The reaped leader's normal exit code, or `None` when it died of a signal.
+    pub exit_code: Option<i32>,
+    /// Whether the leader was actually reaped by this parent.
+    pub reaped: bool,
+    /// The wall time the parent itself measured around spawn and reap.
+    pub wall_ms: u64,
+}
+
+/// Parses the child's single denial line, strictly.
+///
+/// Accepted form, exactly one line and nothing else:
+///
+/// ```text
+/// SOLO-MEDIA-HOST-AS-V1 as_soft=<u64> as_hard=<u64> cpu_soft=<u64> cpu_hard=<u64> pid=<u64> pgid=<u64> request_bytes=<u64> reserve=denied
+/// ```
+///
+/// The marker, the eight field names and their order are fixed; every numeric value is plain ASCII
+/// decimal digits with no sign, no prefix and no whitespace; a trailing newline is required and a
+/// second line, a carriage return, a tab, a doubled space or any unknown, duplicated, missing or
+/// reordered field is refused. `request_bytes` must be exactly [`AS_REQUEST_BYTES_V1`] and the
+/// result token must be exactly [`AS_DENIED_TOKEN_V1`]; `reserve=granted` is never accepted.
+///
+/// # Errors
+///
+/// [`SmokeRefusalV1::HostOutputInvalid`] for any shape or literal defect, and
+/// [`SmokeRefusalV1::HostLimitUnavailable`] for a well-formed line outside the fixed profile.
+pub fn parse_as_child_refusal_v1(text: &str) -> Result<AsRefusalV1, SmokeRefusalV1> {
+    let body = text
+        .strip_suffix('\n')
+        .ok_or(SmokeRefusalV1::HostOutputInvalid)?;
+    if body.contains('\n') || body.contains('\r') || body.contains('\t') {
+        return Err(SmokeRefusalV1::HostOutputInvalid);
+    }
+
+    let tokens: Vec<&str> = body.split(' ').collect();
+    if tokens.len() != 9 || tokens[0] != AS_CHILD_MARKER_V1 {
+        return Err(SmokeRefusalV1::HostOutputInvalid);
+    }
+
+    let observation = SmokeObservationV1 {
+        address_space_soft: field_value(tokens[1], "as_soft=")?,
+        address_space_hard: field_value(tokens[2], "as_hard=")?,
+        cpu_soft: field_value(tokens[3], "cpu_soft=")?,
+        cpu_hard: field_value(tokens[4], "cpu_hard=")?,
+        pid: field_value(tokens[5], "pid=")?,
+        pgid: field_value(tokens[6], "pgid=")?,
+        wall_ms: 0,
+    };
+    let request_bytes = field_value(tokens[7], "request_bytes=")?;
+    if tokens[8] != AS_DENIED_TOKEN_V1 {
+        return Err(SmokeRefusalV1::HostOutputInvalid);
+    }
+    if request_bytes != AS_REQUEST_BYTES_V1 {
+        return Err(SmokeRefusalV1::HostOutputInvalid);
+    }
+    if observation.pid == 0 {
+        return Err(SmokeRefusalV1::HostLimitUnavailable);
+    }
+    Ok(AsRefusalV1 {
+        observation: validate_observation_v1(observation)?,
+        request_bytes,
+    })
+}
+
+/// Classifies the reaped reservation child's exit status.
+///
+/// Only a normal status zero means the child reached its single reservation and observed the
+/// kernel's denial. The three child verification statuses and the distinct
+/// [`CHILD_EXIT_RESERVE_GRANTED`] status all mean the fixed ceilings were not proved, so they map
+/// to [`SmokeRefusalV1::HostLimitUnavailable`] — a reservation that succeeded above the observed
+/// ceiling is exactly a limit that did not hold. A signal death or any other status is
+/// [`SmokeRefusalV1::HostExitAbnormal`].
+///
+/// # Errors
+///
+/// Returns the fixed refusal for a non-zero, signal or unrecognised status.
+pub fn classify_as_child_exit_v1(code: Option<i32>) -> Result<(), SmokeRefusalV1> {
+    match code {
+        Some(0) => Ok(()),
+        Some(value)
+            if value == i32::from(CHILD_EXIT_LIMITS_MISMATCH)
+                || value == i32::from(CHILD_EXIT_GROUP_MISMATCH)
+                || value == i32::from(CHILD_EXIT_READBACK_FAILED)
+                || value == i32::from(CHILD_EXIT_RESERVE_GRANTED) =>
+        {
+            Err(SmokeRefusalV1::HostLimitUnavailable)
+        }
+        _ => Err(SmokeRefusalV1::HostExitAbnormal),
+    }
+}
+
+/// Parses, bounds and validates one raw address-space attempt into accepted evidence, or refuses.
+///
+/// The parent re-checks everything: an un-reaped leader, a non-zero or signal exit, absent,
+/// over-cap, non-UTF-8 or off-schema bytes, a wrong request size, a literal other than
+/// `reserve=denied` and an interval that is not strictly below [`AS_DEADLINE_MS`] are all typed
+/// refusals with no accepted evidence.
+///
+/// # Errors
+///
+/// [`SmokeRefusalV1::HostReapFailed`] for an un-reaped leader,
+/// [`SmokeRefusalV1::HostOutputInvalid`] for unusable bytes, and otherwise the refusal from
+/// [`classify_as_child_exit_v1`] or [`parse_as_child_refusal_v1`].
+pub fn validate_as_attempt_v1(attempt: AsAttemptV1) -> Result<AsRefusalV1, SmokeRefusalV1> {
+    if !attempt.reaped {
+        return Err(SmokeRefusalV1::HostReapFailed);
+    }
+    classify_as_child_exit_v1(attempt.exit_code)?;
+    let bytes = attempt.stdout.ok_or(SmokeRefusalV1::HostOutputInvalid)?;
+    let text = String::from_utf8(bytes).map_err(|_| SmokeRefusalV1::HostOutputInvalid)?;
+    let refusal = parse_as_child_refusal_v1(&text)?;
+    if attempt.wall_ms >= AS_DEADLINE_MS {
+        return Err(SmokeRefusalV1::HostWallTimeout);
+    }
+    Ok(AsRefusalV1 {
+        observation: SmokeObservationV1 {
+            wall_ms: attempt.wall_ms,
+            ..refusal.observation
+        },
+        request_bytes: refusal.request_bytes,
+    })
+}
+
+/// The one fixed address-space enforcement line, built only from an already validated refusal.
+///
+/// `reserve=denied` and the fixed request size are written from the validated values, never from
+/// the child's text, and the marker stays `media_host_as=limit_enforced` so a reservation refusal
+/// can never be confused with the positive smoke's accepted run.
+fn as_evidence_line(refusal: AsRefusalV1) -> String {
+    format!(
+        "{AS_EVIDENCE_MARKER_V1} as_soft={} as_hard={} cpu_soft={} cpu_hard={} request_bytes={} \
+         {AS_DENIED_TOKEN_V1} pid={} pgid={} wall_ms={}\n",
+        refusal.observation.address_space_soft,
+        refusal.observation.address_space_hard,
+        refusal.observation.cpu_soft,
+        refusal.observation.cpu_hard,
+        refusal.request_bytes,
+        refusal.observation.pid,
+        refusal.observation.pgid,
+        refusal.observation.wall_ms
+    )
+}
+
 /// The one fixed terminated-evidence line, built only from an already validated termination.
 ///
 /// `signal=9 reaped=1` is written from the validated values, never from the child's text, and the
@@ -543,6 +780,8 @@ pub fn run_internal_media_host_probe_v1(args: &[OsString]) -> Option<InternalPro
         Ok(InternalProbeModeV1::Child) => Some(child_report()),
         Ok(InternalProbeModeV1::WallParent) => Some(wall_parent_report()),
         Ok(InternalProbeModeV1::WallChild) => Some(wall_child_report()),
+        Ok(InternalProbeModeV1::AsParent) => Some(as_parent_report()),
+        Ok(InternalProbeModeV1::AsChild) => Some(as_child_report()),
         Err(refusal) => Some(refusal_report(refusal)),
     }
 }
@@ -666,6 +905,72 @@ fn wall_child_report() -> InternalProbeReportV1 {
     refusal_report(SmokeRefusalV1::HostUnsupported)
 }
 
+/// Runs the one fixed Linux address-space reservation attempt and returns its raw material.
+///
+/// On Linux this starts exactly one `as-child` of this executable under the **unchanged** pre-exec
+/// installer, supervises it with the fixed 15 000 ms watchdog, and reaps the leader. On every other
+/// host it refuses before creating anything, so no reservation is ever attempted there.
+///
+/// # Errors
+///
+/// Returns a [`SmokeRefusalV1`] for every launch, exit, deadline or reap failure.
+#[cfg(target_os = "linux")]
+pub fn run_internal_as_attempt_v1() -> Result<AsAttemptV1, SmokeRefusalV1> {
+    linux::run_as_probe()
+}
+
+/// Runs the one fixed Linux address-space reservation attempt, which this host cannot provide.
+///
+/// # Errors
+///
+/// Always [`SmokeRefusalV1::HostUnsupported`]; nothing is spawned and nothing is reserved.
+#[cfg(not(target_os = "linux"))]
+pub fn run_internal_as_attempt_v1() -> Result<AsAttemptV1, SmokeRefusalV1> {
+    Err(SmokeRefusalV1::HostUnsupported)
+}
+
+/// The address-space parent mode's whole result, as the composition root must print it.
+///
+/// As with the wall negative, the validation happens here in the platform-neutral layer, so a
+/// refusal is decided by ordinary checked code rather than by the platform branch.
+fn as_parent_report() -> InternalProbeReportV1 {
+    match run_internal_as_attempt_v1().and_then(validate_as_attempt_v1) {
+        Ok(refusal) => InternalProbeReportV1 {
+            exit_code: 0,
+            stdout: Some(as_evidence_line(refusal)),
+            stderr: None,
+        },
+        Err(refusal) => refusal_report(refusal),
+    }
+}
+
+/// The reservation child mode's whole result.
+///
+/// The child itself only ever returns its single denial line or a fixed refusal status, so this
+/// wrapper carries either that already bounded line or the child's own status.
+#[cfg(target_os = "linux")]
+fn as_child_report() -> InternalProbeReportV1 {
+    match linux::run_as_child() {
+        Ok(line) => InternalProbeReportV1 {
+            exit_code: 0,
+            stdout: Some(line),
+            stderr: None,
+        },
+        Err(code) => InternalProbeReportV1 {
+            exit_code: code,
+            stdout: None,
+            stderr: None,
+        },
+    }
+}
+
+/// The reservation child mode is refused on a host with no approved pre-exec boundary: no child is
+/// created and no reservation is attempted.
+#[cfg(not(target_os = "linux"))]
+fn as_child_report() -> InternalProbeReportV1 {
+    refusal_report(SmokeRefusalV1::HostUnsupported)
+}
+
 /// The one fixed accepted evidence line. Nothing is printed before it, and it is only built from
 /// an already validated observation.
 fn accepted_report(observation: SmokeObservationV1) -> InternalProbeReportV1 {
@@ -707,12 +1012,14 @@ mod linux {
     use std::time::{Duration, Instant};
 
     use super::{
+        AS_CHILD_MARKER_V1, AS_DEADLINE_MS, AS_DENIED_TOKEN_V1, AS_REQUEST_BYTES_V1, AsAttemptV1,
         CHILD_EXIT_GROUP_MISMATCH, CHILD_EXIT_LIMITS_MISMATCH, CHILD_EXIT_READBACK_FAILED,
-        CHILD_OBSERVATION_MARKER_V1, INTERNAL_PROBE_CHILD_TOKEN_V1, INTERNAL_PROBE_FLAG_V1,
-        INTERNAL_PROBE_WALL_CHILD_TOKEN_V1, MAX_CHILD_STDERR_BYTES, MAX_CHILD_STDOUT_BYTES,
-        PROFILE_V1_AS_BYTES, PROFILE_V1_CPU_SECONDS, SMOKE_WALL_DEADLINE_MS, SmokeObservationV1,
-        SmokeRefusalV1, WALL_CHILD_READY_MARKER_V1, WALL_CHILD_SLEEP_MS, WALL_DEADLINE_MS,
-        WallAttemptV1, classify_child_exit_v1, parse_child_observation_v1, validate_observation_v1,
+        CHILD_EXIT_RESERVE_GRANTED, CHILD_OBSERVATION_MARKER_V1, INTERNAL_PROBE_AS_CHILD_TOKEN_V1,
+        INTERNAL_PROBE_CHILD_TOKEN_V1, INTERNAL_PROBE_FLAG_V1, INTERNAL_PROBE_WALL_CHILD_TOKEN_V1,
+        MAX_CHILD_STDERR_BYTES, MAX_CHILD_STDOUT_BYTES, PROFILE_V1_AS_BYTES,
+        PROFILE_V1_CPU_SECONDS, SMOKE_WALL_DEADLINE_MS, SmokeObservationV1, SmokeRefusalV1,
+        WALL_CHILD_READY_MARKER_V1, WALL_CHILD_SLEEP_MS, WALL_DEADLINE_MS, WallAttemptV1,
+        classify_child_exit_v1, parse_child_observation_v1, validate_observation_v1,
     };
     use crate::media_worker_host_native::{
         install_linux_child_limits_v1, own_process_group_v1, read_limit_ceilings_v1,
@@ -995,6 +1302,145 @@ mod linux {
         // media, no source, no network and no second executable.
         std::thread::sleep(Duration::from_millis(WALL_CHILD_SLEEP_MS));
         Ok(())
+    }
+
+    /// What the 15 000 ms supervision decided about the one owned reservation child.
+    ///
+    /// The variants keep the exit-versus-timeout race honest: only [`AsSupervision::Exited`] can
+    /// carry a status, and only a normal zero status can become accepted evidence.
+    enum AsSupervision {
+        /// The child finished on its own; the value is its normal exit code, if it had one.
+        Exited(Option<i32>),
+        /// The child was still live at the parent's deadline; it was killed and reaped.
+        TimedOut,
+        /// The child's status could not be observed, so nothing may be claimed.
+        Unobservable,
+    }
+
+    /// Supervises the one fixed `as-child` and hands back its raw, unvalidated material.
+    ///
+    /// The timer starts **before** `Command::spawn`, only the two capped readers ever touch the
+    /// child's output, the leader is reaped by this parent in every path, and the neutral layer
+    /// above decides whether anything may be claimed.
+    pub(super) fn run_as_probe() -> Result<AsAttemptV1, SmokeRefusalV1> {
+        let executable =
+            std::env::current_exe().map_err(|_| SmokeRefusalV1::HostExecutableUnavailable)?;
+        if !executable.is_file() {
+            return Err(SmokeRefusalV1::HostExecutableUnavailable);
+        }
+
+        let mut command = Command::new(&executable);
+        command
+            .arg(INTERNAL_PROBE_FLAG_V1)
+            .arg(INTERNAL_PROBE_AS_CHILD_TOKEN_V1)
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+
+        // The same, unchanged pre-exec boundary: a new session and both ceilings before `exec`.
+        install_linux_child_limits_v1(&mut command);
+
+        let started = Instant::now();
+        let mut child = command
+            .spawn()
+            .map_err(|_| SmokeRefusalV1::HostSpawnFailed)?;
+
+        let out_reader = child
+            .stdout
+            .take()
+            .map(|stream| std::thread::spawn(move || read_bounded(stream, MAX_CHILD_STDOUT_BYTES)));
+        let err_reader = child
+            .stderr
+            .take()
+            .map(|stream| std::thread::spawn(move || read_bounded(stream, MAX_CHILD_STDERR_BYTES)));
+
+        let deadline = Duration::from_millis(AS_DEADLINE_MS);
+        let outcome = loop {
+            match child.try_wait() {
+                Ok(Some(status)) => break AsSupervision::Exited(status.code()),
+                Ok(None) => {}
+                Err(_) => {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    break AsSupervision::Unobservable;
+                }
+            }
+            if started.elapsed() >= deadline {
+                // A hung child is killed through this parent's own handle and reaped here, so no
+                // unreaped leader can outlive the run.
+                let _ = child.kill();
+                let _ = child.wait();
+                break AsSupervision::TimedOut;
+            }
+            std::thread::sleep(POLL_INTERVAL);
+        };
+        let wall_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
+
+        // Joined only after the leader is gone, so a live child's open pipe ends cannot block.
+        let stdout = join_reader(out_reader);
+        let _stderr = join_reader(err_reader);
+
+        let exit_code = match outcome {
+            AsSupervision::Exited(code) => code,
+            AsSupervision::TimedOut => return Err(SmokeRefusalV1::HostWallTimeout),
+            AsSupervision::Unobservable => return Err(SmokeRefusalV1::HostReapFailed),
+        };
+
+        Ok(AsAttemptV1 {
+            stdout: stdout.and_then(Result::ok),
+            exit_code,
+            reaped: true,
+            wall_ms,
+        })
+    }
+
+    /// The fixed reservation child: prove the own limits and group identity, then try once.
+    ///
+    /// The four ceiling halves and the process-group identity are verified **before** the single
+    /// reservation, so a direct, unsupervised invocation refuses promptly and never reaches the
+    /// 768 MiB request. When the reservation is refused — the only expected outcome under the
+    /// installed 512 MiB ceiling — exactly one line is produced. If it unexpectedly succeeds, the
+    /// reservation is dropped without a byte being read, written or touched, and the child refuses
+    /// with its own distinct status and no accepted output.
+    pub(super) fn run_as_child() -> Result<String, u8> {
+        let readback = read_limit_ceilings_v1().map_err(|_| CHILD_EXIT_READBACK_FAILED)?;
+
+        let limits_match = readback.address_space.soft == PROFILE_V1_AS_BYTES
+            && readback.address_space.hard == PROFILE_V1_AS_BYTES
+            && readback.cpu.soft == PROFILE_V1_CPU_SECONDS
+            && readback.cpu.hard == PROFILE_V1_CPU_SECONDS;
+        if !limits_match {
+            return Err(CHILD_EXIT_LIMITS_MISMATCH);
+        }
+
+        let pid = u64::from(std::process::id());
+        let pgid = u64::from(own_process_group_v1().map_err(|_| CHILD_EXIT_READBACK_FAILED)?);
+        if pgid != pid {
+            return Err(CHILD_EXIT_GROUP_MISMATCH);
+        }
+
+        // Exactly one fallible capacity reservation, above the whole verified ceiling. The request
+        // is a capacity reservation only: nothing here initialises, indexes, fills, reads, writes
+        // or otherwise touches the requested bytes, and the vector is dropped in both branches.
+        let capacity =
+            usize::try_from(AS_REQUEST_BYTES_V1).map_err(|_| CHILD_EXIT_READBACK_FAILED)?;
+        let mut reservation = Vec::<u8>::new();
+        let reserved = reservation.try_reserve_exact(capacity);
+        drop(reservation);
+        if reserved.is_ok() {
+            // The ceiling did not hold. Refuse without accepted evidence rather than touching it.
+            return Err(CHILD_EXIT_RESERVE_GRANTED);
+        }
+
+        Ok(format!(
+            "{AS_CHILD_MARKER_V1} as_soft={} as_hard={} cpu_soft={} cpu_hard={} pid={pid} \
+             pgid={pgid} request_bytes={} {AS_DENIED_TOKEN_V1}\n",
+            readback.address_space.soft,
+            readback.address_space.hard,
+            readback.cpu.soft,
+            readback.cpu.hard,
+            AS_REQUEST_BYTES_V1
+        ))
     }
 
     /// Reads at most `cap` bytes; one byte more is a refusal rather than a silent truncation.
@@ -1568,5 +2014,334 @@ mod tests {
             "the child's own marker must not leak into parent evidence"
         );
         assert!(line.is_ascii());
+    }
+
+    /// The canonical denial line the fixed `as-child` writes when the kernel refuses the request.
+    ///
+    /// It is built from the real marker and literal constants, so a changed marker or a changed
+    /// request size cannot pass unobserved.
+    fn as_denial_line() -> String {
+        format!(
+            "{AS_CHILD_MARKER_V1} as_soft=536870912 as_hard=536870912 cpu_soft=10 \
+             cpu_hard=10 pid=6262 pgid=6262 request_bytes=805306368 {AS_DENIED_TOKEN_V1}\n"
+        )
+    }
+
+    fn as_refusal() -> AsRefusalV1 {
+        AsRefusalV1 {
+            observation: SmokeObservationV1 {
+                address_space_soft: PROFILE_V1_AS_BYTES,
+                address_space_hard: PROFILE_V1_AS_BYTES,
+                cpu_soft: PROFILE_V1_CPU_SECONDS,
+                cpu_hard: PROFILE_V1_CPU_SECONDS,
+                pid: 6262,
+                pgid: 6262,
+                wall_ms: 12,
+            },
+            request_bytes: AS_REQUEST_BYTES_V1,
+        }
+    }
+
+    fn as_attempt(stdout: Option<Vec<u8>>) -> AsAttemptV1 {
+        AsAttemptV1 {
+            stdout,
+            exit_code: Some(0),
+            reaped: true,
+            wall_ms: 12,
+        }
+    }
+
+    /// `N083-03`: the two reservation tokens are additive and closed, and every earlier token keeps
+    /// its exact classification.
+    #[test]
+    fn n083_03_the_reservation_tokens_are_closed_and_additive() {
+        assert_eq!(
+            classify_internal_arguments_v1(&argv(&[
+                INTERNAL_PROBE_FLAG_V1,
+                INTERNAL_PROBE_AS_PARENT_TOKEN_V1,
+            ])),
+            Ok(InternalProbeModeV1::AsParent)
+        );
+        assert_eq!(
+            classify_internal_arguments_v1(&argv(&[
+                INTERNAL_PROBE_FLAG_V1,
+                INTERNAL_PROBE_AS_CHILD_TOKEN_V1,
+            ])),
+            Ok(InternalProbeModeV1::AsChild)
+        );
+
+        // Every earlier mode still classifies exactly as it did before this order.
+        for (token, mode) in [
+            (INTERNAL_PROBE_PARENT_TOKEN_V1, InternalProbeModeV1::Parent),
+            (INTERNAL_PROBE_CHILD_TOKEN_V1, InternalProbeModeV1::Child),
+            (
+                INTERNAL_PROBE_WALL_PARENT_TOKEN_V1,
+                InternalProbeModeV1::WallParent,
+            ),
+            (
+                INTERNAL_PROBE_WALL_CHILD_TOKEN_V1,
+                InternalProbeModeV1::WallChild,
+            ),
+        ] {
+            assert_eq!(
+                classify_internal_arguments_v1(&argv(&[INTERNAL_PROBE_FLAG_V1, token])),
+                Ok(mode),
+                "{token} must keep its classification"
+            );
+        }
+
+        let refusals: [&[&str]; 8] = [
+            &[INTERNAL_PROBE_FLAG_V1, "as"],
+            &[INTERNAL_PROBE_FLAG_V1, "AS-CHILD"],
+            &[INTERNAL_PROBE_FLAG_V1, "as_child"],
+            &[INTERNAL_PROBE_FLAG_V1, "as-parent", "as-parent"],
+            &[INTERNAL_PROBE_FLAG_V1, "as-child", "extra"],
+            &[INTERNAL_PROBE_FLAG_V1, "as-child "],
+            &[INTERNAL_PROBE_FLAG_V1, ""],
+            &[INTERNAL_PROBE_FLAG_V1],
+        ];
+        for tokens in refusals {
+            assert_eq!(
+                classify_internal_arguments_v1(&argv(tokens)),
+                Err(SmokeRefusalV1::InternalModeInvalid),
+                "{tokens:?} must be refused, never fallen through"
+            );
+        }
+
+        // Neither reservation token is reachable behind a public subcommand.
+        for token in [
+            INTERNAL_PROBE_AS_PARENT_TOKEN_V1,
+            INTERNAL_PROBE_AS_CHILD_TOKEN_V1,
+        ] {
+            assert_eq!(
+                classify_internal_arguments_v1(&argv(&[
+                    "bootstrap-preflight",
+                    INTERNAL_PROBE_FLAG_V1,
+                    token,
+                ])),
+                Ok(InternalProbeModeV1::NotRequested),
+                "{token} must never be picked up behind a public subcommand"
+            );
+        }
+    }
+
+    /// `N083-03`: exactly one well-formed denial line is accepted, with every value at full width.
+    #[test]
+    fn n083_03_only_the_exact_denial_line_is_accepted() {
+        let parsed = parse_as_child_refusal_v1(&as_denial_line())
+            .expect("the exact denial line is accepted");
+        assert_eq!(
+            parsed,
+            AsRefusalV1 {
+                observation: SmokeObservationV1 {
+                    wall_ms: 0,
+                    ..as_refusal().observation
+                },
+                request_bytes: AS_REQUEST_BYTES_V1,
+            },
+            "only the parent fills in wall time"
+        );
+        assert_eq!(parsed.request_bytes, AS_REQUEST_BYTES_V1);
+    }
+
+    /// `N083-03`: no malformed, partial, duplicated, reordered or trailing denial is accepted.
+    #[test]
+    fn n083_03_malformed_denials_are_refused_without_partial_values() {
+        let cases: [&str; 17] = [
+            "",
+            "\n",
+            "SOLO-MEDIA-HOST-AS-V1\n",
+            // no trailing newline
+            "SOLO-MEDIA-HOST-AS-V1 as_soft=536870912 as_hard=536870912 cpu_soft=10 cpu_hard=10 \
+             pid=6262 pgid=6262 request_bytes=805306368 reserve=denied",
+            // a second line
+            "SOLO-MEDIA-HOST-AS-V1 as_soft=536870912 as_hard=536870912 cpu_soft=10 cpu_hard=10 \
+             pid=6262 pgid=6262 request_bytes=805306368 reserve=denied\nextra\n",
+            // CRLF
+            "SOLO-MEDIA-HOST-AS-V1 as_soft=536870912 as_hard=536870912 cpu_soft=10 cpu_hard=10 \
+             pid=6262 pgid=6262 request_bytes=805306368 reserve=denied\r\n",
+            // tab separator
+            "SOLO-MEDIA-HOST-AS-V1\tas_soft=536870912 as_hard=536870912 cpu_soft=10 cpu_hard=10 \
+             pid=6262 pgid=6262 request_bytes=805306368 reserve=denied\n",
+            // doubled space
+            "SOLO-MEDIA-HOST-AS-V1  as_soft=536870912 as_hard=536870912 cpu_soft=10 cpu_hard=10 \
+             pid=6262 pgid=6262 request_bytes=805306368 reserve=denied\n",
+            // the wall marker instead of the reservation marker
+            "SOLO-MEDIA-HOST-WALL-V1 as_soft=536870912 as_hard=536870912 cpu_soft=10 cpu_hard=10 \
+             pid=6262 pgid=6262 request_bytes=805306368 reserve=denied\n",
+            // reordered fields
+            "SOLO-MEDIA-HOST-AS-V1 as_hard=536870912 as_soft=536870912 cpu_soft=10 cpu_hard=10 \
+             pid=6262 pgid=6262 request_bytes=805306368 reserve=denied\n",
+            // signed value
+            "SOLO-MEDIA-HOST-AS-V1 as_soft=+536870912 as_hard=536870912 cpu_soft=10 cpu_hard=10 \
+             pid=6262 pgid=6262 request_bytes=805306368 reserve=denied\n",
+            // overflow
+            "SOLO-MEDIA-HOST-AS-V1 as_soft=99999999999999999999 as_hard=536870912 cpu_soft=10 \
+             cpu_hard=10 pid=6262 pgid=6262 request_bytes=805306368 reserve=denied\n",
+            // a request that is not the fixed one
+            "SOLO-MEDIA-HOST-AS-V1 as_soft=536870912 as_hard=536870912 cpu_soft=10 cpu_hard=10 \
+             pid=6262 pgid=6262 request_bytes=805306369 reserve=denied\n",
+            // the ceiling itself instead of the over-ceiling request
+            "SOLO-MEDIA-HOST-AS-V1 as_soft=536870912 as_hard=536870912 cpu_soft=10 cpu_hard=10 \
+             pid=6262 pgid=6262 request_bytes=536870912 reserve=denied\n",
+            // an unexpected success is never accepted evidence
+            "SOLO-MEDIA-HOST-AS-V1 as_soft=536870912 as_hard=536870912 cpu_soft=10 cpu_hard=10 \
+             pid=6262 pgid=6262 request_bytes=805306368 reserve=granted\n",
+            // an extra trailing field
+            "SOLO-MEDIA-HOST-AS-V1 as_soft=536870912 as_hard=536870912 cpu_soft=10 cpu_hard=10 \
+             pid=6262 pgid=6262 request_bytes=805306368 reserve=denied wall_ms=12\n",
+            // a missing field
+            "SOLO-MEDIA-HOST-AS-V1 as_soft=536870912 as_hard=536870912 cpu_soft=10 cpu_hard=10 \
+             pid=6262 pgid=6262 reserve=denied\n",
+        ];
+        for case in cases {
+            assert_eq!(
+                parse_as_child_refusal_v1(case),
+                Err(SmokeRefusalV1::HostOutputInvalid),
+                "{case:?} must be refused"
+            );
+        }
+    }
+
+    /// `N083-03`: every abnormal, un-reaped, non-UTF-8 or over-deadline supervision is refused.
+    #[test]
+    fn n083_03_every_abnormal_supervision_is_refused() {
+        let accepted = as_attempt(Some(as_denial_line().into_bytes()));
+        assert_eq!(validate_as_attempt_v1(accepted), Ok(as_refusal()));
+
+        // An un-reaped leader can never be accepted.
+        let mut unreaped = as_attempt(Some(as_denial_line().into_bytes()));
+        unreaped.reaped = false;
+        assert_eq!(
+            validate_as_attempt_v1(unreaped),
+            Err(SmokeRefusalV1::HostReapFailed)
+        );
+
+        // The three verification statuses and an unexpected grant all mean "limits not proved".
+        for code in [71, 72, 73, 74] {
+            let mut attempt = as_attempt(Some(as_denial_line().into_bytes()));
+            attempt.exit_code = Some(code);
+            assert_eq!(
+                validate_as_attempt_v1(attempt),
+                Err(SmokeRefusalV1::HostLimitUnavailable),
+                "status {code} must mean the ceilings were not proved"
+            );
+            assert_eq!(
+                classify_as_child_exit_v1(Some(code)),
+                Err(SmokeRefusalV1::HostLimitUnavailable)
+            );
+        }
+
+        // Any other status, and any signal death, is abnormal rather than a limit refusal.
+        for code in [1, 2, 3, 70, 75, 137, 255] {
+            let mut attempt = as_attempt(Some(as_denial_line().into_bytes()));
+            attempt.exit_code = Some(code);
+            assert_eq!(
+                validate_as_attempt_v1(attempt),
+                Err(SmokeRefusalV1::HostExitAbnormal),
+                "status {code} is not this negative"
+            );
+        }
+        let mut signalled = as_attempt(Some(as_denial_line().into_bytes()));
+        signalled.exit_code = None;
+        assert_eq!(
+            validate_as_attempt_v1(signalled),
+            Err(SmokeRefusalV1::HostExitAbnormal),
+            "a signal death is never success"
+        );
+        assert_eq!(
+            classify_as_child_exit_v1(None),
+            Err(SmokeRefusalV1::HostExitAbnormal)
+        );
+        assert_eq!(
+            classify_as_child_exit_v1(Some(0)),
+            Ok(()),
+            "only a normal zero status can carry the child's denial"
+        );
+
+        // Absent or non-UTF-8 bytes are unusable.
+        assert_eq!(
+            validate_as_attempt_v1(as_attempt(None)),
+            Err(SmokeRefusalV1::HostOutputInvalid)
+        );
+        assert_eq!(
+            validate_as_attempt_v1(as_attempt(Some(Vec::from([0xff_u8, 0xfe, b'\n'])))),
+            Err(SmokeRefusalV1::HostOutputInvalid)
+        );
+
+        // The measured interval must be strictly below the fixed deadline.
+        let mut at_deadline = as_attempt(Some(as_denial_line().into_bytes()));
+        at_deadline.wall_ms = AS_DEADLINE_MS;
+        assert_eq!(
+            validate_as_attempt_v1(at_deadline),
+            Err(SmokeRefusalV1::HostWallTimeout),
+            "an interval at the deadline is not inside it"
+        );
+        let mut over_deadline = as_attempt(Some(as_denial_line().into_bytes()));
+        over_deadline.wall_ms = AS_DEADLINE_MS + 1;
+        assert_eq!(
+            validate_as_attempt_v1(over_deadline),
+            Err(SmokeRefusalV1::HostWallTimeout)
+        );
+    }
+
+    /// `N083-03`: the enforcement line is fixed, bounded and never uses accepted-run wording.
+    #[test]
+    fn n083_03_the_evidence_line_is_fixed_and_bounded() {
+        let line = as_evidence_line(as_refusal());
+        assert_eq!(
+            line,
+            "media_host_as=limit_enforced as_soft=536870912 as_hard=536870912 cpu_soft=10 \
+             cpu_hard=10 request_bytes=805306368 reserve=denied pid=6262 pgid=6262 wall_ms=12\n"
+        );
+        assert!(line.ends_with('\n'), "exactly one evidence line");
+        assert_eq!(line.matches('\n').count(), 1);
+        assert!(line.is_ascii());
+        assert!(
+            !line.contains(PARENT_EVIDENCE_MARKER_V1),
+            "a refused reservation must never be reported as an accepted run"
+        );
+        assert!(
+            !line.contains(WALL_EVIDENCE_MARKER_V1),
+            "a reservation refusal is not a watchdog termination"
+        );
+        assert!(
+            !line.contains(AS_CHILD_MARKER_V1),
+            "the child's own marker must not leak into parent evidence"
+        );
+
+        // The child's single line fits the parent's existing stdout cap with room to spare.
+        let denial = as_denial_line();
+        assert_eq!(denial.matches('\n').count(), 1);
+        assert!(
+            denial.len() < MAX_CHILD_STDOUT_BYTES,
+            "the one denial line must fit the bounded pipe cap: {} bytes",
+            denial.len()
+        );
+    }
+
+    /// `N083-03`: the one fixed request really is larger than the whole address-space ceiling, and
+    /// the fixed supervision deadline is the required 15 000 ms.
+    ///
+    /// The values are read through a function so the assertion compares observed runtime values
+    /// rather than restating compile-time literals.
+    #[test]
+    fn n083_03_the_fixed_request_exceeds_the_whole_address_space_ceiling() {
+        let (ceiling, request, deadline) = fixed_as_profile_v1();
+        assert!(
+            request > ceiling,
+            "the single reservation must exceed the whole ceiling: {request} vs {ceiling}"
+        );
+        assert_eq!(
+            request - ceiling,
+            268_435_456,
+            "the request clears the whole 512 MiB ceiling by 256 MiB"
+        );
+        assert_eq!(deadline, 15_000, "the supervision deadline is 15 000 ms");
+    }
+
+    /// The fixed numbers this negative rests on, read at runtime by the pure case above.
+    fn fixed_as_profile_v1() -> (u64, u64, u64) {
+        (PROFILE_V1_AS_BYTES, AS_REQUEST_BYTES_V1, AS_DEADLINE_MS)
     }
 }

@@ -49,6 +49,14 @@ const WALL_MIN_ELAPSED_MS: u64 = 1_500;
 #[cfg(target_os = "linux")]
 const WALL_MAX_ELAPSED_MS: u64 = 10_000;
 
+/// The exact over-ceiling capacity the reservation child requests, in bytes (768 MiB).
+#[cfg(target_os = "linux")]
+const AS_REQUEST_BYTES: u64 = 805_306_368;
+
+/// The parent's fixed supervision deadline for the reservation refusal, in milliseconds.
+#[cfg(target_os = "linux")]
+const AS_DEADLINE_MS: u64 = 15_000;
+
 /// One bounded observation of one real invocation.
 struct Run {
     exit_code: Option<i32>,
@@ -565,6 +573,210 @@ fn n081_05_both_wall_modes_are_unsupported_before_any_child_exists() {
         assert!(
             observed.stdout.is_empty(),
             "no Linux termination may be claimed on this host: {mode}"
+        );
+        assert_eq!(
+            observed.stderr, "error: MEDIA_HOST_PROBE_REFUSED: HOST_UNSUPPORTED\n",
+            "the {mode} mode must name HOST_UNSUPPORTED"
+        );
+    }
+}
+
+/// `N083-01`: the real parent starts exactly one pre-exec-limited child, the child verifies its own
+/// four ceiling halves and its group identity, makes **one** 768 MiB fallible capacity reservation,
+/// the kernel refuses it, the child exits zero, that leader is reaped, and the parent emits one
+/// validated bounded record — all strictly inside the 15 000 ms deadline.
+#[cfg(target_os = "linux")]
+#[test]
+fn n083_01_the_child_reserves_over_the_ceiling_and_is_refused() {
+    let observed = run(&["--internal-media-host-probe-v1", "as-parent"]);
+    assert!(
+        !observed.timed_out,
+        "the negative must finish inside the case budget"
+    );
+    assert_eq!(
+        observed.exit_code,
+        Some(0),
+        "the negative itself must succeed: stdout={:?} stderr={:?}",
+        observed.stdout,
+        observed.stderr
+    );
+    assert!(
+        observed.stderr.is_empty(),
+        "a proven refusal says nothing on stderr"
+    );
+    assert!(
+        observed.stdout.starts_with("media_host_as=limit_enforced "),
+        "the marker must state enforcement: {:?}",
+        observed.stdout
+    );
+    assert!(observed.stdout.ends_with('\n'));
+    assert_eq!(
+        observed.stdout.matches('\n').count(),
+        1,
+        "exactly one evidence line, never a partial one first"
+    );
+    assert!(
+        !observed.stdout.contains("media_host_probe=accepted"),
+        "a refused reservation must never be reported as an accepted run"
+    );
+    assert!(
+        !observed.stdout.contains("media_host_wall=terminated"),
+        "a reservation refusal is not a watchdog termination"
+    );
+    assert!(
+        !observed.stdout.contains("SOLO-MEDIA-HOST-AS-V1"),
+        "the child's own marker must not leak into parent evidence"
+    );
+
+    let fields = evidence_fields(&observed.stdout);
+    report_observation("n083_as", &observed.stdout);
+    assert_eq!(
+        fields.len(),
+        10,
+        "the marker plus nine fixed fields: {fields:?}"
+    );
+    assert_eq!(fields[0].0, "media_host_as");
+    assert_eq!(fields[0].1, "limit_enforced");
+
+    // The child's own kernel readback, re-checked by the parent, at full width.
+    assert_eq!(numeric(&fields, "as_soft"), PROFILE_AS_BYTES);
+    assert_eq!(numeric(&fields, "as_hard"), PROFILE_AS_BYTES);
+    assert_eq!(numeric(&fields, "cpu_soft"), PROFILE_CPU_SECONDS);
+    assert_eq!(numeric(&fields, "cpu_hard"), PROFILE_CPU_SECONDS);
+    assert!(
+        observed
+            .stdout
+            .contains("as_soft=536870912 as_hard=536870912 cpu_soft=10 cpu_hard=10 "),
+        "every value must be printed at full width: {}",
+        observed.stdout
+    );
+
+    // The one request really is larger than the whole ceiling, and its refusal is literal.
+    let request_bytes = numeric(&fields, "request_bytes");
+    assert_eq!(request_bytes, AS_REQUEST_BYTES);
+    assert!(
+        request_bytes > numeric(&fields, "as_soft"),
+        "the single request must exceed the child's own address-space ceiling"
+    );
+    assert!(
+        observed
+            .stdout
+            .contains("request_bytes=805306368 reserve=denied "),
+        "the literal refusal result must be present: {}",
+        observed.stdout
+    );
+
+    let pid = numeric(&fields, "pid");
+    let pgid = numeric(&fields, "pgid");
+    assert!(pid > 0, "the child reports its own pid");
+    assert_eq!(
+        pgid, pid,
+        "setsid must have made the child its own process-group leader"
+    );
+
+    let wall_ms = numeric(&fields, "wall_ms");
+    assert!(
+        wall_ms < AS_DEADLINE_MS,
+        "the refusal must be decided strictly inside the 15 000 ms deadline: {wall_ms}"
+    );
+}
+
+/// `N083-02`: a direct, unsupervised reservation child refuses from the **prior** limit/group check,
+/// promptly, with no output at all, and never reaches the 768 MiB request.
+#[cfg(target_os = "linux")]
+#[test]
+fn n083_02_a_direct_as_child_refuses_before_the_reservation() {
+    let direct = run(&["--internal-media-host-probe-v1", "as-child"]);
+    assert!(
+        !direct.timed_out,
+        "an unsupervised reservation child must exit promptly"
+    );
+    assert!(
+        direct.elapsed_ms < 5_000,
+        "it must refuse from its own limit check, not from a deadline: {} ms",
+        direct.elapsed_ms
+    );
+    assert!(
+        direct.stdout.is_empty(),
+        "no denial line without the installed limits: {:?}",
+        direct.stdout
+    );
+    assert_eq!(direct.stderr, "", "the child prints nothing at all");
+    let code = direct
+        .exit_code
+        .expect("the child must exit with a status, not a signal");
+    report_observation("n083_direct_as_child", &format!("exit={code}"));
+    assert!(
+        matches!(code, 71..=74),
+        "the child's own verification refusal is one of its four fixed statuses: {code}"
+    );
+}
+
+/// `N083-03`: both new modes are closed and additive on either host, and every malformed, extra,
+/// repeated or misplaced token is the same typed refusal rather than a fall-through.
+#[test]
+fn n083_03_every_wrong_reservation_token_is_refused_by_the_real_binary() {
+    let cases = [
+        vec!["--internal-media-host-probe-v1", "as"],
+        vec!["--internal-media-host-probe-v1", "AS-PARENT"],
+        vec!["--internal-media-host-probe-v1", "as_child"],
+        vec!["--internal-media-host-probe-v1", "as-parent", "as-parent"],
+        vec!["--internal-media-host-probe-v1", "as-child", "extra"],
+        vec!["--internal-media-host-probe-v1", "as-parent", "as-child"],
+        vec!["--internal-media-host-probe-v1"],
+    ];
+    for args in cases {
+        let observed = run(&args);
+        assert!(!observed.timed_out, "{args:?} must not hang");
+        assert_eq!(observed.exit_code, Some(3), "{args:?} must refuse");
+        assert!(
+            observed.stdout.is_empty(),
+            "a refusal never emits evidence: {args:?}"
+        );
+        assert_eq!(
+            observed.stderr, "error: MEDIA_HOST_PROBE_REFUSED: INTERNAL_MODE_INVALID\n",
+            "{args:?} must name its own closed refusal"
+        );
+    }
+
+    // The reservation tokens are not reachable behind a public subcommand either.
+    let hidden = run(&[
+        "bootstrap-preflight",
+        "--internal-media-host-probe-v1",
+        "as-parent",
+    ]);
+    assert!(!hidden.timed_out);
+    assert_ne!(
+        hidden.stdout.as_str(),
+        "media_host_as=limit_enforced",
+        "a public subcommand must never reach the reservation parent"
+    );
+}
+
+/// `N083-04`: on a host without the approved pre-exec boundary both reservation modes refuse before
+/// any child exists and without attempting a reservation, and no Linux-only case can run here.
+#[cfg(not(target_os = "linux"))]
+#[test]
+fn n083_04_both_reservation_modes_are_unsupported_before_any_child_exists() {
+    for mode in ["as-parent", "as-child"] {
+        let observed = run(&["--internal-media-host-probe-v1", mode]);
+        assert!(!observed.timed_out, "{mode} must not hang");
+        assert!(
+            observed.elapsed_ms < 10_000,
+            "a refusal is prompt and never waits for a deadline: {mode}"
+        );
+        assert_eq!(
+            observed.exit_code,
+            Some(3),
+            "the {mode} mode must refuse on this host"
+        );
+        assert!(
+            observed.stdout.is_empty(),
+            "no reservation may be claimed on this host: {mode}"
+        );
+        assert!(
+            !observed.stdout.contains("media_host_as=limit_enforced"),
+            "no enforcement record without a real kernel denial: {mode}"
         );
         assert_eq!(
             observed.stderr, "error: MEDIA_HOST_PROBE_REFUSED: HOST_UNSUPPORTED\n",
