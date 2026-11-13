@@ -2,9 +2,14 @@
 //!
 //! This is the boundary that `SOLO-WO-074 R01` reserved and `SOLO-WO-076 R01` filled: a private
 //! seam that observes the calling process's **existing** address-space and CPU ceilings through
-//! the real kernel. It is deliberately not a supervisor. There is no child process, no limit
-//! mutation, no signal, no session, no handle and no output protocol here — only two `getrlimit`
-//! observations with compile-time-fixed selectors.
+//! the real kernel. `SOLO-WO-085 R01` added the fixed child's own process-group readback and
+//! `SOLO-WO-087 R01` adds one read-only group **and** session identity query, so a trusted child can
+//! attest its own identity and the owning parent can independently observe the same identities of
+//! its live, directly owned child.
+//!
+//! It is deliberately not a supervisor. There is no descendant, no limit mutation, no signal, no
+//! process-tree sweep, no handle cache and no output protocol here — only `getrlimit`, `getpgid`
+//! and `getsid` observations with compile-time-fixed selectors and a caller-validated target.
 //!
 //! Everything, including `use libc`, sits inside a positively `#[cfg(target_os = "linux")]`-gated
 //! module, and every `unsafe` block carries an adjacent `// SAFETY:` rationale, so both the AST
@@ -207,6 +212,89 @@ mod linux {
         Ok(group as u32)
     }
 
+    /// Why a process-group or session identity could not be observed.
+    ///
+    /// Closed and typed, like the refusals above: it carries no `errno`, no path, no process
+    /// metadata and no OS error text, so nothing host-specific can reach an operator through it.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub(crate) enum NativeIdentityRefusalV1 {
+        /// The caller's target was zero, negative or not representable as a kernel `pid_t`.
+        ProcessIdNotRepresentable,
+        /// The `getpgid` query did not report a valid, positive group identity.
+        ProcessGroupUnreadable,
+        /// The `getsid` query did not report a valid, positive session identity.
+        SessionUnreadable,
+    }
+
+    /// One read-only identity observation: the group and session the kernel reports for a target.
+    ///
+    /// Both fields are positive kernel identifiers that were validated **before** conversion, so a
+    /// caller never sees a zero or a wrapped negative value presented as an identity.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub(crate) struct ProcessIdentityV1 {
+        /// The process-group id the kernel reported for the target.
+        pub(crate) group: u32,
+        /// The session id the kernel reported for the target.
+        pub(crate) session: u32,
+    }
+
+    /// Converts a caller's target into the `pid_t` the kernel queries accept.
+    ///
+    /// `None` is the kernel's own "the calling process" selector (`0`), which is the only form the
+    /// fixed trusted child may use. `Some(pid)` must be a positive value a `pid_t` can represent:
+    /// a zero, or a value wider than `pid_t`, is refused **before** any call, so a wrapped negative
+    /// pid can never be handed to the kernel and no caller can name an arbitrary unrepresentable
+    /// process.
+    fn pid_target(target: Option<u32>) -> Result<libc::pid_t, NativeIdentityRefusalV1> {
+        match target {
+            None => Ok(0),
+            Some(pid) => match libc::pid_t::try_from(pid) {
+                Ok(converted) if converted > 0 => Ok(converted),
+                _ => Err(NativeIdentityRefusalV1::ProcessIdNotRepresentable),
+            },
+        }
+    }
+
+    /// Observes the process-group and session identity of `target`, read-only.
+    ///
+    /// `None` asks the kernel about the calling process itself and is used only by the fixed,
+    /// trusted child. `Some(pid)` names one exact positive pid that only this parent's own
+    /// `Child::id()` can supply, and is used only by the fixed parent while that child is alive.
+    ///
+    /// Nothing here mutates state: `getpgid` and `getsid` are pure observations. No signal, no
+    /// `waitpid`, no `pidfd`, no `fork` and no process-group or session control is reachable from
+    /// this module, and each kernel status is checked before any result is converted.
+    pub(crate) fn observe_process_identity_v1(
+        target: Option<u32>,
+    ) -> Result<ProcessIdentityV1, NativeIdentityRefusalV1> {
+        let pid = pid_target(target)?;
+
+        // SAFETY: `getpgid` is a read-only query. It takes one `pid_t` that was just validated as
+        // either the kernel's own `0` selector or a positive, representable pid; it writes through
+        // no pointer, allocates nothing, mutates no process state and cannot fault. A negative
+        // return is the kernel's error report and becomes the closed refusal below rather than
+        // being cast, so no fabricated group identity can leave this function.
+        let group = unsafe { libc::getpgid(pid) };
+        if group <= 0 {
+            return Err(NativeIdentityRefusalV1::ProcessGroupUnreadable);
+        }
+
+        // SAFETY: `getsid` is the same shape of read-only query for the session identity: one
+        // already validated `pid_t`, no pointer, no allocation, no state mutation and no fault. Its
+        // negative return is likewise the kernel's error report, checked before conversion, so a
+        // rejected call can never become a session identity.
+        let session = unsafe { libc::getsid(pid) };
+        if session <= 0 {
+            return Err(NativeIdentityRefusalV1::SessionUnreadable);
+        }
+
+        let group =
+            u32::try_from(group).map_err(|_| NativeIdentityRefusalV1::ProcessGroupUnreadable)?;
+        let session =
+            u32::try_from(session).map_err(|_| NativeIdentityRefusalV1::SessionUnreadable)?;
+        Ok(ProcessIdentityV1 { group, session })
+    }
+
     #[cfg(test)]
     mod tests {
         use super::*;
@@ -276,5 +364,6 @@ mod linux {
 // caller-selected limit, no executable parameter and no Windows counterpart here.
 #[cfg(target_os = "linux")]
 pub(crate) use linux::{
-    install_linux_child_limits_v1, own_process_group_v1, read_limit_ceilings_v1,
+    install_linux_child_limits_v1, observe_process_identity_v1, own_process_group_v1,
+    read_limit_ceilings_v1,
 };

@@ -225,6 +225,36 @@ pub const CPU_TERMINATION_SIGNAL_SOFT_V1: i32 = 24;
 /// The Linux `SIGKILL` number: the kernel's signal at the **hard** `RLIMIT_CPU` ceiling.
 pub const CPU_TERMINATION_SIGNAL_HARD_V1: i32 = 9;
 
+/// The one fixed parent token of the live-child session attestation (`SOLO-WO-087 R01`).
+///
+/// Honoured only in second position behind [`INTERNAL_PROBE_FLAG_V1`], exactly like every earlier
+/// closed mode, so it can never be reached through a public subcommand.
+pub const INTERNAL_PROBE_SESSION_PARENT_TOKEN_V1: &str = "session-parent";
+
+/// The one fixed, trusted child token of the live-child session attestation.
+pub const INTERNAL_PROBE_SESSION_CHILD_TOKEN_V1: &str = "session-child";
+
+/// The child's single readiness marker: unambiguous and never reused by an earlier proof.
+pub const SESSION_CHILD_READY_MARKER_V1: &str = "SOLO-MEDIA-HOST-SESSION-V1";
+
+/// The parent's single evidence marker. It is distinct from every earlier result, so a live-child
+/// identity attestation can never be read as an accepted probe, a watchdog kill, a reservation
+/// refusal or a kernel CPU termination.
+pub const SESSION_EVIDENCE_MARKER_V1: &str = "media_host_session=live_attested";
+
+/// The fixed child's post-readiness sleep: **4 000 milliseconds** of plain wall time.
+///
+/// It burns no CPU, allocates no large memory, opens nothing, forks nothing and starts no thread.
+/// Its only purpose is to keep a descendant-free child alive long enough for the parent's own
+/// read-only kernel observation of a still-live handle. It is not a timeout or CPU-limit negative.
+pub const SESSION_CHILD_SLEEP_MS: u64 = 4_000;
+
+/// The fixed parent wall deadline of the session attestation: **15 000 milliseconds**.
+///
+/// Measured from before `spawn` to the completed leader reap, exactly like the positive and
+/// address-space deadlines, and well inside the integration case's own 20 000 ms budget.
+pub const SESSION_DEADLINE_MS: u64 = 15_000;
+
 /// The fixed `RLIMIT_AS` profile: 536 870 912 bytes (512 MiB), soft **and** hard.
 ///
 /// This is the single source of truth: the Linux pre-exec closure in
@@ -279,6 +309,21 @@ const CHILD_EXIT_RESERVE_GRANTED: u8 = 74;
 /// reported as kernel enforcement. It is Linux-only because only the Linux child can produce it.
 #[cfg(target_os = "linux")]
 const CHILD_EXIT_CPU_LOOP_RETURNED: u8 = 75;
+
+/// Child exit status: the session child's own kernel identity readback **failed**.
+///
+/// Only the Linux child can produce it. It means `getpgid`/`getsid` did not report a usable
+/// identity, so nothing was proved and no readiness line may be written.
+#[cfg(target_os = "linux")]
+const CHILD_EXIT_SESSION_READBACK_FAILED: u8 = 76;
+
+/// Child exit status: the session child is **not** its own process-group and session leader.
+///
+/// This is the expected result of a direct, unsupervised `session-child` invocation: without the
+/// pre-exec installer no `setsid` ran, so the kernel reports the inherited group and session. The
+/// child refuses promptly, before its sleep and before any output.
+#[cfg(target_os = "linux")]
+const CHILD_EXIT_SESSION_MISMATCH: u8 = 77;
 
 /// The closed refusal vocabulary of the limit smoke probe.
 ///
@@ -366,6 +411,10 @@ pub enum InternalProbeModeV1 {
     CpuParent,
     /// Run the one fixed child that burns CPU until the kernel ends it.
     CpuChild,
+    /// Run the one fixed supervising parent of the live-child session attestation.
+    SessionParent,
+    /// Run the one fixed, trusted child that attests its own kernel session identity and sleeps.
+    SessionChild,
 }
 
 /// What the composition root must emit for an internal mode, and with which exit status.
@@ -412,6 +461,10 @@ pub fn classify_internal_arguments_v1(
         Ok(InternalProbeModeV1::CpuParent)
     } else if mode == OsStr::new(INTERNAL_PROBE_CPU_CHILD_TOKEN_V1) {
         Ok(InternalProbeModeV1::CpuChild)
+    } else if mode == OsStr::new(INTERNAL_PROBE_SESSION_PARENT_TOKEN_V1) {
+        Ok(InternalProbeModeV1::SessionParent)
+    } else if mode == OsStr::new(INTERNAL_PROBE_SESSION_CHILD_TOKEN_V1) {
+        Ok(InternalProbeModeV1::SessionChild)
     } else {
         Err(SmokeRefusalV1::InternalModeInvalid)
     }
@@ -1045,6 +1098,231 @@ fn cpu_evidence_line(termination: CpuTerminationV1) -> String {
     )
 }
 
+/// The fixed child's own identity attestation, parsed strictly from its one readiness line.
+///
+/// It carries the four ceiling halves the child read back plus its own kernel `pid`, `pgid` and
+/// `sid`. Nothing here is trusted on its own: the parent re-checks every value against its own
+/// kernel observation and the compile-time profile before any evidence can be emitted.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SessionChildObservationV1 {
+    /// The child's `RLIMIT_AS` soft ceiling, in bytes.
+    pub address_space_soft: u64,
+    /// The child's `RLIMIT_AS` hard ceiling, in bytes.
+    pub address_space_hard: u64,
+    /// The child's `RLIMIT_CPU` soft ceiling, in seconds.
+    pub cpu_soft: u64,
+    /// The child's `RLIMIT_CPU` hard ceiling, in seconds.
+    pub cpu_hard: u64,
+    /// The child's own process id, as the child reported it.
+    pub pid: u64,
+    /// The child's own process-group id, which `setsid` must have made equal to `pid`.
+    pub pgid: u64,
+    /// The child's own session id, which `setsid` must have made equal to `pid`.
+    pub sid: u64,
+}
+
+/// Parses the session child's single readiness line, strictly.
+///
+/// Accepted form, exactly one line and nothing else:
+///
+/// ```text
+/// SOLO-MEDIA-HOST-SESSION-V1 as_soft=<u64> as_hard=<u64> cpu_soft=<u64> cpu_hard=<u64> pid=<u64> pgid=<u64> sid=<u64>
+/// ```
+///
+/// The marker, the seven field names and their order are fixed; every value is plain ASCII decimal
+/// digits with no sign, no prefix, no separator and no whitespace; a single trailing newline is
+/// required and a second line, a carriage return, a tab, a doubled space or any unknown,
+/// duplicated, missing or reordered field is refused. Identity values are judged by
+/// [`validate_session_child_v1`], so the same closed reader serves both hosts' neutral tests.
+///
+/// # Errors
+///
+/// [`SmokeRefusalV1::HostOutputInvalid`] for any shape defect.
+pub fn parse_session_child_readiness_v1(
+    text: &str,
+) -> Result<SessionChildObservationV1, SmokeRefusalV1> {
+    let body = text
+        .strip_suffix('\n')
+        .ok_or(SmokeRefusalV1::HostOutputInvalid)?;
+    if body.contains('\n') || body.contains('\r') || body.contains('\t') {
+        return Err(SmokeRefusalV1::HostOutputInvalid);
+    }
+
+    let tokens: Vec<&str> = body.split(' ').collect();
+    if tokens.len() != 8 || tokens[0] != SESSION_CHILD_READY_MARKER_V1 {
+        return Err(SmokeRefusalV1::HostOutputInvalid);
+    }
+
+    Ok(SessionChildObservationV1 {
+        address_space_soft: field_value(tokens[1], "as_soft=")?,
+        address_space_hard: field_value(tokens[2], "as_hard=")?,
+        cpu_soft: field_value(tokens[3], "cpu_soft=")?,
+        cpu_hard: field_value(tokens[4], "cpu_hard=")?,
+        pid: field_value(tokens[5], "pid=")?,
+        pgid: field_value(tokens[6], "pgid=")?,
+        sid: field_value(tokens[7], "sid=")?,
+    })
+}
+
+/// Validates the parsed child line against the fixed profile and its own three identities.
+///
+/// A child that reports anything but the compile-time ceilings and a strictly positive
+/// `pid == pgid == sid` has proved nothing, so it is refused with the same closed
+/// [`SmokeRefusalV1::HostLimitUnavailable`] the earlier limit proofs use for "the required fixed
+/// limits, or the required group identity, were not proved".
+///
+/// # Errors
+///
+/// [`SmokeRefusalV1::HostLimitUnavailable`] for any off-profile ceiling or non-identical identity.
+pub fn validate_session_child_v1(
+    observation: SessionChildObservationV1,
+) -> Result<SessionChildObservationV1, SmokeRefusalV1> {
+    let limits_match = observation.address_space_soft == PROFILE_V1_AS_BYTES
+        && observation.address_space_hard == PROFILE_V1_AS_BYTES
+        && observation.cpu_soft == PROFILE_V1_CPU_SECONDS
+        && observation.cpu_hard == PROFILE_V1_CPU_SECONDS;
+    let identity_match = observation.pid > 0
+        && observation.pgid == observation.pid
+        && observation.sid == observation.pid;
+    if !limits_match || !identity_match {
+        return Err(SmokeRefusalV1::HostLimitUnavailable);
+    }
+    Ok(observation)
+}
+
+/// The parent's raw, unvalidated material for one live-child session attestation.
+///
+/// It carries what the parent itself observed — its live-child kernel query, the two liveness
+/// readbacks around that query, the exit status, the reap and the wall time — plus the child's
+/// capped output. Nothing in it is evidence until [`validate_session_attempt_v1`] accepts it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SessionAttemptV1 {
+    /// The child's captured stdout bytes, or `None` when the reader failed, overflowed or panicked.
+    pub stdout: Option<Vec<u8>>,
+    /// The exact positive pid this parent's own `Child` handle reported at spawn.
+    pub child_pid: u64,
+    /// The kernel's `getpgid` answer for the still-live, directly owned child.
+    ///
+    /// `0` means no observation was made, because a real group id is always positive.
+    pub observed_pgid: u64,
+    /// The kernel's `getsid` answer for the same live child. `0` likewise means "not observed".
+    pub observed_sid: u64,
+    /// Whether `try_wait()` reported the child still running immediately **before** the query.
+    pub live_before: bool,
+    /// Whether `try_wait()` reported the child still running immediately **after** the query.
+    pub live_after: bool,
+    /// The leader's normal exit code, or `None` when it was signalled or unobservable.
+    pub exit_code: Option<i32>,
+    /// Whether the leader was actually reaped by this parent.
+    pub reaped: bool,
+    /// Whether this parent sent any signal to the leader. `true` can never become evidence.
+    pub parent_killed: bool,
+    /// The wall time the parent measured from before `spawn` to the completed leader reap.
+    pub wall_ms: u64,
+}
+
+/// The complete, validated live-child session attestation.
+///
+/// It only ever exists after the child exited normally with code zero, the leader was reaped
+/// without any kill by this parent, the child was proved alive both immediately before and
+/// immediately after the parent's own kernel query, the one readiness line parsed strictly, and
+/// every identity agreed with the parent's independent observation.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SessionAttestationV1 {
+    /// The child's four ceiling halves and its own three identities, re-checked by the parent.
+    pub observation: SessionChildObservationV1,
+    /// The process-group id the parent's own kernel query reported for the live child.
+    pub observed_pgid: u64,
+    /// The session id the same parent query reported.
+    pub observed_sid: u64,
+    /// Whether the leader was reaped. Always `true` in any value that exists.
+    pub reaped: bool,
+    /// The parent-measured wall time in milliseconds.
+    pub wall_ms: u64,
+}
+
+/// Validates one raw session attempt into accepted evidence, or refuses.
+///
+/// Every refusal path returns a typed refusal and therefore no evidence line at all: a kill by this
+/// parent, a missing reap, a signalled or non-zero exit, a child that was not proved alive at the
+/// observation, a measurement at or beyond the fixed deadline, unreadable or over-cap readiness
+/// bytes, an off-profile ceiling, a non-identical child identity, or any disagreement with the
+/// parent's own kernel observation.
+///
+/// # Errors
+///
+/// [`SmokeRefusalV1::HostExitAbnormal`] for a parent kill, an abnormal exit or a child not proved
+/// live; [`SmokeRefusalV1::HostReapFailed`] for a missing reap;
+/// [`SmokeRefusalV1::HostWallTimeout`] for an over-deadline measurement;
+/// [`SmokeRefusalV1::HostOutputInvalid`] for unreadable, over-cap, non-UTF-8 or off-schema bytes;
+/// otherwise [`SmokeRefusalV1::HostLimitUnavailable`].
+pub fn validate_session_attempt_v1(
+    attempt: SessionAttemptV1,
+) -> Result<SessionAttestationV1, SmokeRefusalV1> {
+    if attempt.parent_killed {
+        return Err(SmokeRefusalV1::HostExitAbnormal);
+    }
+    if !attempt.reaped {
+        return Err(SmokeRefusalV1::HostReapFailed);
+    }
+    if attempt.exit_code != Some(0) {
+        return Err(SmokeRefusalV1::HostExitAbnormal);
+    }
+    if !attempt.live_before || !attempt.live_after {
+        return Err(SmokeRefusalV1::HostExitAbnormal);
+    }
+    if attempt.wall_ms >= SESSION_DEADLINE_MS {
+        return Err(SmokeRefusalV1::HostWallTimeout);
+    }
+
+    let bytes = attempt.stdout.ok_or(SmokeRefusalV1::HostOutputInvalid)?;
+    let text = String::from_utf8(bytes).map_err(|_| SmokeRefusalV1::HostOutputInvalid)?;
+    let observation = validate_session_child_v1(parse_session_child_readiness_v1(&text)?)?;
+
+    // The child's reported pid must be the exact pid this parent's own handle gave, and the
+    // parent's independent kernel observation must agree with it on both identities.
+    let ids_agree = attempt.child_pid > 0
+        && observation.pid == attempt.child_pid
+        && attempt.observed_pgid > 0
+        && attempt.observed_sid > 0
+        && attempt.observed_pgid == observation.pgid
+        && attempt.observed_sid == observation.sid;
+    if !ids_agree {
+        return Err(SmokeRefusalV1::HostLimitUnavailable);
+    }
+
+    Ok(SessionAttestationV1 {
+        observation,
+        observed_pgid: attempt.observed_pgid,
+        observed_sid: attempt.observed_sid,
+        reaped: attempt.reaped,
+        wall_ms: attempt.wall_ms,
+    })
+}
+
+/// The one fixed live-attestation line, built only from an already validated attestation.
+///
+/// The marker states exactly what was proved — a live child observed at this check — and is
+/// distinct from every earlier result. `reaped` is written from the parent's own lifecycle value,
+/// never from any child text, so a child cannot author a reap or identity claim of its own.
+fn session_evidence_line(attestation: SessionAttestationV1) -> String {
+    format!(
+        "{SESSION_EVIDENCE_MARKER_V1} as_soft={} as_hard={} cpu_soft={} cpu_hard={} pid={} \
+         pgid={} sid={} observed_pgid={} observed_sid={} reaped={} wall_ms={}\n",
+        attestation.observation.address_space_soft,
+        attestation.observation.address_space_hard,
+        attestation.observation.cpu_soft,
+        attestation.observation.cpu_hard,
+        attestation.observation.pid,
+        attestation.observation.pgid,
+        attestation.observation.sid,
+        attestation.observed_pgid,
+        attestation.observed_sid,
+        u8::from(attestation.reaped),
+        attestation.wall_ms
+    )
+}
+
 /// Runs the reserved internal mode, if — and only if — the arguments ask for it.
 ///
 /// `None` means the reserved flag was absent, so the ordinary public CLI must run unchanged.
@@ -1059,6 +1337,8 @@ pub fn run_internal_media_host_probe_v1(args: &[OsString]) -> Option<InternalPro
         Ok(InternalProbeModeV1::AsChild) => Some(as_child_report()),
         Ok(InternalProbeModeV1::CpuParent) => Some(cpu_parent_report()),
         Ok(InternalProbeModeV1::CpuChild) => Some(cpu_child_report()),
+        Ok(InternalProbeModeV1::SessionParent) => Some(session_parent_report()),
+        Ok(InternalProbeModeV1::SessionChild) => Some(session_child_report()),
         Err(refusal) => Some(refusal_report(refusal)),
     }
 }
@@ -1230,6 +1510,31 @@ pub fn run_internal_cpu_attempt_v1() -> Result<CpuAttemptV1, SmokeRefusalV1> {
     Err(SmokeRefusalV1::HostUnsupported)
 }
 
+/// Runs the one fixed Linux live-child session attestation and returns its raw material.
+///
+/// On Linux this starts exactly one `session-child` of this executable under the **unchanged**
+/// pre-exec installer, observes that still-live, directly owned child's group and session through
+/// read-only kernel queries, waits for its normal exit and reaps it inside the fixed 15 000 ms
+/// deadline. On every other host it refuses before creating anything.
+///
+/// # Errors
+///
+/// Returns a [`SmokeRefusalV1`] for every launch, unobservable-status or failed-reap failure.
+#[cfg(target_os = "linux")]
+pub fn run_internal_session_attempt_v1() -> Result<SessionAttemptV1, SmokeRefusalV1> {
+    linux::run_session_probe()
+}
+
+/// Runs the one fixed Linux live-child session attestation, which this host cannot provide.
+///
+/// # Errors
+///
+/// Always [`SmokeRefusalV1::HostUnsupported`]; no child is created and no session query is made.
+#[cfg(not(target_os = "linux"))]
+pub fn run_internal_session_attempt_v1() -> Result<SessionAttemptV1, SmokeRefusalV1> {
+    Err(SmokeRefusalV1::HostUnsupported)
+}
+
 /// The address-space parent mode's whole result, as the composition root must print it.
 ///
 /// As with the wall negative, the validation happens here in the platform-neutral layer, so a
@@ -1316,6 +1621,51 @@ fn cpu_child_report() -> InternalProbeReportV1 {
     refusal_report(SmokeRefusalV1::HostUnsupported)
 }
 
+/// The session parent mode's whole result, as the composition root must print it.
+///
+/// As with the earlier proofs, the decision is made here in the platform-neutral layer, so a
+/// refusal — including a watchdog kill, a child that was not proved live at the observation, or a
+/// disagreement between the child's line and the parent's own kernel observation — is decided by
+/// ordinary checked code rather than by the platform branch.
+fn session_parent_report() -> InternalProbeReportV1 {
+    match run_internal_session_attempt_v1().and_then(validate_session_attempt_v1) {
+        Ok(attestation) => InternalProbeReportV1 {
+            exit_code: 0,
+            stdout: Some(session_evidence_line(attestation)),
+            stderr: None,
+        },
+        Err(refusal) => refusal_report(refusal),
+    }
+}
+
+/// The session child mode's whole result.
+///
+/// The child writes only its one readiness line to its own stdout, so this wrapper never carries a
+/// payload: a successful child returns with no line of its own to print, and a verification
+/// refusal is the child's own fixed status with no line either.
+#[cfg(target_os = "linux")]
+fn session_child_report() -> InternalProbeReportV1 {
+    match linux::run_session_child() {
+        Ok(()) => InternalProbeReportV1 {
+            exit_code: 0,
+            stdout: None,
+            stderr: None,
+        },
+        Err(code) => InternalProbeReportV1 {
+            exit_code: code,
+            stdout: None,
+            stderr: None,
+        },
+    }
+}
+
+/// The session child mode is refused on a host with no approved pre-exec boundary: no child is
+/// created, no session query is made and the fixed four-second sleep is never reached.
+#[cfg(not(target_os = "linux"))]
+fn session_child_report() -> InternalProbeReportV1 {
+    refusal_report(SmokeRefusalV1::HostUnsupported)
+}
+
 /// The one fixed accepted evidence line. Nothing is printed before it, and it is only built from
 /// an already validated observation.
 fn accepted_report(observation: SmokeObservationV1) -> InternalProbeReportV1 {
@@ -1359,16 +1709,20 @@ mod linux {
     use super::{
         AS_CHILD_MARKER_V1, AS_DEADLINE_MS, AS_DENIED_TOKEN_V1, AS_REQUEST_BYTES_V1, AsAttemptV1,
         CHILD_EXIT_CPU_LOOP_RETURNED, CHILD_EXIT_GROUP_MISMATCH, CHILD_EXIT_LIMITS_MISMATCH,
-        CHILD_EXIT_READBACK_FAILED, CHILD_EXIT_RESERVE_GRANTED, CHILD_OBSERVATION_MARKER_V1,
-        CPU_CHILD_READY_MARKER_V1, CPU_DEADLINE_MS, CpuAttemptV1, INTERNAL_PROBE_AS_CHILD_TOKEN_V1,
+        CHILD_EXIT_READBACK_FAILED, CHILD_EXIT_RESERVE_GRANTED, CHILD_EXIT_SESSION_MISMATCH,
+        CHILD_EXIT_SESSION_READBACK_FAILED, CHILD_OBSERVATION_MARKER_V1, CPU_CHILD_READY_MARKER_V1,
+        CPU_DEADLINE_MS, CpuAttemptV1, INTERNAL_PROBE_AS_CHILD_TOKEN_V1,
         INTERNAL_PROBE_CHILD_TOKEN_V1, INTERNAL_PROBE_CPU_CHILD_TOKEN_V1, INTERNAL_PROBE_FLAG_V1,
-        INTERNAL_PROBE_WALL_CHILD_TOKEN_V1, MAX_CHILD_STDERR_BYTES, MAX_CHILD_STDOUT_BYTES,
-        PROFILE_V1_AS_BYTES, PROFILE_V1_CPU_SECONDS, SMOKE_WALL_DEADLINE_MS, SmokeObservationV1,
-        SmokeRefusalV1, WALL_CHILD_READY_MARKER_V1, WALL_CHILD_SLEEP_MS, WALL_DEADLINE_MS,
-        WallAttemptV1, classify_child_exit_v1, parse_child_observation_v1, validate_observation_v1,
+        INTERNAL_PROBE_SESSION_CHILD_TOKEN_V1, INTERNAL_PROBE_WALL_CHILD_TOKEN_V1,
+        MAX_CHILD_STDERR_BYTES, MAX_CHILD_STDOUT_BYTES, PROFILE_V1_AS_BYTES, PROFILE_V1_CPU_SECONDS,
+        SESSION_CHILD_READY_MARKER_V1, SESSION_CHILD_SLEEP_MS, SESSION_DEADLINE_MS,
+        SMOKE_WALL_DEADLINE_MS, SessionAttemptV1, SmokeObservationV1, SmokeRefusalV1,
+        WALL_CHILD_READY_MARKER_V1, WALL_CHILD_SLEEP_MS, WALL_DEADLINE_MS, WallAttemptV1,
+        classify_child_exit_v1, parse_child_observation_v1, validate_observation_v1,
     };
     use crate::media_worker_host_native::{
-        install_linux_child_limits_v1, own_process_group_v1, read_limit_ceilings_v1,
+        install_linux_child_limits_v1, observe_process_identity_v1, own_process_group_v1,
+        read_limit_ceilings_v1,
     };
 
     /// How often the parent re-checks the single child. Small enough that the 15 000 ms deadline
@@ -1963,6 +2317,199 @@ mod linux {
                 return;
             }
         }
+    }
+
+    /// What the fixed 15 000 ms supervision decided about the one owned session child.
+    ///
+    /// The variants keep the possible outcomes apart so that only a normal, self-chosen exit can
+    /// ever carry a live attestation; a status this parent produced itself is recorded as such and
+    /// must be refused by the neutral validator.
+    enum SessionSupervision {
+        /// The child exited on its own before this parent's deadline; the value is its exit code.
+        Observed(Option<i32>),
+        /// The deadline expired: this parent signalled only its owned handle, and whether it reaped.
+        ParentKilled(bool),
+        /// Neither the status nor a clean reap could be observed, so nothing may be claimed.
+        Unobservable,
+    }
+
+    /// Supervises the one fixed `session-child` and hands back its raw, unvalidated material.
+    ///
+    /// The timer starts **before** `Command::spawn`, the child is launched through the unchanged
+    /// pre-exec installer, and the parent's own read-only kernel query is bracketed by two
+    /// `try_wait` readbacks of the same `Child` handle, so the observation is provably of a child
+    /// that was alive both immediately before and immediately after it. Only this parent's own
+    /// `Child` handle is ever signalled, and only as bounded cleanup of that leader on a refusal or
+    /// a deadline. No process group, descendant or foreign process is touched and no negative-pid
+    /// signal is ever constructed.
+    pub(super) fn run_session_probe() -> Result<SessionAttemptV1, SmokeRefusalV1> {
+        let executable =
+            std::env::current_exe().map_err(|_| SmokeRefusalV1::HostExecutableUnavailable)?;
+        if !executable.is_file() {
+            return Err(SmokeRefusalV1::HostExecutableUnavailable);
+        }
+
+        let mut command = Command::new(&executable);
+        command
+            .arg(INTERNAL_PROBE_FLAG_V1)
+            .arg(INTERNAL_PROBE_SESSION_CHILD_TOKEN_V1)
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+
+        // The same, unchanged pre-exec boundary: a new session and both ceilings before `exec`.
+        install_linux_child_limits_v1(&mut command);
+
+        let started = Instant::now();
+        let mut child = command.spawn().map_err(|_| SmokeRefusalV1::HostSpawnFailed)?;
+
+        // The one exact positive pid this parent may ever query: its own handle's id.
+        let handle_pid = child.id();
+        if handle_pid == 0 {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(SmokeRefusalV1::HostSpawnFailed);
+        }
+
+        let out_reader = child
+            .stdout
+            .take()
+            .map(|stream| std::thread::spawn(move || read_bounded(stream, MAX_CHILD_STDOUT_BYTES)));
+        let err_reader = child
+            .stderr
+            .take()
+            .map(|stream| std::thread::spawn(move || read_bounded(stream, MAX_CHILD_STDERR_BYTES)));
+
+        // Immediately before the query, the child must still be running.
+        let live_before = matches!(child.try_wait(), Ok(None));
+        // The read-only kernel observation of that still-live, directly owned child.
+        let observed = if live_before {
+            observe_process_identity_v1(Some(handle_pid)).ok()
+        } else {
+            None
+        };
+        // Immediately after the query, the same handle must still be running.
+        let live_after = matches!(child.try_wait(), Ok(None));
+
+        let deadline = Duration::from_millis(SESSION_DEADLINE_MS);
+        let outcome = loop {
+            match child.try_wait() {
+                // A normal, self-chosen exit before any kill by this parent.
+                Ok(Some(status)) => break SessionSupervision::Observed(status.code()),
+                Ok(None) => {}
+                Err(_) => {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    break SessionSupervision::Unobservable;
+                }
+            }
+            if started.elapsed() >= deadline {
+                // This parent's own watchdog expired. It signals only its owned handle and reaps
+                // the leader: that status is the parent's own and can never become evidence.
+                if child.kill().is_err() {
+                    let _ = child.wait();
+                    break SessionSupervision::Unobservable;
+                }
+                break match child.wait() {
+                    Ok(_) => SessionSupervision::ParentKilled(true),
+                    Err(_) => SessionSupervision::Unobservable,
+                };
+            }
+            std::thread::sleep(POLL_INTERVAL);
+        };
+        let wall_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
+
+        // Joined only after the leader is gone, so a live child's open pipe ends cannot block.
+        let stdout = join_reader(out_reader);
+        let _stderr = join_reader(err_reader);
+
+        let (observed_pgid, observed_sid) = match observed {
+            Some(identity) => (u64::from(identity.group), u64::from(identity.session)),
+            None => (0, 0),
+        };
+
+        match outcome {
+            SessionSupervision::Observed(code) => Ok(SessionAttemptV1 {
+                stdout: stdout.and_then(Result::ok),
+                child_pid: u64::from(handle_pid),
+                observed_pgid,
+                observed_sid,
+                live_before,
+                live_after,
+                exit_code: code,
+                reaped: true,
+                parent_killed: false,
+                wall_ms,
+            }),
+            SessionSupervision::ParentKilled(reaped) => Ok(SessionAttemptV1 {
+                stdout: stdout.and_then(Result::ok),
+                child_pid: u64::from(handle_pid),
+                observed_pgid,
+                observed_sid,
+                live_before,
+                live_after,
+                exit_code: None,
+                reaped,
+                parent_killed: true,
+                wall_ms,
+            }),
+            SessionSupervision::Unobservable => Err(SmokeRefusalV1::HostReapFailed),
+        }
+    }
+
+    /// The fixed session child: prove its own ceilings and its own session identity, then sleep.
+    ///
+    /// The four ceiling halves and the kernel's own `pid == pgid == sid` are verified **before** the
+    /// readiness line and before any sleep, so a direct, unsupervised invocation refuses promptly,
+    /// prints nothing and never reaches the four-second window. The child allocates no workload of
+    /// its own, opens nothing, forks nothing, starts no thread and installs no signal handler: it
+    /// writes one fixed line and then sleeps on its own thread.
+    pub(super) fn run_session_child() -> Result<(), u8> {
+        let readback = read_limit_ceilings_v1().map_err(|_| CHILD_EXIT_READBACK_FAILED)?;
+
+        let limits_match = readback.address_space.soft == PROFILE_V1_AS_BYTES
+            && readback.address_space.hard == PROFILE_V1_AS_BYTES
+            && readback.cpu.soft == PROFILE_V1_CPU_SECONDS
+            && readback.cpu.hard == PROFILE_V1_CPU_SECONDS;
+        if !limits_match {
+            return Err(CHILD_EXIT_LIMITS_MISMATCH);
+        }
+
+        let pid = u64::from(std::process::id());
+        if pid == 0 {
+            return Err(CHILD_EXIT_SESSION_READBACK_FAILED);
+        }
+        let identity =
+            observe_process_identity_v1(None).map_err(|_| CHILD_EXIT_SESSION_READBACK_FAILED)?;
+        let pgid = u64::from(identity.group);
+        let sid = u64::from(identity.session);
+        if pid != pgid || pid != sid {
+            return Err(CHILD_EXIT_SESSION_MISMATCH);
+        }
+
+        // One fixed readiness line, written and flushed before the sleep, so the parent can
+        // validate the child's own kernel answer while that child is still demonstrably alive.
+        let line = format!(
+            "{SESSION_CHILD_READY_MARKER_V1} as_soft={} as_hard={} cpu_soft={} cpu_hard={} \
+             pid={pid} pgid={pgid} sid={sid}\n",
+            readback.address_space.soft,
+            readback.address_space.hard,
+            readback.cpu.soft,
+            readback.cpu.hard
+        );
+        {
+            let mut stdout = std::io::stdout();
+            stdout
+                .write_all(line.as_bytes())
+                .and_then(|()| stdout.flush())
+                .map_err(|_| CHILD_EXIT_SESSION_READBACK_FAILED)?;
+        }
+
+        // The one fixed four-second window that keeps a descendant-free child alive for the
+        // parent's read-only observation: no CPU burn, no allocation stress and no descendants.
+        std::thread::sleep(Duration::from_millis(SESSION_CHILD_SLEEP_MS));
+
+        Ok(())
     }
 
     /// Reads at most `cap` bytes; one byte more is a refusal rather than a silent truncation.
@@ -3264,5 +3811,301 @@ mod tests {
             CPU_TERMINATION_SIGNAL_HARD_V1,
             WALL_DEADLINE_MS,
         )
+    }
+
+    /// The exact session readiness line the fixed child is required to write.
+    const WELL_FORMED_SESSION: &str = "SOLO-MEDIA-HOST-SESSION-V1 as_soft=536870912 as_hard=536870912 cpu_soft=10 cpu_hard=10 pid=4242 pgid=4242 sid=4242\n";
+
+    /// One raw attempt that a correct parent could have produced for that line.
+    fn session_attempt() -> SessionAttemptV1 {
+        SessionAttemptV1 {
+            stdout: Some(WELL_FORMED_SESSION.as_bytes().to_vec()),
+            child_pid: 4242,
+            observed_pgid: 4242,
+            observed_sid: 4242,
+            live_before: true,
+            live_after: true,
+            exit_code: Some(0),
+            reaped: true,
+            parent_killed: false,
+            wall_ms: 4_050,
+        }
+    }
+
+    /// `N087-03`: both new tokens are closed and additive on either host, and every malformed,
+    /// extra, repeated or misplaced token is the same typed refusal rather than a fall-through.
+    /// Every earlier mode must still classify exactly as it did before this proof existed.
+    #[test]
+    fn n087_03_the_session_tokens_are_closed_and_additive() {
+        for (token, mode) in [
+            ("session-parent", InternalProbeModeV1::SessionParent),
+            ("session-child", InternalProbeModeV1::SessionChild),
+            ("parent", InternalProbeModeV1::Parent),
+            ("child", InternalProbeModeV1::Child),
+            ("wall-parent", InternalProbeModeV1::WallParent),
+            ("wall-child", InternalProbeModeV1::WallChild),
+            ("as-parent", InternalProbeModeV1::AsParent),
+            ("as-child", InternalProbeModeV1::AsChild),
+            ("cpu-parent", InternalProbeModeV1::CpuParent),
+            ("cpu-child", InternalProbeModeV1::CpuChild),
+        ] {
+            assert_eq!(
+                classify_internal_arguments_v1(&argv(&[INTERNAL_PROBE_FLAG_V1, token])),
+                Ok(mode),
+                "`{token}` must classify unchanged"
+            );
+        }
+
+        for wrong in [
+            vec![INTERNAL_PROBE_FLAG_V1, "session"],
+            vec![INTERNAL_PROBE_FLAG_V1, "SESSION-PARENT"],
+            vec![INTERNAL_PROBE_FLAG_V1, "session_parent"],
+            vec![INTERNAL_PROBE_FLAG_V1, "session-parent", "session-parent"],
+            vec![INTERNAL_PROBE_FLAG_V1, "session-child", "extra"],
+            vec![INTERNAL_PROBE_FLAG_V1, "session-parent", "session-child"],
+            vec![INTERNAL_PROBE_FLAG_V1, " session-parent"],
+            vec![INTERNAL_PROBE_FLAG_V1, "session-child "],
+            vec![INTERNAL_PROBE_FLAG_V1],
+        ] {
+            assert_eq!(
+                classify_internal_arguments_v1(&argv(&wrong)),
+                Err(SmokeRefusalV1::InternalModeInvalid),
+                "must refuse {wrong:?}"
+            );
+        }
+
+        // Neither mode is reachable behind a public subcommand.
+        assert_eq!(
+            classify_internal_arguments_v1(&argv(&[
+                "bootstrap-preflight",
+                INTERNAL_PROBE_FLAG_V1,
+                "session-parent",
+            ])),
+            Ok(InternalProbeModeV1::NotRequested),
+            "the reserved flag is honoured only in second position"
+        );
+    }
+
+    /// `N087-03`: only the exact readiness line is accepted. Negative, zero, overflowing,
+    /// reordered, duplicated, extra, tabbed, doubled-space, CRLF, unterminated and foreign-marker
+    /// forms are all refused, and a well-formed but off-profile or non-identical line is refused by
+    /// the validator rather than the reader.
+    #[test]
+    fn n087_03_only_the_exact_session_readiness_line_is_accepted() {
+        let parsed =
+            parse_session_child_readiness_v1(WELL_FORMED_SESSION).expect("the fixed line parses");
+        assert_eq!(parsed.pid, 4242);
+        assert_eq!(parsed.pgid, 4242);
+        assert_eq!(parsed.sid, 4242);
+        assert_eq!(parsed.address_space_soft, PROFILE_V1_AS_BYTES);
+        assert_eq!(parsed.cpu_hard, PROFILE_V1_CPU_SECONDS);
+
+        let malformed = [
+            "SOLO-MEDIA-HOST-SESSION-V1 as_soft=536870912 as_hard=536870912 cpu_soft=10 cpu_hard=10 pid=4242 pgid=4242\n",
+            "SOLO-MEDIA-HOST-SESSION-V1 as_soft=536870912 as_hard=536870912 cpu_soft=10 cpu_hard=10 pid=4242 pgid=4242 sid=4242 sid=4242\n",
+            "SOLO-MEDIA-HOST-SESSION-V1 as_soft=536870912 as_hard=536870912 cpu_soft=10 cpu_hard=10 pid=4242 pgid=4242 sid=4242 extra=1\n",
+            "SOLO-MEDIA-HOST-SESSION-V1 as_soft=536870912 as_hard=536870912 cpu_soft=10 cpu_hard=10 pgid=4242 pid=4242 sid=4242\n",
+            "SOLO-MEDIA-HOST-SESSION-V1 as_soft=-536870912 as_hard=536870912 cpu_soft=10 cpu_hard=10 pid=4242 pgid=4242 sid=4242\n",
+            "SOLO-MEDIA-HOST-SESSION-V1 as_soft=+536870912 as_hard=536870912 cpu_soft=10 cpu_hard=10 pid=4242 pgid=4242 sid=4242\n",
+            "SOLO-MEDIA-HOST-SESSION-V1 as_soft=99999999999999999999999999 as_hard=536870912 cpu_soft=10 cpu_hard=10 pid=4242 pgid=4242 sid=4242\n",
+            "SOLO-MEDIA-HOST-SESSION-V1  as_soft=536870912 as_hard=536870912 cpu_soft=10 cpu_hard=10 pid=4242 pgid=4242 sid=4242\n",
+            "SOLO-MEDIA-HOST-SESSION-V1 as_soft=536870912\tas_hard=536870912 cpu_soft=10 cpu_hard=10 pid=4242 pgid=4242 sid=4242\n",
+            "SOLO-MEDIA-HOST-SESSION-V1 as_soft=536870912 as_hard=536870912 cpu_soft=10 cpu_hard=10 pid=4242 pgid=4242 sid=4242\r\n",
+            "SOLO-MEDIA-HOST-PROBE-V1 as_soft=536870912 as_hard=536870912 cpu_soft=10 cpu_hard=10 pid=4242 pgid=4242 sid=4242\n",
+            "SOLO-MEDIA-HOST-SESSION-V1 as_soft=536870912 as_hard=536870912 cpu_soft=10 cpu_hard=10 pid=4242 pgid=4242 sid=4242",
+        ];
+        for text in malformed {
+            assert_eq!(
+                parse_session_child_readiness_v1(text),
+                Err(SmokeRefusalV1::HostOutputInvalid),
+                "must refuse a shape defect"
+            );
+        }
+
+        let off_profile = [
+            "SOLO-MEDIA-HOST-SESSION-V1 as_soft=536870913 as_hard=536870912 cpu_soft=10 cpu_hard=10 pid=4242 pgid=4242 sid=4242\n",
+            "SOLO-MEDIA-HOST-SESSION-V1 as_soft=536870912 as_hard=536870912 cpu_soft=11 cpu_hard=10 pid=4242 pgid=4242 sid=4242\n",
+            "SOLO-MEDIA-HOST-SESSION-V1 as_soft=536870912 as_hard=536870912 cpu_soft=10 cpu_hard=10 pid=0 pgid=0 sid=0\n",
+            "SOLO-MEDIA-HOST-SESSION-V1 as_soft=536870912 as_hard=536870912 cpu_soft=10 cpu_hard=10 pid=4242 pgid=4243 sid=4242\n",
+            "SOLO-MEDIA-HOST-SESSION-V1 as_soft=536870912 as_hard=536870912 cpu_soft=10 cpu_hard=10 pid=4242 pgid=4242 sid=4243\n",
+        ];
+        for text in off_profile {
+            let parsed = parse_session_child_readiness_v1(text).expect("well formed");
+            assert_eq!(
+                validate_session_child_v1(parsed),
+                Err(SmokeRefusalV1::HostLimitUnavailable),
+                "must refuse an off-profile or non-identical line"
+            );
+        }
+    }
+
+    /// `N087-03`: a forged identity line alone is never accepted. The child's own claim only
+    /// becomes evidence when the parent's independent kernel observation of its still-live child
+    /// agrees with it, so an attestation cannot be manufactured from child text.
+    #[test]
+    fn n087_03_a_forged_session_line_is_never_accepted_without_a_live_observation() {
+        // The line parses and validates on its own ...
+        let parsed = parse_session_child_readiness_v1(WELL_FORMED_SESSION).expect("shape");
+        assert!(validate_session_child_v1(parsed).is_ok());
+
+        // ... but with no parent observation it is not evidence.
+        let mut unobserved = session_attempt();
+        unobserved.observed_pgid = 0;
+        unobserved.observed_sid = 0;
+        assert_eq!(
+            validate_session_attempt_v1(unobserved),
+            Err(SmokeRefusalV1::HostLimitUnavailable),
+            "a child's own claim cannot stand in for the parent's kernel observation"
+        );
+
+        // A disagreement between the two views is a refusal, in either identity.
+        let mut wrong_group = session_attempt();
+        wrong_group.observed_pgid = 4_243;
+        assert_eq!(
+            validate_session_attempt_v1(wrong_group),
+            Err(SmokeRefusalV1::HostLimitUnavailable)
+        );
+        let mut wrong_session = session_attempt();
+        wrong_session.observed_sid = 4_243;
+        assert_eq!(
+            validate_session_attempt_v1(wrong_session),
+            Err(SmokeRefusalV1::HostLimitUnavailable)
+        );
+
+        // A child whose pid is not the one this parent's handle reported is refused.
+        let mut wrong_handle = session_attempt();
+        wrong_handle.child_pid = 4_243;
+        assert_eq!(
+            validate_session_attempt_v1(wrong_handle),
+            Err(SmokeRefusalV1::HostLimitUnavailable),
+            "the line's pid must be the exact pid of the parent's own handle"
+        );
+
+        // The child must be proved alive on both sides of the query.
+        for (before, after) in [(false, true), (true, false), (false, false)] {
+            let mut attempt = session_attempt();
+            attempt.live_before = before;
+            attempt.live_after = after;
+            assert_eq!(
+                validate_session_attempt_v1(attempt),
+                Err(SmokeRefusalV1::HostExitAbnormal),
+                "a child not proved live across the observation is never evidence"
+            );
+        }
+    }
+
+    /// `N087-03`: every incomplete or abnormal lifecycle is refused, so only a normal zero exit of
+    /// a reaped leader, inside the fixed deadline, can produce the one evidence line.
+    #[test]
+    fn n087_03_every_incomplete_session_lifecycle_is_refused() {
+        let mut killed = session_attempt();
+        killed.parent_killed = true;
+        killed.exit_code = None;
+        assert_eq!(
+            validate_session_attempt_v1(killed),
+            Err(SmokeRefusalV1::HostExitAbnormal),
+            "a status this parent produced is never evidence"
+        );
+
+        let mut unreaped = session_attempt();
+        unreaped.reaped = false;
+        assert_eq!(
+            validate_session_attempt_v1(unreaped),
+            Err(SmokeRefusalV1::HostReapFailed)
+        );
+
+        for code in [None, Some(1), Some(71), Some(77)] {
+            let mut attempt = session_attempt();
+            attempt.exit_code = code;
+            assert_eq!(
+                validate_session_attempt_v1(attempt),
+                Err(SmokeRefusalV1::HostExitAbnormal),
+                "only a normal zero exit is accepted: {code:?}"
+            );
+        }
+
+        let mut at_deadline = session_attempt();
+        at_deadline.wall_ms = SESSION_DEADLINE_MS;
+        assert_eq!(
+            validate_session_attempt_v1(at_deadline),
+            Err(SmokeRefusalV1::HostWallTimeout),
+            "the measurement must be strictly inside the deadline"
+        );
+
+        let mut missing = session_attempt();
+        missing.stdout = None;
+        assert_eq!(
+            validate_session_attempt_v1(missing),
+            Err(SmokeRefusalV1::HostOutputInvalid)
+        );
+
+        let mut non_utf8 = session_attempt();
+        non_utf8.stdout = Some(vec![0xff, 0xfe, 0xfd]);
+        assert_eq!(
+            validate_session_attempt_v1(non_utf8),
+            Err(SmokeRefusalV1::HostOutputInvalid)
+        );
+
+        let mut over_cap = session_attempt();
+        over_cap.stdout = Some(vec![b'a'; 2_048]);
+        assert_eq!(
+            validate_session_attempt_v1(over_cap),
+            Err(SmokeRefusalV1::HostOutputInvalid)
+        );
+    }
+
+    /// `N087-03`: the one evidence line is fixed, bounded and never borrows an earlier proof's
+    /// wording, so a live-child identity attestation can never be misread as a different result.
+    #[test]
+    fn n087_03_the_session_evidence_line_is_fixed_and_bounded() {
+        let attestation =
+            validate_session_attempt_v1(session_attempt()).expect("a complete attempt is evidence");
+        let line = session_evidence_line(attestation);
+
+        assert!(
+            line.starts_with(SESSION_EVIDENCE_MARKER_V1),
+            "the marker must state exactly what was proved: {line:?}"
+        );
+        assert!(line.ends_with('\n'));
+        assert_eq!(
+            line.matches('\n').count(),
+            1,
+            "exactly one evidence line, never a partial one first"
+        );
+        let expected = [
+            "media_host_session=live_attested",
+            "as_soft=536870912",
+            "as_hard=536870912",
+            "cpu_soft=10",
+            "cpu_hard=10",
+            "pid=4242",
+            "pgid=4242",
+            "sid=4242",
+            "observed_pgid=4242",
+            "observed_sid=4242",
+            "reaped=1",
+            "wall_ms=4050",
+        ];
+        assert_eq!(
+            line.trim_end_matches('\n').split(' ').collect::<Vec<_>>(),
+            expected.to_vec(),
+            "the marker and the eleven fixed fields keep their exact order"
+        );
+
+        for foreign in [
+            "media_host_probe=accepted",
+            "media_host_wall=terminated",
+            "media_host_as=limit_enforced",
+            "media_host_cpu=kernel_terminated",
+            "SOLO-MEDIA-HOST-PROBE-V1",
+            "SOLO-MEDIA-HOST-WALL-V1",
+            "SOLO-MEDIA-HOST-AS-V1",
+            "SOLO-MEDIA-HOST-CPU-V1",
+        ] {
+            assert!(
+                !line.contains(foreign),
+                "the session record must not borrow {foreign}"
+            );
+        }
     }
 }
