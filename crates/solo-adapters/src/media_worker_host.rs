@@ -1512,6 +1512,30 @@ impl SessionReapV1 {
     }
 }
 
+/// Classifies the **one real** `Child::wait()` outcome of a supervised group leader.
+///
+/// This is the production boundary the group supervisor uses immediately after `child.wait()`, so
+/// the failed-wait decision is ordinary checked code rather than a branch buried in the supervisor.
+/// Only `Ok` yields a signal status; every `Err` becomes [`SmokeRefusalV1::HostReapFailed`], which is
+/// what prevents a failed reap from ever reaching a success attempt or a reader join.
+///
+/// Linux-only because reading a signal from a wait status needs the Unix extension trait; no
+/// Windows counterpart exists and none is authorized.
+///
+/// # Errors
+///
+/// [`SmokeRefusalV1::HostReapFailed`] for any failed wait.
+#[cfg(target_os = "linux")]
+fn group_wait_signal_v1(
+    waited: std::io::Result<std::process::ExitStatus>,
+) -> Result<Option<i32>, SmokeRefusalV1> {
+    use std::os::unix::process::ExitStatusExt;
+
+    waited
+        .map(|status| status.signal())
+        .map_err(|_| SmokeRefusalV1::HostReapFailed)
+}
+
 /// The terminal plan for one early-readiness refusal cleanup.
 ///
 /// This is the production decision rule for that path: it decides **both** whether the capped
@@ -3468,11 +3492,10 @@ mod linux {
             }
         })?;
 
-        // Only the kernel's own status of this parent's own handle can establish the leader reap.
-        let (leader_reaped, leader_signal) = match child.wait() {
-            Ok(status) => (true, status.signal()),
-            Err(_) => (false, None),
-        };
+        // Linux-only group supervision: a failed reap cannot become an Ok attempt.
+        let leader_signal = super::group_wait_signal_v1(child.wait())?;
+        // Only the observed successful wait can establish this fact.
+        let leader_reaped = true;
 
         // A disappearance is written with the earlier identity, because a recycled pid would instead
         // appear as a live or zombie record carrying a different start time, which is refused below.
@@ -3755,10 +3778,15 @@ mod linux {
                 if u64::from(identity.group) == pid && u64::from(identity.session) == pid)
             && live;
         if !ready {
+            // A join is permitted only behind a **confirmed** reap of this leader's own descendant
+            // handle. An unconfirmed wait must not be able to block this leader on an open pipe, so
+            // the same rule the parent applies to its leader applies here to the descendant.
             let _ = descendant.kill();
-            let _ = descendant.wait();
-            let _ = join_reader(out_reader);
-            let _ = join_reader(err_reader);
+            let reaped = descendant.wait().is_ok();
+            if reaped {
+                let _ = join_reader(out_reader);
+                let _ = join_reader(err_reader);
+            }
             return Err(CHILD_EXIT_GROUP_DESCENDANT_MISMATCH);
         }
 
@@ -6015,6 +6043,28 @@ mod tests {
         assert_eq!(
             validate_group_descendant_readiness_v1(descendant.as_bytes(), 4715, 4713),
             Err(SmokeRefusalV1::HostLimitUnavailable)
+        );
+    }
+
+    /// `N093-07`: the **same** classification helper production uses immediately after
+    /// `child.wait()` turns a failed reap into `HOST_REAP_FAILED`.
+    ///
+    /// This is a pure classification test of the real production rule: it injects an `io::Error` into
+    /// the helper rather than faking a kernel wait failure or altering `std::process::Child`, and it
+    /// proves the negative only. The successful path is proved by the real Linux group case.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn n093_07_a_failed_wait_classifies_as_a_reap_refusal() {
+        let failed = group_wait_signal_v1(Err(std::io::Error::other("reap failed")));
+        assert_eq!(
+            failed,
+            Err(SmokeRefusalV1::HostReapFailed),
+            "a failed wait must never yield a signal status"
+        );
+        assert_eq!(
+            SmokeRefusalV1::HostReapFailed.code(),
+            "HOST_REAP_FAILED",
+            "the classified refusal keeps its stable public token"
         );
     }
 }

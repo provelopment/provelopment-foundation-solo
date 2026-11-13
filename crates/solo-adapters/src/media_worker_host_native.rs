@@ -574,14 +574,18 @@ mod linux {
     }
 }
 
-// The three fixed entry points the safe façade consumes.
+// The fixed entry points the safe façade consumes.
 //
 // The implementation lives inside the positively Linux-gated `linux` module above, which keeps
-// every `unsafe` occurrence inside a provable gate; these re-exports only make the same three
-// fixed functions nameable from the rest of the crate. There is no general-purpose native API, no
-// caller-selected limit, no executable parameter and no Windows counterpart here.
+// every `unsafe` occurrence inside a provable gate; these re-exports only make the same fixed
+// items nameable from the rest of the crate. There is no general-purpose native API, no
+// caller-selected limit, no executable parameter and no Windows counterpart here: the two group
+// items are the owned-group termination request and the bounded `/proc` state observation that
+// `SOLO-WO-093 R01` added, and `SOLO-WO-094 R01` re-exports them so the façade's own imports
+// resolve on Linux.
 #[cfg(target_os = "linux")]
 pub(crate) use linux::{
-    install_linux_child_limits_v1, observe_process_identity_v1, own_process_group_v1,
-    read_limit_ceilings_v1,
+    GroupSignalRefusalV1, ProcessStateV1, install_linux_child_limits_v1,
+    observe_process_identity_v1, observe_process_state_v1, own_process_group_v1,
+    read_limit_ceilings_v1, terminate_owned_group_v1,
 };
