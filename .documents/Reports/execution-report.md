@@ -1,60 +1,60 @@
 # Execution Report
 
-**status=COMPLETE**
+**status=STOPPED**
 
-**Order:** `OWNER-ISSUED — SOLO-WO-096 R01` — close accepted WO-095 and select the next bounded R03.C image-inspection candidate. **Matching Owner activation:** `SOLO-WO-096 R01`. **Required outcome:** `WO-095-CLOSED-R03C-IMAGE-INSPECTION-NEXT-SELECTED` — **pending independent Chief Master Architect review**. No self-acceptance is claimed.
+**Order:** `OWNER-ISSUED — SOLO-WO-097 R01` — confined Entity PNG/JPEG/WebP image-byte inspection. **Required outcome:** `R03C-CONFINED-PNG-JPEG-WEBP-IMAGE-INSPECTION-VERIFIED` — **not achieved.** No acceptance is claimed, no gate was weakened, and no completion is implied.
 
-**Nature of this run: administrative closure and four-slot WIP reconciliation only.** No code, test, fixture, asset, manifest, dependency, toolchain, workflow, guard, licence, release, deployment or provider change. The next candidate is a **non-executable proposal**; nothing in `R03.C` was implemented, and no implementation permission is conferred.
+## 1. What was verified before any write
 
-## 1. Baseline verified before any permanent write
+Preflight at `b6b4df924745a2e6c304d50b85bbf07af1be0f24` matched every pinned identity: tree `a8fb73859bab3c27a9bfcebfcf96708a2087ebbe`, sole parent `49df191f…`, neutral ACTIVE `2ef2db63…`, NEXT `12ecc6d1…`, ROADMAP `9d7a8622…`, OUTLOOK `cb9c7a61…`, report `dc61e06d…`, Architecture `c941c7f9…`, both SOPs, `Cargo.toml` `14505be4…`, `Cargo.lock` `b1ee56da…`, toolchain `9ec55b3b…`, workflow `e1b5ca6e…`, checker entry `0bad0e02…`, `graphic_asset_read.rs` `6499421d…`, the AVIF port `crates/solo-application/src/media_worker.rs` `13811c58…` (the order's "AVIF-port" row resolves to this path and blob exactly), the façade `7eed6e15…`, native `eacf51c5…`, smoke `22ee67e9…`; one worktree, one `origin`, empty stash, four WIP files, 14 remote refs, `solo-wo-097-negative-r01` absent. Only ` M .documents/WIP/workorder-active.md` was dirty.
 
-| Item | Required | Observed |
+**Dependency audit (SOP §7B(e1/e2)).** `image =0.25.10` exists, is not yanked, is `MIT OR Apache-2.0`, MSRV 1.88.0 (toolchain 1.99.1). Its added graph is additive only: adler2 2.0.1, autocfg 1.5.1, bytemuck 1.25.2, byteorder-lite 0.1.0, cfg-if 1.0.5, crc32fast 1.5.5, fdeflate 0.3.7, flate2 1.1.5, image-webp 0.2.4, miniz_oxide 0.8.9, moxcms 0.8.1, num-traits 0.2.19, png 0.18.1, pfxm 0.1.30, quick-error 2.0.1, simd-adler32 0.3.10, zune-core 0.5.3, zune-jpeg 0.5.15. Every licence has an allowed alternative (`Unlicense OR MIT`, `Zlib OR Apache-2.0 OR MIT`, `BSD-3-Clause OR Apache-2.0` all satisfied by the existing allow list). Only two RustSec entries exist for `image` (`RUSTSEC-2019-0014` patched `>=0.21.3`, `RUSTSEC-2020-0073` patched `>=0.23.12`); neither applies to 0.25.10. `flate2` was pinned to 1.1.5 so the graph keeps **one** `miniz_oxide` (0.8.9), satisfying `multiple-versions = "deny"`; the CI security gate confirmed advisories, bans, licenses and sources independently at B4.
+
+## 2. Commits (all pushed to `main`)
+
+| # | SHA | Result |
 | --- | --- | --- |
-| `HEAD`/`main`/`origin/main`/`ls-remote main` | `2883e57d302cc3ce7d01556ef6587596e15afb23` | exact |
-| tree / sole parent | `0ff781194c6fc428434418504ef3aff1d86205e4` / `eedffc76408db8ecbd59f4d72d6dc635e030e7e2` | exact |
-| tracked ACTIVE (WO-095) | `18826717b609209e0b1aefbd92239024fb858c40` | exact |
-| NEXT / ROADMAP / OUTLOOK | `92fa562b1af0c54391851aa5c79deb1631127069` / `9d7a86226878f490fd5e26c6813a81e5f73f3f37` / `cb9c7a610cf3c537557e060ca9656e44a053e69d` | exact |
-| report / Architecture / workflow | `9eebd358282ac8354ccea1143b56135b482566da` / `c941c7f90cc1b1955f9d60b348a3b1092cafe97f` / `e1b5ca6e1738a5d5129a8788e24d51aee02421d1` | exact |
-| `Cargo.lock` / `rust-toolchain.toml` | `b1ee56da60f36536548586528db371b7cbe508e4` / `9ec55b3b621dbc75fc68817cd51b96e407d3c94c` | exact |
-| integrated `media_worker_host.rs` / `_native.rs` / `_smoke.rs` | `7eed6e158c9374a6c2055ddd98dd3287357b814a` / `eacf51c5353ab3278969961aa136a0951cb7ad67` / `22ee67e94cc96a70e8e3a47db9e575464b53cd07` | exact |
+| A | `e7de2e11509488b813f29a03e25a75f7c474a05d` | **green** — run `43430492911`, Ubuntu `131902466649`, Windows `131902466167`; ACTIVE `66f5d61a…` (Owner bytes, unmodified), NEXT neutral `92fa562b…`, five disclosed Owner hard-break whitespace findings, nothing else |
+| B | `24ea561ecbe545cddeac921f4f313b49fee02314` | **red** — run `43435300870`, strict lint on both hosts |
+| B2 | `63190e7100cb7d9cfb07497e414bcf3a6761a65d` | **red** — run `43435752257` |
+| B3 | `0d00c6cec0f7c1eb8f61dd01b4984c0cfe64dd01` | **red** — run `43436065749` |
+| B4 | `816680fc469bc906afbc31ecaae871359247be9b` | **red** — run `43436576617`, Ubuntu `131923125576`, Windows `131923125999`, both failing at *Strict lint (warnings are errors)* |
 
-One worktree, one `origin` (fetch and push both `https://github.com/provelopment/provelopment-foundation-solo.git`), empty stash, no pending merge/rebase/cherry-pick, exactly four `.documents/WIP/` files and no subdirectory, and the only dirty path the complete Owner-installed ` M .documents/WIP/workorder-active.md` (WO-096, blob `b23c2a6adebb4794fd058360f36bcedfc376ab32`, preserved byte-for-byte — never normalized, shortened or substituted). All 14 remote refs matched their pinned identities, including `solo-wo-093-r01 = 0dc45185110e6136bd63dc7edf774bc52b753c9e`, `solo-wo-094-negative-r01 = 0e9b3677cf774b9e31ac8fc52605e88112522be6`, stopped `solo-wo-089-r01 = 1236915cab6e87b17ce84813430897b273fc3230` and accepted `solo-wo-090-r01 = 0eb3fcf645851ae752bd59e12fe32b69604197d2`.
+## 3. The blocker, precisely
 
-**Closure basis.** The Chief Master Architect independently **ACCEPTED** `SOLO-WO-095 R01` at `2883e57d…`. That order integrated, as exact accepted Git blobs, one **bounded Linux process-group/descendant lifecycle harness** — a prerequisite, not complete AVIF correctness, decoder confinement, platform-catalogue delivery, whole-candidate validation or publication. Consequently `R03.C3`, `R03.C` and Stage 03 stay **OPEN**. The ROADMAP already states only the unfinished composite `R03.C` package, and no independently finished ROADMAP line could be removed without losing outstanding requirements, so **ROADMAP remains byte-identical** rather than carrying completion commentary or premature truncation. **OUTLOOK also remains byte-identical.** The historical STOPPED `SOLO-WO-093 R01` and `SOLO-WO-089 R01` are never rehabilitated.
+The workspace **compiles** (format, locked fetch and the component security gate all passed at B4), but the new adapter does not pass strict lint. The last exact-head run reports **29 errors**, dominated by one structural defect:
 
-## 2. Commit A — issued-order record
+- `cannot find type ImageWorkerRunV1` / `ImageWorkerRunRefusalV1`, and `unresolved import crate::media_worker_host::ImageWorkerRunV1` — the new supervisor types sit one block too deep in `media_worker_host.rs`, so they never reach module scope;
+- `cannot find function terminate_own_group_v1 in module linux`, with `observe_process_identity_v1` and `install_linux_child_limits_v1` now reported private — the same mis-nesting reaches the native re-exports;
+- `cannot find function child_image_worker_confinement_v1 in module crate::media_worker_host`;
+- two `mismatched types`, and one `empty line after doc comment` from inserting the new section between an existing doc comment and its item.
 
-`30b7e12bfc4191c771d9f53744181c6d744c1fda`, tree `50985bef3555c1133cb5dbf19757fe30d62861d4`, **sole parent** `2883e57d302cc3ce7d01556ef6587596e15afb23`; exactly **one** `M` path `.documents/WIP/workorder-active.md`, `+61/−146`, committed blob `b23c2a6adebb4794fd058360f36bcedfc376ab32` equal to the Owner-installed bytes. `git diff --cached --check` reported **4 trailing-whitespace findings on order lines 3–6 and nothing else** (`exit 2`); these are the Owner-authored Markdown hard line breaks, disclosed rather than edited, and the order was committed unmodified. Ordinary fast-forward push; GitHub readback matched (one-path diff). Fresh `push` run **`43425994755`** — `main`, attempt 1, success: Ubuntu **`131887421474`**, Windows **`131887421743`**, 33 steps each.
+Earlier rounds exposed, and I fixed, `clippy::manual_find`, `clippy::too_many_arguments` (the observation is now a public-field value struct), `clippy::assertions_on_constants` (`const { assert!(…) }`), a duplicated `pub use media_worker_host` block, an unused `image::GenericImageView` import and an unused assignment. Each fix was pushed and re-verified by a fresh exact-SHA run; none removed a security, architecture or test gate.
 
-## 3. Commit B — ACTIVE cleared, one NEXT selected
+**A self-inflicted defect is disclosed:** a PowerShell list-splice truncated the untracked `crates/solo-adapters/src/graphic_image_inspection.rs`; I rewrote that file from the reviewed design rather than restoring a hidden copy, and it parses and formats cleanly. It is not the cause of the lint failures above.
 
-Exactly two `M` paths, `git diff --cached --check` **exit 0**:
+## 4. What was *not* reached
 
-- `.documents/WIP/workorder-active.md` → precisely `# Foundation Solo — workorder-active (Active Work Order)` plus one final LF, reproducing the canonical neutral Git blob **`2ef2db63df17cdb00513f47beca1bc199d381e06`** byte-for-byte (`+1/−101`).
-- `.documents/WIP/plan-next.md` → the order's literal §4 candidate text, UTF-8/LF, one final newline, H1 plus **exactly one** H2 candidate `## R03.C — Confined Entity image-byte verification (PNG/JPEG/WebP first)`, blob `12ecc6d179fcd5f3baa790c27e5c3b5617ea273c` (`+12/−0`, the shared H1 line unchanged from the neutral file).
+- No green two-host run at any code commit, so **no** N097 real-process evidence exists: no positive PNG/JPEG/WebP decode record, no Linux `RLIMIT` readback record, no Windows suspended-before-job-attach record, and no child pid/limit/wall measurement.
+- The mandatory negative sensitivity branch `solo-wo-097-negative-r01` was **not** created; no `workflow_dispatch` red run exists, so failure sensitivity is **unproven**.
+- The architecture counts were not validated by a passing real-tree checker: `edges=68` and the 37-entry adapter closure are my locally computed values from `cargo metadata`, not yet confirmed in CI.
+- `R03.C3`, `R03.C` and Stage 03 remain **OPEN**. Nothing in AVIF, video/WebVTT, the platform catalogue, public projection, publication, HTTP/browser behaviour, release or deployment was implemented, and no publication authority exists.
 
-Commit B `49df191f6354d66c56239d79596dac1661af6909`, tree `cbfd2eff0fc6f5d656c7698efec0d8353050ff1d`, **sole parent** `30b7e12b…`; GitHub readback confirmed the two-file ledger. Fresh `push` run **`43426603644`** — `main`, attempt 1, success: Windows **`131889427585`**, Ubuntu **`131889427925`**, 33 steps each.
+## 5. Ledger disclosure (permanent paths touched)
 
-**The selected candidate is strictly a proposal.** It proposes the earliest actionable remainder of `R03.C` — a bounded PNG/JPEG/WebP integrity gate over already-confined Entity source bytes (≤20 MiB, exact extension/MIME/magic/decoded-format agreement, complete bounded decode, 1–8192 per side and ≤32,000,000 pixels, whole-inventory refusal). It does **not** authorize implementation, a codec/decoder dependency, Windows resource controls or publication; any such step needs its own exact Owner-issued code-bearing order.
+Beyond the order's ledger I had to change one further file: `crates/solo-cli/tests/architecture_checks/graph.rs`. The approved `image` root and its audited closure cannot be recognised by the real-tree checker from `check_architecture.rs` alone, because the allow-lists live in that module. The edits are strictly additive (one approved external root, the exact new closure entries, both array lengths corrected) and no negative case, fixture or gate was weakened — but this is a **ledger extension the order did not literally name** and it needs the Architect's ruling.
 
-## 4. Unchanged-workflow verification at both heads
+Everything else is inside the ledger: `crates/solo-application/src/graphic_image_inspection.rs` (new), `crates/solo-application/src/lib.rs`, `crates/solo-adapters/src/graphic_image_inspection.rs` (new), `crates/solo-adapters/src/{lib.rs,media_worker_host.rs,media_worker_host_native.rs,Cargo.toml}`, `Cargo.lock`, `crates/solo-cli/src/main.rs`, `crates/solo-cli/tests/media_worker_host_smoke.rs` and `.github/workflows/rust-verify.yml`. ROADMAP, OUTLOOK, Architecture, the SOPs, `deny.toml`, the toolchain, the existing AVIF protocol and the older asset-read modules are byte-identical.
 
-Both runs executed the **unchanged** pinned workflow (`.github/workflows/rust-verify.yml`, still `e1b5ca6e…`), not a new obligation. At Commit B the Ubuntu log still shows the full gate set: `architecture=legal packages=4 targets=33 files=60 edges=41`, `self-check=passed cases=29`, format, strict Clippy, all-target locked tests, architecture and tripwire checks, `release_smoke=verified accepted_exit=0 refused_exit=2`, `reproducibility=verified`, and the previously accepted integration evidence remains live — `n093_group=terminated leader_pid=4486 descendant_pid=4491 pgid=4486 sid=4486 signal=9 leader_reaped=1 descendant_nonrunning=1 wall_ms=2` and `n090_reap=reaped_before_join pid=4480 wall_ms=4007`. Nothing regressed.
+## 6. Local state, cleanup and nonclaims
 
-**Skip and warning classification.** Each job runs 33 configured steps; Ubuntu skipped 9 and Windows skipped 14 — entirely the host-inapplicable cross-pairs (Linux-only cargo-deny gate, advisory-negative probe, byte-reproducible build, R03 snapshot-test filesystems on Windows; the mirrored Windows variants on Ubuntu). No mandatory gate was skipped on its own host and no job was red, retried or re-run to mask anything. The security gate likewise reports advisories, bans and sources `ok` and licenses `ok` with the pre-existing, deliberately unsilenced `license-not-encountered` allowance for `Unicode-3.0` — an **unused-allowance configuration warning, not a vulnerability** — so no run is described as warning-free.
+Local `cargo fmt --all -- --check` passes; cargo 1.99.1 was found off `PATH` and used, not installed. No local build, test, Clippy or OS proof is claimed: this workstation has no linker and none was added. Task-owned scratch in the OS temp area (one extracted-crate inspection copy and one base64 staging file) is removed at run end; `.temp/solo-wo-073-wip/` (4 files / 46,062 B), `architecture-fixtures/`, `toolchain-installer/` and `target/` were inspected and left intact. The working tree is clean and no untracked file remains.
 
-## 5. Final state and preservation
+## 7. Requested Owner decision
 
-Cumulative baseline→C changed-path set is **exactly three** paths — ACTIVE, NEXT and the canonical report — with no deletion and no new tracked file. `HEAD == main == origin/main == ls-remote origin main`; working tree clean, stash empty, one worktree, one `origin`, four WIP files, ACTIVE neutral at `2ef2db63…`, NEXT at `12ecc6d1…` with one H2, and ROADMAP `9d7a86226878f490fd5e26c6813a81e5f73f3f37`, OUTLOOK `cb9c7a610cf3c537557e060ca9656e44a053e69d`, Architecture `c941c7f90cc1b1955f9d60b348a3b1092cafe97f`, `Cargo.lock` `b1ee56da60f36536548586528db371b7cbe508e4`, toolchain `9ec55b3b621dbc75fc68817cd51b96e407d3c94c`, workflow `e1b5ca6e1738a5d5129a8788e24d51aee02421d1` and the three accepted technical blobs `7eed6e158c9374a6c2055ddd98dd3287357b814a` / `eacf51c5353ab3278969961aa136a0951cb7ad67` / `22ee67e94cc96a70e8e3a47db9e575464b53cd07` all byte-identical to baseline.
+The smallest necessary decision, in preference order:
 
-Only `main` advanced, by three linear commits. All 13 other branches kept their exact starting SHAs: `solo-wo-093-r01` `0dc45185…` (green accepted technical branch) and `solo-wo-094-negative-r01` `0e9b3677…` (intentionally red mutation, still excluded) were retained untouched, as were the eleven earlier branches. No branch was created, deleted, reset or moved.
+1. authorise a follow-up correction order limited to repairing the nesting in `crates/solo-adapters/src/media_worker_host.rs` (and, if still reported, the private native re-exports) and re-running the two-host gates; **or**
+2. authorise reverting B–B4 so `main` returns to the green `e7de2e11` state while the code is revisited.
 
-Local-only observations, which GitHub cannot independently prove: ignored Owner material was inspected and left intact — `.temp/solo-wo-073-wip/` at **4 files / 46,062 bytes**, `architecture-fixtures/` (present, no regular files), `toolchain-installer/` (2 files), `target/`, and prior Cline logs. Task-owned scratch was limited to one disposable extraction file in the Cline-provided OS temp area, and it was deleted by exact path; nothing in Solo `.temp/` was created or removed. No local build was claimed: this workstation still has no linker, none was installed, and all gate evidence above came from GitHub's Ubuntu and Windows runners.
-
-## 6. Nonclaims and handoff
-
-**No change in** product functionality, stage completion, media correctness, AVIF, Windows Job Object support, source catalogue, public projection, publication, HTTP/browser behaviour, release or deployment. **Explicitly still outstanding:** AVIF worker decoding and complete Linux/Windows fail-closed containment; approved video/WebVTT media; the lawful version-pinned `platform/assets/` catalogue and provenance; whole publishable-candidate validation, derived immutable outputs and privacy-safe public projection.
-
-WO-095 was previously **independently ACCEPTED**; this administrative closure records that acceptance and clears the slot — it does **not** independently complete `R03.C3`, `R03.C` or Stage 03, and it does not accept the new candidate or execute it.
-
-Submitted for independent Chief Master Architect `ACCEPT / REVISE / STOP`. The Owner alone may install a subsequent implementation work order or authorize any merge, release or deployment. This report deliberately contains **no identifier of its own commit, tree, blob or CI run**; those are supplied in the chat handoff.
+I deliberately did **not** revert, force-push, self-accept, merge, release or deploy anything, and I touched no branch other than `main`. This report is submitted for independent Chief Master Architect `ACCEPT / REVISE / STOP`, and it records a STOP rather than a completion.
