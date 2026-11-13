@@ -57,6 +57,17 @@ const AS_REQUEST_BYTES: u64 = 805_306_368;
 #[cfg(target_os = "linux")]
 const AS_DEADLINE_MS: u64 = 15_000;
 
+/// The CPU parent's fixed supervision deadline, in milliseconds.
+///
+/// It is the order's separate 60 000 ms budget for the one legitimate CPU burn and is deliberately
+/// not the 2 000 ms wall-negative watchdog or the 15 000 ms positive/address-space deadlines.
+#[cfg(target_os = "linux")]
+const CPU_DEADLINE_MS: u64 = 60_000;
+
+/// The one CPU-exhaustion case's own outer budget: strictly above the parent's 60 000 ms deadline.
+#[cfg(target_os = "linux")]
+const CPU_CASE_TIMEOUT_MS: u64 = 90_000;
+
 /// One bounded observation of one real invocation.
 struct Run {
     exit_code: Option<i32>,
@@ -67,8 +78,17 @@ struct Run {
     elapsed_ms: u64,
 }
 
-/// Runs the compiled binary with `args` and returns its bounded observation.
+/// Runs the compiled binary with `args` under the ordinary case budget.
 fn run(args: &[&str]) -> Run {
+    run_bounded(args, CASE_TIMEOUT_MS)
+}
+
+/// Runs the compiled binary with `args` under an explicit outer budget.
+///
+/// The CPU-exhaustion case is the only caller that passes a larger budget, because a deliberate
+/// ten-second CPU burn legitimately takes more wall time than the older fast cases. A budget expiry
+/// kills and reaps the owned case process and reports `timed_out`, which every caller must refuse.
+fn run_bounded(args: &[&str], budget_ms: u64) -> Run {
     let mut child = Command::new(BIN)
         .args(args)
         .stdin(Stdio::null())
@@ -97,7 +117,7 @@ fn run(args: &[&str]) -> Run {
             Ok(None) => {}
             Err(error) => panic!("the case must stay observable: {error}"),
         }
-        if started.elapsed() >= Duration::from_millis(CASE_TIMEOUT_MS) {
+        if started.elapsed() >= Duration::from_millis(budget_ms) {
             let _ = child.kill();
             let _ = child.wait();
             break None;
@@ -777,6 +797,223 @@ fn n083_04_both_reservation_modes_are_unsupported_before_any_child_exists() {
         assert!(
             !observed.stdout.contains("media_host_as=limit_enforced"),
             "no enforcement record without a real kernel denial: {mode}"
+        );
+        assert_eq!(
+            observed.stderr, "error: MEDIA_HOST_PROBE_REFUSED: HOST_UNSUPPORTED\n",
+            "the {mode} mode must name HOST_UNSUPPORTED"
+        );
+    }
+}
+
+/// `N085-01`: the one real CPU-exhaustion proof. The parent starts exactly one pre-exec-limited child
+/// through the unchanged installer; the child verifies its own four ceiling halves and its group
+/// identity, reports that readiness, and then burns CPU until the kernel ends it; the parent observes
+/// that real wait status before any kill of its own, reaps the leader and emits one bounded record.
+/// The signal is the kernel's `SIGXCPU` or `SIGKILL`, never this parent's kill.
+#[cfg(target_os = "linux")]
+#[test]
+fn n085_01_the_kernel_cpu_limit_terminates_the_child() {
+    let observed = run_bounded(
+        &["--internal-media-host-probe-v1", "cpu-parent"],
+        CPU_CASE_TIMEOUT_MS,
+    );
+    assert!(
+        !observed.timed_out,
+        "the CPU proof must finish inside its own 90 000 ms outer budget"
+    );
+    assert_eq!(
+        observed.exit_code,
+        Some(0),
+        "the proof itself must succeed: stdout={:?} stderr={:?}",
+        observed.stdout,
+        observed.stderr
+    );
+    assert!(
+        observed.stderr.is_empty(),
+        "a proven kernel termination says nothing on stderr"
+    );
+    assert!(
+        observed
+            .stdout
+            .starts_with("media_host_cpu=kernel_terminated "),
+        "the marker must state kernel termination: {:?}",
+        observed.stdout
+    );
+    assert!(observed.stdout.ends_with('\n'));
+    assert_eq!(
+        observed.stdout.matches('\n').count(),
+        1,
+        "exactly one evidence line, never a partial one first"
+    );
+    for foreign in [
+        "media_host_probe=accepted",
+        "media_host_wall=terminated",
+        "media_host_as=limit_enforced",
+        "SOLO-MEDIA-HOST-CPU-V1",
+    ] {
+        assert!(
+            !observed.stdout.contains(foreign),
+            "the CPU record must not borrow {foreign}"
+        );
+    }
+
+    let fields = evidence_fields(&observed.stdout);
+    report_observation("n085_cpu", &observed.stdout);
+    assert_eq!(
+        fields.len(),
+        11,
+        "the marker plus ten fixed fields: {fields:?}"
+    );
+    assert_eq!(fields[0].0, "media_host_cpu");
+    assert_eq!(fields[0].1, "kernel_terminated");
+
+    // The child's own pre-burn kernel readback, re-checked by the parent, at full width.
+    assert_eq!(numeric(&fields, "as_soft"), PROFILE_AS_BYTES);
+    assert_eq!(numeric(&fields, "as_hard"), PROFILE_AS_BYTES);
+    assert_eq!(numeric(&fields, "cpu_soft"), PROFILE_CPU_SECONDS);
+    assert_eq!(numeric(&fields, "cpu_hard"), PROFILE_CPU_SECONDS);
+    assert!(
+        observed
+            .stdout
+            .contains("as_soft=536870912 as_hard=536870912 cpu_soft=10 cpu_hard=10 "),
+        "every value must be printed at full width: {}",
+        observed.stdout
+    );
+
+    let pid = numeric(&fields, "pid");
+    let pgid = numeric(&fields, "pgid");
+    assert!(pid > 0, "the child reports its own pid");
+    assert_eq!(
+        pgid, pid,
+        "setsid must have made the child its own process-group leader"
+    );
+
+    // The termination came from the kernel, strictly inside the parent's own deadline.
+    let signal = numeric(&fields, "signal");
+    assert!(
+        signal == 24 || signal == 9,
+        "only SIGXCPU (24) or SIGKILL (9) is RLIMIT_CPU enforcement: {signal}"
+    );
+    assert_eq!(numeric(&fields, "reaped"), 1, "the leader was reaped");
+    assert_eq!(
+        numeric(&fields, "parent_killed"),
+        0,
+        "this parent must not have sent the signal it reports"
+    );
+
+    let wall_ms = numeric(&fields, "wall_ms");
+    assert!(
+        wall_ms > 0 && wall_ms < CPU_DEADLINE_MS,
+        "the kernel decided this run strictly inside the 60 000 ms deadline: {wall_ms}"
+    );
+    assert!(
+        observed.elapsed_ms >= wall_ms,
+        "the case's own budget must contain the parent's measurement"
+    );
+}
+
+/// `N085-02`: a direct, unsupervised `cpu-child` refuses from its own limit/group check before any
+/// loop iteration, so the deliberate CPU burn is never executed outside the limited child.
+#[cfg(target_os = "linux")]
+#[test]
+fn n085_02_a_direct_cpu_child_refuses_before_the_loop() {
+    let direct = run(&["--internal-media-host-probe-v1", "cpu-child"]);
+    assert!(!direct.timed_out, "the child must exit promptly");
+    assert!(
+        direct.elapsed_ms < 10_000,
+        "a refused child must never spend the CPU budget: {}",
+        direct.elapsed_ms
+    );
+    assert_ne!(
+        direct.exit_code,
+        Some(0),
+        "an unsupervised child must never report success"
+    );
+    assert!(
+        direct.stdout.is_empty(),
+        "no readiness line without the installed limits: {:?}",
+        direct.stdout
+    );
+    assert_eq!(direct.stderr, "", "the child prints nothing at all");
+    let code = direct
+        .exit_code
+        .expect("the child must exit with a status, not a signal");
+    report_observation("n085_direct_cpu_child", &format!("exit={code}"));
+    assert!(
+        matches!(code, 71..=73 | 75),
+        "the child's own verification refusal is one of its fixed statuses: {code}"
+    );
+}
+
+/// `N085-03`: both new modes are closed and additive on either host, and every malformed, extra,
+/// repeated or misplaced token is the same typed refusal rather than a fall-through.
+#[test]
+fn n085_03_every_wrong_cpu_token_is_refused_by_the_real_binary() {
+    let cases = [
+        vec!["--internal-media-host-probe-v1", "cpu"],
+        vec!["--internal-media-host-probe-v1", "CPU-PARENT"],
+        vec!["--internal-media-host-probe-v1", "cpu_child"],
+        vec!["--internal-media-host-probe-v1", "cpu-parent", "cpu-parent"],
+        vec!["--internal-media-host-probe-v1", "cpu-child", "extra"],
+        vec!["--internal-media-host-probe-v1", "cpu-parent", "cpu-child"],
+        vec!["--internal-media-host-probe-v1", " cpu-parent"],
+        vec!["--internal-media-host-probe-v1"],
+    ];
+    for args in cases {
+        let observed = run(&args);
+        assert!(!observed.timed_out, "{args:?} must not hang");
+        assert_eq!(observed.exit_code, Some(3), "{args:?} must refuse");
+        assert!(
+            observed.stdout.is_empty(),
+            "a refusal never emits evidence: {args:?}"
+        );
+        assert_eq!(
+            observed.stderr, "error: MEDIA_HOST_PROBE_REFUSED: INTERNAL_MODE_INVALID\n",
+            "{args:?} must name its own closed refusal"
+        );
+    }
+
+    // The CPU tokens are not reachable behind a public subcommand either.
+    let hidden = run(&[
+        "bootstrap-preflight",
+        "--internal-media-host-probe-v1",
+        "cpu-parent",
+    ]);
+    assert!(!hidden.timed_out);
+    assert!(
+        !hidden.stdout.contains("media_host_cpu=kernel_terminated"),
+        "a public subcommand must never reach the CPU parent"
+    );
+}
+
+/// `N085-04`: on a host without the approved pre-exec boundary both CPU modes refuse before any child
+/// exists and without running any workload, and no Linux-only case can run here.
+#[cfg(not(target_os = "linux"))]
+#[test]
+fn n085_04_both_cpu_modes_are_unsupported_before_any_child_exists() {
+    for mode in ["cpu-parent", "cpu-child"] {
+        let observed = run(&["--internal-media-host-probe-v1", mode]);
+        assert!(!observed.timed_out, "{mode} must not hang");
+        assert!(
+            observed.elapsed_ms < 10_000,
+            "a refusal is prompt and never waits for a deadline: {mode}"
+        );
+        assert_eq!(
+            observed.exit_code,
+            Some(3),
+            "the {mode} mode must refuse on this host"
+        );
+        assert!(
+            observed.stdout.is_empty(),
+            "no CPU evidence may be claimed on this host: {mode}"
+        );
+        assert!(
+            !observed.stdout.contains("media_host_cpu=kernel_terminated"),
+            "no kernel-termination record without a real kernel signal: {mode}"
+        );
+        assert!(
+            !observed.stdout.contains("SOLO-MEDIA-HOST-CPU-V1"),
+            "no readiness line without a child: {mode}"
         );
         assert_eq!(
             observed.stderr, "error: MEDIA_HOST_PROBE_REFUSED: HOST_UNSUPPORTED\n",

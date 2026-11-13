@@ -88,6 +88,37 @@
 //! address-space ceiling. It proves nothing about page touching, resident memory or RSS, aggregate
 //! memory, the OOM killer, arbitrary allocators, `RLIMIT_CPU` exhaustion, a child tree, a sandbox
 //! or any release artifact.
+//!
+//! # The CPU-limit kernel termination (`SOLO-WO-085 R01`)
+//!
+//! A refused reservation says nothing about *consumed CPU time*. This module therefore owns one
+//! further, deliberately narrow proof on the same unchanged seam:
+//!
+//! * `cpu-parent` re-executes this same executable in the fixed `cpu-child` mode through the
+//!   **unchanged** pre-exec installer (`setsid`, `RLIMIT_AS` 512 MiB soft/hard, `RLIMIT_CPU` 10 s
+//!   soft/hard), supervises it with an independent **60 000 ms** wall deadline and a 10 ms poll, and
+//!   never signals it while it is inside that deadline;
+//! * `cpu-child` performs the identical kernel readback first — all four ceiling halves and a
+//!   positive `pgid == pid` — writes and flushes one fixed readiness line, and only then enters one
+//!   single-threaded, constant-space, allocation-free, deterministic arithmetic loop guarded by
+//!   [`std::hint::black_box`]. It registers **no** signal handler, opens nothing, allocates nothing,
+//!   sleeps nowhere, forks nothing and runs no second executable, so the only thing that can end
+//!   that loop is the kernel's own CPU-time enforcement;
+//! * the parent accepts one fixed evidence line only when the reaped leader's **real wait status**
+//!   came from `try_wait` before any parent kill, `ExitStatusExt::signal()` returned `SIGXCPU` (24)
+//!   or `SIGKILL` (9), the status was not a normal exit, the child's readiness line was captured in
+//!   full and re-validated, and the parent's own measurement is inside its deadline;
+//! * if the deadline expires first, the parent signals **only its own** `Child` handle, reaps it and
+//!   refuses with `HOST_WALL_TIMEOUT`. That refusal is never degraded evidence, even when the
+//!   resulting status happens to be `SIGKILL`;
+//! * Windows and every other non-Linux target refuse both modes as `HOST_UNSUPPORTED` before any
+//!   child or CPU loop exists.
+//!
+//! What this proves: one trusted, pre-exec-limited, descendant-free child of this executable really
+//! was terminated by the kernel because its consumed CPU time reached the ceiling it had verified.
+//! What it does **not** prove: aggregate CPU across a tree, resilience against a hostile child, a
+//! sandbox, executable identity, wall-time precision (wall and CPU seconds are different clocks),
+//! any Windows process control, memory containment, media correctness or publication.
 
 use std::ffi::{OsStr, OsString};
 
@@ -164,6 +195,36 @@ pub const AS_EVIDENCE_MARKER_V1: &str = "media_host_as=limit_enforced";
 /// that cannot reach its own denial inside this interval is a refusal, never accepted evidence.
 pub const AS_DEADLINE_MS: u64 = SMOKE_WALL_DEADLINE_MS;
 
+/// The one fixed sub-mode token that asks for the CPU-limit supervising parent.
+pub const INTERNAL_PROBE_CPU_PARENT_TOKEN_V1: &str = "cpu-parent";
+
+/// The one fixed sub-mode token that asks for the CPU-burning child.
+pub const INTERNAL_PROBE_CPU_CHILD_TOKEN_V1: &str = "cpu-child";
+
+/// The exact marker that begins the CPU child's single pre-burn readiness line.
+pub const CPU_CHILD_READY_MARKER_V1: &str = "SOLO-MEDIA-HOST-CPU-V1";
+
+/// The exact marker that begins the parent's single kernel-termination evidence line.
+///
+/// It is deliberately neither `media_host_probe=accepted`, `media_host_wall=terminated` nor
+/// `media_host_as=limit_enforced`: a kernel CPU-limit death is a distinct result, and the parent's
+/// own kill can never borrow this wording.
+pub const CPU_EVIDENCE_MARKER_V1: &str = "media_host_cpu=kernel_terminated";
+
+/// The independent parent wall deadline of the CPU-limit proof: **60 000 milliseconds**.
+///
+/// It is deliberately separate from — and much longer than — the 2 000 ms wall-negative watchdog
+/// and the 15 000 ms positive/address-space deadlines, because the workload it bounds is the one
+/// legitimate CPU burn and only the kernel may end it. Wall milliseconds are **not** consumed CPU
+/// seconds, so no exact wall duration is ever asserted.
+pub const CPU_DEADLINE_MS: u64 = 60_000;
+
+/// The Linux `SIGXCPU` number: the kernel's signal at the **soft** `RLIMIT_CPU` ceiling.
+pub const CPU_TERMINATION_SIGNAL_SOFT_V1: i32 = 24;
+
+/// The Linux `SIGKILL` number: the kernel's signal at the **hard** `RLIMIT_CPU` ceiling.
+pub const CPU_TERMINATION_SIGNAL_HARD_V1: i32 = 9;
+
 /// The fixed `RLIMIT_AS` profile: 536 870 912 bytes (512 MiB), soft **and** hard.
 ///
 /// This is the single source of truth: the Linux pre-exec closure in
@@ -209,6 +270,15 @@ const CHILD_EXIT_READBACK_FAILED: u8 = 73;
 /// The child drops that reservation without touching a byte and refuses with this distinct
 /// status, so a host whose ceiling did not hold can never produce accepted evidence.
 const CHILD_EXIT_RESERVE_GRANTED: u8 = 74;
+
+/// Child exit status: the fixed CPU loop unexpectedly **returned**.
+///
+/// Under the verified 10-second `RLIMIT_CPU` the kernel ends that loop with `SIGXCPU` or `SIGKILL`,
+/// so a return is impossible on a conforming host. If it ever happened the child refuses with this
+/// distinct status and no success line, so a loop that did not run to the ceiling can never be
+/// reported as kernel enforcement. It is Linux-only because only the Linux child can produce it.
+#[cfg(target_os = "linux")]
+const CHILD_EXIT_CPU_LOOP_RETURNED: u8 = 75;
 
 /// The closed refusal vocabulary of the limit smoke probe.
 ///
@@ -292,6 +362,10 @@ pub enum InternalProbeModeV1 {
     AsParent,
     /// Run the one fixed child that attempts the single over-ceiling reservation.
     AsChild,
+    /// Run the one fixed supervising parent of the CPU-limit kernel termination.
+    CpuParent,
+    /// Run the one fixed child that burns CPU until the kernel ends it.
+    CpuChild,
 }
 
 /// What the composition root must emit for an internal mode, and with which exit status.
@@ -334,6 +408,10 @@ pub fn classify_internal_arguments_v1(
         Ok(InternalProbeModeV1::AsParent)
     } else if mode == OsStr::new(INTERNAL_PROBE_AS_CHILD_TOKEN_V1) {
         Ok(InternalProbeModeV1::AsChild)
+    } else if mode == OsStr::new(INTERNAL_PROBE_CPU_PARENT_TOKEN_V1) {
+        Ok(InternalProbeModeV1::CpuParent)
+    } else if mode == OsStr::new(INTERNAL_PROBE_CPU_CHILD_TOKEN_V1) {
+        Ok(InternalProbeModeV1::CpuChild)
     } else {
         Err(SmokeRefusalV1::InternalModeInvalid)
     }
@@ -770,6 +848,203 @@ fn wall_evidence_line(termination: WallTerminationV1) -> String {
     )
 }
 
+/// One validated kernel CPU-limit termination of an already limited child.
+///
+/// It exists only after the parent observed the leader's **real wait status** from `try_wait`
+/// before any parent kill, that status named `SIGXCPU` or `SIGKILL`, the child's readiness line was
+/// captured in full and re-validated, and the parent's own measurement stayed inside its deadline.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CpuTerminationV1 {
+    /// The child's own pre-burn observation: four ceiling halves, its pid and its matching pgid.
+    pub observation: SmokeObservationV1,
+    /// The signal the kernel reported for the reaped leader.
+    pub signal: i32,
+    /// Whether the leader was actually reaped, as `1` for the evidence.
+    pub reaped: bool,
+    /// Whether this parent sent the signal. It must stay `false`: a parent kill is a refusal.
+    pub parent_killed: bool,
+}
+
+/// Parses the CPU child's single pre-burn readiness line, strictly.
+///
+/// Accepted form, exactly one line and nothing else:
+///
+/// ```text
+/// SOLO-MEDIA-HOST-CPU-V1 as_soft=<u64> as_hard=<u64> cpu_soft=<u64> cpu_hard=<u64> pid=<u64> pgid=<u64>
+/// ```
+///
+/// The shape is the positive smoke's shape under the CPU marker, so the same closed field reader,
+/// the same refusal vocabulary and the same profile check apply. A negative or zero pid is refused
+/// because it cannot be a real child of this parent.
+///
+/// # Errors
+///
+/// [`SmokeRefusalV1::HostOutputInvalid`] for any shape defect and
+/// [`SmokeRefusalV1::HostLimitUnavailable`] for a well-formed line outside the fixed profile.
+pub fn parse_cpu_child_readiness_v1(text: &str) -> Result<SmokeObservationV1, SmokeRefusalV1> {
+    let body = text
+        .strip_suffix('\n')
+        .ok_or(SmokeRefusalV1::HostOutputInvalid)?;
+    if body.contains('\n') || body.contains('\r') || body.contains('\t') {
+        return Err(SmokeRefusalV1::HostOutputInvalid);
+    }
+
+    let tokens: Vec<&str> = body.split(' ').collect();
+    if tokens.len() != 7 || tokens[0] != CPU_CHILD_READY_MARKER_V1 {
+        return Err(SmokeRefusalV1::HostOutputInvalid);
+    }
+
+    let observation = SmokeObservationV1 {
+        address_space_soft: field_value(tokens[1], "as_soft=")?,
+        address_space_hard: field_value(tokens[2], "as_hard=")?,
+        cpu_soft: field_value(tokens[3], "cpu_soft=")?,
+        cpu_hard: field_value(tokens[4], "cpu_hard=")?,
+        pid: field_value(tokens[5], "pid=")?,
+        pgid: field_value(tokens[6], "pgid=")?,
+        wall_ms: 0,
+    };
+    if observation.pid == 0 {
+        return Err(SmokeRefusalV1::HostLimitUnavailable);
+    }
+    validate_observation_v1(observation)
+}
+
+/// Classifies the leader's real termination, and refuses everything that is not kernel CPU death.
+///
+/// A normal exit — with any code, including `0` — is never a CPU-limit termination, a signal other
+/// than `SIGXCPU` or `SIGKILL` is never accepted, and a status this parent produced itself is a
+/// refusal even when it happens to be `SIGKILL`: the order requires that the parent's own watchdog
+/// can never be reported as kernel enforcement.
+///
+/// # Errors
+///
+/// [`SmokeRefusalV1::HostReapFailed`] when no reap happened,
+/// [`SmokeRefusalV1::HostWallTimeout`] when this parent killed the child, otherwise
+/// [`SmokeRefusalV1::HostExitAbnormal`].
+pub fn classify_cpu_termination_v1(
+    signal: Option<i32>,
+    reaped: bool,
+    parent_killed: bool,
+) -> Result<i32, SmokeRefusalV1> {
+    if !reaped {
+        return Err(SmokeRefusalV1::HostReapFailed);
+    }
+    if parent_killed {
+        return Err(SmokeRefusalV1::HostWallTimeout);
+    }
+    match signal {
+        Some(value)
+            if value == CPU_TERMINATION_SIGNAL_SOFT_V1
+                || value == CPU_TERMINATION_SIGNAL_HARD_V1 =>
+        {
+            Ok(value)
+        }
+        Some(_) | None => Err(SmokeRefusalV1::HostExitAbnormal),
+    }
+}
+
+/// Validates a complete CPU termination against the fixed profile and the required signals.
+///
+/// # Errors
+///
+/// Any refusal from [`classify_cpu_termination_v1`] or [`validate_observation_v1`], plus
+/// [`SmokeRefusalV1::HostLimitUnavailable`] for a zero pid and
+/// [`SmokeRefusalV1::HostWallTimeout`] for a measurement at or beyond the fixed 60 000 ms deadline.
+pub fn validate_cpu_termination_v1(
+    termination: CpuTerminationV1,
+) -> Result<CpuTerminationV1, SmokeRefusalV1> {
+    let signal = classify_cpu_termination_v1(
+        Some(termination.signal),
+        termination.reaped,
+        termination.parent_killed,
+    )?;
+    let validated = validate_observation_v1(termination.observation)?;
+    if validated.pid == 0 {
+        return Err(SmokeRefusalV1::HostLimitUnavailable);
+    }
+    // The parent measures wall time, not CPU time: a measurement at or past its own deadline means
+    // the watchdog decided this run, which is a refusal regardless of the status it produced.
+    if validated.wall_ms == 0 || validated.wall_ms >= CPU_DEADLINE_MS {
+        return Err(SmokeRefusalV1::HostWallTimeout);
+    }
+    Ok(CpuTerminationV1 {
+        observation: validated,
+        signal,
+        reaped: true,
+        parent_killed: false,
+    })
+}
+
+/// The raw, still-unvalidated material one CPU supervision produced.
+///
+/// It carries inert data only. Nothing in it is believed until [`validate_cpu_attempt_v1`] has
+/// classified the true wait status, parsed the readiness bytes and bounded the measured interval,
+/// which is also why that validation lives in the platform-neutral layer instead of next to the
+/// Linux process code.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CpuAttemptV1 {
+    /// The child's captured stdout bytes, or `None` when the reader failed, overflowed or panicked.
+    pub stdout: Option<Vec<u8>>,
+    /// The signal of the leader's real wait status, or `None` when it exited normally.
+    pub signal: Option<i32>,
+    /// Whether the leader was actually reaped by this parent.
+    pub reaped: bool,
+    /// Whether this parent sent the terminating signal. `true` can never become evidence.
+    pub parent_killed: bool,
+    /// The wall time the parent itself measured around spawn and reap.
+    pub wall_ms: u64,
+}
+
+/// Parses, bounds and validates one raw CPU attempt into accepted evidence, or refuses.
+///
+/// Every refusal path — a normal exit, an unexpected signal, a parent kill, a failed reap, unreadable
+/// or over-cap readiness bytes, an off-profile value or an over-deadline measurement — returns a
+/// typed refusal and therefore no evidence line at all.
+///
+/// # Errors
+///
+/// [`SmokeRefusalV1::HostOutputInvalid`] for unreadable, over-cap, non-UTF-8 or off-schema readiness
+/// bytes; otherwise the refusal from [`validate_cpu_termination_v1`].
+pub fn validate_cpu_attempt_v1(attempt: CpuAttemptV1) -> Result<CpuTerminationV1, SmokeRefusalV1> {
+    let signal =
+        classify_cpu_termination_v1(attempt.signal, attempt.reaped, attempt.parent_killed)?;
+    let bytes = attempt.stdout.ok_or(SmokeRefusalV1::HostOutputInvalid)?;
+    let text = String::from_utf8(bytes).map_err(|_| SmokeRefusalV1::HostOutputInvalid)?;
+    let observation = parse_cpu_child_readiness_v1(&text)?;
+    validate_cpu_termination_v1(CpuTerminationV1 {
+        observation: SmokeObservationV1 {
+            wall_ms: attempt.wall_ms,
+            ..observation
+        },
+        signal,
+        reaped: attempt.reaped,
+        parent_killed: attempt.parent_killed,
+    })
+}
+
+/// The one fixed kernel-termination line, built only from an already validated termination.
+///
+/// `signal`, `reaped` and `parent_killed` are written from the parent's own lifecycle values, never
+/// from any child text: the child reports only its pre-burn readiness and cannot author a
+/// termination claim. The marker is distinct from every earlier result, so a kernel CPU death can
+/// never be read as an accepted probe, a watchdog kill or a reservation refusal.
+fn cpu_evidence_line(termination: CpuTerminationV1) -> String {
+    format!(
+        "{CPU_EVIDENCE_MARKER_V1} as_soft={} as_hard={} cpu_soft={} cpu_hard={} pid={} pgid={} \
+         signal={} reaped={} parent_killed={} wall_ms={}\n",
+        termination.observation.address_space_soft,
+        termination.observation.address_space_hard,
+        termination.observation.cpu_soft,
+        termination.observation.cpu_hard,
+        termination.observation.pid,
+        termination.observation.pgid,
+        termination.signal,
+        u8::from(termination.reaped),
+        u8::from(termination.parent_killed),
+        termination.observation.wall_ms
+    )
+}
+
 /// Runs the reserved internal mode, if — and only if — the arguments ask for it.
 ///
 /// `None` means the reserved flag was absent, so the ordinary public CLI must run unchanged.
@@ -782,6 +1057,8 @@ pub fn run_internal_media_host_probe_v1(args: &[OsString]) -> Option<InternalPro
         Ok(InternalProbeModeV1::WallChild) => Some(wall_child_report()),
         Ok(InternalProbeModeV1::AsParent) => Some(as_parent_report()),
         Ok(InternalProbeModeV1::AsChild) => Some(as_child_report()),
+        Ok(InternalProbeModeV1::CpuParent) => Some(cpu_parent_report()),
+        Ok(InternalProbeModeV1::CpuChild) => Some(cpu_child_report()),
         Err(refusal) => Some(refusal_report(refusal)),
     }
 }
@@ -929,6 +1206,30 @@ pub fn run_internal_as_attempt_v1() -> Result<AsAttemptV1, SmokeRefusalV1> {
     Err(SmokeRefusalV1::HostUnsupported)
 }
 
+/// Runs the one fixed Linux CPU-limit termination attempt and returns its raw, unvalidated material.
+///
+/// On Linux this starts exactly one `cpu-child` of this executable under the **unchanged** pre-exec
+/// installer, supervises it with the fixed 60 000 ms deadline, and never signals it inside that
+/// deadline. On every other host it refuses before creating anything.
+///
+/// # Errors
+///
+/// Returns a [`SmokeRefusalV1`] for every launch, unobservable-status or failed-reap failure.
+#[cfg(target_os = "linux")]
+pub fn run_internal_cpu_attempt_v1() -> Result<CpuAttemptV1, SmokeRefusalV1> {
+    linux::run_cpu_probe()
+}
+
+/// Runs the one fixed Linux CPU-limit termination attempt, which this host cannot provide.
+///
+/// # Errors
+///
+/// Always [`SmokeRefusalV1::HostUnsupported`]; no child is created and no loop runs.
+#[cfg(not(target_os = "linux"))]
+pub fn run_internal_cpu_attempt_v1() -> Result<CpuAttemptV1, SmokeRefusalV1> {
+    Err(SmokeRefusalV1::HostUnsupported)
+}
+
 /// The address-space parent mode's whole result, as the composition root must print it.
 ///
 /// As with the wall negative, the validation happens here in the platform-neutral layer, so a
@@ -968,6 +1269,50 @@ fn as_child_report() -> InternalProbeReportV1 {
 /// created and no reservation is attempted.
 #[cfg(not(target_os = "linux"))]
 fn as_child_report() -> InternalProbeReportV1 {
+    refusal_report(SmokeRefusalV1::HostUnsupported)
+}
+
+/// The CPU parent mode's whole result, as the composition root must print it.
+///
+/// As with the earlier negatives, the validation happens here in the platform-neutral layer, so a
+/// refusal — including a deadline kill by this parent — is decided by ordinary checked code rather
+/// than by the platform branch.
+fn cpu_parent_report() -> InternalProbeReportV1 {
+    match run_internal_cpu_attempt_v1().and_then(validate_cpu_attempt_v1) {
+        Ok(termination) => InternalProbeReportV1 {
+            exit_code: 0,
+            stdout: Some(cpu_evidence_line(termination)),
+            stderr: None,
+        },
+        Err(refusal) => refusal_report(refusal),
+    }
+}
+
+/// The CPU child mode's whole result.
+///
+/// The child writes only its pre-burn readiness to its own stdout, so this wrapper never carries a
+/// payload: a return from the CPU loop is a non-zero status with no line, and a verification
+/// refusal is the child's own fixed status with no line either.
+#[cfg(target_os = "linux")]
+fn cpu_child_report() -> InternalProbeReportV1 {
+    match linux::run_cpu_child() {
+        Ok(()) => InternalProbeReportV1 {
+            exit_code: 0,
+            stdout: None,
+            stderr: None,
+        },
+        Err(code) => InternalProbeReportV1 {
+            exit_code: code,
+            stdout: None,
+            stderr: None,
+        },
+    }
+}
+
+/// The CPU child mode is refused on a host with no approved pre-exec boundary: no child is created
+/// and no CPU workload is ever started.
+#[cfg(not(target_os = "linux"))]
+fn cpu_child_report() -> InternalProbeReportV1 {
     refusal_report(SmokeRefusalV1::HostUnsupported)
 }
 
@@ -1013,13 +1358,14 @@ mod linux {
 
     use super::{
         AS_CHILD_MARKER_V1, AS_DEADLINE_MS, AS_DENIED_TOKEN_V1, AS_REQUEST_BYTES_V1, AsAttemptV1,
-        CHILD_EXIT_GROUP_MISMATCH, CHILD_EXIT_LIMITS_MISMATCH, CHILD_EXIT_READBACK_FAILED,
-        CHILD_EXIT_RESERVE_GRANTED, CHILD_OBSERVATION_MARKER_V1, INTERNAL_PROBE_AS_CHILD_TOKEN_V1,
-        INTERNAL_PROBE_CHILD_TOKEN_V1, INTERNAL_PROBE_FLAG_V1, INTERNAL_PROBE_WALL_CHILD_TOKEN_V1,
-        MAX_CHILD_STDERR_BYTES, MAX_CHILD_STDOUT_BYTES, PROFILE_V1_AS_BYTES,
-        PROFILE_V1_CPU_SECONDS, SMOKE_WALL_DEADLINE_MS, SmokeObservationV1, SmokeRefusalV1,
-        WALL_CHILD_READY_MARKER_V1, WALL_CHILD_SLEEP_MS, WALL_DEADLINE_MS, WallAttemptV1,
-        classify_child_exit_v1, parse_child_observation_v1, validate_observation_v1,
+        CHILD_EXIT_CPU_LOOP_RETURNED, CHILD_EXIT_GROUP_MISMATCH, CHILD_EXIT_LIMITS_MISMATCH,
+        CHILD_EXIT_READBACK_FAILED, CHILD_EXIT_RESERVE_GRANTED, CHILD_OBSERVATION_MARKER_V1,
+        CPU_CHILD_READY_MARKER_V1, CPU_DEADLINE_MS, CpuAttemptV1, INTERNAL_PROBE_AS_CHILD_TOKEN_V1,
+        INTERNAL_PROBE_CHILD_TOKEN_V1, INTERNAL_PROBE_CPU_CHILD_TOKEN_V1, INTERNAL_PROBE_FLAG_V1,
+        INTERNAL_PROBE_WALL_CHILD_TOKEN_V1, MAX_CHILD_STDERR_BYTES, MAX_CHILD_STDOUT_BYTES,
+        PROFILE_V1_AS_BYTES, PROFILE_V1_CPU_SECONDS, SMOKE_WALL_DEADLINE_MS, SmokeObservationV1,
+        SmokeRefusalV1, WALL_CHILD_READY_MARKER_V1, WALL_CHILD_SLEEP_MS, WALL_DEADLINE_MS,
+        WallAttemptV1, classify_child_exit_v1, parse_child_observation_v1, validate_observation_v1,
     };
     use crate::media_worker_host_native::{
         install_linux_child_limits_v1, own_process_group_v1, read_limit_ceilings_v1,
@@ -1441,6 +1787,182 @@ mod linux {
             readback.cpu.hard,
             AS_REQUEST_BYTES_V1
         ))
+    }
+
+    /// What the 60 000 ms supervision decided about the one owned CPU child.
+    ///
+    /// The variants keep the two possible signal sources apart: only [`CpuSupervision::Observed`]
+    /// can carry kernel evidence, while [`CpuSupervision::ParentKilled`] records that this parent
+    /// produced the status itself and must therefore never be reported as enforcement.
+    enum CpuSupervision {
+        /// The child exited on its own before this parent's deadline; the value is its real signal.
+        Observed(Option<i32>),
+        /// The deadline expired: this parent signalled only its owned handle, and whether it reaped.
+        ParentKilled(Option<i32>, bool),
+        /// Neither the status nor a clean reap could be observed, so nothing may be claimed.
+        Unobservable,
+    }
+
+    /// Supervises the one fixed `cpu-child` and hands back its raw, unvalidated material.
+    ///
+    /// The timer starts **before** `Command::spawn`, the child is launched through the unchanged
+    /// pre-exec installer, only this parent's own `Child` handle is ever signalled, and the two
+    /// capped readers are joined only after the leader is gone. No process group, descendant or
+    /// foreign process is touched.
+    pub(super) fn run_cpu_probe() -> Result<CpuAttemptV1, SmokeRefusalV1> {
+        let executable =
+            std::env::current_exe().map_err(|_| SmokeRefusalV1::HostExecutableUnavailable)?;
+        if !executable.is_file() {
+            return Err(SmokeRefusalV1::HostExecutableUnavailable);
+        }
+
+        let mut command = Command::new(&executable);
+        command
+            .arg(INTERNAL_PROBE_FLAG_V1)
+            .arg(INTERNAL_PROBE_CPU_CHILD_TOKEN_V1)
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+
+        // The same, unchanged pre-exec boundary: a new session and both ceilings before `exec`.
+        install_linux_child_limits_v1(&mut command);
+
+        let started = Instant::now();
+        let mut child = command
+            .spawn()
+            .map_err(|_| SmokeRefusalV1::HostSpawnFailed)?;
+
+        let out_reader = child
+            .stdout
+            .take()
+            .map(|stream| std::thread::spawn(move || read_bounded(stream, MAX_CHILD_STDOUT_BYTES)));
+        let err_reader = child
+            .stderr
+            .take()
+            .map(|stream| std::thread::spawn(move || read_bounded(stream, MAX_CHILD_STDERR_BYTES)));
+
+        let deadline = Duration::from_millis(CPU_DEADLINE_MS);
+        let outcome = loop {
+            match child.try_wait() {
+                // The true wait status of an exit that happened before any kill by this parent.
+                Ok(Some(status)) => break CpuSupervision::Observed(status.signal()),
+                Ok(None) => {}
+                Err(_) => {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    break CpuSupervision::Unobservable;
+                }
+            }
+            if started.elapsed() >= deadline {
+                // This parent's own watchdog expired. It signals only its owned handle, reaps the
+                // leader and records that the status is its own: that is a refusal, never evidence.
+                if child.kill().is_err() {
+                    let _ = child.wait();
+                    break CpuSupervision::Unobservable;
+                }
+                break match child.wait() {
+                    Ok(status) => CpuSupervision::ParentKilled(status.signal(), true),
+                    Err(_) => CpuSupervision::Unobservable,
+                };
+            }
+            std::thread::sleep(POLL_INTERVAL);
+        };
+        let wall_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
+
+        // Joined only after the leader is gone, so a live child's open pipe ends cannot block.
+        let stdout = join_reader(out_reader);
+        let _stderr = join_reader(err_reader);
+
+        match outcome {
+            CpuSupervision::Observed(signal) => Ok(CpuAttemptV1 {
+                stdout: stdout.and_then(Result::ok),
+                signal,
+                reaped: true,
+                parent_killed: false,
+                wall_ms,
+            }),
+            CpuSupervision::ParentKilled(signal, reaped) => Ok(CpuAttemptV1 {
+                stdout: stdout.and_then(Result::ok),
+                signal,
+                reaped,
+                parent_killed: true,
+                wall_ms,
+            }),
+            CpuSupervision::Unobservable => Err(SmokeRefusalV1::HostReapFailed),
+        }
+    }
+
+    /// The fixed CPU child: prove the own limits and group identity, then burn CPU until the kernel
+    /// ends this process.
+    ///
+    /// The four ceiling halves and the process-group identity are verified **before** the readiness
+    /// line and before any loop iteration, so a direct, unsupervised invocation refuses promptly,
+    /// prints nothing and never reaches the workload. The loop itself is single-threaded, constant
+    /// space, allocation-free and syscall-free, and it installs no signal handler: only the kernel's
+    /// own `RLIMIT_CPU` enforcement can end it. A return from it is refused with its own fixed
+    /// status and no success line.
+    pub(super) fn run_cpu_child() -> Result<(), u8> {
+        let readback = read_limit_ceilings_v1().map_err(|_| CHILD_EXIT_READBACK_FAILED)?;
+
+        let limits_match = readback.address_space.soft == PROFILE_V1_AS_BYTES
+            && readback.address_space.hard == PROFILE_V1_AS_BYTES
+            && readback.cpu.soft == PROFILE_V1_CPU_SECONDS
+            && readback.cpu.hard == PROFILE_V1_CPU_SECONDS;
+        if !limits_match {
+            return Err(CHILD_EXIT_LIMITS_MISMATCH);
+        }
+
+        let pid = u64::from(std::process::id());
+        let pgid = u64::from(own_process_group_v1().map_err(|_| CHILD_EXIT_READBACK_FAILED)?);
+        if pgid != pid {
+            return Err(CHILD_EXIT_GROUP_MISMATCH);
+        }
+
+        // One fixed readiness line, written and flushed before the burn, so the parent can validate
+        // the child's own kernel answer even though the child can never report its own death.
+        let line = format!(
+            "{CPU_CHILD_READY_MARKER_V1} as_soft={} as_hard={} cpu_soft={} cpu_hard={} \
+             pid={pid} pgid={pgid}\n",
+            readback.address_space.soft,
+            readback.address_space.hard,
+            readback.cpu.soft,
+            readback.cpu.hard
+        );
+        {
+            let mut stdout = std::io::stdout();
+            stdout
+                .write_all(line.as_bytes())
+                .and_then(|()| stdout.flush())
+                .map_err(|_| CHILD_EXIT_READBACK_FAILED)?;
+        }
+
+        // The one authorized CPU workload, reached only with the ceilings verified above.
+        burn_cpu();
+
+        // Reachable only if that loop returned, which a conforming kernel never allows under the
+        // verified 10-second ceiling: refuse with a distinct status and without any success line.
+        Err(CHILD_EXIT_CPU_LOOP_RETURNED)
+    }
+
+    /// The one fixed CPU-only workload: single-threaded, constant space, deterministic.
+    ///
+    /// It allocates nothing, sleeps nowhere, yields nowhere, opens nothing, forks nothing and calls
+    /// no OS service, so the only thing that can end it is the kernel's own CPU-time enforcement.
+    /// `wrapping_*` arithmetic keeps it deterministic and [`std::hint::black_box`] keeps it alive
+    /// through optimisation; the guarded `return` documents that this function is expected never to
+    /// return while still letting the caller refuse if it somehow does.
+    fn burn_cpu() {
+        let mut state: u64 = 0x9E37_79B9_7F4A_7C15;
+        loop {
+            state = state
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            state ^= state.rotate_left(17);
+            state = std::hint::black_box(state);
+            if std::hint::black_box(false) {
+                return;
+            }
+        }
     }
 
     /// Reads at most `cap` bytes; one byte more is a refusal rather than a silent truncation.
@@ -2343,5 +2865,404 @@ mod tests {
     /// The fixed numbers this negative rests on, read at runtime by the pure case above.
     fn fixed_as_profile_v1() -> (u64, u64, u64) {
         (PROFILE_V1_AS_BYTES, AS_REQUEST_BYTES_V1, AS_DEADLINE_MS)
+    }
+
+    /// The canonical readiness line the fixed `cpu-child` writes before it burns CPU.
+    fn cpu_ready_line() -> String {
+        format!(
+            "{CPU_CHILD_READY_MARKER_V1} as_soft=536870912 as_hard=536870912 cpu_soft=10 \
+             cpu_hard=10 pid=7272 pgid=7272\n"
+        )
+    }
+
+    fn cpu_observation() -> SmokeObservationV1 {
+        SmokeObservationV1 {
+            address_space_soft: PROFILE_V1_AS_BYTES,
+            address_space_hard: PROFILE_V1_AS_BYTES,
+            cpu_soft: PROFILE_V1_CPU_SECONDS,
+            cpu_hard: PROFILE_V1_CPU_SECONDS,
+            pid: 7272,
+            pgid: 7272,
+            wall_ms: 10_012,
+        }
+    }
+
+    fn cpu_termination() -> CpuTerminationV1 {
+        CpuTerminationV1 {
+            observation: cpu_observation(),
+            signal: CPU_TERMINATION_SIGNAL_HARD_V1,
+            reaped: true,
+            parent_killed: false,
+        }
+    }
+
+    fn cpu_attempt(stdout: Option<Vec<u8>>) -> CpuAttemptV1 {
+        CpuAttemptV1 {
+            stdout,
+            signal: Some(CPU_TERMINATION_SIGNAL_SOFT_V1),
+            reaped: true,
+            parent_killed: false,
+            wall_ms: 10_012,
+        }
+    }
+
+    /// `N085-03`: no malformed, duplicated, reordered, negative or oversized readiness is accepted.
+    #[test]
+    fn n085_03_malformed_cpu_readiness_is_refused() {
+        let malformed: [&str; 13] = [
+            "",
+            "\n",
+            "SOLO-MEDIA-HOST-CPU-V1\n",
+            // no trailing newline
+            "SOLO-MEDIA-HOST-CPU-V1 as_soft=536870912 as_hard=536870912 cpu_soft=10 \
+             cpu_hard=10 pid=7272 pgid=7272",
+            // a second line
+            "SOLO-MEDIA-HOST-CPU-V1 as_soft=536870912 as_hard=536870912 cpu_soft=10 \
+             cpu_hard=10 pid=7272 pgid=7272\nextra\n",
+            // CRLF
+            "SOLO-MEDIA-HOST-CPU-V1 as_soft=536870912 as_hard=536870912 cpu_soft=10 \
+             cpu_hard=10 pid=7272 pgid=7272\r\n",
+            // tab separator
+            "SOLO-MEDIA-HOST-CPU-V1\tas_soft=536870912 as_hard=536870912 cpu_soft=10 \
+             cpu_hard=10 pid=7272 pgid=7272\n",
+            // doubled space
+            "SOLO-MEDIA-HOST-CPU-V1  as_soft=536870912 as_hard=536870912 cpu_soft=10 \
+             cpu_hard=10 pid=7272 pgid=7272\n",
+            // another mode's marker
+            "SOLO-MEDIA-HOST-WALL-V1 as_soft=536870912 as_hard=536870912 cpu_soft=10 \
+             cpu_hard=10 pid=7272 pgid=7272\n",
+            // reordered fields
+            "SOLO-MEDIA-HOST-CPU-V1 as_hard=536870912 as_soft=536870912 cpu_soft=10 \
+             cpu_hard=10 pid=7272 pgid=7272\n",
+            // signed value
+            "SOLO-MEDIA-HOST-CPU-V1 as_soft=+536870912 as_hard=536870912 cpu_soft=10 \
+             cpu_hard=10 pid=7272 pgid=7272\n",
+            // a missing field
+            "SOLO-MEDIA-HOST-CPU-V1 as_soft=536870912 as_hard=536870912 cpu_soft=10 \
+             cpu_hard=10 pid=7272\n",
+            // an extra field
+            "SOLO-MEDIA-HOST-CPU-V1 as_soft=536870912 as_hard=536870912 cpu_soft=10 \
+             cpu_hard=10 pid=7272 pgid=7272 signal=9\n",
+        ];
+        for line in malformed {
+            assert_eq!(
+                parse_cpu_child_readiness_v1(line),
+                Err(SmokeRefusalV1::HostOutputInvalid),
+                "{line:?} must be refused as invalid output"
+            );
+        }
+
+        // A well-formed line outside the fixed profile, or with an impossible identity, is refused.
+        let off_profile: [(&str, SmokeRefusalV1); 4] = [
+            (
+                "SOLO-MEDIA-HOST-CPU-V1 as_soft=536870913 as_hard=536870912 cpu_soft=10 \
+                 cpu_hard=10 pid=7272 pgid=7272\n",
+                SmokeRefusalV1::HostLimitUnavailable,
+            ),
+            (
+                "SOLO-MEDIA-HOST-CPU-V1 as_soft=536870912 as_hard=536870912 cpu_soft=11 \
+                 cpu_hard=10 pid=7272 pgid=7272\n",
+                SmokeRefusalV1::HostLimitUnavailable,
+            ),
+            (
+                "SOLO-MEDIA-HOST-CPU-V1 as_soft=536870912 as_hard=536870912 cpu_soft=10 \
+                 cpu_hard=10 pid=7272 pgid=7273\n",
+                SmokeRefusalV1::HostLimitUnavailable,
+            ),
+            (
+                "SOLO-MEDIA-HOST-CPU-V1 as_soft=536870912 as_hard=536870912 cpu_soft=10 \
+                 cpu_hard=10 pid=0 pgid=0\n",
+                SmokeRefusalV1::HostLimitUnavailable,
+            ),
+        ];
+        for (line, refusal) in off_profile {
+            assert_eq!(
+                parse_cpu_child_readiness_v1(line),
+                Err(refusal),
+                "{line:?} must be refused rather than accepted as proof"
+            );
+        }
+    }
+
+    /// `N085-03`: only a reaped, pre-deadline kernel `SIGXCPU`/`SIGKILL` ever becomes evidence.
+    #[test]
+    fn n085_03_every_unexpected_cpu_termination_is_refused() {
+        for signal in [
+            CPU_TERMINATION_SIGNAL_SOFT_V1,
+            CPU_TERMINATION_SIGNAL_HARD_V1,
+        ] {
+            assert_eq!(
+                classify_cpu_termination_v1(Some(signal), true, false),
+                Ok(signal),
+                "signal {signal} is the kernel's own RLIMIT_CPU enforcement"
+            );
+        }
+
+        // A normal exit is never a kill, and an absent status is never evidence either.
+        for code in [None, Some(0), Some(71), Some(73), Some(75), Some(137)] {
+            assert_eq!(
+                classify_cpu_termination_v1(code, true, false),
+                Err(SmokeRefusalV1::HostExitAbnormal),
+                "{code:?} must not be read as kernel enforcement"
+            );
+        }
+
+        // No other signal is this proof.
+        for signal in [1, 2, 6, 11, 15, 31] {
+            assert_eq!(
+                classify_cpu_termination_v1(Some(signal), true, false),
+                Err(SmokeRefusalV1::HostExitAbnormal),
+                "signal {signal} is not RLIMIT_CPU enforcement"
+            );
+        }
+
+        // This parent's own kill is a refusal even when the status it produced is `SIGKILL`.
+        for signal in [
+            CPU_TERMINATION_SIGNAL_SOFT_V1,
+            CPU_TERMINATION_SIGNAL_HARD_V1,
+        ] {
+            assert_eq!(
+                classify_cpu_termination_v1(Some(signal), true, true),
+                Err(SmokeRefusalV1::HostWallTimeout),
+                "a watchdog kill must never be reported as kernel enforcement"
+            );
+        }
+
+        // Without a reap nothing may be claimed, whatever the signal looked like.
+        assert_eq!(
+            classify_cpu_termination_v1(Some(CPU_TERMINATION_SIGNAL_HARD_V1), false, false),
+            Err(SmokeRefusalV1::HostReapFailed)
+        );
+
+        // A complete, well-formed attempt is the only accepted shape.
+        let accepted = validate_cpu_attempt_v1(cpu_attempt(Some(cpu_ready_line().into_bytes())))
+            .expect("a complete, well-formed attempt is the only accepted shape");
+        assert_eq!(accepted.signal, CPU_TERMINATION_SIGNAL_SOFT_V1);
+        assert!(accepted.reaped);
+        assert!(!accepted.parent_killed);
+        assert_eq!(accepted.observation.wall_ms, 10_012);
+    }
+
+    /// `N085-03`: the two CPU tokens are additive and closed, and every legacy token is unchanged.
+    #[test]
+    fn n085_03_the_cpu_tokens_are_closed_and_additive() {
+        assert_eq!(
+            classify_internal_arguments_v1(&argv(&[
+                INTERNAL_PROBE_FLAG_V1,
+                INTERNAL_PROBE_CPU_PARENT_TOKEN_V1,
+            ])),
+            Ok(InternalProbeModeV1::CpuParent)
+        );
+        assert_eq!(
+            classify_internal_arguments_v1(&argv(&[
+                INTERNAL_PROBE_FLAG_V1,
+                INTERNAL_PROBE_CPU_CHILD_TOKEN_V1,
+            ])),
+            Ok(InternalProbeModeV1::CpuChild)
+        );
+
+        // Every earlier pair still classifies exactly as it did before this order.
+        let legacy = [
+            (INTERNAL_PROBE_PARENT_TOKEN_V1, InternalProbeModeV1::Parent),
+            (INTERNAL_PROBE_CHILD_TOKEN_V1, InternalProbeModeV1::Child),
+            (
+                INTERNAL_PROBE_WALL_PARENT_TOKEN_V1,
+                InternalProbeModeV1::WallParent,
+            ),
+            (
+                INTERNAL_PROBE_WALL_CHILD_TOKEN_V1,
+                InternalProbeModeV1::WallChild,
+            ),
+            (
+                INTERNAL_PROBE_AS_PARENT_TOKEN_V1,
+                InternalProbeModeV1::AsParent,
+            ),
+            (
+                INTERNAL_PROBE_AS_CHILD_TOKEN_V1,
+                InternalProbeModeV1::AsChild,
+            ),
+        ];
+        for (token, mode) in legacy {
+            assert_eq!(
+                classify_internal_arguments_v1(&argv(&[INTERNAL_PROBE_FLAG_V1, token])),
+                Ok(mode),
+                "{token} must keep classifying as before"
+            );
+        }
+
+        let refusals: [&[&str]; 8] = [
+            &[INTERNAL_PROBE_FLAG_V1, "cpu"],
+            &[INTERNAL_PROBE_FLAG_V1, "CPU-PARENT"],
+            &[INTERNAL_PROBE_FLAG_V1, "cpu_child"],
+            &[INTERNAL_PROBE_FLAG_V1, "cpu-parent", "cpu-parent"],
+            &[INTERNAL_PROBE_FLAG_V1, "cpu-child", "extra"],
+            &[INTERNAL_PROBE_FLAG_V1, "cpu-parent", "cpu-child"],
+            &[INTERNAL_PROBE_FLAG_V1, " cpu-parent"],
+            &[INTERNAL_PROBE_FLAG_V1],
+        ];
+        for tokens in refusals {
+            assert_eq!(
+                classify_internal_arguments_v1(&argv(tokens)),
+                Err(SmokeRefusalV1::InternalModeInvalid),
+                "{tokens:?} must be refused, never fallen through"
+            );
+        }
+
+        // Neither CPU token is reachable behind a public subcommand.
+        for token in [
+            INTERNAL_PROBE_CPU_PARENT_TOKEN_V1,
+            INTERNAL_PROBE_CPU_CHILD_TOKEN_V1,
+        ] {
+            assert_eq!(
+                classify_internal_arguments_v1(&argv(&["bootstrap-preflight", token])),
+                Ok(InternalProbeModeV1::NotRequested),
+                "{token} must never be honoured behind a public subcommand"
+            );
+        }
+    }
+
+    /// `N085-03`: exactly one well-formed readiness line is accepted, with nothing else.
+    #[test]
+    fn n085_03_only_the_exact_cpu_readiness_line_is_accepted() {
+        let parsed = parse_cpu_child_readiness_v1(&cpu_ready_line())
+            .expect("the canonical readiness line is accepted");
+        assert_eq!(
+            parsed,
+            SmokeObservationV1 {
+                wall_ms: 0,
+                ..cpu_observation()
+            },
+            "only the parent fills in wall time"
+        );
+        assert!(
+            cpu_ready_line().len() < MAX_CHILD_STDOUT_BYTES,
+            "the one readiness line must fit the bounded pipe cap"
+        );
+    }
+
+    /// `N085-03`: absent, non-UTF-8, over-cap, parent-killed, over-deadline and off-profile attempts
+    /// are all refused, so no refused run can ever produce a success line.
+    #[test]
+    fn n085_03_refused_cpu_attempts_never_become_evidence() {
+        assert_eq!(
+            validate_cpu_attempt_v1(cpu_attempt(None)),
+            Err(SmokeRefusalV1::HostOutputInvalid)
+        );
+        assert_eq!(
+            validate_cpu_attempt_v1(cpu_attempt(Some(Vec::from([0xff_u8, 0xfe, b'\n'])))),
+            Err(SmokeRefusalV1::HostOutputInvalid)
+        );
+        assert_eq!(
+            validate_cpu_attempt_v1(cpu_attempt(Some(vec![b'x'; MAX_CHILD_STDOUT_BYTES + 1]))),
+            Err(SmokeRefusalV1::HostOutputInvalid)
+        );
+
+        // This parent's own kill refuses the whole attempt, even at an accepted signal number.
+        let mut killed = cpu_attempt(Some(cpu_ready_line().into_bytes()));
+        killed.signal = Some(CPU_TERMINATION_SIGNAL_HARD_V1);
+        killed.parent_killed = true;
+        assert_eq!(
+            validate_cpu_attempt_v1(killed),
+            Err(SmokeRefusalV1::HostWallTimeout)
+        );
+
+        // An exit without any signal is never enforcement, whatever the readiness said.
+        let mut normal_exit = cpu_attempt(Some(cpu_ready_line().into_bytes()));
+        normal_exit.signal = None;
+        assert_eq!(
+            validate_cpu_attempt_v1(normal_exit),
+            Err(SmokeRefusalV1::HostExitAbnormal)
+        );
+
+        // A reap that never happened refuses too.
+        let mut unreaped = cpu_attempt(Some(cpu_ready_line().into_bytes()));
+        unreaped.reaped = false;
+        assert_eq!(
+            validate_cpu_attempt_v1(unreaped),
+            Err(SmokeRefusalV1::HostReapFailed)
+        );
+
+        // The measured interval must sit strictly inside the 60 000 ms deadline.
+        for wall_ms in [0, CPU_DEADLINE_MS, CPU_DEADLINE_MS + 1] {
+            let mut bounded = cpu_attempt(Some(cpu_ready_line().into_bytes()));
+            bounded.wall_ms = wall_ms;
+            assert_eq!(
+                validate_cpu_attempt_v1(bounded),
+                Err(SmokeRefusalV1::HostWallTimeout),
+                "wall_ms {wall_ms} is not inside the deadline"
+            );
+        }
+
+        // Evidence is refused when any value drifts off the fixed profile.
+        let mut off_profile_termination = cpu_termination();
+        off_profile_termination.observation.cpu_hard = 11;
+        assert_eq!(
+            validate_cpu_termination_v1(off_profile_termination),
+            Err(SmokeRefusalV1::HostLimitUnavailable)
+        );
+        let mut no_identity = cpu_termination();
+        no_identity.observation.pid = 0;
+        no_identity.observation.pgid = 0;
+        assert_eq!(
+            validate_cpu_termination_v1(no_identity),
+            Err(SmokeRefusalV1::HostLimitUnavailable)
+        );
+    }
+
+    /// `N085-03`: the termination line is fixed, bounded and never borrows another result's wording.
+    #[test]
+    fn n085_03_the_cpu_evidence_line_is_fixed_and_bounded() {
+        let line = cpu_evidence_line(cpu_termination());
+        assert_eq!(
+            line,
+            "media_host_cpu=kernel_terminated as_soft=536870912 as_hard=536870912 cpu_soft=10 \
+             cpu_hard=10 pid=7272 pgid=7272 signal=9 reaped=1 parent_killed=0 wall_ms=10012\n"
+        );
+        assert!(line.is_ascii());
+        assert!(line.ends_with('\n'), "exactly one evidence line");
+        assert_eq!(line.matches('\n').count(), 1);
+        for foreign in [
+            PARENT_EVIDENCE_MARKER_V1,
+            WALL_EVIDENCE_MARKER_V1,
+            AS_EVIDENCE_MARKER_V1,
+            CPU_CHILD_READY_MARKER_V1,
+            AS_CHILD_MARKER_V1,
+        ] {
+            assert!(
+                !line.contains(foreign),
+                "the termination line must not borrow {foreign}"
+            );
+        }
+        assert!(line.len() < MAX_CHILD_STDOUT_BYTES);
+    }
+
+    /// `N085-03`: the fixed CPU profile really is the verified 10-second kernel limit, and the parent
+    /// deadline is the separate 60 000 ms budget rather than any earlier watchdog.
+    #[test]
+    fn n085_03_the_fixed_cpu_profile_is_the_ten_second_kernel_limit() {
+        let (cpu_seconds, deadline, soft, hard, wall_deadline) = fixed_cpu_profile_v1();
+        assert_eq!(cpu_seconds, 10, "RLIMIT_CPU soft and hard are both 10 s");
+        assert_eq!(deadline, 60_000, "the CPU parent deadline is 60 000 ms");
+        assert_eq!(soft, 24, "SIGXCPU is the soft-limit signal");
+        assert_eq!(hard, 9, "SIGKILL is the hard-limit signal");
+        assert_ne!(
+            soft, hard,
+            "the two kernel signals must stay distinguishable"
+        );
+        assert!(
+            deadline > wall_deadline && deadline > SMOKE_WALL_DEADLINE_MS,
+            "the CPU budget must exceed both earlier watchdogs"
+        );
+    }
+
+    /// The fixed numbers this proof rests on, read at runtime by the pure case above.
+    fn fixed_cpu_profile_v1() -> (u64, u64, i32, i32, u64) {
+        (
+            PROFILE_V1_CPU_SECONDS,
+            CPU_DEADLINE_MS,
+            CPU_TERMINATION_SIGNAL_SOFT_V1,
+            CPU_TERMINATION_SIGNAL_HARD_V1,
+            WALL_DEADLINE_MS,
+        )
     }
 }
