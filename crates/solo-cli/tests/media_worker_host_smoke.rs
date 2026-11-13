@@ -68,6 +68,17 @@ const CPU_DEADLINE_MS: u64 = 60_000;
 #[cfg(target_os = "linux")]
 const CPU_CASE_TIMEOUT_MS: u64 = 90_000;
 
+/// The session child's fixed post-readiness sleep, in milliseconds.
+///
+/// It is the window the parent needs for its own read-only kernel observation, never a timeout or
+/// CPU-limit negative, so no case asserts an exact wall time against it.
+#[cfg(target_os = "linux")]
+const SESSION_CHILD_SLEEP_MS: u64 = 4_000;
+
+/// The session parent's fixed wall deadline, in milliseconds.
+#[cfg(target_os = "linux")]
+const SESSION_DEADLINE_MS: u64 = 15_000;
+
 /// One bounded observation of one real invocation.
 struct Run {
     exit_code: Option<i32>,
@@ -1013,6 +1024,237 @@ fn n085_04_both_cpu_modes_are_unsupported_before_any_child_exists() {
         );
         assert!(
             !observed.stdout.contains("SOLO-MEDIA-HOST-CPU-V1"),
+            "no readiness line without a child: {mode}"
+        );
+        assert_eq!(
+            observed.stderr, "error: MEDIA_HOST_PROBE_REFUSED: HOST_UNSUPPORTED\n",
+            "the {mode} mode must name HOST_UNSUPPORTED"
+        );
+    }
+}
+
+/// `N087-01`: the real parent proves a live, directly owned child's process-group **and** session
+/// identity in two independent ways — the child's own kernel readback and the parent's own
+/// read-only kernel query of that still-live child — and only then emits one bounded line.
+///
+/// A status of zero is only reachable through the neutral validator, which refuses any attempt
+/// where the child was not proved alive both immediately before and immediately after the parent's
+/// observation, so this case's own success is the "live before and after" assertion.
+#[cfg(target_os = "linux")]
+#[test]
+fn n087_01_the_parent_independently_attests_a_live_child_session() {
+    let observed = run(&["--internal-media-host-probe-v1", "session-parent"]);
+    assert!(
+        !observed.timed_out,
+        "the attestation must finish inside the ordinary 20 000 ms case budget"
+    );
+    assert_eq!(
+        observed.exit_code,
+        Some(0),
+        "the proof itself must succeed: stdout={:?} stderr={:?}",
+        observed.stdout,
+        observed.stderr
+    );
+    assert!(
+        observed.stderr.is_empty(),
+        "a live, attested run says nothing on stderr"
+    );
+    assert!(
+        observed
+            .stdout
+            .starts_with("media_host_session=live_attested "),
+        "the marker must state live attestation: {:?}",
+        observed.stdout
+    );
+    assert!(observed.stdout.ends_with('\n'));
+    assert_eq!(
+        observed.stdout.matches('\n').count(),
+        1,
+        "exactly one evidence line, never a partial one first"
+    );
+    for foreign in [
+        "media_host_probe=accepted",
+        "media_host_wall=terminated",
+        "media_host_as=limit_enforced",
+        "media_host_cpu=kernel_terminated",
+        "SOLO-MEDIA-HOST-SESSION-V1",
+    ] {
+        assert!(
+            !observed.stdout.contains(foreign),
+            "the session record must not borrow {foreign}"
+        );
+    }
+
+    let fields = evidence_fields(&observed.stdout);
+    report_observation("n087_session", &observed.stdout);
+    assert_eq!(
+        fields.len(),
+        12,
+        "the marker plus eleven fixed fields: {fields:?}"
+    );
+    assert_eq!(fields[0].0, "media_host_session");
+    assert_eq!(fields[0].1, "live_attested");
+
+    // The child's own kernel readback, re-checked by the parent, at full width.
+    assert_eq!(numeric(&fields, "as_soft"), PROFILE_AS_BYTES);
+    assert_eq!(numeric(&fields, "as_hard"), PROFILE_AS_BYTES);
+    assert_eq!(numeric(&fields, "cpu_soft"), PROFILE_CPU_SECONDS);
+    assert_eq!(numeric(&fields, "cpu_hard"), PROFILE_CPU_SECONDS);
+    assert!(
+        observed
+            .stdout
+            .contains("as_soft=536870912 as_hard=536870912 cpu_soft=10 cpu_hard=10 "),
+        "every value must be printed at full width: {}",
+        observed.stdout
+    );
+
+    let pid = numeric(&fields, "pid");
+    let pgid = numeric(&fields, "pgid");
+    let sid = numeric(&fields, "sid");
+    let observed_pgid = numeric(&fields, "observed_pgid");
+    let observed_sid = numeric(&fields, "observed_sid");
+    assert!(pid > 0, "a real child has a positive pid");
+    assert_eq!(
+        pgid, pid,
+        "setsid must have made the child its own process-group leader"
+    );
+    assert_eq!(
+        sid, pid,
+        "setsid must have made the child its own session leader"
+    );
+    assert_eq!(
+        observed_pgid, pid,
+        "the parent's own kernel group query must agree with the child"
+    );
+    assert_eq!(
+        observed_sid, pid,
+        "the parent's own kernel session query must agree with the child"
+    );
+    assert_eq!(
+        numeric(&fields, "reaped"),
+        1,
+        "the parent reaped the leader it spawned"
+    );
+
+    let wall_ms = numeric(&fields, "wall_ms");
+    assert!(
+        wall_ms > 0 && wall_ms < SESSION_DEADLINE_MS,
+        "the run decided itself strictly inside the 15 000 ms deadline: {wall_ms}"
+    );
+    assert!(
+        observed.elapsed_ms >= wall_ms,
+        "the case's own budget must contain the parent's measurement"
+    );
+}
+
+/// `N087-02`: a direct, unsupervised `session-child` refuses from its own limit/identity check
+/// before its four-second sleep, so the parent-only observation cannot be faked from outside.
+#[cfg(target_os = "linux")]
+#[test]
+fn n087_02_a_direct_session_child_refuses_before_its_sleep() {
+    let direct = run(&["--internal-media-host-probe-v1", "session-child"]);
+    assert!(!direct.timed_out, "the child must exit promptly");
+    assert!(
+        direct.elapsed_ms < SESSION_CHILD_SLEEP_MS,
+        "the refusal must happen before the four-second window: {} ms",
+        direct.elapsed_ms
+    );
+    assert!(
+        direct.stdout.is_empty(),
+        "a refused child writes no readiness line: {:?}",
+        direct.stdout
+    );
+    assert!(
+        direct.stderr.is_empty(),
+        "a refused child writes no diagnostic of its own: {:?}",
+        direct.stderr
+    );
+    let code = direct
+        .exit_code
+        .expect("the child must exit with a status, not a signal");
+    report_observation("n087_direct_session_child", &format!("exit={code}"));
+    assert!(
+        matches!(code, 71..=73 | 76 | 77),
+        "the child's own verification refusal is one of its fixed statuses: {code}"
+    );
+}
+
+/// `N087-03`: both new modes are closed and additive on either host, and every malformed, extra,
+/// repeated or misplaced token is the same typed refusal rather than a fall-through.
+#[test]
+fn n087_03_every_wrong_session_token_is_refused_by_the_real_binary() {
+    let cases = [
+        vec!["--internal-media-host-probe-v1", "session"],
+        vec!["--internal-media-host-probe-v1", "SESSION-PARENT"],
+        vec!["--internal-media-host-probe-v1", "session_child"],
+        vec![
+            "--internal-media-host-probe-v1",
+            "session-parent",
+            "session-parent",
+        ],
+        vec!["--internal-media-host-probe-v1", "session-child", "extra"],
+        vec![
+            "--internal-media-host-probe-v1",
+            "session-parent",
+            "session-child",
+        ],
+        vec!["--internal-media-host-probe-v1", " session-parent"],
+        vec!["--internal-media-host-probe-v1"],
+    ];
+    for args in cases {
+        let observed = run(&args);
+        assert!(!observed.timed_out, "{args:?} must not hang");
+        assert_eq!(observed.exit_code, Some(3), "{args:?} must refuse");
+        assert!(
+            observed.stdout.is_empty(),
+            "a refusal never emits evidence: {args:?}"
+        );
+        assert_eq!(
+            observed.stderr, "error: MEDIA_HOST_PROBE_REFUSED: INTERNAL_MODE_INVALID\n",
+            "{args:?} must name its own closed refusal"
+        );
+    }
+
+    // The session tokens are not reachable behind a public subcommand either.
+    let hidden = run(&[
+        "bootstrap-preflight",
+        "--internal-media-host-probe-v1",
+        "session-parent",
+    ]);
+    assert!(!hidden.timed_out);
+    assert!(
+        !hidden.stdout.contains("media_host_session=live_attested"),
+        "a public subcommand must never reach the session parent"
+    );
+}
+
+/// `N087-04`: on a host without the approved pre-exec boundary both session modes refuse before any
+/// child exists and without running any workload, and no Linux-only case can run here.
+#[cfg(not(target_os = "linux"))]
+#[test]
+fn n087_04_both_session_modes_are_unsupported_before_any_child_exists() {
+    for mode in ["session-parent", "session-child"] {
+        let observed = run(&["--internal-media-host-probe-v1", mode]);
+        assert!(!observed.timed_out, "{mode} must not hang");
+        assert!(
+            observed.elapsed_ms < 10_000,
+            "a refusal is prompt and never waits for a deadline: {mode}"
+        );
+        assert_eq!(
+            observed.exit_code,
+            Some(3),
+            "the {mode} mode must refuse on this host"
+        );
+        assert!(
+            observed.stdout.is_empty(),
+            "no session evidence may be claimed on this host: {mode}"
+        );
+        assert!(
+            !observed.stdout.contains("media_host_session=live_attested"),
+            "no live-attestation record without a real kernel observation: {mode}"
+        );
+        assert!(
+            !observed.stdout.contains("SOLO-MEDIA-HOST-SESSION-V1"),
             "no readiness line without a child: {mode}"
         );
         assert_eq!(
