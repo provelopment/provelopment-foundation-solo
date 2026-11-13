@@ -2457,7 +2457,7 @@ mod linux {
             match ready_rx.recv_timeout(remaining) {
                 Ok(Some(line)) => {
                     let pid = u64::from(handle_pid);
-                    match validate_session_readiness_v1(&line, pid) {
+                    match super::validate_session_readiness_v1(&line, pid) {
                         Ok(_) => Some(line),
                         Err(refusal) => {
                             readiness_failure = Some(refusal);
