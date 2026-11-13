@@ -38,14 +38,8 @@ pub const APPROVED_DEV_OWNER: &str = "solo-cli";
 /// only for `cfg(target_os = "linux")` and `windows-sys` only for `cfg(windows)` — so a
 /// single host never compiles both, and the locked graph therefore carries exactly one
 /// `windows-sys`, which is what keeps `multiple-versions = "deny"` satisfied.
-pub const APPROVED_ADAPTER_EXTERNAL_NORMAL: [&str; 6] = [
-    "image",
-    "libc",
-    "rustix",
-    "serde",
-    "serde_json",
-    "windows-sys",
-];
+pub const APPROVED_ADAPTER_EXTERNAL_NORMAL: [&str; 5] =
+    ["libc", "rustix", "serde", "serde_json", "windows-sys"];
 
 /// The only package permitted to declare an approved external normal dependency.
 pub const APPROVED_ADAPTER_EXTERNAL_OWNER: &str = "solo-adapters";
@@ -55,44 +49,25 @@ pub const APPROVED_ADAPTER_EXTERNAL_OWNER: &str = "solo-adapters";
 ///
 /// It is enumerated rather than computed so that a new transitive component cannot
 /// appear silently: an unlisted node is an unapproved reachability and is refused.
-pub const APPROVED_ADAPTER_CLOSURE: [&str; 37] = [
-    "adler2",
-    "autocfg",
+pub const APPROVED_ADAPTER_CLOSURE: [&str; 18] = [
     "bitflags",
-    "bytemuck",
-    "byteorder-lite",
-    "cfg-if",
-    "crc32fast",
     "errno",
-    "fdeflate",
-    "flate2",
-    "image",
-    "image-webp",
     "itoa",
     "libc",
     "linux-raw-sys",
     "memchr",
-    "miniz_oxide",
-    "moxcms",
-    "num-traits",
-    "png",
     "proc-macro2",
-    "pxfm",
-    "quick-error",
     "quote",
     "rustix",
     "serde",
     "serde_core",
     "serde_derive",
     "serde_json",
-    "simd-adler32",
     "syn",
     "unicode-ident",
     "windows-link",
     "windows-sys",
     "zmij",
-    "zune-core",
-    "zune-jpeg",
 ];
 
 /// The single reviewed owner/kind/root rule for external dependency declarations.
