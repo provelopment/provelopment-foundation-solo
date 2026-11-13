@@ -397,20 +397,15 @@ fn the_adapter_lint_arrangement_is_exactly_the_approved_one() {
         !source.contains("#![allow(unsafe_code)]"),
         "a crate-wide allowance is never permitted"
     );
-    let windows_allowances = source
-        .matches("#[cfg_attr(windows, allow(unsafe_code))]")
-        .count();
-    assert_eq!(
-        windows_allowances, 1,
-        "exactly one module-scoped, Windows-only allowance is approved"
-    );
-    let linux_allowances = source
-        .matches("#[cfg_attr(target_os = \"linux\", allow(unsafe_code))]")
-        .count();
-    assert_eq!(
-        linux_allowances, 1,
-        "exactly one module-scoped, Linux-only allowance is approved"
-    );
+    // The closed, per-declaration contract: the two reserve files, each with its own exact
+    // allowance, and no other module, function or attribute carrying one. This replaces a brittle
+    // file-wide count, which could not tell a correct allowance from a moved one.
+    if let Err(problems) = arrangement_v1(&source) {
+        panic!(
+            "the adapter root is not exactly one of the two accepted allowance shapes:\n{}",
+            problems.join("\n")
+        );
+    }
     assert!(
         source.contains("mod media_worker_host_native;"),
         "the Linux allowance must be scoped to the readback seam itself"
@@ -418,6 +413,109 @@ fn the_adapter_lint_arrangement_is_exactly_the_approved_one() {
     assert!(
         source.contains("mod source_read_native;"),
         "the Windows allowance must remain scoped to the source reader itself"
+    );
+}
+
+/// A minimal adapter root in the accepted legacy shape.
+const LEGACY_ROOT: &str = r#"
+#![deny(unsafe_code)]
+mod graphic_image_inspection;
+#[cfg(target_os = "linux")]
+#[cfg_attr(target_os = "linux", allow(unsafe_code))]
+mod media_worker_host_native;
+mod media_worker_host;
+#[cfg_attr(windows, allow(unsafe_code))]
+mod source_read_native;
+"#;
+
+/// The same root in the completed shape this order authorises.
+const COMPLETED_ROOT: &str = r#"
+#![deny(unsafe_code)]
+mod graphic_image_inspection;
+#[cfg(any(target_os = "linux", windows))]
+#[cfg_attr(target_os = "linux", allow(unsafe_code))]
+#[cfg_attr(windows, allow(unsafe_code))]
+mod media_worker_host_native;
+mod media_worker_host;
+#[cfg_attr(windows, allow(unsafe_code))]
+mod source_read_native;
+"#;
+
+#[test]
+fn the_arrangement_accepts_both_exact_shapes_and_only_them() {
+    assert!(
+        arrangement_v1(LEGACY_ROOT).is_ok(),
+        "the real checkout's legacy shape must stay accepted"
+    );
+    assert!(
+        arrangement_v1(COMPLETED_ROOT).is_ok(),
+        "the completed dual-host shape must be accepted"
+    );
+}
+
+#[test]
+fn the_arrangement_refuses_an_extra_or_moved_windows_allowance() {
+    for (label, source) in [
+        (
+            "a second Windows allowance on the process module in the legacy shape",
+            LEGACY_ROOT.replace(
+                "#[cfg_attr(target_os = \"linux\", allow(unsafe_code))]\nmod media_worker_host_native;",
+                "#[cfg_attr(target_os = \"linux\", allow(unsafe_code))]\n#[cfg_attr(windows, allow(unsafe_code))]\nmod media_worker_host_native;",
+            ),
+        ),
+        (
+            "an allowance moved onto an ordinary module",
+            LEGACY_ROOT.replace(
+                "#[cfg_attr(windows, allow(unsafe_code))]\nmod source_read_native;",
+                "mod source_read_native;",
+            )
+            .replace(
+                "mod graphic_image_inspection;",
+                "#[cfg_attr(windows, allow(unsafe_code))]\nmod graphic_image_inspection;",
+            ),
+        ),
+        (
+            "a duplicated source-read allowance",
+            LEGACY_ROOT.replace(
+                "mod source_read_native;",
+                "mod source_read_native;\n#[cfg_attr(windows, allow(unsafe_code))]\nmod source_read_two;",
+            ),
+        ),
+        (
+            "a `#[path]` declaration of a reserve file",
+            LEGACY_ROOT.replace(
+                "mod source_read_native;",
+                "#[path = \"source_read_native.rs\"]\nmod source_read_native;",
+            ),
+        ),
+        (
+            "a crate-wide allowance",
+            LEGACY_ROOT.replace("#![deny(unsafe_code)]", "#![allow(unsafe_code)]"),
+        ),
+        (
+            "a `cfg_attr(any(..))` allowance",
+            LEGACY_ROOT.replace(
+                "#[cfg_attr(target_os = \"linux\", allow(unsafe_code))]",
+                "#[cfg_attr(any(target_os = \"linux\", windows), allow(unsafe_code))]",
+            ),
+        ),
+    ] {
+        assert!(
+            arrangement_v1(&source).is_err(),
+            "{label} must be refused by the per-declaration contract"
+        );
+    }
+}
+
+#[test]
+fn the_arrangement_refuses_a_missing_linux_allowance() {
+    let source = LEGACY_ROOT.replace(
+        "#[cfg_attr(target_os = \"linux\", allow(unsafe_code))]\n",
+        "",
+    );
+    assert!(
+        arrangement_v1(&source).is_err(),
+        "the process module cannot lose its Linux allowance"
     );
 }
 
@@ -682,4 +780,172 @@ fn the_guard_refuses_an_allowance_that_is_not_the_single_approved_one() {
         .is_empty(),
         "a combined `any(..)` gate is never an approved allowance"
     );
+}
+
+/// One `mod` declaration's allowance facts, read from that module's **own** attributes.
+///
+/// A file-wide count cannot distinguish an allowance that sits on the right module from one that
+/// was moved onto a neighbour, so every fact is taken per declaration.
+#[derive(Default)]
+struct DeclV1 {
+    name: String,
+    windows: usize,
+    linux: usize,
+    other: usize,
+    linux_only: bool,
+    any_os: bool,
+    other_cfg: bool,
+    path_attr: bool,
+}
+
+fn attr_text(attribute: &syn::Attribute) -> String {
+    let path = attribute
+        .path()
+        .segments
+        .iter()
+        .map(|segment| segment.ident.to_string())
+        .collect::<Vec<_>>()
+        .join("::");
+    let rendered = match &attribute.meta {
+        syn::Meta::List(list) => format!("{path}({})", list.tokens),
+        // A `#[path = "…"]` attribute carries its value as a name-value pair, so the value is not
+        // in the path or the token list; the marker is enough to recognise the evasion.
+        syn::Meta::NameValue(_) => format!("{path}="),
+        _ => path,
+    };
+    rendered
+        .chars()
+        .filter(|character| !character.is_whitespace())
+        .collect()
+}
+
+fn decl_v1(module: &syn::ItemMod) -> DeclV1 {
+    let mut declaration = DeclV1 {
+        name: module.ident.to_string(),
+        ..DeclV1::default()
+    };
+    for attribute in &module.attrs {
+        match attr_text(attribute).as_str() {
+            "cfg_attr(windows,allow(unsafe_code))" => declaration.windows += 1,
+            "cfg_attr(target_os=\"linux\",allow(unsafe_code))" => declaration.linux += 1,
+            "cfg(windows)" => declaration.other_cfg = true,
+            "cfg(target_os=\"linux\")" => declaration.linux_only = true,
+            "cfg(any(target_os=\"linux\",windows))" => declaration.any_os = true,
+            other if other.starts_with("path(") || other.starts_with("path=") => {
+                declaration.path_attr = true;
+            }
+            other if other.contains("allow(unsafe_code)") => declaration.other += 1,
+            other if other.starts_with("cfg(") || other.starts_with("cfg_attr(") => {
+                declaration.other_cfg = true;
+            }
+            _ => {}
+        }
+    }
+    declaration
+}
+
+/// The closed contract for the adapter root's `unsafe` allowances.
+///
+/// Two finite shapes are accepted, and nothing else: the **legacy** arrangement the real checkout
+/// still carries (a Linux-gated process module with no Windows allowance) and the **completed**
+/// arrangement this order authorises (the same single module available on both hosts, carrying
+/// exactly one Windows allowance of its own). An extra, moved or duplicated allowance, a missing
+/// Linux allowance, a second native module, a `#[path]` evasion, a wildcard or `any(..)`-gated
+/// *allowance*, and an allowance on any ordinary module are all refused. The `any(..)` here is
+/// module **availability** only; it never proves the scope of an `unsafe` expression, which the
+/// unchanged AST checker still requires to sit in its own positive platform gate.
+fn arrangement_v1(source: &str) -> Result<(), Vec<String>> {
+    let file = match syn::parse_file(source) {
+        Ok(file) => file,
+        Err(error) => return Err(vec![format!("the adapter root is not parseable: {error}")]),
+    };
+    let mut problems: Vec<String> = Vec::new();
+
+    let denied = file
+        .attrs
+        .iter()
+        .any(|attribute| attr_text(attribute) == "deny(unsafe_code)");
+    if !denied {
+        problems.push("the crate root no longer denies `unsafe_code`".to_owned());
+    }
+    for attribute in &file.attrs {
+        if attr_text(attribute).contains("allow(unsafe_code)") {
+            problems.push("the crate root carries a crate-wide allowance".to_owned());
+        }
+    }
+
+    let mut declarations: Vec<DeclV1> = Vec::new();
+    for item in &file.items {
+        if let syn::Item::Mod(module) = item {
+            declarations.push(decl_v1(module));
+        }
+    }
+
+    let readers: Vec<&DeclV1> = declarations
+        .iter()
+        .filter(|declaration| declaration.name == "source_read_native")
+        .collect();
+    let process: Vec<&DeclV1> = declarations
+        .iter()
+        .filter(|declaration| declaration.name == "media_worker_host_native")
+        .collect();
+
+    match readers.as_slice() {
+        [reader] => {
+            if reader.windows != 1 || reader.linux != 0 || reader.other != 0 || reader.path_attr {
+                problems.push(format!(
+                    "`mod source_read_native` must carry exactly one Windows allowance and nothing else (found {} Windows, {} Linux, {} other, path={})",
+                    reader.windows, reader.linux, reader.other, reader.path_attr
+                ));
+            }
+        }
+        found => problems.push(format!(
+            "expected exactly one `mod source_read_native`, found {}",
+            found.len()
+        )),
+    }
+
+    match process.as_slice() {
+        [module] => {
+            if module.linux != 1 || module.other != 0 || module.path_attr {
+                problems.push(format!(
+                    "`mod media_worker_host_native` must carry exactly one Linux allowance and nothing else (found {} Linux, {} other, path={})",
+                    module.linux, module.other, module.path_attr
+                ));
+            }
+            let legacy = module.linux_only && !module.any_os && module.windows == 0;
+            let completed = module.any_os && !module.linux_only && module.windows == 1;
+            if !legacy && !completed {
+                problems.push(format!(
+                    "`mod media_worker_host_native` is neither the accepted legacy shape nor the completed shape (cfg linux={}, any={}, windows-cfg={}; {} Windows allowance(s))",
+                    module.linux_only, module.any_os, module.other_cfg, module.windows
+                ));
+            }
+        }
+        found => problems.push(format!(
+            "expected exactly one `mod media_worker_host_native`, found {}",
+            found.len()
+        )),
+    }
+
+    for declaration in &declarations {
+        if declaration.name == "source_read_native"
+            || declaration.name == "media_worker_host_native"
+        {
+            continue;
+        }
+        if declaration.windows + declaration.linux + declaration.other != 0 || declaration.path_attr
+        {
+            problems.push(format!(
+                "`mod {}` is not an approved native module yet carries an allowance or a `#[path]`",
+                declaration.name
+            ));
+        }
+    }
+
+    if problems.is_empty() {
+        Ok(())
+    } else {
+        Err(problems)
+    }
 }
