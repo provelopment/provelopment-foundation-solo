@@ -323,21 +323,21 @@ pub const GROUP_DEADLINE_MS: u64 = 15_000;
 /// The leader's bounded wait for the descendant's own readiness record, in milliseconds.
 ///
 /// It is a sub-budget of the single deadline above, never an extra one.
-#[cfg(any(target_os = "linux", test))]
+#[cfg(target_os = "linux")]
 pub const GROUP_DESCENDANT_READY_DEADLINE_MS: u64 = 5_000;
 
 /// The fixed finite wall lifetime of the one descendant, in milliseconds.
 ///
 /// This is the safety net for a refusal on the positive path: a descendant that is never signalled
 /// still ends by itself inside this window, so no long-running test process can be left behind.
-#[cfg(any(target_os = "linux", test))]
+#[cfg(target_os = "linux")]
 pub const GROUP_DESCENDANT_LIFETIME_MS: u64 = 8_000;
 
 /// How long the leader holds after its readiness record, in milliseconds.
 ///
 /// The parent is expected to signal the group well inside this window. A leader that survives it
 /// refuses, so a parent that never signalled can never be reported as a group termination.
-#[cfg(any(target_os = "linux", test))]
+#[cfg(target_os = "linux")]
 pub const GROUP_LEADER_HOLD_MS: u64 = 10_000;
 
 /// The fixed `RLIMIT_AS` profile: 536 870 912 bytes (512 MiB), soft **and** hard.
@@ -3772,11 +3772,14 @@ mod linux {
             None
         };
         let live = matches!(descendant.try_wait(), Ok(None));
+        // The descendant must be proved inside this leader's own group and session. Written as a
+        // closure rather than a guarded `matches!` pattern so the source-boundary checker can parse
+        // every macro argument as an ordinary expression.
+        let observed_in_group = observed.is_some_and(|identity| {
+            u64::from(identity.group) == pid && u64::from(identity.session) == pid
+        });
 
-        let ready = matches!(verified, Ok(Some(_)))
-            && matches!(observed, Some(identity)
-                if u64::from(identity.group) == pid && u64::from(identity.session) == pid)
-            && live;
+        let ready = matches!(verified, Ok(Some(_))) && observed_in_group && live;
         if !ready {
             // A join is permitted only behind a **confirmed** reap of this leader's own descendant
             // handle. An unconfirmed wait must not be able to block this leader on an open pipe, so

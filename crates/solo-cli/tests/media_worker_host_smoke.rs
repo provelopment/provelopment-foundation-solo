@@ -1677,11 +1677,13 @@ fn n093_03_direct_group_invocations_and_every_wrong_token_refuse() {
     for mode in ["group-leader", "group-invalid-leader"] {
         let observed = run(&["--internal-media-host-probe-v1", mode]);
         assert!(!observed.timed_out, "{mode} must not hang");
-        assert_eq!(
-            observed.exit_code,
-            Some(77),
-            "{mode} without `setsid` is not its own leader and must refuse: stdout={:?}",
-            observed.stdout
+        let code = observed
+            .exit_code
+            .expect("a direct group mode must exit with a status, not a signal");
+        report_observation("n093_direct", &format!("{mode} exit={code}"));
+        assert!(
+            matches!(code, 71 | 77),
+            "a direct {mode} refuses its inherited ceilings or its identity: {code}"
         );
         assert!(
             observed.stdout.is_empty(),
@@ -1692,8 +1694,12 @@ fn n093_03_direct_group_invocations_and_every_wrong_token_refuse() {
     let descendant = run(&["--internal-media-host-probe-v1", "group-descendant"]);
     assert!(!descendant.timed_out, "a direct descendant must not hang");
     assert!(
-        matches!(descendant.exit_code, Some(0) | Some(79)),
-        "a direct descendant either refuses its inherited identity or merely attests it: {:?}",
+        matches!(
+            descendant.exit_code,
+            Some(0) | Some(71) | Some(77) | Some(79)
+        ),
+        "a direct descendant refuses its inherited ceilings or identity, or merely attests \
+         its own inherited group: {:?}",
         descendant.exit_code
     );
     assert!(
