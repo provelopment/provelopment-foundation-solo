@@ -2469,6 +2469,8 @@ mod linux {
     /// a deadline. No process group, descendant or foreign process is touched and no negative-pid
     /// signal is ever constructed.
     pub(super) fn run_session_probe() -> Result<SessionAttemptV1, SmokeRefusalV1> {
+        use super::{SessionCleanupPlanV1, SessionReapV1};
+
         let executable =
             std::env::current_exe().map_err(|_| SmokeRefusalV1::HostExecutableUnavailable)?;
         if !executable.is_file() {
