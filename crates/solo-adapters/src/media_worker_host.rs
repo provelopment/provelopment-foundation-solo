@@ -276,7 +276,8 @@ const CHILD_EXIT_RESERVE_GRANTED: u8 = 74;
 /// Under the verified 10-second `RLIMIT_CPU` the kernel ends that loop with `SIGXCPU` or `SIGKILL`,
 /// so a return is impossible on a conforming host. If it ever happened the child refuses with this
 /// distinct status and no success line, so a loop that did not run to the ceiling can never be
-/// reported as kernel enforcement.
+/// reported as kernel enforcement. It is Linux-only because only the Linux child can produce it.
+#[cfg(target_os = "linux")]
 const CHILD_EXIT_CPU_LOOP_RETURNED: u8 = 75;
 
 /// The closed refusal vocabulary of the limit smoke probe.
