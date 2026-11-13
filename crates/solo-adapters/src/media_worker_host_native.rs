@@ -27,11 +27,24 @@ mod linux {
     // otherwise refuse a deliberately unexercised private API.
     #![allow(dead_code)]
 
+    use std::io::Read;
     use std::mem::MaybeUninit;
     use std::os::unix::process::CommandExt;
-    use std::process::Command;
+    use std::process::{Child, Command};
 
     use crate::media_worker_host::{PROFILE_V1_AS_BYTES, PROFILE_V1_CPU_SECONDS};
+
+    /// The most bytes of one `/proc/<pid>/stat` record this seam will read.
+    ///
+    /// A real record is a few hundred bytes; the cap means a hostile or unusual kernel surface can
+    /// never make this observation allocate without bound.
+    const PROC_STAT_READ_CAP: u64 = 4096;
+
+    /// The field index, after the closing `)`, of the kernel's process start time.
+    ///
+    /// `/proc/<pid>/stat` numbers `state` as field 3 and `starttime` as field 22, so after the
+    /// command name ends at the final `)` the start time sits at zero-based offset 19.
+    const PROC_STAT_START_TIME_OFFSET: usize = 19;
 
     /// The kernel's "no limit" sentinel for an unsigned resource value.
     #[cfg(test)]
@@ -295,6 +308,211 @@ mod linux {
         Ok(ProcessIdentityV1 { group, session })
     }
 
+    /// Why one owned-group termination was not issued.
+    ///
+    /// Closed and typed, like every refusal above: it carries no `errno`, no path and no process
+    /// metadata, so nothing host-specific reaches an operator through it.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub(crate) enum GroupSignalRefusalV1 {
+        /// A pid was zero, one, not representable as a kernel `pid_t`, or self-contradictory.
+        BadIdentity,
+        /// The directly owned leader was not proved still running immediately around the call.
+        LeaderNotLive,
+        /// The kernel's own group/session answers did not match the identities this call requires.
+        IdentityMismatch,
+        /// The kernel rejected the one signal, so no termination may be claimed.
+        SignalRejected,
+    }
+
+    /// What one owned-group termination actually established.
+    ///
+    /// It records the **request** and the identities it was checked against. It is deliberately not a
+    /// termination, a reap or a descendant exit: the caller must establish those separately.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub(crate) struct GroupSignalOutcomeV1 {
+        /// The leader pid, derived inside this seam from the owned handle.
+        pub(crate) leader_pid: u32,
+        /// The descendant pid supplied only for identity validation.
+        pub(crate) descendant_pid: u32,
+        /// The verified group identity, which the kernel reported as the leader pid.
+        pub(crate) group: u32,
+        /// The verified session identity, which the kernel reported as the leader pid.
+        pub(crate) session: u32,
+    }
+
+    /// Sends exactly one `SIGKILL` to the **owned** group of `owned_child`, after re-proving it.
+    ///
+    /// The leader pid is derived here from the caller's own `Child` handle, never from a parameter;
+    /// `descendant_pid` is used only to prove that the descendant really sits in that group. The
+    /// group number is therefore never caller-selected, and no generic signaller exists: this
+    /// function cannot be asked to signal an arbitrary group, PID `0`, or `-1`.
+    ///
+    /// The pre-call `try_wait` bracket narrows, but does **not** eliminate, the window in which the
+    /// leader could exit and its pid be reused. It is not a race-free lifetime pin, and no caller may
+    /// present it as hostile-descendant containment.
+    pub(crate) fn terminate_owned_group_v1(
+        owned_child: &mut Child,
+        descendant_pid: u32,
+    ) -> Result<GroupSignalOutcomeV1, GroupSignalRefusalV1> {
+        let handle_pid = owned_child.id();
+        let leader_pid =
+            i32::try_from(handle_pid).map_err(|_| GroupSignalRefusalV1::BadIdentity)?;
+        if leader_pid <= 1 || descendant_pid == handle_pid || descendant_pid <= 1 {
+            return Err(GroupSignalRefusalV1::BadIdentity);
+        }
+        if !matches!(owned_child.try_wait(), Ok(None)) {
+            return Err(GroupSignalRefusalV1::LeaderNotLive);
+        }
+
+        let leader = observe_process_identity_v1(Some(handle_pid))
+            .map_err(|_| GroupSignalRefusalV1::IdentityMismatch)?;
+        if leader.group != handle_pid || leader.session != handle_pid {
+            return Err(GroupSignalRefusalV1::IdentityMismatch);
+        }
+        let descendant = observe_process_identity_v1(Some(descendant_pid))
+            .map_err(|_| GroupSignalRefusalV1::IdentityMismatch)?;
+        if descendant.group != handle_pid || descendant.session != handle_pid {
+            return Err(GroupSignalRefusalV1::IdentityMismatch);
+        }
+
+        // The verified group must not be this process's own group: a group signal that could reach
+        // the supervising parent is refused before the call rather than discovered afterwards.
+        let own_group =
+            own_process_group_v1().map_err(|_| GroupSignalRefusalV1::IdentityMismatch)?;
+        if own_group == leader.group {
+            return Err(GroupSignalRefusalV1::IdentityMismatch);
+        }
+
+        // Recheck the same handle immediately before signalling, so a leader that exited during the
+        // observations above cannot be signalled by a stale identity this call just derived.
+        if !matches!(owned_child.try_wait(), Ok(None)) {
+            return Err(GroupSignalRefusalV1::LeaderNotLive);
+        }
+
+        let target = leader_pid
+            .checked_neg()
+            .ok_or(GroupSignalRefusalV1::BadIdentity)?;
+
+        // SAFETY: `kill` takes a `pid_t` and a signal number and performs no memory access, so no
+        // pointer, allocation or Rust state is involved. `target` is the negation of a positive pid
+        // this function just derived from the caller's own `Child` handle, which is the kernel's
+        // documented "this process group" selector; it can never be `0` or `-1`, because
+        // `leader_pid > 1` was enforced above and `checked_neg` refused any overflow. The group was
+        // verified as the leader's own and proved different from this process's group, so the signal
+        // cannot reach the supervising parent, a foreign group or a caller-selected group. The
+        // signal is the fixed `SIGKILL` constant, never a caller-supplied number.
+        let rc = unsafe { libc::kill(target, libc::SIGKILL) };
+
+        if rc != 0 {
+            return Err(GroupSignalRefusalV1::SignalRejected);
+        }
+        Ok(GroupSignalOutcomeV1 {
+            leader_pid: handle_pid,
+            descendant_pid,
+            group: leader.group,
+            session: leader.session,
+        })
+    }
+
+    /// The bounded, kernel-backed run state of one observed pid.
+    ///
+    /// `Running` and `Zombie` both carry the kernel's **start-time** identity, so a caller can prove
+    /// that the state it read belongs to the same process it observed earlier and not to a recycled
+    /// pid. A zombie is non-running but is **not** parent-reaped by this process.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub(crate) enum ProcessStateV1 {
+        /// The kernel reports the process as alive and not terminated.
+        Running {
+            /// The kernel's `starttime` identity for this process.
+            start_time: u64,
+        },
+        /// The kernel reports the process as a zombie: terminated, awaiting its own parent's reap.
+        Zombie {
+            /// The kernel's `starttime` identity for this process.
+            start_time: u64,
+        },
+        /// No `/proc` entry exists for the pid any more.
+        Gone,
+    }
+
+    /// Why one `/proc` observation was refused rather than reported.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub(crate) enum ProcessStateRefusalV1 {
+        /// The record existed but could not be read.
+        Unreadable,
+        /// The record existed but was truncated, non-UTF-8, or off-schema.
+        Malformed,
+    }
+
+    /// Observes one pid's run state and start-time identity from `/proc`, bounded and read-only.
+    ///
+    /// Nothing here mutates state, sends a signal, waits on a child or scans a process table: it
+    /// opens exactly one fixed `/proc/<pid>/stat` path for one already-validated positive pid. An
+    /// absent entry is reported as [`ProcessStateV1::Gone`]; anything unreadable or off-schema is a
+    /// typed refusal, so an inconclusive read can never be presented as a termination.
+    pub(crate) fn observe_process_state_v1(
+        pid: u32,
+    ) -> Result<ProcessStateV1, ProcessStateRefusalV1> {
+        if pid <= 1 {
+            return Err(ProcessStateRefusalV1::Malformed);
+        }
+        let path = format!("/proc/{pid}/stat");
+        let file = match std::fs::File::open(&path) {
+            Ok(file) => file,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                return Ok(ProcessStateV1::Gone);
+            }
+            Err(_) => return Err(ProcessStateRefusalV1::Unreadable),
+        };
+
+        let mut buffer = Vec::new();
+        let read = file
+            .take(PROC_STAT_READ_CAP)
+            .read_to_end(&mut buffer)
+            .map_err(|_| ProcessStateRefusalV1::Unreadable)?;
+        if u64::try_from(read).unwrap_or(u64::MAX) >= PROC_STAT_READ_CAP {
+            return Err(ProcessStateRefusalV1::Malformed);
+        }
+        let text = std::str::from_utf8(&buffer).map_err(|_| ProcessStateRefusalV1::Malformed)?;
+        parse_proc_stat_v1(text)
+    }
+
+    /// Parses one `/proc/<pid>/stat` record into a typed state and start-time identity.
+    ///
+    /// The command name is delimited by the **last** `)`, so a name that itself contains a space or a
+    /// bracket cannot shift the field offsets. Only the fixed state character and the fixed
+    /// start-time field are read; every other field is ignored rather than interpreted.
+    fn parse_proc_stat_v1(text: &str) -> Result<ProcessStateV1, ProcessStateRefusalV1> {
+        let open = text.find('(').ok_or(ProcessStateRefusalV1::Malformed)?;
+        let close = text.rfind(')').ok_or(ProcessStateRefusalV1::Malformed)?;
+        if close <= open {
+            return Err(ProcessStateRefusalV1::Malformed);
+        }
+        let rest = text
+            .get(close + 1..)
+            .ok_or(ProcessStateRefusalV1::Malformed)?;
+        let fields: Vec<&str> = rest.split_whitespace().collect();
+        if fields.len() <= PROC_STAT_START_TIME_OFFSET {
+            return Err(ProcessStateRefusalV1::Malformed);
+        }
+
+        let state = fields[0];
+        if state.len() != 1 {
+            return Err(ProcessStateRefusalV1::Malformed);
+        }
+        let start_time = fields[PROC_STAT_START_TIME_OFFSET]
+            .parse::<u64>()
+            .map_err(|_| ProcessStateRefusalV1::Malformed)?;
+
+        match state {
+            "R" | "S" | "D" | "I" | "T" | "t" | "W" | "P" => {
+                Ok(ProcessStateV1::Running { start_time })
+            }
+            "Z" | "X" | "x" => Ok(ProcessStateV1::Zombie { start_time }),
+            _ => Err(ProcessStateRefusalV1::Malformed),
+        }
+    }
+
     #[cfg(test)]
     mod tests {
         use super::*;
@@ -356,14 +574,18 @@ mod linux {
     }
 }
 
-// The three fixed entry points the safe façade consumes.
+// The fixed entry points the safe façade consumes.
 //
 // The implementation lives inside the positively Linux-gated `linux` module above, which keeps
-// every `unsafe` occurrence inside a provable gate; these re-exports only make the same three
-// fixed functions nameable from the rest of the crate. There is no general-purpose native API, no
-// caller-selected limit, no executable parameter and no Windows counterpart here.
+// every `unsafe` occurrence inside a provable gate; these re-exports only make the same fixed
+// items nameable from the rest of the crate. There is no general-purpose native API, no
+// caller-selected limit, no executable parameter and no Windows counterpart here: the two group
+// items are the owned-group termination request and the bounded `/proc` state observation that
+// `SOLO-WO-093 R01` added, and `SOLO-WO-094 R01` re-exports them so the façade's own imports
+// resolve on Linux.
 #[cfg(target_os = "linux")]
 pub(crate) use linux::{
-    install_linux_child_limits_v1, observe_process_identity_v1, own_process_group_v1,
-    read_limit_ceilings_v1,
+    GroupSignalRefusalV1, ProcessStateV1, install_linux_child_limits_v1,
+    observe_process_identity_v1, observe_process_state_v1, own_process_group_v1,
+    read_limit_ceilings_v1, terminate_owned_group_v1,
 };

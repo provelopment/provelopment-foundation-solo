@@ -1531,3 +1531,265 @@ fn n090_02_both_session_modes_stay_unsupported_after_the_correction() {
         );
     }
 }
+
+/// The group parent's single fixed deadline, in milliseconds.
+///
+/// It bounds the readiness handoff, both identity proofs, the one group signal, the leader reap and
+/// the descendant observation together, and it starts before leader spawn.
+#[cfg(target_os = "linux")]
+const GROUP_DEADLINE_MS: u64 = 15_000;
+
+/// `N093-01`: on real Ubuntu CI the fixed parent proves both kernel identities of one live leader and
+/// one live descendant, sends exactly one `SIGKILL` to the group it owns, reaps its own leader, and
+/// independently observes that same descendant no longer running.
+#[cfg(target_os = "linux")]
+#[test]
+fn n093_01_the_real_parent_terminates_its_owned_group_and_observes_the_descendant() {
+    let observed = run(&["--internal-media-host-probe-v1", "group-parent"]);
+    assert!(
+        !observed.timed_out,
+        "the group proof must finish inside its own budget"
+    );
+    assert_eq!(
+        observed.exit_code,
+        Some(0),
+        "the group proof must succeed: stdout={:?} stderr={:?}",
+        observed.stdout,
+        observed.stderr
+    );
+    assert!(
+        observed.stderr.is_empty(),
+        "a live, orderly group run says nothing on stderr"
+    );
+    assert!(
+        observed.stdout.starts_with("media_host_group=terminated "),
+        "the accepted group marker is exact: {:?}",
+        observed.stdout
+    );
+    assert_eq!(
+        observed.stdout.matches('\n').count(),
+        1,
+        "exactly one evidence line, never a partial one first"
+    );
+    assert!(
+        !observed.stdout.contains("SOLO-MEDIA-HOST-GROUP-V1")
+            && !observed.stdout.contains("SOLO-MEDIA-HOST-GROUP-DESC-V1"),
+        "neither readiness record may leak into the accepted line"
+    );
+
+    let fields = evidence_fields(&observed.stdout);
+    assert_eq!(
+        fields.len(),
+        9,
+        "the marker plus eight fixed fields: {fields:?}"
+    );
+    assert_eq!(fields[0].0, "media_host_group");
+    assert_eq!(fields[0].1, "terminated");
+
+    let leader = numeric(&fields, "leader_pid");
+    let descendant = numeric(&fields, "descendant_pid");
+    assert!(leader > 1, "a real leader has a positive pid");
+    assert!(descendant > 1, "a real descendant has a positive pid");
+    assert_ne!(
+        descendant, leader,
+        "the descendant must be a different process from its leader"
+    );
+    assert_eq!(
+        numeric(&fields, "pgid"),
+        leader,
+        "the group is the leader's own pid"
+    );
+    assert_eq!(
+        numeric(&fields, "sid"),
+        leader,
+        "the session is the leader's own pid"
+    );
+    assert_eq!(numeric(&fields, "signal"), 9, "the one signal is SIGKILL");
+    assert_eq!(
+        numeric(&fields, "leader_reaped"),
+        1,
+        "the leader was reaped"
+    );
+    assert_eq!(
+        numeric(&fields, "descendant_nonrunning"),
+        1,
+        "the same descendant was observed non-running"
+    );
+
+    let wall_ms = numeric(&fields, "wall_ms");
+    assert!(
+        wall_ms > 0 && wall_ms < GROUP_DEADLINE_MS,
+        "the run decided itself strictly inside its 15 000 ms deadline: {wall_ms}"
+    );
+    report_observation(
+        "n093_group",
+        &format!(
+            "terminated leader_pid={leader} descendant_pid={descendant} pgid={leader} \
+             sid={leader} signal=9 leader_reaped=1 descendant_nonrunning=1 wall_ms={wall_ms}"
+        ),
+    );
+}
+
+/// `N093-02`: on real Ubuntu CI the fixed invalid-readiness path produces exactly one typed refusal
+/// and no accepted output, and — by construction, since the signal path is unreachable without an
+/// accepted record — zero group-target `kill` calls. The leader itself is still reaped with a checked
+/// wait, or the reap failure would override the refusal.
+#[cfg(target_os = "linux")]
+#[test]
+fn n093_02_the_invalid_readiness_path_refuses_before_any_group_signal() {
+    let observed = run(&["--internal-media-host-probe-v1", "group-invalid-parent"]);
+    assert!(
+        !observed.timed_out,
+        "the negative must decide itself inside the fixed budget"
+    );
+    assert_eq!(
+        observed.exit_code,
+        Some(3),
+        "the negative must refuse with the internal status: stdout={:?} stderr={:?}",
+        observed.stdout,
+        observed.stderr
+    );
+    assert!(
+        observed.stdout.is_empty(),
+        "the negative must print no accepted output at all: {:?}",
+        observed.stdout
+    );
+    assert_eq!(
+        observed.stderr, "error: MEDIA_HOST_PROBE_REFUSED: HOST_OUTPUT_INVALID\n",
+        "the negative must name the output refusal before any identity authority"
+    );
+    report_observation(
+        "n093_refusal",
+        &format!(
+            "invalid_readiness=HOST_OUTPUT_INVALID stdout_bytes=0 group_signal=none \
+             leader_cleanup=checked wall_ms={}",
+            observed.elapsed_ms
+        ),
+    );
+}
+
+/// `N093-03`: a direct, unsupervised leader invocation and every wrong, duplicated, extra or
+/// misordered token refuse, print no evidence and launch no grandchild. A direct descendant may
+/// legitimately attest only its own inherited identity, so it must at least never emit evidence.
+#[cfg(target_os = "linux")]
+#[test]
+fn n093_03_direct_group_invocations_and_every_wrong_token_refuse() {
+    for mode in ["group-leader", "group-invalid-leader"] {
+        let observed = run(&["--internal-media-host-probe-v1", mode]);
+        assert!(!observed.timed_out, "{mode} must not hang");
+        let code = observed
+            .exit_code
+            .expect("a direct group mode must exit with a status, not a signal");
+        report_observation("n093_direct", &format!("{mode} exit={code}"));
+        assert!(
+            matches!(code, 71 | 77),
+            "a direct {mode} refuses its inherited ceilings or its identity: {code}"
+        );
+        assert!(
+            observed.stdout.is_empty(),
+            "{mode} must print neither readiness nor evidence when invoked directly"
+        );
+    }
+
+    let descendant = run(&["--internal-media-host-probe-v1", "group-descendant"]);
+    assert!(!descendant.timed_out, "a direct descendant must not hang");
+    assert!(
+        matches!(
+            descendant.exit_code,
+            Some(0) | Some(71) | Some(77) | Some(79)
+        ),
+        "a direct descendant refuses its inherited ceilings or identity, or merely attests \
+         its own inherited group: {:?}",
+        descendant.exit_code
+    );
+    assert!(
+        !descendant.stdout.contains("media_host_group="),
+        "a direct descendant can never emit group evidence"
+    );
+
+    for tokens in [
+        vec!["--internal-media-host-probe-v1"],
+        vec!["--internal-media-host-probe-v1", "group"],
+        vec!["--internal-media-host-probe-v1", "GROUP-PARENT"],
+        vec!["--internal-media-host-probe-v1", "group-parents"],
+        vec![
+            "--internal-media-host-probe-v1",
+            "group-parent",
+            "group-parent",
+        ],
+        vec!["--internal-media-host-probe-v1", "group-parent", "extra"],
+    ] {
+        let observed = run(&tokens);
+        assert!(!observed.timed_out, "a wrong token must decide immediately");
+        assert_eq!(
+            observed.exit_code,
+            Some(3),
+            "a wrong token must refuse: {tokens:?}"
+        );
+        assert!(observed.stdout.is_empty(), "a wrong token prints nothing");
+        assert_eq!(
+            observed.stderr, "error: MEDIA_HOST_PROBE_REFUSED: INTERNAL_MODE_INVALID\n",
+            "a wrong token must name the closed mode refusal: {tokens:?}"
+        );
+    }
+}
+
+/// `N093-04`: on `windows-2025` every new group mode refuses before any spawn, kernel query, sleep or
+/// signal, and the earlier Windows behaviour is unchanged.
+#[cfg(not(target_os = "linux"))]
+#[test]
+fn n093_04_every_group_mode_is_unsupported_before_any_child_exists() {
+    for mode in [
+        "group-parent",
+        "group-leader",
+        "group-descendant",
+        "group-invalid-parent",
+        "group-invalid-leader",
+    ] {
+        let observed = run(&["--internal-media-host-probe-v1", mode]);
+        assert!(!observed.timed_out, "{mode} must not hang");
+        assert_eq!(
+            observed.exit_code,
+            Some(3),
+            "the {mode} mode must refuse on this host"
+        );
+        assert!(
+            observed.stdout.is_empty(),
+            "no group record and no evidence without a child: {mode}"
+        );
+        assert_eq!(
+            observed.stderr, "error: MEDIA_HOST_PROBE_REFUSED: HOST_UNSUPPORTED\n",
+            "the {mode} mode must name HOST_UNSUPPORTED"
+        );
+    }
+}
+
+/// `N093-06`: the public CLI is unchanged and every earlier evidence marker keeps its exact meaning,
+/// so no group result can be confused with an earlier proof.
+#[test]
+fn n093_06_the_public_cli_and_every_earlier_marker_are_unchanged() {
+    let public = run(&["group-parent"]);
+    assert_eq!(
+        public.exit_code,
+        Some(2),
+        "the public CLI still refuses an unknown subcommand"
+    );
+    assert!(
+        public.stdout.is_empty(),
+        "the public CLI prints no evidence for an unknown subcommand"
+    );
+
+    let markers = [
+        "media_host_wall=terminated",
+        "media_host_as=limit_enforced",
+        "media_host_cpu=kernel_terminated",
+        "media_host_session=live_attested",
+        "media_host_probe=accepted",
+    ];
+    for marker in markers {
+        assert_ne!(
+            marker, "media_host_group=terminated",
+            "the group marker must stay distinct from every earlier marker"
+        );
+    }
+}

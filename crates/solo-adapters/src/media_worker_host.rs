@@ -259,6 +259,87 @@ pub const SESSION_CHILD_SLEEP_MS: u64 = 4_000;
 /// address-space deadlines, and well inside the integration case's own 20 000 ms budget.
 pub const SESSION_DEADLINE_MS: u64 = 15_000;
 
+/// The internal token of the one fixed **group supervising parent** of the `R03.C3` group proof.
+///
+/// `SOLO-WO-093 R01` adds it, and only it can create the group leader. The token is honoured only
+/// in second position behind the reserved flag, so it can never be reached from the public CLI.
+pub const INTERNAL_PROBE_GROUP_PARENT_TOKEN_V1: &str = "group-parent";
+
+/// The internal token of the one fixed **group leader**.
+///
+/// The parent re-executes this same executable into this mode, which becomes its own session and
+/// process-group leader under the unchanged pre-exec installer and starts exactly one descendant.
+pub const INTERNAL_PROBE_GROUP_LEADER_TOKEN_V1: &str = "group-leader";
+
+/// The internal token of the one fixed **group descendant**.
+///
+/// It is started only by the group leader, without a second `setsid`, so it inherits that leader's
+/// group, session and both ceilings, and it has one fixed finite wall lifetime.
+pub const INTERNAL_PROBE_GROUP_DESCENDANT_TOKEN_V1: &str = "group-descendant";
+
+/// The internal token of the fixed **invalid-readiness parent** of the group negative.
+///
+/// This parent uses the same pre-exec limits and the same deadline, but its leader creates **no**
+/// descendant and emits one deliberately malformed readiness record, so the parent must refuse
+/// before any group identity authority exists and without issuing any group signal.
+pub const INTERNAL_PROBE_GROUP_INVALID_PARENT_TOKEN_V1: &str = "group-invalid-parent";
+
+/// The internal token of the fixed **invalid-readiness leader**.
+///
+/// It proves the same fixed ceilings and session identity, creates no descendant, then writes one
+/// closed-but-wrong record: twelve tokens where the schema has eleven.
+pub const INTERNAL_PROBE_GROUP_INVALID_LEADER_TOKEN_V1: &str = "group-invalid-leader";
+
+/// The exact marker that begins the group leader's single readiness record.
+///
+/// The record carries the leader's own `pid`/`pgid`/`sid`, the descendant's `pid`/`pgid`/`sid` and
+/// the four ceiling halves. Every value is re-checked by the parent against its own kernel
+/// observations, so no field of this text can authorize anything by itself.
+#[cfg(any(target_os = "linux", test))]
+pub const GROUP_LEADER_READY_MARKER_V1: &str = "SOLO-MEDIA-HOST-GROUP-V1";
+
+/// The exact marker that begins the fixed descendant's own readiness record.
+///
+/// Only the leader reads it, and only to prove that the descendant it spawned is really the process
+/// that answered, with the leader's group and session.
+#[cfg(any(target_os = "linux", test))]
+pub const GROUP_DESCENDANT_READY_MARKER_V1: &str = "SOLO-MEDIA-HOST-GROUP-DESC-V1";
+
+/// The exact marker that begins the one accepted group evidence line.
+///
+/// It is distinct from every earlier marker, so no existing regression can be re-read as a group
+/// result and no group result can be mistaken for a session, CPU, address-space or wall proof.
+pub const GROUP_EVIDENCE_MARKER_V1: &str = "media_host_group=terminated";
+
+/// The one signal the group proof may send: `SIGKILL`, written as its fixed Linux number.
+pub const GROUP_TERMINATION_SIGNAL_V1: i32 = 9;
+
+/// The single group parent deadline: **15 000 milliseconds**, started **before** leader spawn.
+///
+/// It bounds the readiness handoff, the identity queries, the one group signal, the leader reap and
+/// the descendant non-running observation together. No later step opens a second budget.
+pub const GROUP_DEADLINE_MS: u64 = 15_000;
+
+/// The leader's bounded wait for the descendant's own readiness record, in milliseconds.
+///
+/// It is a sub-budget of the single deadline above, never an extra one.
+#[cfg(target_os = "linux")]
+pub const GROUP_DESCENDANT_READY_DEADLINE_MS: u64 = 5_000;
+
+/// The fixed finite wall lifetime of the one descendant, in milliseconds.
+///
+/// This is the safety net for a refusal on the positive path: a descendant that is never signalled
+/// still ends by itself inside this window, so no long-running test process can be left behind.
+#[cfg(target_os = "linux")]
+pub const GROUP_DESCENDANT_LIFETIME_MS: u64 = 8_000;
+
+/// How long the leader holds after its readiness record, in milliseconds.
+///
+/// The parent is expected to signal the group well inside this window. A leader that survives it
+/// refuses, so a parent that never signalled can never be reported as a group termination.
+#[cfg(target_os = "linux")]
+pub const GROUP_LEADER_HOLD_MS: u64 = 10_000;
+
 /// The fixed `RLIMIT_AS` profile: 536 870 912 bytes (512 MiB), soft **and** hard.
 ///
 /// This is the single source of truth: the Linux pre-exec closure in
@@ -329,6 +410,28 @@ const CHILD_EXIT_SESSION_READBACK_FAILED: u8 = 76;
 #[cfg(target_os = "linux")]
 const CHILD_EXIT_SESSION_MISMATCH: u8 = 77;
 
+/// Child exit status: the group leader could not start its one fixed descendant.
+///
+/// Only the Linux leader can produce it. Nothing is printed, so a leader that never acquired a
+/// descendant can never emit a readiness record.
+#[cfg(target_os = "linux")]
+const CHILD_EXIT_GROUP_SPAWN_FAILED: u8 = 78;
+
+/// Child exit status: the group descendant could not be positively identified in the leader's group.
+///
+/// This is also the expected result of a direct, unsupervised `group-descendant` invocation: without
+/// the leader's `setsid` the descendant is not inside the leader's group and session, so it refuses
+/// before its readiness record and before its finite sleep.
+#[cfg(target_os = "linux")]
+const CHILD_EXIT_GROUP_DESCENDANT_MISMATCH: u8 = 79;
+
+/// Child exit status: the group leader outlived its own fixed hold, so no group signal ever came.
+///
+/// A surviving leader is not a group termination. It refuses, and its descendant still ends by
+/// itself inside its own finite lifetime.
+#[cfg(target_os = "linux")]
+const CHILD_EXIT_GROUP_LEADER_SURVIVED: u8 = 80;
+
 /// The closed refusal vocabulary of the limit smoke probe.
 ///
 /// Every variant is a fixed token with no OS error text, no path, no environment string and no
@@ -351,6 +454,12 @@ pub enum SmokeRefusalV1 {
     HostOutputInvalid,
     /// The single child could not be reaped, so no result may be claimed.
     HostReapFailed,
+    /// The fixed descendant's post-signal non-running state could not be established from the
+    /// kernel for the **same** observed identity, so no group termination may be claimed.
+    ///
+    /// It is deliberately distinct from [`Self::HostReapFailed`]: the leader reap and the descendant
+    /// observation are separate facts, and collapsing them would let one stand for the other.
+    HostDescendantUnverified,
     /// The reserved internal flag was present but its token shape was wrong.
     InternalModeInvalid,
 }
@@ -367,6 +476,7 @@ impl SmokeRefusalV1 {
             Self::HostExitAbnormal => "HOST_EXIT_ABNORMAL",
             Self::HostOutputInvalid => "HOST_OUTPUT_INVALID",
             Self::HostReapFailed => "HOST_REAP_FAILED",
+            Self::HostDescendantUnverified => "HOST_DESCENDANT_UNVERIFIED",
             Self::InternalModeInvalid => "INTERNAL_MODE_INVALID",
         }
     }
@@ -419,6 +529,16 @@ pub enum InternalProbeModeV1 {
     SessionParent,
     /// Run the one fixed, trusted child that attests its own kernel session identity and sleeps.
     SessionChild,
+    /// Run the one fixed supervising parent of the bounded group and descendant lifecycle proof.
+    GroupParent,
+    /// Run the one fixed group leader, which starts exactly one fixed descendant.
+    GroupLeader,
+    /// Run the one fixed group descendant, which inherits the leader's group and session.
+    GroupDescendant,
+    /// Run the one fixed supervising parent of the invalid-readiness group negative.
+    GroupInvalidParent,
+    /// Run the one fixed leader that emits a deliberately malformed readiness record.
+    GroupInvalidLeader,
 }
 
 /// What the composition root must emit for an internal mode, and with which exit status.
@@ -469,6 +589,16 @@ pub fn classify_internal_arguments_v1(
         Ok(InternalProbeModeV1::SessionParent)
     } else if mode == OsStr::new(INTERNAL_PROBE_SESSION_CHILD_TOKEN_V1) {
         Ok(InternalProbeModeV1::SessionChild)
+    } else if mode == OsStr::new(INTERNAL_PROBE_GROUP_PARENT_TOKEN_V1) {
+        Ok(InternalProbeModeV1::GroupParent)
+    } else if mode == OsStr::new(INTERNAL_PROBE_GROUP_LEADER_TOKEN_V1) {
+        Ok(InternalProbeModeV1::GroupLeader)
+    } else if mode == OsStr::new(INTERNAL_PROBE_GROUP_DESCENDANT_TOKEN_V1) {
+        Ok(InternalProbeModeV1::GroupDescendant)
+    } else if mode == OsStr::new(INTERNAL_PROBE_GROUP_INVALID_PARENT_TOKEN_V1) {
+        Ok(InternalProbeModeV1::GroupInvalidParent)
+    } else if mode == OsStr::new(INTERNAL_PROBE_GROUP_INVALID_LEADER_TOKEN_V1) {
+        Ok(InternalProbeModeV1::GroupInvalidLeader)
     } else {
         Err(SmokeRefusalV1::InternalModeInvalid)
     }
@@ -1382,6 +1512,30 @@ impl SessionReapV1 {
     }
 }
 
+/// Classifies the **one real** `Child::wait()` outcome of a supervised group leader.
+///
+/// This is the production boundary the group supervisor uses immediately after `child.wait()`, so
+/// the failed-wait decision is ordinary checked code rather than a branch buried in the supervisor.
+/// Only `Ok` yields a signal status; every `Err` becomes [`SmokeRefusalV1::HostReapFailed`], which is
+/// what prevents a failed reap from ever reaching a success attempt or a reader join.
+///
+/// Linux-only because reading a signal from a wait status needs the Unix extension trait; no
+/// Windows counterpart exists and none is authorized.
+///
+/// # Errors
+///
+/// [`SmokeRefusalV1::HostReapFailed`] for any failed wait.
+#[cfg(target_os = "linux")]
+fn group_wait_signal_v1(
+    waited: std::io::Result<std::process::ExitStatus>,
+) -> Result<Option<i32>, SmokeRefusalV1> {
+    use std::os::unix::process::ExitStatusExt;
+
+    waited
+        .map(|status| status.signal())
+        .map_err(|_| SmokeRefusalV1::HostReapFailed)
+}
+
 /// The terminal plan for one early-readiness refusal cleanup.
 ///
 /// This is the production decision rule for that path: it decides **both** whether the capped
@@ -1449,6 +1603,346 @@ fn session_evidence_line(attestation: SessionAttestationV1) -> String {
     )
 }
 
+/// The leader's single readiness record, exactly as the parent parses it.
+///
+/// It carries the four ceiling halves, the leader's own `pid`/`pgid`/`sid` and the descendant's
+/// `pid`/`pgid`/`sid`. Nothing here is trusted on its own: the parent proves every identity again
+/// through its own kernel queries and refuses on any disagreement.
+#[cfg(any(target_os = "linux", test))]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct GroupChildObservationV1 {
+    /// The leader's `RLIMIT_AS` soft ceiling, in bytes.
+    pub address_space_soft: u64,
+    /// The leader's `RLIMIT_AS` hard ceiling, in bytes.
+    pub address_space_hard: u64,
+    /// The leader's `RLIMIT_CPU` soft ceiling, in seconds.
+    pub cpu_soft: u64,
+    /// The leader's `RLIMIT_CPU` hard ceiling, in seconds.
+    pub cpu_hard: u64,
+    /// The leader's own process id.
+    pub leader_pid: u64,
+    /// The leader's process-group id, which `setsid` must have made equal to `leader_pid`.
+    pub leader_pgid: u64,
+    /// The leader's session id, which `setsid` must have made equal to `leader_pid`.
+    pub leader_sid: u64,
+    /// The one descendant's process id, which must differ from the leader's.
+    pub descendant_pid: u64,
+    /// The descendant's process-group id, which must be the **leader's** pid.
+    pub descendant_pgid: u64,
+    /// The descendant's session id, which must be the **leader's** pid.
+    pub descendant_sid: u64,
+}
+
+/// The descendant's own readiness record, as the leader parses it.
+///
+/// Only the leader reads this, and only to prove that the process it spawned answered in its own
+/// inherited group and session.
+#[cfg(any(target_os = "linux", test))]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct GroupDescendantObservationV1 {
+    /// The descendant's own process id.
+    pub pid: u64,
+    /// The descendant's process-group id, inherited from the leader.
+    pub pgid: u64,
+    /// The descendant's session id, inherited from the leader.
+    pub sid: u64,
+}
+
+/// Parses the group leader's single readiness record, strictly.
+///
+/// Accepted form, exactly one line and nothing else:
+///
+/// ```text
+/// SOLO-MEDIA-HOST-GROUP-V1 as_soft=<u64> as_hard=<u64> cpu_soft=<u64> cpu_hard=<u64> pid=<u64> pgid=<u64> sid=<u64> descendant_pid=<u64> descendant_pgid=<u64> descendant_sid=<u64>
+/// ```
+///
+/// The marker, the ten field names and their order are fixed; every value is plain ASCII decimal
+/// with no sign, no prefix, no separator and no whitespace; a single trailing newline is required
+/// and a second line, a carriage return, a tab, a doubled space or any unknown, duplicated,
+/// missing, extra or reordered field is refused.
+///
+/// # Errors
+///
+/// [`SmokeRefusalV1::HostOutputInvalid`] for any shape defect.
+#[cfg(any(target_os = "linux", test))]
+pub fn parse_group_readiness_v1(text: &str) -> Result<GroupChildObservationV1, SmokeRefusalV1> {
+    let body = text
+        .strip_suffix('\n')
+        .ok_or(SmokeRefusalV1::HostOutputInvalid)?;
+    if body.contains('\n') || body.contains('\r') || body.contains('\t') {
+        return Err(SmokeRefusalV1::HostOutputInvalid);
+    }
+
+    let tokens: Vec<&str> = body.split(' ').collect();
+    if tokens.len() != 11 || tokens[0] != GROUP_LEADER_READY_MARKER_V1 {
+        return Err(SmokeRefusalV1::HostOutputInvalid);
+    }
+
+    Ok(GroupChildObservationV1 {
+        address_space_soft: field_value(tokens[1], "as_soft=")?,
+        address_space_hard: field_value(tokens[2], "as_hard=")?,
+        cpu_soft: field_value(tokens[3], "cpu_soft=")?,
+        cpu_hard: field_value(tokens[4], "cpu_hard=")?,
+        leader_pid: field_value(tokens[5], "pid=")?,
+        leader_pgid: field_value(tokens[6], "pgid=")?,
+        leader_sid: field_value(tokens[7], "sid=")?,
+        descendant_pid: field_value(tokens[8], "descendant_pid=")?,
+        descendant_pgid: field_value(tokens[9], "descendant_pgid=")?,
+        descendant_sid: field_value(tokens[10], "descendant_sid=")?,
+    })
+}
+
+/// Parses the fixed descendant's single readiness record, strictly.
+///
+/// Accepted form, exactly one line and nothing else:
+///
+/// ```text
+/// SOLO-MEDIA-HOST-GROUP-DESC-V1 pid=<u64> pgid=<u64> sid=<u64>
+/// ```
+///
+/// # Errors
+///
+/// [`SmokeRefusalV1::HostOutputInvalid`] for any shape defect.
+#[cfg(any(target_os = "linux", test))]
+pub fn parse_group_descendant_readiness_v1(
+    text: &str,
+) -> Result<GroupDescendantObservationV1, SmokeRefusalV1> {
+    let body = text
+        .strip_suffix('\n')
+        .ok_or(SmokeRefusalV1::HostOutputInvalid)?;
+    if body.contains('\n') || body.contains('\r') || body.contains('\t') {
+        return Err(SmokeRefusalV1::HostOutputInvalid);
+    }
+
+    let tokens: Vec<&str> = body.split(' ').collect();
+    if tokens.len() != 4 || tokens[0] != GROUP_DESCENDANT_READY_MARKER_V1 {
+        return Err(SmokeRefusalV1::HostOutputInvalid);
+    }
+
+    Ok(GroupDescendantObservationV1 {
+        pid: field_value(tokens[1], "pid=")?,
+        pgid: field_value(tokens[2], "pgid=")?,
+        sid: field_value(tokens[3], "sid=")?,
+    })
+}
+
+/// Validates the parsed leader record against the fixed profile and the parent's own handle.
+///
+/// The record must state the compile-time ceilings, a leader that is strictly its own group and
+/// session leader, a descendant that is strictly **not** the leader, and a descendant that shares
+/// exactly the leader's group and session. `expected_leader_pid` is the pid this parent's own
+/// `Child` handle reported, so a record authored by any other process is refused.
+///
+/// # Errors
+///
+/// [`SmokeRefusalV1::HostOutputInvalid`] for a non-UTF-8 record;
+/// [`SmokeRefusalV1::HostLimitUnavailable`] for any off-profile ceiling or disagreeing identity.
+#[cfg(any(target_os = "linux", test))]
+pub fn validate_group_readiness_v1(
+    line: &[u8],
+    expected_leader_pid: u64,
+) -> Result<GroupChildObservationV1, SmokeRefusalV1> {
+    let text = std::str::from_utf8(line).map_err(|_| SmokeRefusalV1::HostOutputInvalid)?;
+    let observation = parse_group_readiness_v1(text)?;
+
+    let limits_match = observation.address_space_soft == PROFILE_V1_AS_BYTES
+        && observation.address_space_hard == PROFILE_V1_AS_BYTES
+        && observation.cpu_soft == PROFILE_V1_CPU_SECONDS
+        && observation.cpu_hard == PROFILE_V1_CPU_SECONDS;
+    let leader_is_own_handle =
+        expected_leader_pid > 1 && observation.leader_pid == expected_leader_pid;
+    let leader_is_own_leader = observation.leader_pid > 1
+        && observation.leader_pgid == observation.leader_pid
+        && observation.leader_sid == observation.leader_pid;
+    let descendant_is_distinct =
+        observation.descendant_pid > 1 && observation.descendant_pid != observation.leader_pid;
+    let descendant_is_in_group = observation.descendant_pgid == observation.leader_pid
+        && observation.descendant_sid == observation.leader_pid;
+
+    if !limits_match
+        || !leader_is_own_handle
+        || !leader_is_own_leader
+        || !descendant_is_distinct
+        || !descendant_is_in_group
+    {
+        return Err(SmokeRefusalV1::HostLimitUnavailable);
+    }
+    Ok(observation)
+}
+
+/// Validates the descendant record against the leader's own handle and group.
+///
+/// The record must name exactly the pid the leader's `Child` handle reported, that pid must not be
+/// the leader itself, and both reported identities must be the leader's pid — the group and session
+/// the descendant inherited, never a new one of its own.
+///
+/// # Errors
+///
+/// [`SmokeRefusalV1::HostOutputInvalid`] for a non-UTF-8 record;
+/// [`SmokeRefusalV1::HostLimitUnavailable`] for a disagreeing identity.
+#[cfg(any(target_os = "linux", test))]
+pub fn validate_group_descendant_readiness_v1(
+    line: &[u8],
+    expected_descendant_pid: u64,
+    leader_pid: u64,
+) -> Result<GroupDescendantObservationV1, SmokeRefusalV1> {
+    let text = std::str::from_utf8(line).map_err(|_| SmokeRefusalV1::HostOutputInvalid)?;
+    let observation = parse_group_descendant_readiness_v1(text)?;
+
+    let is_own_handle =
+        expected_descendant_pid > 1 && leader_pid > 1 && observation.pid == expected_descendant_pid;
+    let is_distinct = observation.pid != leader_pid;
+    let inherited = observation.pgid == leader_pid && observation.sid == leader_pid;
+
+    if !is_own_handle || !is_distinct || !inherited {
+        return Err(SmokeRefusalV1::HostLimitUnavailable);
+    }
+    Ok(observation)
+}
+
+/// The parent's raw, unvalidated material for one group lifecycle attempt.
+///
+/// It carries only facts the **parent itself** established: its own handle's pids, its own kernel
+/// queries of the leader and the descendant, the one signal it issued and the status it reaped, and
+/// the bounded `/proc` observations of the same descendant identity. Nothing in it is evidence until
+/// [`validate_group_attempt_v1`] accepts it, and no child text can set any field.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct GroupAttemptV1 {
+    /// The exact positive pid this parent's own `Child` handle reported at spawn.
+    pub leader_pid: u64,
+    /// The exact positive pid this parent independently observed for the one descendant.
+    pub descendant_pid: u64,
+    /// The leader's kernel process-group id, observed by this parent while the leader was live.
+    pub leader_pgid: u64,
+    /// The leader's kernel session id, observed by this parent while the leader was live.
+    pub leader_sid: u64,
+    /// The descendant's kernel process-group id, observed by this parent before the signal.
+    pub descendant_pgid: u64,
+    /// The descendant's kernel session id, observed by this parent before the signal.
+    pub descendant_sid: u64,
+    /// Whether `try_wait()` reported the leader still running immediately **before** the signal.
+    pub live_before: bool,
+    /// Whether `try_wait()` reported the leader still running immediately **after** the queries.
+    pub live_after: bool,
+    /// Whether this parent's one group-directed signal was really accepted by the kernel.
+    pub group_signal_issued: bool,
+    /// The signal number the leader's own wait status reported, or `None` when it was unobservable.
+    pub leader_signal: Option<i32>,
+    /// Whether this parent actually reaped its own directly owned leader.
+    pub leader_reaped: bool,
+    /// The descendant's kernel start-time identity observed **before** the signal.
+    pub descendant_start_before: u64,
+    /// The same descendant's kernel start-time identity observed **after** the signal.
+    pub descendant_start_after: u64,
+    /// Whether the same descendant was observed non-running after the signal.
+    pub descendant_nonrunning: bool,
+    /// The parent-measured wall time from **before** leader spawn.
+    pub wall_ms: u64,
+}
+
+/// The complete, validated group lifecycle result.
+///
+/// It only ever exists after the readiness record was accepted, both identities were proved by this
+/// parent, exactly one group signal was accepted, the leader was reaped with the expected signal,
+/// and the same descendant was observed non-running. It says nothing about **reaping** the
+/// descendant: the parent holds no handle for it and must never claim one.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct GroupTerminationV1 {
+    /// The leader pid this parent owned and reaped.
+    pub leader_pid: u64,
+    /// The descendant pid this parent observed start and then observe stop.
+    pub descendant_pid: u64,
+    /// The verified group identity, which is the leader's pid.
+    pub group: u64,
+    /// The verified session identity, which is the leader's pid.
+    pub session: u64,
+    /// The accepted termination signal.
+    pub signal: i32,
+    /// The parent-measured wall time.
+    pub wall_ms: u64,
+}
+
+/// Validates one raw group attempt into accepted evidence, or refuses.
+///
+/// Every refusal path returns a typed refusal and therefore no evidence line at all. The rule keeps
+/// the facts the order requires **distinct**: a signal **request**, a leader **reap**, a descendant
+/// **non-running observation**, and a descendant **reap** — the last of which is unrepresentable
+/// here, because neither this function nor its result type has a field for it.
+///
+/// # Errors
+///
+/// [`SmokeRefusalV1::HostLimitUnavailable`] for a missing group signal or a disagreeing identity;
+/// [`SmokeRefusalV1::HostExitAbnormal`] for a leader not proved live or not reporting exactly the
+/// accepted signal; [`SmokeRefusalV1::HostReapFailed`] for a missing leader reap;
+/// [`SmokeRefusalV1::HostDescendantUnverified`] for a descendant not observed non-running under the
+/// **same** start-time identity; [`SmokeRefusalV1::HostWallTimeout`] for a measurement at or beyond
+/// the fixed deadline.
+pub fn validate_group_attempt_v1(
+    attempt: GroupAttemptV1,
+) -> Result<GroupTerminationV1, SmokeRefusalV1> {
+    if !attempt.group_signal_issued {
+        return Err(SmokeRefusalV1::HostLimitUnavailable);
+    }
+
+    let leader_ok = attempt.leader_pid > 1
+        && attempt.leader_pgid == attempt.leader_pid
+        && attempt.leader_sid == attempt.leader_pid;
+    let descendant_ok = attempt.descendant_pid > 1
+        && attempt.descendant_pid != attempt.leader_pid
+        && attempt.descendant_pgid == attempt.leader_pid
+        && attempt.descendant_sid == attempt.leader_pid;
+    if !leader_ok || !descendant_ok {
+        return Err(SmokeRefusalV1::HostLimitUnavailable);
+    }
+
+    if !attempt.live_before || !attempt.live_after {
+        return Err(SmokeRefusalV1::HostExitAbnormal);
+    }
+    if attempt.leader_signal != Some(GROUP_TERMINATION_SIGNAL_V1) {
+        return Err(SmokeRefusalV1::HostExitAbnormal);
+    }
+    if !attempt.leader_reaped {
+        return Err(SmokeRefusalV1::HostReapFailed);
+    }
+
+    if !attempt.descendant_nonrunning
+        || attempt.descendant_start_before == 0
+        || attempt.descendant_start_after != attempt.descendant_start_before
+    {
+        return Err(SmokeRefusalV1::HostDescendantUnverified);
+    }
+
+    if attempt.wall_ms == 0 || attempt.wall_ms >= GROUP_DEADLINE_MS {
+        return Err(SmokeRefusalV1::HostWallTimeout);
+    }
+
+    Ok(GroupTerminationV1 {
+        leader_pid: attempt.leader_pid,
+        descendant_pid: attempt.descendant_pid,
+        group: attempt.leader_pgid,
+        session: attempt.leader_sid,
+        signal: GROUP_TERMINATION_SIGNAL_V1,
+        wall_ms: attempt.wall_ms,
+    })
+}
+
+/// The one fixed group evidence line, built only from an already validated termination.
+///
+/// `leader_reaped` and `descendant_nonrunning` are written from the parent's own lifecycle and
+/// observation values, never from any child text, and no field here can express a descendant reap.
+fn group_evidence_line(termination: GroupTerminationV1) -> String {
+    format!(
+        "{GROUP_EVIDENCE_MARKER_V1} leader_pid={} descendant_pid={} pgid={} sid={} signal={} \
+         leader_reaped=1 descendant_nonrunning=1 wall_ms={}\n",
+        termination.leader_pid,
+        termination.descendant_pid,
+        termination.group,
+        termination.session,
+        termination.signal,
+        termination.wall_ms
+    )
+}
+
 /// Runs the reserved internal mode, if — and only if — the arguments ask for it.
 ///
 /// `None` means the reserved flag was absent, so the ordinary public CLI must run unchanged.
@@ -1465,6 +1959,11 @@ pub fn run_internal_media_host_probe_v1(args: &[OsString]) -> Option<InternalPro
         Ok(InternalProbeModeV1::CpuChild) => Some(cpu_child_report()),
         Ok(InternalProbeModeV1::SessionParent) => Some(session_parent_report()),
         Ok(InternalProbeModeV1::SessionChild) => Some(session_child_report()),
+        Ok(InternalProbeModeV1::GroupParent) => Some(group_parent_report()),
+        Ok(InternalProbeModeV1::GroupLeader) => Some(group_leader_report()),
+        Ok(InternalProbeModeV1::GroupDescendant) => Some(group_descendant_report()),
+        Ok(InternalProbeModeV1::GroupInvalidParent) => Some(group_invalid_parent_report()),
+        Ok(InternalProbeModeV1::GroupInvalidLeader) => Some(group_invalid_leader_report()),
         Err(refusal) => Some(refusal_report(refusal)),
     }
 }
@@ -1821,6 +2320,158 @@ fn refusal_report(refusal: SmokeRefusalV1) -> InternalProbeReportV1 {
     }
 }
 
+/// Runs the one fixed Linux group lifecycle proof.
+///
+/// On Linux this starts exactly one `group-leader` under the unchanged pre-exec installer, accepts
+/// one bounded readiness record, re-proves both real identities through its own kernel queries,
+/// issues exactly one group-directed signal to the group it owns, reaps its own leader with a
+/// checked `Child::wait()`, and independently observes the same descendant non-running. Every other
+/// host refuses before creating anything.
+///
+/// # Errors
+///
+/// Returns a [`SmokeRefusalV1`] for every launch, readiness, identity, signal, reap, delegation or
+/// deadline failure.
+#[cfg(target_os = "linux")]
+pub fn run_internal_group_attempt_v1() -> Result<GroupAttemptV1, SmokeRefusalV1> {
+    linux::run_group_probe()
+}
+
+/// Runs the one fixed Linux group lifecycle proof, which this host cannot provide.
+///
+/// # Errors
+///
+/// Always [`SmokeRefusalV1::HostUnsupported`]; no leader, descendant, query or signal occurs.
+#[cfg(not(target_os = "linux"))]
+pub fn run_internal_group_attempt_v1() -> Result<GroupAttemptV1, SmokeRefusalV1> {
+    Err(SmokeRefusalV1::HostUnsupported)
+}
+
+/// Runs the fixed invalid-readiness group negative.
+///
+/// On Linux this starts exactly one `group-invalid-leader` under the same limits, receives its
+/// deliberately malformed record, refuses with [`SmokeRefusalV1::HostOutputInvalid`] **before** any
+/// group identity query, sends **zero** group signals, and reaps its own directly held leader with a
+/// checked `Child::wait()`. A failed reap overrides the readiness refusal.
+///
+/// # Errors
+///
+/// [`SmokeRefusalV1::HostOutputInvalid`] on the intended path; any other [`SmokeRefusalV1`] for a
+/// launch, deadline or unreaped-leader failure.
+#[cfg(target_os = "linux")]
+pub fn run_internal_group_invalid_attempt_v1() -> Result<(), SmokeRefusalV1> {
+    linux::run_group_invalid_probe()
+}
+
+/// Runs the invalid-readiness group negative, which this host cannot provide.
+///
+/// # Errors
+///
+/// Always [`SmokeRefusalV1::HostUnsupported`]; no leader is created and no record is read.
+#[cfg(not(target_os = "linux"))]
+pub fn run_internal_group_invalid_attempt_v1() -> Result<(), SmokeRefusalV1> {
+    Err(SmokeRefusalV1::HostUnsupported)
+}
+
+/// The group parent mode's whole result, as the composition root must print it.
+///
+/// As with the earlier proofs, the decision is made here in the platform-neutral layer, so a refusal
+/// — including a rejected signal, an unreaped leader or an unverified descendant — is decided by
+/// ordinary checked code rather than by the platform branch.
+fn group_parent_report() -> InternalProbeReportV1 {
+    match run_internal_group_attempt_v1().and_then(validate_group_attempt_v1) {
+        Ok(termination) => InternalProbeReportV1 {
+            exit_code: 0,
+            stdout: Some(group_evidence_line(termination)),
+            stderr: None,
+        },
+        Err(refusal) => refusal_report(refusal),
+    }
+}
+
+/// The invalid-readiness group parent's whole result.
+///
+/// The intended path is a refusal, so this wrapper can never carry a success line: a returning
+/// negative is itself treated as the closed output refusal it was supposed to produce.
+fn group_invalid_parent_report() -> InternalProbeReportV1 {
+    match run_internal_group_invalid_attempt_v1() {
+        Ok(()) => refusal_report(SmokeRefusalV1::HostOutputInvalid),
+        Err(refusal) => refusal_report(refusal),
+    }
+}
+
+/// The group leader mode's whole result.
+///
+/// The leader writes only its own readiness record to stdout, so this wrapper never carries a
+/// payload of its own: a leader that returns has refused, and reports its fixed status with no line.
+#[cfg(target_os = "linux")]
+fn group_leader_report() -> InternalProbeReportV1 {
+    match linux::run_group_leader() {
+        Ok(()) => InternalProbeReportV1 {
+            exit_code: 0,
+            stdout: None,
+            stderr: None,
+        },
+        Err(code) => InternalProbeReportV1 {
+            exit_code: code,
+            stdout: None,
+            stderr: None,
+        },
+    }
+}
+
+/// The group leader mode is refused on a host with no approved pre-exec boundary.
+#[cfg(not(target_os = "linux"))]
+fn group_leader_report() -> InternalProbeReportV1 {
+    refusal_report(SmokeRefusalV1::HostUnsupported)
+}
+
+/// The group descendant mode's whole result.
+#[cfg(target_os = "linux")]
+fn group_descendant_report() -> InternalProbeReportV1 {
+    match linux::run_group_descendant() {
+        Ok(()) => InternalProbeReportV1 {
+            exit_code: 0,
+            stdout: None,
+            stderr: None,
+        },
+        Err(code) => InternalProbeReportV1 {
+            exit_code: code,
+            stdout: None,
+            stderr: None,
+        },
+    }
+}
+
+/// The group descendant mode is refused on a host with no approved pre-exec boundary.
+#[cfg(not(target_os = "linux"))]
+fn group_descendant_report() -> InternalProbeReportV1 {
+    refusal_report(SmokeRefusalV1::HostUnsupported)
+}
+
+/// The invalid-readiness leader mode's whole result.
+#[cfg(target_os = "linux")]
+fn group_invalid_leader_report() -> InternalProbeReportV1 {
+    match linux::run_group_invalid_leader() {
+        Ok(()) => InternalProbeReportV1 {
+            exit_code: 0,
+            stdout: None,
+            stderr: None,
+        },
+        Err(code) => InternalProbeReportV1 {
+            exit_code: code,
+            stdout: None,
+            stderr: None,
+        },
+    }
+}
+
+/// The invalid-readiness leader mode is refused on a host with no approved pre-exec boundary.
+#[cfg(not(target_os = "linux"))]
+fn group_invalid_leader_report() -> InternalProbeReportV1 {
+    refusal_report(SmokeRefusalV1::HostUnsupported)
+}
+
 /// The Linux half: the bounded parent and the fixed child readback.
 ///
 /// Both entry points use ordinary safe Rust only. The `unsafe` pre-exec registration and the
@@ -1834,21 +2485,28 @@ mod linux {
 
     use super::{
         AS_CHILD_MARKER_V1, AS_DEADLINE_MS, AS_DENIED_TOKEN_V1, AS_REQUEST_BYTES_V1, AsAttemptV1,
-        CHILD_EXIT_CPU_LOOP_RETURNED, CHILD_EXIT_GROUP_MISMATCH, CHILD_EXIT_LIMITS_MISMATCH,
-        CHILD_EXIT_READBACK_FAILED, CHILD_EXIT_RESERVE_GRANTED, CHILD_EXIT_SESSION_MISMATCH,
-        CHILD_EXIT_SESSION_READBACK_FAILED, CHILD_OBSERVATION_MARKER_V1, CPU_CHILD_READY_MARKER_V1,
-        CPU_DEADLINE_MS, CpuAttemptV1, INTERNAL_PROBE_AS_CHILD_TOKEN_V1,
-        INTERNAL_PROBE_CHILD_TOKEN_V1, INTERNAL_PROBE_CPU_CHILD_TOKEN_V1, INTERNAL_PROBE_FLAG_V1,
-        INTERNAL_PROBE_SESSION_CHILD_TOKEN_V1, INTERNAL_PROBE_WALL_CHILD_TOKEN_V1,
-        MAX_CHILD_STDERR_BYTES, MAX_CHILD_STDOUT_BYTES, PROFILE_V1_AS_BYTES,
-        PROFILE_V1_CPU_SECONDS, SESSION_CHILD_READY_MARKER_V1, SESSION_CHILD_SLEEP_MS,
-        SESSION_DEADLINE_MS, SMOKE_WALL_DEADLINE_MS, SessionAttemptV1, SmokeObservationV1,
-        SmokeRefusalV1, WALL_CHILD_READY_MARKER_V1, WALL_CHILD_SLEEP_MS, WALL_DEADLINE_MS,
-        WallAttemptV1, classify_child_exit_v1, parse_child_observation_v1, validate_observation_v1,
+        CHILD_EXIT_CPU_LOOP_RETURNED, CHILD_EXIT_GROUP_DESCENDANT_MISMATCH,
+        CHILD_EXIT_GROUP_LEADER_SURVIVED, CHILD_EXIT_GROUP_MISMATCH, CHILD_EXIT_GROUP_SPAWN_FAILED,
+        CHILD_EXIT_LIMITS_MISMATCH, CHILD_EXIT_READBACK_FAILED, CHILD_EXIT_RESERVE_GRANTED,
+        CHILD_EXIT_SESSION_MISMATCH, CHILD_EXIT_SESSION_READBACK_FAILED,
+        CHILD_OBSERVATION_MARKER_V1, CPU_CHILD_READY_MARKER_V1, CPU_DEADLINE_MS, CpuAttemptV1,
+        GROUP_DEADLINE_MS, GROUP_DESCENDANT_LIFETIME_MS, GROUP_DESCENDANT_READY_DEADLINE_MS,
+        GROUP_DESCENDANT_READY_MARKER_V1, GROUP_LEADER_HOLD_MS, GROUP_LEADER_READY_MARKER_V1,
+        GroupAttemptV1, INTERNAL_PROBE_AS_CHILD_TOKEN_V1, INTERNAL_PROBE_CHILD_TOKEN_V1,
+        INTERNAL_PROBE_CPU_CHILD_TOKEN_V1, INTERNAL_PROBE_FLAG_V1,
+        INTERNAL_PROBE_GROUP_DESCENDANT_TOKEN_V1, INTERNAL_PROBE_GROUP_INVALID_LEADER_TOKEN_V1,
+        INTERNAL_PROBE_GROUP_LEADER_TOKEN_V1, INTERNAL_PROBE_SESSION_CHILD_TOKEN_V1,
+        INTERNAL_PROBE_WALL_CHILD_TOKEN_V1, MAX_CHILD_STDERR_BYTES, MAX_CHILD_STDOUT_BYTES,
+        PROFILE_V1_AS_BYTES, PROFILE_V1_CPU_SECONDS, SESSION_CHILD_READY_MARKER_V1,
+        SESSION_CHILD_SLEEP_MS, SESSION_DEADLINE_MS, SMOKE_WALL_DEADLINE_MS, SessionAttemptV1,
+        SmokeObservationV1, SmokeRefusalV1, WALL_CHILD_READY_MARKER_V1, WALL_CHILD_SLEEP_MS,
+        WALL_DEADLINE_MS, WallAttemptV1, classify_child_exit_v1, parse_child_observation_v1,
+        validate_observation_v1,
     };
     use crate::media_worker_host_native::{
-        install_linux_child_limits_v1, observe_process_identity_v1, own_process_group_v1,
-        read_limit_ceilings_v1,
+        GroupSignalRefusalV1, ProcessStateV1, install_linux_child_limits_v1,
+        observe_process_identity_v1, observe_process_state_v1, own_process_group_v1,
+        read_limit_ceilings_v1, terminate_owned_group_v1,
     };
 
     /// How often the parent re-checks the single child. Small enough that the 15 000 ms deadline
@@ -2774,6 +3432,536 @@ mod linux {
             let _ = ready.send(None);
         }
         Ok(buffer)
+    }
+
+    /// Carries one accepted readiness record through identity proof, one group signal, the checked
+    /// leader reap and the bounded descendant observation.
+    ///
+    /// Order is the whole point, so it is fixed here and nowhere else: liveness bracketing, the
+    /// leader's own identities, the descendant's identities, the descendant's live start-time
+    /// identity, the **one** group signal, the checked leader reap, then the same descendant's
+    /// non-running state. Every step that fails returns a typed refusal before the next one runs, so
+    /// a signal can never be sent on unproved identities and no observation can be reported for a
+    /// leader that was never reaped.
+    fn probe_group_after_readiness(
+        child: &mut std::process::Child,
+        handle_pid: u32,
+        observation: super::GroupChildObservationV1,
+        started: Instant,
+    ) -> Result<GroupAttemptV1, SmokeRefusalV1> {
+        let deadline_at = started + Duration::from_millis(GROUP_DEADLINE_MS);
+
+        let live_before = matches!(child.try_wait(), Ok(None));
+        if !live_before {
+            return Err(SmokeRefusalV1::HostExitAbnormal);
+        }
+
+        let owner = u64::from(handle_pid);
+        let leader_identity = observe_process_identity_v1(Some(handle_pid))
+            .map_err(|_| SmokeRefusalV1::HostLimitUnavailable)?;
+        if u64::from(leader_identity.group) != owner || u64::from(leader_identity.session) != owner
+        {
+            return Err(SmokeRefusalV1::HostLimitUnavailable);
+        }
+
+        let descendant_pid = u32::try_from(observation.descendant_pid)
+            .map_err(|_| SmokeRefusalV1::HostLimitUnavailable)?;
+        let descendant_identity = observe_process_identity_v1(Some(descendant_pid))
+            .map_err(|_| SmokeRefusalV1::HostLimitUnavailable)?;
+        if u64::from(descendant_identity.group) != owner
+            || u64::from(descendant_identity.session) != owner
+        {
+            return Err(SmokeRefusalV1::HostLimitUnavailable);
+        }
+
+        let descendant_start_before = match observe_process_state_v1(descendant_pid) {
+            Ok(ProcessStateV1::Running { start_time }) if start_time > 0 => start_time,
+            _ => return Err(SmokeRefusalV1::HostDescendantUnverified),
+        };
+
+        if !matches!(child.try_wait(), Ok(None)) {
+            return Err(SmokeRefusalV1::HostExitAbnormal);
+        }
+
+        terminate_owned_group_v1(child, descendant_pid).map_err(|refusal| match refusal {
+            GroupSignalRefusalV1::BadIdentity | GroupSignalRefusalV1::IdentityMismatch => {
+                SmokeRefusalV1::HostLimitUnavailable
+            }
+            GroupSignalRefusalV1::LeaderNotLive | GroupSignalRefusalV1::SignalRejected => {
+                SmokeRefusalV1::HostExitAbnormal
+            }
+        })?;
+
+        // Linux-only group supervision: a failed reap cannot become an Ok attempt.
+        let leader_signal = super::group_wait_signal_v1(child.wait())?;
+        // Only the observed successful wait can establish this fact.
+        let leader_reaped = true;
+
+        // A disappearance is written with the earlier identity, because a recycled pid would instead
+        // appear as a live or zombie record carrying a different start time, which is refused below.
+        let mut descendant_nonrunning = false;
+        let mut descendant_start_after = 0_u64;
+        loop {
+            match observe_process_state_v1(descendant_pid) {
+                Ok(ProcessStateV1::Gone) => {
+                    descendant_start_after = descendant_start_before;
+                    descendant_nonrunning = true;
+                    break;
+                }
+                Ok(ProcessStateV1::Zombie { start_time }) => {
+                    descendant_start_after = start_time;
+                    descendant_nonrunning = true;
+                    break;
+                }
+                Ok(ProcessStateV1::Running { start_time }) => {
+                    if start_time != descendant_start_before {
+                        descendant_start_after = start_time;
+                        break;
+                    }
+                }
+                Err(_) => break,
+            }
+            if Instant::now() >= deadline_at {
+                break;
+            }
+            std::thread::sleep(POLL_INTERVAL);
+        }
+
+        let wall_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
+        Ok(GroupAttemptV1 {
+            leader_pid: owner,
+            descendant_pid: observation.descendant_pid,
+            leader_pgid: u64::from(leader_identity.group),
+            leader_sid: u64::from(leader_identity.session),
+            descendant_pgid: u64::from(descendant_identity.group),
+            descendant_sid: u64::from(descendant_identity.session),
+            live_before,
+            live_after: true,
+            group_signal_issued: true,
+            leader_signal,
+            leader_reaped,
+            descendant_start_before,
+            descendant_start_after,
+            descendant_nonrunning,
+            wall_ms,
+        })
+    }
+
+    /// Supervises the one fixed `group-leader` and hands back its raw, unvalidated material.
+    ///
+    /// The single 15 000 ms budget starts **before** `Command::spawn`. The leader is launched through
+    /// the unchanged pre-exec installer, so it is its own session and process-group leader with both
+    /// fixed ceilings. The parent accepts at most one readiness record, then re-proves the leader and
+    /// the descendant through its **own** kernel queries — bracketed by two `try_wait` readbacks of
+    /// the same handle — before the one group-directed signal, its own checked leader reap, and the
+    /// bounded `/proc` observation of the same descendant identity.
+    ///
+    /// When any pre-signal condition fails it sends **no** group signal at all: it reaps only its own
+    /// handle through [`cleanup_owned_leader`] and reports a refusal. On the signal path it still
+    /// establishes the leader reap with a checked `Child::wait()` before joining any capped reader.
+    pub(super) fn run_group_probe() -> Result<GroupAttemptV1, SmokeRefusalV1> {
+        let executable =
+            std::env::current_exe().map_err(|_| SmokeRefusalV1::HostExecutableUnavailable)?;
+        if !executable.is_file() {
+            return Err(SmokeRefusalV1::HostExecutableUnavailable);
+        }
+
+        let mut command = Command::new(&executable);
+        command
+            .arg(INTERNAL_PROBE_FLAG_V1)
+            .arg(INTERNAL_PROBE_GROUP_LEADER_TOKEN_V1)
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+
+        // The unchanged pre-exec boundary: a new session, then both ceilings, before `exec`.
+        install_linux_child_limits_v1(&mut command);
+
+        let started = Instant::now();
+        let mut child = command
+            .spawn()
+            .map_err(|_| SmokeRefusalV1::HostSpawnFailed)?;
+
+        let handle_pid = child.id();
+        if handle_pid == 0 {
+            return Err(cleanup_owned_leader(
+                &mut child,
+                None,
+                None,
+                SmokeRefusalV1::HostSpawnFailed,
+            ));
+        }
+
+        let (ready_tx, ready_rx) = std::sync::mpsc::channel::<Option<Vec<u8>>>();
+        let out_reader = match child.stdout.take() {
+            Some(stream) => Some(std::thread::spawn(move || {
+                read_session_stdout(stream, MAX_CHILD_STDOUT_BYTES, ready_tx)
+            })),
+            None => {
+                drop(ready_tx);
+                None
+            }
+        };
+        let err_reader = child
+            .stderr
+            .take()
+            .map(|stream| std::thread::spawn(move || read_bounded(stream, MAX_CHILD_STDERR_BYTES)));
+
+        // One bounded, one-shot readiness handoff inside the single budget already started.
+        let deadline = Duration::from_millis(GROUP_DEADLINE_MS);
+        let remaining = deadline.saturating_sub(started.elapsed());
+        let mut readiness_failure = None;
+        let readiness = if remaining.is_zero() {
+            readiness_failure = Some(SmokeRefusalV1::HostWallTimeout);
+            None
+        } else {
+            match ready_rx.recv_timeout(remaining) {
+                Ok(Some(line)) => {
+                    match super::validate_group_readiness_v1(&line, u64::from(handle_pid)) {
+                        Ok(observation) => Some(observation),
+                        Err(refusal) => {
+                            readiness_failure = Some(refusal);
+                            None
+                        }
+                    }
+                }
+                Ok(None) => {
+                    readiness_failure = Some(SmokeRefusalV1::HostOutputInvalid);
+                    None
+                }
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                    readiness_failure = Some(SmokeRefusalV1::HostWallTimeout);
+                    None
+                }
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                    readiness_failure = Some(SmokeRefusalV1::HostOutputInvalid);
+                    None
+                }
+            }
+        };
+
+        // Without an accepted record the identity queries, the signal and the observation are never
+        // reached at all: this path issues zero group signals and reaps only its own handle.
+        let Some(observation) = readiness else {
+            return Err(cleanup_owned_leader(
+                &mut child,
+                out_reader,
+                err_reader,
+                readiness_failure.unwrap_or(SmokeRefusalV1::HostOutputInvalid),
+            ));
+        };
+
+        match probe_group_after_readiness(&mut child, handle_pid, observation, started) {
+            Ok(attempt) => {
+                // Joined only after the leader was reaped and the descendant was observed, so no
+                // live writer can hold this parent on a pipe end.
+                let _ = join_reader(out_reader);
+                let _ = join_reader(err_reader);
+                Ok(attempt)
+            }
+            Err(refusal) => Err(cleanup_owned_leader(
+                &mut child, out_reader, err_reader, refusal,
+            )),
+        }
+    }
+
+    /// Bounded, checked cleanup of **this parent's own** directly held leader.
+    ///
+    /// It reuses the accepted `SOLO-WO-090 R01` rule unchanged: the kill result is recorded but never
+    /// evidence, a confirmed reap is what allows the capped readers to be joined, and a failed reap
+    /// overrides the original refusal with [`SmokeRefusalV1::HostReapFailed`]. It sends no group
+    /// signal of any kind, so every refusal path through it issues exactly zero group `kill` calls.
+    fn cleanup_owned_leader(
+        child: &mut std::process::Child,
+        out: Option<std::thread::JoinHandle<BoundedRead>>,
+        err: Option<std::thread::JoinHandle<BoundedRead>>,
+        refusal: SmokeRefusalV1,
+    ) -> SmokeRefusalV1 {
+        use super::{SessionCleanupPlanV1, SessionReapV1};
+
+        let kill_accepted = child.kill().is_ok();
+        let reap = SessionReapV1::from_wait_outcome_v1(child.wait());
+        let plan = SessionCleanupPlanV1::classify_v1(kill_accepted, reap, refusal);
+        if plan.joins_readers_v1() {
+            let _ = join_reader(out);
+            let _ = join_reader(err);
+        }
+        plan.refusal_v1()
+    }
+
+    /// The fixed group leader: prove its own ceilings and session, start exactly one descendant,
+    /// verify that descendant, then emit one readiness record and hold.
+    ///
+    /// The descendant is started **without** the pre-exec installer, so it inherits this leader's
+    /// group, session and both ceilings instead of creating a new session of its own. A direct,
+    /// unsupervised `group-leader` invocation has no `setsid` and therefore refuses before spawning or
+    /// printing anything.
+    pub(super) fn run_group_leader() -> Result<(), u8> {
+        let readback = read_limit_ceilings_v1().map_err(|_| CHILD_EXIT_READBACK_FAILED)?;
+        let limits_match = readback.address_space.soft == PROFILE_V1_AS_BYTES
+            && readback.address_space.hard == PROFILE_V1_AS_BYTES
+            && readback.cpu.soft == PROFILE_V1_CPU_SECONDS
+            && readback.cpu.hard == PROFILE_V1_CPU_SECONDS;
+        if !limits_match {
+            return Err(CHILD_EXIT_LIMITS_MISMATCH);
+        }
+
+        let pid = u64::from(std::process::id());
+        if pid == 0 {
+            return Err(CHILD_EXIT_SESSION_READBACK_FAILED);
+        }
+        let own =
+            observe_process_identity_v1(None).map_err(|_| CHILD_EXIT_SESSION_READBACK_FAILED)?;
+        if u64::from(own.group) != pid || u64::from(own.session) != pid {
+            return Err(CHILD_EXIT_SESSION_MISMATCH);
+        }
+
+        let executable = std::env::current_exe().map_err(|_| CHILD_EXIT_GROUP_SPAWN_FAILED)?;
+        if !executable.is_file() {
+            return Err(CHILD_EXIT_GROUP_SPAWN_FAILED);
+        }
+
+        let mut command = Command::new(&executable);
+        command
+            .arg(INTERNAL_PROBE_FLAG_V1)
+            .arg(INTERNAL_PROBE_GROUP_DESCENDANT_TOKEN_V1)
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        // Deliberately **no** pre-exec installer: the descendant must inherit this group and these
+        // ceilings, so it never calls `setsid` and never creates a session of its own.
+        let mut descendant = command.spawn().map_err(|_| CHILD_EXIT_GROUP_SPAWN_FAILED)?;
+        let descendant_pid = descendant.id();
+        if descendant_pid == 0 || descendant_pid == std::process::id() {
+            let _ = descendant.kill();
+            let _ = descendant.wait();
+            return Err(CHILD_EXIT_GROUP_DESCENDANT_MISMATCH);
+        }
+
+        let (ready_tx, ready_rx) = std::sync::mpsc::channel::<Option<Vec<u8>>>();
+        let out_reader = match descendant.stdout.take() {
+            Some(stream) => Some(std::thread::spawn(move || {
+                read_session_stdout(stream, MAX_CHILD_STDOUT_BYTES, ready_tx)
+            })),
+            None => {
+                drop(ready_tx);
+                None
+            }
+        };
+        let err_reader = descendant
+            .stderr
+            .take()
+            .map(|stream| std::thread::spawn(move || read_bounded(stream, MAX_CHILD_STDERR_BYTES)));
+
+        let ready_line = match ready_rx
+            .recv_timeout(Duration::from_millis(GROUP_DESCENDANT_READY_DEADLINE_MS))
+        {
+            Ok(Some(line)) => Some(line),
+            _ => None,
+        };
+        let verified = ready_line
+            .as_deref()
+            .map(|line| {
+                super::validate_group_descendant_readiness_v1(line, u64::from(descendant_pid), pid)
+            })
+            .transpose();
+
+        let observed = if verified.is_ok() {
+            observe_process_identity_v1(Some(descendant_pid)).ok()
+        } else {
+            None
+        };
+        let live = matches!(descendant.try_wait(), Ok(None));
+        // The descendant must be proved inside this leader's own group and session. Written as a
+        // closure rather than a guarded `matches!` pattern so the source-boundary checker can parse
+        // every macro argument as an ordinary expression.
+        let observed_in_group = observed.is_some_and(|identity| {
+            u64::from(identity.group) == pid && u64::from(identity.session) == pid
+        });
+
+        let ready = matches!(verified, Ok(Some(_))) && observed_in_group && live;
+        if !ready {
+            // A join is permitted only behind a **confirmed** reap of this leader's own descendant
+            // handle. An unconfirmed wait must not be able to block this leader on an open pipe, so
+            // the same rule the parent applies to its leader applies here to the descendant.
+            let _ = descendant.kill();
+            let reaped = descendant.wait().is_ok();
+            if reaped {
+                let _ = join_reader(out_reader);
+                let _ = join_reader(err_reader);
+            }
+            return Err(CHILD_EXIT_GROUP_DESCENDANT_MISMATCH);
+        }
+
+        let line = format!(
+            "{GROUP_LEADER_READY_MARKER_V1} as_soft={} as_hard={} cpu_soft={} cpu_hard={} \
+             pid={pid} pgid={pid} sid={pid} descendant_pid={descendant_pid} \
+             descendant_pgid={pid} descendant_sid={pid}\n",
+            readback.address_space.soft,
+            readback.address_space.hard,
+            readback.cpu.soft,
+            readback.cpu.hard
+        );
+        {
+            let mut stdout = std::io::stdout();
+            stdout
+                .write_all(line.as_bytes())
+                .and_then(|()| stdout.flush())
+                .map_err(|_| CHILD_EXIT_GROUP_DESCENDANT_MISMATCH)?;
+        }
+
+        // The parent is expected to signal the whole group well inside this hold. Reaching the end of
+        // it means no group signal ever came, which is a refusal, never a termination: the descendant
+        // still ends by itself inside its own fixed lifetime.
+        std::thread::sleep(Duration::from_millis(GROUP_LEADER_HOLD_MS));
+        Err(CHILD_EXIT_GROUP_LEADER_SURVIVED)
+    }
+
+    /// The fixed group descendant: prove inherited group and ceilings, emit readiness, then sleep a
+    /// fixed finite life.
+    ///
+    /// It must be inside the leader's group and session but must **not** be a group leader itself, so
+    /// `pgid == sid` is required and `pid == pgid` is refused. It creates no descendant of its own,
+    /// forks nothing, opens nothing and installs no handler.
+    pub(super) fn run_group_descendant() -> Result<(), u8> {
+        let readback = read_limit_ceilings_v1().map_err(|_| CHILD_EXIT_READBACK_FAILED)?;
+        let limits_match = readback.address_space.soft == PROFILE_V1_AS_BYTES
+            && readback.address_space.hard == PROFILE_V1_AS_BYTES
+            && readback.cpu.soft == PROFILE_V1_CPU_SECONDS
+            && readback.cpu.hard == PROFILE_V1_CPU_SECONDS;
+        if !limits_match {
+            return Err(CHILD_EXIT_LIMITS_MISMATCH);
+        }
+
+        let pid = u64::from(std::process::id());
+        if pid == 0 {
+            return Err(CHILD_EXIT_SESSION_READBACK_FAILED);
+        }
+        let own =
+            observe_process_identity_v1(None).map_err(|_| CHILD_EXIT_SESSION_READBACK_FAILED)?;
+        let pgid = u64::from(own.group);
+        let sid = u64::from(own.session);
+        if pgid != sid || pid == pgid {
+            return Err(CHILD_EXIT_GROUP_DESCENDANT_MISMATCH);
+        }
+
+        let line = format!("{GROUP_DESCENDANT_READY_MARKER_V1} pid={pid} pgid={pgid} sid={sid}\n");
+        {
+            let mut stdout = std::io::stdout();
+            stdout
+                .write_all(line.as_bytes())
+                .and_then(|()| stdout.flush())
+                .map_err(|_| CHILD_EXIT_GROUP_DESCENDANT_MISMATCH)?;
+        }
+
+        // The one fixed finite lifetime: the safety net that keeps a never-signalled descendant from
+        // outliving a refused run.
+        std::thread::sleep(Duration::from_millis(GROUP_DESCENDANT_LIFETIME_MS));
+        Ok(())
+    }
+
+    /// Supervises the fixed invalid-readiness leader and refuses on its malformed record.
+    ///
+    /// This path exists to prove a real Linux **negative**: the record is shape-invalid, so
+    /// [`super::validate_group_readiness_v1`] refuses with [`SmokeRefusalV1::HostOutputInvalid`]
+    /// before any group identity authority exists. No group signal is reachable from here at all —
+    /// the only signalling call in this function is the ordinary `Child::kill()` of this parent's own
+    /// directly held leader inside [`cleanup_owned_leader`], and a failed reap still overrides the
+    /// refusal.
+    pub(super) fn run_group_invalid_probe() -> Result<(), SmokeRefusalV1> {
+        let executable =
+            std::env::current_exe().map_err(|_| SmokeRefusalV1::HostExecutableUnavailable)?;
+        if !executable.is_file() {
+            return Err(SmokeRefusalV1::HostExecutableUnavailable);
+        }
+
+        let mut command = Command::new(&executable);
+        command
+            .arg(INTERNAL_PROBE_FLAG_V1)
+            .arg(INTERNAL_PROBE_GROUP_INVALID_LEADER_TOKEN_V1)
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        install_linux_child_limits_v1(&mut command);
+
+        let started = Instant::now();
+        let mut child = command
+            .spawn()
+            .map_err(|_| SmokeRefusalV1::HostSpawnFailed)?;
+
+        let (ready_tx, ready_rx) = std::sync::mpsc::channel::<Option<Vec<u8>>>();
+        let out_reader = match child.stdout.take() {
+            Some(stream) => Some(std::thread::spawn(move || {
+                read_session_stdout(stream, MAX_CHILD_STDOUT_BYTES, ready_tx)
+            })),
+            None => {
+                drop(ready_tx);
+                None
+            }
+        };
+        let err_reader = child
+            .stderr
+            .take()
+            .map(|stream| std::thread::spawn(move || read_bounded(stream, MAX_CHILD_STDERR_BYTES)));
+
+        let remaining = Duration::from_millis(GROUP_DEADLINE_MS).saturating_sub(started.elapsed());
+        let refusal = if remaining.is_zero() {
+            SmokeRefusalV1::HostWallTimeout
+        } else {
+            match ready_rx.recv_timeout(remaining) {
+                Ok(Some(line)) => super::validate_group_readiness_v1(&line, u64::from(child.id()))
+                    .err()
+                    .unwrap_or(SmokeRefusalV1::HostOutputInvalid),
+                Ok(None) => SmokeRefusalV1::HostOutputInvalid,
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => SmokeRefusalV1::HostWallTimeout,
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                    SmokeRefusalV1::HostOutputInvalid
+                }
+            }
+        };
+
+        // Zero group signals: this is the ordinary checked cleanup of this parent's own handle only.
+        Err(cleanup_owned_leader(
+            &mut child, out_reader, err_reader, refusal,
+        ))
+    }
+
+    /// The fixed invalid-readiness leader: prove the same identity, create no descendant, write one
+    /// deliberately malformed record and exit.
+    ///
+    /// Twelve tokens where the schema has eleven, so no identity field in it is ever authoritative.
+    pub(super) fn run_group_invalid_leader() -> Result<(), u8> {
+        let readback = read_limit_ceilings_v1().map_err(|_| CHILD_EXIT_READBACK_FAILED)?;
+        let limits_match = readback.address_space.soft == PROFILE_V1_AS_BYTES
+            && readback.address_space.hard == PROFILE_V1_AS_BYTES
+            && readback.cpu.soft == PROFILE_V1_CPU_SECONDS
+            && readback.cpu.hard == PROFILE_V1_CPU_SECONDS;
+        if !limits_match {
+            return Err(CHILD_EXIT_LIMITS_MISMATCH);
+        }
+
+        let pid = u64::from(std::process::id());
+        let own =
+            observe_process_identity_v1(None).map_err(|_| CHILD_EXIT_SESSION_READBACK_FAILED)?;
+        if pid == 0 || u64::from(own.group) != pid || u64::from(own.session) != pid {
+            return Err(CHILD_EXIT_SESSION_MISMATCH);
+        }
+
+        let line = format!(
+            "{GROUP_LEADER_READY_MARKER_V1} as_soft={} as_hard={} cpu_soft={} cpu_hard={} \
+             pid={pid} pgid={pid} sid={pid} descendant_pid=0 descendant_pgid=0 \
+             descendant_sid=0 extra=1\n",
+            readback.address_space.soft,
+            readback.address_space.hard,
+            readback.cpu.soft,
+            readback.cpu.hard
+        );
+        let mut stdout = std::io::stdout();
+        stdout
+            .write_all(line.as_bytes())
+            .and_then(|()| stdout.flush())
+            .map_err(|_| CHILD_EXIT_GROUP_DESCENDANT_MISMATCH)?;
+        Ok(())
     }
 
     /// Reads at most `cap` bytes; one byte more is a refusal rather than a silent truncation.
@@ -4619,5 +5807,267 @@ mod tests {
         let plan = SessionCleanupPlanV1::classify_v1(true, reap, refusal);
         assert!(plan.joins_readers_v1());
         assert_eq!(plan.refusal_v1(), refusal);
+    }
+
+    /// A complete, internally consistent group attempt with every accepted property set.
+    ///
+    /// It is a **pure fixture**, never a kernel result: `N093-05` decides the acceptance rule from it
+    /// and describes nothing as a real OS observation.
+    fn group_attempt() -> GroupAttemptV1 {
+        GroupAttemptV1 {
+            leader_pid: 4712,
+            descendant_pid: 4715,
+            leader_pgid: 4712,
+            leader_sid: 4712,
+            descendant_pgid: 4712,
+            descendant_sid: 4712,
+            live_before: true,
+            live_after: true,
+            group_signal_issued: true,
+            leader_signal: Some(GROUP_TERMINATION_SIGNAL_V1),
+            leader_reaped: true,
+            descendant_start_before: 987_654,
+            descendant_start_after: 987_654,
+            descendant_nonrunning: true,
+            wall_ms: 731,
+        }
+    }
+
+    /// `N093-05`: only the fully proved shape is accepted, and the accepted value names the group,
+    /// the session and the one signal without ever offering a descendant-reap field.
+    #[test]
+    fn n093_05_the_fully_proved_group_attempt_is_the_only_accepted_shape() {
+        let termination =
+            validate_group_attempt_v1(group_attempt()).expect("the fixture is proved");
+        assert_eq!(termination.leader_pid, 4712);
+        assert_eq!(termination.descendant_pid, 4715);
+        assert_eq!(termination.group, 4712);
+        assert_eq!(termination.session, 4712);
+        assert_eq!(termination.signal, GROUP_TERMINATION_SIGNAL_V1);
+        assert_eq!(termination.wall_ms, 731);
+    }
+
+    /// `N093-05`: a leader that is not its own group/session leader, a descendant equal to the
+    /// leader, a descendant outside the leader's group, and a zero identity all refuse.
+    #[test]
+    fn n093_05_every_wrong_group_or_descendant_identity_refuses() {
+        let cases = [
+            GroupAttemptV1 {
+                leader_pgid: 4713,
+                ..group_attempt()
+            },
+            GroupAttemptV1 {
+                leader_sid: 4713,
+                ..group_attempt()
+            },
+            GroupAttemptV1 {
+                descendant_pid: 4712,
+                ..group_attempt()
+            },
+            GroupAttemptV1 {
+                descendant_pid: 0,
+                ..group_attempt()
+            },
+            GroupAttemptV1 {
+                descendant_pgid: 4716,
+                ..group_attempt()
+            },
+            GroupAttemptV1 {
+                descendant_sid: 4716,
+                ..group_attempt()
+            },
+            GroupAttemptV1 {
+                leader_pid: 1,
+                ..group_attempt()
+            },
+        ];
+        for case in cases {
+            assert_eq!(
+                validate_group_attempt_v1(case),
+                Err(SmokeRefusalV1::HostLimitUnavailable),
+                "an unproved identity must refuse: {case:?}"
+            );
+        }
+    }
+
+    /// `N093-05`: a missing signal request, a missing leader reap, a leader not proved live, an
+    /// abnormal or absent signal status, an unobserved descendant, a recycled start-time identity and
+    /// an over-deadline measurement each refuse with their own closed token.
+    #[test]
+    fn n093_05_signal_reap_observation_and_deadline_facts_stay_distinct() {
+        let cases = [
+            (
+                GroupAttemptV1 {
+                    group_signal_issued: false,
+                    ..group_attempt()
+                },
+                SmokeRefusalV1::HostLimitUnavailable,
+            ),
+            (
+                GroupAttemptV1 {
+                    leader_reaped: false,
+                    ..group_attempt()
+                },
+                SmokeRefusalV1::HostReapFailed,
+            ),
+            (
+                GroupAttemptV1 {
+                    live_before: false,
+                    ..group_attempt()
+                },
+                SmokeRefusalV1::HostExitAbnormal,
+            ),
+            (
+                GroupAttemptV1 {
+                    live_after: false,
+                    ..group_attempt()
+                },
+                SmokeRefusalV1::HostExitAbnormal,
+            ),
+            (
+                GroupAttemptV1 {
+                    leader_signal: None,
+                    ..group_attempt()
+                },
+                SmokeRefusalV1::HostExitAbnormal,
+            ),
+            (
+                GroupAttemptV1 {
+                    leader_signal: Some(15),
+                    ..group_attempt()
+                },
+                SmokeRefusalV1::HostExitAbnormal,
+            ),
+            (
+                GroupAttemptV1 {
+                    descendant_nonrunning: false,
+                    ..group_attempt()
+                },
+                SmokeRefusalV1::HostDescendantUnverified,
+            ),
+            (
+                GroupAttemptV1 {
+                    descendant_start_before: 0,
+                    ..group_attempt()
+                },
+                SmokeRefusalV1::HostDescendantUnverified,
+            ),
+            (
+                GroupAttemptV1 {
+                    descendant_start_after: 987_655,
+                    ..group_attempt()
+                },
+                SmokeRefusalV1::HostDescendantUnverified,
+            ),
+            (
+                GroupAttemptV1 {
+                    wall_ms: 0,
+                    ..group_attempt()
+                },
+                SmokeRefusalV1::HostWallTimeout,
+            ),
+            (
+                GroupAttemptV1 {
+                    wall_ms: GROUP_DEADLINE_MS,
+                    ..group_attempt()
+                },
+                SmokeRefusalV1::HostWallTimeout,
+            ),
+        ];
+        for (case, expected) in cases {
+            assert_eq!(
+                validate_group_attempt_v1(case),
+                Err(expected),
+                "this fact must refuse as {expected:?}: {case:?}"
+            );
+        }
+    }
+
+    /// `N093-05`: both group records are closed schemas — duplicated, extra, missing and reordered
+    /// fields, a second line and a carriage return are all refused, and an identity disagreement is
+    /// refused as an identity refusal rather than as a shape refusal.
+    #[test]
+    fn n093_05_both_group_records_are_closed_schemas() {
+        let good = concat!(
+            "SOLO-MEDIA-HOST-GROUP-V1 as_soft=536870912 as_hard=536870912 cpu_soft=10 cpu_hard=10 ",
+            "pid=4712 pgid=4712 sid=4712 descendant_pid=4715 descendant_pgid=4712 ",
+            "descendant_sid=4712\n"
+        );
+        let parsed = parse_group_readiness_v1(good).expect("the fixed record parses");
+        assert_eq!(parsed.leader_pid, 4712);
+        assert_eq!(parsed.descendant_pid, 4715);
+
+        let duplicated = good.replace("descendant_pid=4715", "descendant_pid=4715 pid=4712");
+        let reordered = concat!(
+            "SOLO-MEDIA-HOST-GROUP-V1 as_soft=536870912 as_hard=536870912 cpu_soft=10 cpu_hard=10 ",
+            "pgid=4712 pid=4712 sid=4712 descendant_pid=4715 descendant_pgid=4712 ",
+            "descendant_sid=4712\n"
+        );
+        let extra = good.replace('\n', " extra=1\n");
+        let missing = good.replace(" descendant_pid=4715", "");
+        let two_lines = format!("{good}{good}");
+        let carriage = good.replace('\n', "\r\n");
+        for bad in [
+            duplicated,
+            reordered.to_owned(),
+            extra,
+            missing,
+            two_lines,
+            carriage,
+        ] {
+            assert_eq!(
+                parse_group_readiness_v1(&bad),
+                Err(SmokeRefusalV1::HostOutputInvalid),
+                "an off-schema record must refuse: {bad:?}"
+            );
+        }
+
+        let descendant = "SOLO-MEDIA-HOST-GROUP-DESC-V1 pid=4715 pgid=4712 sid=4712\n";
+        let parsed =
+            parse_group_descendant_readiness_v1(descendant).expect("the fixed record parses");
+        assert_eq!(parsed.pid, 4715);
+        assert_eq!(parsed.pgid, 4712);
+        for bad in [
+            "SOLO-MEDIA-HOST-GROUP-V1 pid=4715 pgid=4712 sid=4712\n",
+            "SOLO-MEDIA-HOST-GROUP-DESC-V1 pid=4715 pgid=4712\n",
+            "SOLO-MEDIA-HOST-GROUP-DESC-V1 pid=4715 pgid=4712 sid=4712",
+        ] {
+            assert_eq!(
+                parse_group_descendant_readiness_v1(bad),
+                Err(SmokeRefusalV1::HostOutputInvalid),
+                "an off-schema descendant record must refuse: {bad:?}"
+            );
+        }
+
+        assert_eq!(
+            validate_group_readiness_v1(good.as_bytes(), 4713),
+            Err(SmokeRefusalV1::HostLimitUnavailable)
+        );
+        assert_eq!(
+            validate_group_descendant_readiness_v1(descendant.as_bytes(), 4715, 4713),
+            Err(SmokeRefusalV1::HostLimitUnavailable)
+        );
+    }
+
+    /// `N093-07`: the **same** classification helper production uses immediately after
+    /// `child.wait()` turns a failed reap into `HOST_REAP_FAILED`.
+    ///
+    /// This is a pure classification test of the real production rule: it injects an `io::Error` into
+    /// the helper rather than faking a kernel wait failure or altering `std::process::Child`, and it
+    /// proves the negative only. The successful path is proved by the real Linux group case.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn n093_07_a_failed_wait_classifies_as_a_reap_refusal() {
+        let failed = group_wait_signal_v1(Err(std::io::Error::other("reap failed")));
+        assert_eq!(
+            failed,
+            Err(SmokeRefusalV1::HostReapFailed),
+            "a failed wait must never yield a signal status"
+        );
+        assert_eq!(
+            SmokeRefusalV1::HostReapFailed.code(),
+            "HOST_REAP_FAILED",
+            "the classified refusal keeps its stable public token"
+        );
     }
 }
