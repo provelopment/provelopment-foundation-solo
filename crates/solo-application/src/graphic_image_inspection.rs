@@ -147,12 +147,9 @@ impl GraphicImageFormatV1 {
         if extension.is_empty() {
             return None;
         }
-        for format in Self::ALL {
-            if format.accepted_extensions().contains(&extension) {
-                return Some(format);
-            }
-        }
-        None
+        Self::ALL
+            .into_iter()
+            .find(|format| format.accepted_extensions().contains(&extension))
     }
 }
 
@@ -218,54 +215,31 @@ impl GraphicImageInspectRequestV1 {
 /// their place.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GraphicImageWorkerObservationV1 {
-    confirmed_format: GraphicImageFormatV1,
-    observed_mime: &'static str,
-    source_digest: MediaWorkerDigestV1,
-    width: u32,
-    height: u32,
-    decoded_bytes: u64,
-    decoded_digest: MediaWorkerDigestV1,
-    worker_pid: u32,
-    limits_verified: bool,
-    cleanup_verified: bool,
-    wall_ms: u64,
+    /// The still-image format the parent re-derived from the received bytes.
+    pub confirmed_format: GraphicImageFormatV1,
+    /// The canonical MIME of that confirmed format.
+    pub observed_mime: &'static str,
+    /// The SHA-256 the parent recomputed over the source it sent.
+    pub source_digest: MediaWorkerDigestV1,
+    /// The decoded width the parent confirmed.
+    pub width: u32,
+    /// The decoded height the parent confirmed.
+    pub height: u32,
+    /// The exact number of decoded bytes the parent received and hashed.
+    pub decoded_bytes: u64,
+    /// The SHA-256 the parent recomputed over exactly the decoded bytes it received.
+    pub decoded_digest: MediaWorkerDigestV1,
+    /// The worker process identifier the parent observed.
+    pub worker_pid: u32,
+    /// Whether the parent proved the confinement bounds were really installed before decode.
+    pub limits_verified: bool,
+    /// Whether the parent confirmed the child was reaped and its resources released.
+    pub cleanup_verified: bool,
+    /// The measured wall time of the attempt, in milliseconds.
+    pub wall_ms: u64,
 }
 
 impl GraphicImageWorkerObservationV1 {
-    /// Pairs one fully checked worker attempt with the parent's own verified facts.
-    ///
-    /// The constructor validates and repairs nothing: the caller already had to receive complete
-    /// frames, rehash the exact bytes received and confirm the host facts, and the policy below
-    /// re-checks every consistency rule the caller could still have got wrong.
-    #[must_use]
-    pub const fn new(
-        confirmed_format: GraphicImageFormatV1,
-        observed_mime: &'static str,
-        source_digest: MediaWorkerDigestV1,
-        width: u32,
-        height: u32,
-        decoded_bytes: u64,
-        decoded_digest: MediaWorkerDigestV1,
-        worker_pid: u32,
-        limits_verified: bool,
-        cleanup_verified: bool,
-        wall_ms: u64,
-    ) -> Self {
-        Self {
-            confirmed_format,
-            observed_mime,
-            source_digest,
-            width,
-            height,
-            decoded_bytes,
-            decoded_digest,
-            worker_pid,
-            limits_verified,
-            cleanup_verified,
-            wall_ms,
-        }
-    }
-
     /// The still-image format the parent re-derived from the received bytes.
     #[must_use]
     pub const fn confirmed_format(&self) -> GraphicImageFormatV1 {

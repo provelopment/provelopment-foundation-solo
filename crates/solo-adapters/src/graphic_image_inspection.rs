@@ -996,19 +996,19 @@ fn validate_image_worker_run_v1(
         );
     }
 
-    GraphicImageInspectPortOutcomeV1::Inspected(Box::new(GraphicImageWorkerObservationV1::new(
-        frame.format,
-        declared.canonical_mime(),
-        frame.source_digest,
-        frame.width,
-        frame.height,
-        frame.decoded,
-        received_digest,
-        run.child_pid(),
-        run.limits_verified(),
-        run.cleanup_verified(),
-        run.wall_ms(),
-    )))
+    GraphicImageInspectPortOutcomeV1::Inspected(Box::new(GraphicImageWorkerObservationV1 {
+        confirmed_format: frame.format,
+        observed_mime: declared.canonical_mime(),
+        source_digest: frame.source_digest,
+        width: frame.width,
+        height: frame.height,
+        decoded_bytes: frame.decoded,
+        decoded_digest: received_digest,
+        worker_pid: run.child_pid(),
+        limits_verified: run.limits_verified(),
+        cleanup_verified: run.cleanup_verified(),
+        wall_ms: run.wall_ms(),
+    }))
 }
 
 /// Which stage refused one real Entity image candidate.
