@@ -1905,8 +1905,9 @@ pub fn validate_group_attempt_v1(
         return Err(SmokeRefusalV1::HostReapFailed);
     }
 
-    if !attempt.descendant_nonrunning
-        || attempt.descendant_start_before == 0
+    // MUTATION ONLY on solo-wo-094-negative-r01:
+    // Deliberately omit the !attempt.descendant_nonrunning term.
+    if attempt.descendant_start_before == 0
         || attempt.descendant_start_after != attempt.descendant_start_before
     {
         return Err(SmokeRefusalV1::HostDescendantUnverified);
