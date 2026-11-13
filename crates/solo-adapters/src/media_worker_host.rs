@@ -4127,6 +4127,9 @@ mod tests {
             "the child's window must close inside the parent's deadline"
         );
         assert_eq!(SESSION_CHILD_READY_MARKER_V1, "SOLO-MEDIA-HOST-SESSION-V1");
-        assert_eq!(SESSION_EVIDENCE_MARKER_V1, "media_host_session=live_attested");
+        assert_eq!(
+            SESSION_EVIDENCE_MARKER_V1,
+            "media_host_session=live_attested"
+        );
     }
 }
