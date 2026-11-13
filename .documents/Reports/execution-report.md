@@ -1,219 +1,153 @@
 # Execution Report
 
-**Order:** `OWNER-ISSUED — SOLO-WO-090 R01` — CORRECTIVE: session readiness reap-failure truth and fresh-gate requalification.
-**Matching activation:** `SOLO-WO-090 R01`. **Date (ISO):** 2026-11-13.
+**Order:** `OWNER-ISSUED — SOLO-WO-091 R01` — INTEGRATE: corrected Linux session readiness and reap-fail-closed proof.
+**Matching activation:** `SOLO-WO-091 R01`. **Date (ISO):** 2026-11-13.
 
-**Prior disposition, recorded permanently and not reinterpreted:** `SOLO-WO-089 R01` was **STOPPED** by the Chief Master Architect and is **not accepted**. Its two independently identified breaches stand as stated: **(A)** technical files were edited before the mandatory issuance CI gate — restored before issuance and never committed to `main`, but still a sequencing violation; and **(B)** the new early-readiness-refusal path discarded the result of `Child::wait()` and then joined readers as though the child were known to be gone. Neither is erased, excused, retroactively accepted or used as precedent here. The WO-089 report and its technical branch are preserved unchanged as evidence and are still **not** accepted artifacts.
+**Claimed outcome, submitted for independent review only: `LINUX-SESSION-READINESS-REAP-FAIL-CLOSED-INTEGRATED`.**
 
-**Implementation-agent claimed outcome: `LINUX-SESSION-READINESS-REAP-FAIL-CLOSED-PROVEN` — on isolated technical branch `solo-wo-090-r01` ONLY.** This is a claim submitted for independent review, not self-acceptance, and it is **not** `SOLO-WO-089 ACCEPT`.
+**Three dispositions, kept deliberately distinct.**
 
-**What was corrected.** The inherited early-readiness-refusal branch of `run_session_probe` now classifies its cleanup from an actually checked `Child::wait()` instead of discarding it. A `wait()` error is reported as `HostReapFailed` and **overrides** the readiness refusal that triggered the cleanup; the capped reader threads are joined **only** after a confirmed successful reap. A rejected `Child::kill()` is never treated as evidence of termination, and a confirmed reap still cannot convert a refusal into success. The readiness-before-query barrier, all fixed limits, deadlines, caps, tokens, the native FFI seam and the public CLI are untouched.
+* `SOLO-WO-089 R01` — **permanently STOPPED, NOT ACCEPTED, NOT retrospectively compliant.** Both original reasons stand: **(A)** technical files were edited before the mandatory issuance CI gate; **(B)** the early-readiness-refusal path discarded the `Child::wait()` result and joined readers without a proven leader exit. Its report blob `ee6417c1ab76aad44fc836de5b230e87d4160dea` and its frozen branch `solo-wo-089-r01` `1236915cab6e87b17ce84813430897b273fc3230` (tree `57fd4bd4b7fe01cda18c55c3a9ce848c54befeb7`) were not rewritten, moved, deleted or rehabilitated.
+* `SOLO-WO-090 R01` — **ACCEPT**, outcome `LINUX-SESSION-READINESS-REAP-FAIL-CLOSED-PROVEN`, on the new corrective branch only. That acceptance does not reach back to WO-089.
+* `SOLO-WO-091 R01` (this run) — a bounded **integration-only** promotion of exactly two already-accepted Git blobs into `main`, with zero source authoring.
 
-**What is NOT established.** No process-group authority, no descendant containment, no general-purpose process supervisor, no PID-reuse or identity permanence, no media correctness, no publication, no release, no Windows capability. `R03.C3`, `R03.C` and Stage 03 remain **OPEN**; all containment, media-correctness, publication and release flags remain `false`.
+**Nonclaims.** No real operating-system forced `Child::wait()` failure was injected or observed; the failed-reap classification is proven by deterministic pure tests and by source structure, not by a real kernel reap failure. No process-tree or descendant cleanup, no persistent PID pinning, no race-free identity after observation, no group-signalling authority, no Windows Job Object enforcement, no host sandbox, no AVIF or media correctness, no publication, release or deployment. `R03.C3`, `R03.C` and Stage 03 remain **OPEN**; containment, media-correctness, publication and release flags remain **false**.
 
-## 1. Preflight — PASS, and clean before any technical action
+## 1. Preflight — PASS, before any action
 
-Sole checkout `C:\Users\Sean\Documents\Provelopment\00.foundation-solo`, verified as the real worktree root. Exactly one worktree; exactly one remote `origin` with identical fetch/push URL `https://github.com/provelopment/provelopment-foundation-solo.git`; no stash; no untracked path; exactly four `.documents/WIP/` files. `git status --porcelain` showed **only** ` M .documents/WIP/workorder-active.md` — the Owner-installed `SOLO-WO-090 R01`, read and never edited, trimmed, synthesised or auto-formatted. `solo-wo-090-r01` did **not** exist locally or on `origin`.
+Sole checkout `C:\Users\Sean\Documents\Provelopment\00.foundation-solo`; one worktree; one remote `origin`, fetch and push both `https://github.com/provelopment/provelopment-foundation-solo.git`; no stash; no untracked path; exactly four `.documents/WIP/` files. `git status --porcelain` showed **only** ` M .documents/WIP/workorder-active.md` — the complete, unmodified Owner-installed `SOLO-WO-091 R01` (22 748 bytes, LF), never edited, trimmed or auto-formatted. `.temp/solo-wo-091-run/` was verified **absent** and was created only after the issuance gate returned green.
 
-| Mandatory baseline identity | Required | Observed |
+| Baseline identity | Required | Observed |
 | --- | --- | --- |
-| `HEAD == main == origin/main` | `29ccec0b276c5a180f38cbe121781ea8618a82ac` | exact (local, remote-tracking, GitHub) |
-| Baseline tree | `2be96bc4ba88fd1107a6ebb3ffccadcc75a787d8` | exact |
-| Canonical WO-089 report blob | `ee6417c1ab76aad44fc836de5b230e87d4160dea` | exact |
-| Previous tracked ACTIVE blob | `6167d719d2ac3c302e5fa44c9976fb94b33a43b3` | exact |
+| `HEAD == main == origin/main` | `0fc2da6fd41699acb9add8c9369a6d83ef9c994a` | exact (local, remote-tracking, GitHub) |
+| Baseline tree | `5754e30acb2e435c64939e9f7596a24484f81bbe` | exact |
+| Sole parent of that report commit | `2d0314ab30a4bea75e979be6ab61add497689c22` | exact |
+| Canonical report blob | `6a36487b1e668b6f53957881c0ebc8ea18bbac6e` | exact |
+| Previously tracked ACTIVE blob | `4aac00be56053978fd11fbc97b975590ae642e06` | exact |
+| `plan-next.md` / `plan-roadmap.md` / `plan-outlook.md` | `92fa562b…` / `9d7a8622…` / `cb9c7a61…` | exact |
 | `ARCHITECTURE.md` | `c941c7f90cc1b1955f9d60b348a3b1092cafe97f` | exact |
-| NEXT / ROADMAP / OUTLOOK | `92fa562b…` / `9d7a8622…` / `cb9c7a61…` | exact |
-| `rust-verify.yml` | `e1b5ca6e1738a5d5129a8788e24d51aee02421d1` | exact; both `edges=41` pins intact |
+| `rust-verify.yml` | `e1b5ca6e1738a5d5129a8788e24d51aee02421d1` | exact |
 | `Cargo.lock` | `b1ee56da60f36536548586528db371b7cbe508e4` | exact |
 | `solo-adapters/Cargo.toml` | `47d732f26b18addc67a2fc6d0a4a94939b8ca134` | exact |
 | `solo-adapters/src/lib.rs` | `1550d34f820642bb5573e06d4fccb758109fd26c` | exact |
-| **Frozen native seam** | `1e698245493f6d10ebb9636282698a797a242865` | exact |
-| **Mainline façade before correction** | `2f83c0695da5a49b4539d4472dfc2e2a460e1691` | exact |
+| **Native seam** | `1e698245493f6d10ebb9636282698a797a242865` | exact |
+| **Façade (pre-promotion)** | `2f83c0695da5a49b4539d4472dfc2e2a460e1691` | exact |
 | `solo-cli/src/main.rs` | `b3c89ad0ce256f69e5763855559d20757554c461` | exact |
-| **Mainline host integration test** | `a97c09954e96fbddd6380fb301be182584c183ea` | exact |
+| **Host integration test (pre-promotion)** | `a97c09954e96fbddd6380fb301be182584c183ea` | exact |
 | `tests/unsafe_boundary.rs` | `b88e7b42ab03bd78557e58d4c54b957b59369d6c` | exact |
 | Arch graph checker | `7a5beadaa0fc6cae4b5f83bf6a3ff3f97484d45b` | exact |
 | Workspace graph checker | `25a91b2c212805633fcf0fd80e4aaea11c595ba3` | exact |
 
-**Seventeen of seventeen anchors exact, zero mismatches.** All eleven refs were identical across local branches, `origin/*` and `git ls-remote`: `main` `29ccec0b…`; `solo-wo-089-r01` `1236915cab6e87b17ce84813430897b273fc3230` at tree `57fd4bd4b7fe01cda18c55c3a9ce848c54befeb7` (**stopped, unchanged**); `solo-wo-087-r01` `8250f742…`; `solo-wo-085-r01` `5bf9082b…`; `solo-wo-083-r01` `ccc3ca8f…`; `solo-wo-081-r01` `cacc0f9b…`; `solo-wo-079-r01` `380393dd…`; `solo-wo-076-r01` `40a40bab…`; `solo-wo-061-r01` `4371af21…`; `solo-wo-069-r01` `e6162cdf…`; `solo-wo-070-r01` `d270f95c…`.
+**Seventeen of seventeen anchors exact, zero mismatches.** **Twelve** refs at baseline — `main` plus eleven branches — identical across local `refs/heads`, `origin/*` and `git ls-remote --heads origin` (`remote_count=12`, `main` counted once, not also as a remote-tracking duplicate). Accepted promotion source `solo-wo-090-r01` = `0eb3fcf645851ae752bd59e12fe32b69604197d2`, tree `71a26a58558fcbe6a18ae819c0fe9cdffa9de1d3`, parent `052fa5e38de7f45535e6012f4063b6a9320cc9be`, façade `a1f2bdb9960a4befc44efab746640e4d19bb624b`, test `5444013571a71efde758422fdf9d8fada79ef53a` — all exact. Stopped `solo-wo-089-r01` exact and untouched. No branch/ref drift, no extra worktree, no recognized-but-unexpected local material.
 
-**Inherited ignored material inventoried and untouched:** `.temp/solo-wo-073-wip/` = **4 files / 46 062 bytes**; plus `architecture-fixtures/`, `toolchain-installer/` and `target/`. GitHub cannot attest to ignored local files; these are Agent-observed local facts only.
+**Owner-local ignored inventory (agent-observed only — GitHub cannot verify ignored paths):** `.temp/solo-wo-073-wip/` = **4 files / 46 062 bytes**; plus `architecture-fixtures/`, `toolchain-installer/` and `target/`. All preserved and never read as code.
 
-**Sequencing discipline held this time.** No technical file was edited, generated, parked, imported or branched before the issuance gate was green. There was no pre-gate technical scratch. New order-owned scratch `.temp/solo-wo-090-run/` was created only **after** the gate returned green, and only to hold CI logs and this draft.
-
-## 2. ACTIVE-only issuance — PASS, before any technical action
+## 2. ACTIVE-only issuance — PASS, before any promotion
 
 | Field | Value |
 | --- | --- |
-| Issuance commit | `2d0314ab30a4bea75e979be6ab61add497689c22` |
-| Issuance tree | `e237b7ecb624babf74e3148ad1b26fe7c5356a76` |
-| Parents | exactly one: `29ccec0b276c5a180f38cbe121781ea8618a82ac` |
-| Changed paths | exactly one: `M .documents/WIP/workorder-active.md`, `+122 −78` |
-| New ACTIVE blob | `4aac00be56053978fd11fbc97b975590ae642e06` (26 824 bytes) |
-| Push | ordinary fast-forward `29ccec0..2d0314a  main -> main` |
-| GitHub readback | tree `e237b7ec…`, sole parent `29ccec0b…`, one modified file `+122/-78`, ACTIVE blob `4aac00be…` |
+| Issuance commit | `57b31d0f5036f574e86eb54f43eb2ddfc36b55ae` |
+| Issuance tree | `7ca6bf078ecb571d5231ccf84ee982cfe46cf071` |
+| Sole parent | `0fc2da6fd41699acb9add8c9369a6d83ef9c994a` |
+| Changed paths | exactly one `M .documents/WIP/workorder-active.md`, `+85 −93` |
+| New ACTIVE blob | `78faa1b3a5ce2e025d7c5aafc0c0db0b3154e7c1` |
+| Push | ordinary fast-forward `0fc2da6..57b31d0  main -> main` |
+| GitHub readback | tree `7ca6bf07…`, sole parent `0fc2da6f…`, one file `+85/-93`, ACTIVE blob `78faa1b3…` |
 
-**Issuance CI gate — PASS.** `push`-triggered `rust-verify` run **`43399050611`** at exactly `2d0314ab…`: `conclusion=success`, `event=push`, `head_branch=main`, `attempt=1`. Jobs **`131797030074`** `verify (ubuntu-24.04)` **success** (33 configured steps, 24 success / 9 skipped, 0 failed) and **`131797030465`** `verify (windows-2025)` **success** (33 steps, 19 success / 14 skipped, 0 failed) — exactly the documented host-inapplicable skip counts. Real logs inspected. Afterwards `HEAD == main == origin/main == 2d0314ab…`, index and worktree clean, one tracked path changed, all branch refs unmoved. **Only then** did the technical phase start.
+**Issuance CI gate — PASS.** `push`-triggered `rust-verify` run **`43403442303`** at exactly `57b31d0f…`: `conclusion=success`, `event=push`, `head_branch=main`, `attempt=1`. Jobs **`131811775177`** `verify (ubuntu-24.04)` **success** (33 configured steps, 24 success / 9 skipped, 0 failed) and **`131811774673`** `verify (windows-2025)` **success** (33 steps, 19 success / 14 skipped, 0 failed). Real logs inspected. Afterwards `HEAD == main == origin/main == 57b31d0f…`, clean index and worktree, and unchanged source blobs. **No promotion, no scratch and no technical action occurred before this green.**
 
-## 3. New corrective branch and the auditable seed import
+## 3. Two-path accepted-blob promotion — five independent proofs
 
-`solo-wo-090-r01` was created from exactly the successful issuance commit, previously nonexistent, with a clean tree. Then — and only then — this exact path-scoped command was executed verbatim:
+Executed on clean `main` at the issuance SHA, verbatim:
 
 ```text
-git restore --source=1236915cab6e87b17ce84813430897b273fc3230 --staged --worktree -- crates/solo-adapters/src/media_worker_host.rs crates/solo-cli/tests/media_worker_host_smoke.rs
+git restore --source=0eb3fcf645851ae752bd59e12fe32b69604197d2 --staged --worktree -- crates/solo-adapters/src/media_worker_host.rs crates/solo-cli/tests/media_worker_host_smoke.rs
 ```
 
-Verified immediately: staged ledger was exactly two `M` rows and nothing else; index blobs were exactly `56676fecbd1fef510348c5b777da3a8eadf745b6` and `99b470f3073e59d30543dcc5862ec6f4037e46a3`; filter-aware worktree `git hash-object` values matched those same two objects; `git diff --cached --check` was empty. The Owner worktree holds CRLF because of `core.autocrlf=true` with `* text=auto`, so filter-aware object identity (not raw `--no-filters` bytes) governs equivalence, as the order directs; no EOL policy was changed and no source was rewritten.
+| Proof | Requirement | Observed |
+| --- | --- | --- |
+| **1** | exactly two `M` rows; numstat `491 14` / `268 0`; `--check` silent; nothing unstaged or untracked | exact; `cached_count=2`, `cached_check=0`, `unstaged=[]`, `untracked=[]` |
+| **2** | index object == accepted-branch object == pinned accepted blob, both paths | `100644 a1f2bdb9… 0` and `100644 54440135… 0`; branch `a1f2bdb9…` / `54440135…` |
+| **3** | filter-aware `git hash-object` == accepted blob, both paths | `a1f2bdb9…` / `54440135…` — identical |
+| **4** | 15 protected blobs unchanged versus issuance | 15 checked, **0** mismatches |
+| **5** | GitHub comparison of staged/index/branch/committed objects | all four agree on both paths (see §4) |
 
-The import is recorded as an explicitly **unaccepted corrective seed**, on the technical branch only, and is not an independently accepted implementation.
+**Physical line-ending observation, reported as mapping and not as an edit.** With `core.autocrlf=true` and `* text=auto`, the physical worktree streams contain CRLF (`crlf=true`) and the `--no-filters` physical hashes are `dc57811c15a7c72d6c18b99e3bf3d5e69130cc83` (façade, 209 500 bytes) and `c32acb30ac5fc790097088298267d8a0c5e1660b` (test, 58 358 bytes). Those differ from the canonical LF Git blobs purely by line-ending mapping. No Git attribute was toggled, nothing was normalized or re-encoded, and no accepted source byte was edited.
 
-| Commit | Tree | Parent | Ledger | Numstat |
+## 4. Integration commit and its complete two-host CI
+
+| Field | Value |
+| --- | --- |
+| Integration commit | `4b9d115246f5e7070c9981bd123a3de9f8901519` |
+| Integration tree | `e0e686c1680625a6fec3ff7c209820cc86a20bfb` |
+| Sole parent | `57b31d0f5036f574e86eb54f43eb2ddfc36b55ae` |
+| Ledger | exactly two `M` rows: `+491 −14` façade, `+268 −0` test |
+| Committed façade blob | `a1f2bdb9960a4befc44efab746640e4d19bb624b` |
+| Committed test blob | `5444013571a71efde758422fdf9d8fada79ef53a` |
+| Native seam at integration | `1e698245493f6d10ebb9636282698a797a242865` (unchanged) |
+| Push | ordinary fast-forward `57b31d0..4b9d115  main -> main` |
+
+**GitHub readback:** tree `e0e686c1…`, sole parent `57b31d0f…`, two files `+491/-14` and `+268/-0`; façade content blob `a1f2bdb9…` and test content blob `54440135…` at the integration commit **and** at `0eb3fcf6…` on the accepted branch — the same objects on both sides of the promotion. Baseline→integration paths are exactly three: ACTIVE plus the two implementation files. No merge, no cherry-pick, no `git apply`, no whole-tree checkout, no reformat, no normalization.
+
+| CI stage | Run | Ubuntu job | Windows job | Result |
 | --- | --- | --- | --- | --- |
-| **Seed** `51e2677d0289b919cfa5e4909472597d9ffef282` | `17f39d98e9dc30da0d52b2a0d7f93fa76526026c` | `2d0314ab…` | 2 paths | `+315 −14`, `+166 −0` |
-| **Correction** `0608b546037008ca774aba53132d797bd0fd6bce` | `c46ad3af51979f36691a4a65b93122ed541599a0` | `51e2677d…` | 2 paths | `+179 −8`, `+99 −0` |
-| **rustfmt fix** `052fa5e38de7f45535e6012f4063b6a9320cc9be` | `319c9c0a52f15715428a21fb64432bb9ed14e186` | `0608b546…` | 2 paths | `+4 −1`, `+4 −1` |
-| **Scope fix** `0eb3fcf645851ae752bd59e12fe32b69604197d2` | `71a26a58558fcbe6a18ae819c0fe9cdffa9de1d3` | `052fa5e3…` | 1 path | `+2 −0` |
+| Issuance | `43403442303` | `131811775177` success | `131811774673` success | green, 33 steps each, 0 failed |
+| **Integration** | **`43403903155`** | **`131813336491` success** | **`131813336133` success** | **green, 33 steps each, 0 failed, 9/14 skips** |
+| Report head | see §9 handoff | — | — | required separately |
 
-The correction commit was amended once **before its first push** (to shorten an identifier that would have exceeded `rustfmt`'s call width); the pre-amend object `bee3f8ee…` was never published. Commits 3 and 4 are the two disclosed red-CI corrections of §6. No commit touched any path other than the two authorized ones.
+Both integration runs are `push`-triggered at `4b9d115246f5…`, `head_branch=main`, `attempt=1`. The earlier branch run `43400642204` is **not** attributed to this integration.
 
-**Final branch:** `solo-wo-090-r01` = `0eb3fcf645851ae752bd59e12fe32b69604197d2`, tree `71a26a58558fcbe6a18ae819c0fe9cdffa9de1d3`, local and `origin/solo-wo-090-r01` identical.
+## 5. Fresh real Linux evidence at the integration SHA
 
-**Cumulative branch diff versus the issuance commit — exactly two paths, no add, delete or rename:**
-
-| Path | Before | After | Diff |
-| --- | --- | --- | --- |
-| `crates/solo-adapters/src/media_worker_host.rs` | `2f83c0695da5a49b4539d4472dfc2e2a460e1691` | `a1f2bdb9960a4befc44efab746640e4d19bb624b` | `+491 −14` |
-| `crates/solo-cli/tests/media_worker_host_smoke.rs` | `a97c09954e96fbddd6380fb301be182584c183ea` | `5444013571a71efde758422fdf9d8fada79ef53a` | `+268 −0` |
-
-`media_worker_host_native.rs` is `1e698245…` on the branch — byte-identical to baseline. Zero new `unsafe`, zero new FFI, zero new native roots, zero new dependency, zero new CLI mode, zero process-group or descendant operation.
-
-## 4. The defect and the corrected production decision rule
-
-**The inherited defect, quoted from the seed.** The early-readiness-refusal branch did this:
-
-```rust
-if let Some(refusal) = readiness_failure {
-    let _ = child.kill();
-    let _ = child.wait();
-    let _ = join_reader(out_reader);
-    let _ = join_reader(err_reader);
-    return Err(refusal);
-}
-```
-
-The `wait()` result was discarded, the readers were joined on the assumption that the leader was gone, and the original readiness refusal was returned even if the reap had failed — a cleanup reported as completed that was never established.
-
-**The corrected production code** (`run_session_probe`, final branch):
-
-```rust
-if let Some(refusal) = readiness_failure {
-    let kill_ok = child.kill().is_ok();
-    let reap = SessionReapV1::from_wait_outcome_v1(child.wait());
-    let plan = SessionCleanupPlanV1::classify_v1(kill_ok, reap, refusal);
-    if plan.joins_readers_v1() {
-        let _ = join_reader(out_reader);
-        let _ = join_reader(err_reader);
-    }
-    return Err(plan.refusal_v1());
-}
-```
-
-**The mechanism, in two ordinary safe types that production actually uses.**
-
-* `SessionReapV1` — `Reaped` | `Unreaped`, constructed only by `from_wait_outcome_v1(Result<ExitStatus, io::Error>)` where **only `Ok`** yields `Reaped`. The kill result is structurally absent from this type, so no signal result can be mistaken for a reap.
-* `SessionCleanupPlanV1` — `JoinThenRefuse(SmokeRefusalV1)` | `UnverifiedReap`, produced only by `classify_v1(kill_accepted, reap, refusal)`. It decides **both** the joining decision (`joins_readers_v1`) and the reported refusal (`refusal_v1`), so the two can never disagree. `UnverifiedReap` reports `SmokeRefusalV1::HostReapFailed`, which **overrides** the readiness refusal. `kill_accepted` is accepted for the record and deliberately excluded from the decision.
-
-Neither variant can express success and the caller always returns `Err`, so cleanup can never be converted into evidence. Both types are gated `#[cfg(any(target_os = "linux", test))]`, keeping them out of Windows production builds while staying platform-neutral for the pure tests.
-
-**Verified ordering and cleanup in the final source** (`crates/solo-adapters/src/media_worker_host.rs`): line **2527** `let readiness_line = if remaining.is_zero() {` → **2531** `recv_timeout(remaining)` → **2534** `super::validate_session_readiness_v1(&line, pid)` → **2564** `live_before` readback → **2567** `observe_process_identity_v1(Some(handle_pid))`. The kernel query is reachable only when `readiness_line` is `Some`, which requires validation to have returned `Ok`. The early-refusal cleanup is then **2584** `child.kill()`, **2585** `from_wait_outcome_v1(child.wait())`, **2586** `classify_v1`, **2587** `if plan.joins_readers_v1()`, **2588–2589** the only two `join_reader` calls on that path, **2591** `return Err(plan.refusal_v1())`.
-
-**Invariants preserved byte-for-byte:** child sleep 4 000 ms; one 15 000 ms deadline started before `spawn` and consumed only in its remainder by the readiness wait; 20 000 ms integration budget; existing poll interval; stdout cap 1 024 / stderr cap 512 as one total stream cap; first-complete-newline handoff; strict profile and PID checks; exact whole-stream post-reap comparison; the accepted marker `media_host_session=live_attested` with its twelve fields in their original order and count; both private tokens; `install_linux_child_limits_v1` with `setsid` and both `setrlimit` calls; the public CLI contracts.
-
-**Residual risk, disclosed.** If a real `Child::wait()` ever failed, the corrected path deliberately does **not** join the possibly-blocked readers and reports `HostReapFailed`; the detached reader threads and any still-live leader would then be an unresolved cleanup risk, reported truthfully rather than papered over. Broadening authority to kill process groups or descendants to resolve that is explicitly out of scope, and no real runner encountered it.
-
-## 5. Proof matrix — results at the exact final branch SHA
-
-| Gate | Result |
-| --- | --- |
-| `N090-01` sequencing | **PASS** — clean preflight; ACTIVE-only issuance `2d0314ab`; two-host issuance green `43399050611` **before** branch, import or any technical edit; seed is a branch-only commit with exact candidate blob readback |
-| `N090-02` production cleanup | **PASS** — early refusal never queries the kernel; checked `wait()` precedes the only joins; `HostReapFailed` overrides and cannot be masked; the production rule is covered by five deterministic tests |
-| `N090-03` synchronized positive | **PASS** — `n090_reap=reaped_before_join pid=4708 wall_ms=4009`, unchanged twelve-field schema, ceilings `536870912`/`10`, `pid=pgid=sid=observed_pgid=observed_sid`, `reaped=1`, inside 15 s |
-| `N090-04` refusals | **PASS** — direct child exits 71 before readiness/sleep; malformed, absent, foreign-PID, duplicated, trailing and over-cap readiness all fail closed; early-equals-full comparison and both caps asserted |
-| `N090-05` Windows | **PASS** — `n090_02_… ... ok`; both modes exit 3, empty stdout, no child, no readiness worker; **0** `n090_reap=` / **0** `n089_readiness=` / **0** `n087_session=` in the whole Windows log |
-| `N090-06` regressions | **PASS** — N076/N079/N081/N083/N085/N087/N089 all re-green and unmodified |
-| `N090-07` architecture/security | **PASS** — native seam `1e698245…`; `packages=4 targets=33 files=60 edges=41`; `cases=29`; deny/tripwire/release/reproducibility green |
-| `N090-08` final isolated CI | **PASS** — run `43400642204`, both jobs 33 configured steps, 0 failed |
-
-**Raw Linux observations, run `43400642204` (Ubuntu `131802338873`), read from the job log:**
+Read from Ubuntu job `131813336491` of run `43403903155` — a genuinely new execution at `4b9d1152…`, not a replay of branch or WO-090 output. The PIDs below are distinct from every earlier run (WO-090 used 4708/4666/4649/4597/4517/4531/4561); that is a freshness observation only, since the order does not require PID uniqueness and none is claimed as proof.
 
 ```text
-n090_reap=reaped_before_join pid=4708 wall_ms=4009
-n089_readiness=validated_before_query pid=4666 wall_ms=4010
-n087_session=media_host_session=live_attested as_soft=536870912 as_hard=536870912 cpu_soft=10 cpu_hard=10 pid=4649 pgid=4649 sid=4649 observed_pgid=4649 observed_sid=4649 reaped=1 wall_ms=4009
-n085_cpu=media_host_cpu=kernel_terminated ... pid=4597 pgid=4597 signal=9 reaped=1 parent_killed=0 wall_ms=10008
-n079_observation=media_host_probe=accepted ... pid=4517 pgid=4517 wall_ms=1
-n081_wall=media_host_wall=terminated ... pid=4531 pgid=4531 signal=9 reaped=1 wall_ms=2004
-n083_as=media_host_as=limit_enforced ... request_bytes=805306368 reserve=denied pid=4561 pgid=4561 wall_ms=10
+n090_reap=reaped_before_join pid=4712 wall_ms=4008
+n089_readiness=validated_before_query pid=4668 wall_ms=4010
+n087_session=media_host_session=live_attested as_soft=536870912 as_hard=536870912 cpu_soft=10 cpu_hard=10 pid=4655 pgid=4655 sid=4655 observed_pgid=4655 observed_sid=4655 reaped=1 wall_ms=4008
+n085_cpu=media_host_cpu=kernel_terminated as_soft=536870912 as_hard=536870912 cpu_soft=10 cpu_hard=10 pid=4601 pgid=4601 signal=9 reaped=1 parent_killed=0 wall_ms=10004
+n079_observation=media_host_probe=accepted as_soft=536870912 as_hard=536870912 cpu_soft=10 cpu_hard=10 pid=4522 pgid=4522 wall_ms=10
+n081_wall=media_host_wall=terminated as_soft=536870912 as_hard=536870912 cpu_soft=10 cpu_hard=10 pid=4535 pgid=4535 signal=9 reaped=1 wall_ms=2004
+n083_as=media_host_as=limit_enforced as_soft=536870912 as_hard=536870912 cpu_soft=10 cpu_hard=10 request_bytes=805306368 reserve=denied pid=4565 pgid=4565 wall_ms=10
+n089_direct_session_child=exit=71
+n087_direct_session_child=exit=71
 ```
 
-Three separate real invocations of the same accepted path in one job produced three distinct fresh PIDs — `4708` (N090), `4666` (N089), `4649` (N087) — each with `as=536870912/536870912`, `cpu=10/10`, five equal identities, `reaped=1` and `0 < wall_ms < 15000`. `n090_reap` is a **test-log annotation** describing genuinely inspected source state and genuinely measured values; it is not a new product field or mode, and the only product line remains `media_host_session=live_attested …`.
+**Positive synchronized proof (`N090-03`).** The accepted product line is unchanged: `media_host_session=live_attested` with the same fixed field names and order, `RLIMIT_AS` soft/hard `536870912`, `RLIMIT_CPU` soft/hard `10`, `pid=pgid=sid=observed_pgid=observed_sid>0`, normal exit zero, no parent kill, `reaped=1`, and `wall_ms=4008` — strictly between 0 and `15000`. The child flushed its complete fixed readiness line and the parent validated it before the sole read-only group/session query, bracketed by live-before and live-after checks. `n090_reap=…` and `n089_readiness=…` are **test-log annotations** describing inspected source state and measured values; they are not additional product or protocol fields.
 
-**Deterministic `n090_` tests — pure, platform-neutral, and proving the production rule:**
+**The production failed-reap decision rule is present in the integrated source.** The early-readiness-refusal path uses `SessionReapV1::from_wait_outcome_v1(child.wait())` and `SessionCleanupPlanV1::classify_v1(kill_ok, reap, refusal)`; only `Reaped` may enter the reader-join phase, and `Unreaped` reports `SmokeRefusalV1::HostReapFailed` regardless of the initial readiness refusal or of whether the kill was accepted. Ordering is unchanged: capped `recv_timeout` on the remainder of the single 15 000 ms deadline → strict readiness validation → live-before → the sole `getpgid`/`getsid` pair → live-after, with the query structurally unreachable without a validated line.
 
-| Test | Proves |
-| --- | --- |
-| `n090_01_a_confirmed_reap_keeps_the_refusal_and_permits_joining` | readiness refusal + confirmed reap stays the original refusal, and joining is permitted — cleanup never becomes success |
-| `n090_02_a_failed_reap_overrides_the_readiness_refusal` | real `io::Error` → `Unreaped`; every readiness refusal becomes `HostReapFailed`, joining forbidden |
-| `n090_03_a_kill_result_cannot_stand_in_for_a_reap` | accepted kill with `Unreaped` still fails the reap; rejected kill with `Reaped` still permits joining |
-| `n090_04_the_cleanup_rule_is_total_over_every_refusal` | full truth table over 3 refusals × 2 kill results × 2 reap outcomes |
-| `n090_05_a_reader_failure_cannot_become_success` | a failed/overflowed reader still refuses on the accepted path; no early-refusal plan is an acceptance |
+**Deterministic tests — five production-linked, all green on both hosts:** `n090_01_a_confirmed_reap_keeps_the_refusal_and_permits_joining`, `n090_02_a_failed_reap_overrides_the_readiness_refusal`, `n090_03_a_kill_result_cannot_stand_in_for_a_reap`, `n090_04_the_cleanup_rule_is_total_over_every_refusal` (truth table over 3 refusals × 2 kill results × 2 reap outcomes), `n090_05_a_reader_failure_cannot_become_success`.
 
-`n090_01_the_real_parent_reaps_before_joining_after_the_correction` is the one **real** kernel test; the other five are explicitly **pure** and manufacture no OS failure, no foreign PID, no signal and no race. The retained N089 pair still proves the barrier itself: `n089_01_an_attempt_without_the_readiness_gate_is_refused` (no readiness gate can authorize the native query) and `n089_02_the_gated_line_and_the_full_stream_must_agree_exactly` (early line must equal the final entire stream). Nine `n089_` tests are retained unchanged.
+**Linux real corrective test:** `n090_01_the_real_parent_reaps_before_joining_after_the_correction ... ok`.
 
-**Direct-child refusal evidence:** `n089_direct_session_child=exit=71` and `n087_direct_session_child=exit=71` — both refuse before writing any readiness line and before the four-second window.
+**Negatives, all still closed.** Direct unsupervised `session-child` exits `71` before any readiness line and before the four-second window (two independent observations above). No arbitrary executable or PID input exists. Malformed, absent, delayed, foreign-PID, duplicated, trailing and over-cap readiness all refuse; a missing gate, failed or closed handoff, abnormal exit, missed deadline, reader failure and unverified reap all refuse. Retained `n089_01_an_attempt_without_the_readiness_gate_is_refused ... ok` and `n089_02_the_gated_line_and_the_full_stream_must_agree_exactly ... ok` re-prove the barrier and the exact early-equals-full comparison. Caps and budgets unchanged: stdout `1024`, stderr `512`, child sleep `4000` ms, parent deadline `15000` ms from before spawn, integration budget `20000` ms, existing poll interval, and all older N076/N079/N081/N083/N085 deadlines intact. No descendant handling, no process-group signal, no `pidfd`, no new native API.
 
-**Gates, both hosts:** pinned Rust `1.99.1`; format check success; strict `Clippy -D warnings` success; locked all-target tests with **33** `test result: ok` groups per host; `architecture=legal packages=4 targets=33 files=60 edges=41`; `self-check=passed cases=29`; `cargo-deny 0.20.2` advisories/bans/licenses/sources from the SHA-256-verified archive with the Ubuntu `RUSTSEC-2026-0009` probe refusing as designed; `lock_sha256=bf421c6e17034eb642cccfceeba22e01b5bea5ed138f03a3e5daf1c833086723`; `release_smoke=verified accepted_exit=0 refused_exit=2`; forbidden-import/bypass refusal with guaranteed restore; `reproducibility=verified` on two clean builds. The single `test result: FAILED` group per host is the deliberately injected tripwire inside a step that concluded **success**.
+**Windows (`N090-05`).** `n090_02_both_session_modes_stay_unsupported_after_the_correction ... ok`, plus inherited `n089_04_no_readiness_worker_runs_where_the_boundary_is_unsupported ... ok` and `n087_04_both_session_modes_are_unsupported_before_any_child_exists ... ok`. Both private session modes remain `HOST_UNSUPPORTED` at exit `3` with empty stdout and the exact fixed diagnostic; no spawn, no readiness worker, no Linux-only test executed, and **zero** `n090_reap=`, `n089_readiness=` and `n087_session=` positive lines in the entire Windows log.
 
-## 6. Every CI attempt on the technical branch, including both red ones
+**All original gates, unmodified and green on both hosts.** Rust pinned to `1.99.1`; `cargo fmt --all -- --check`; strict Clippy with warnings as errors; locked `cargo test --all-targets` giving **33** `test result: ok` groups per host; `architecture=legal packages=4 targets=33 files=60 edges=41` with the literal workflow graph pins; architecture self-check `cases=29`; forbidden-import and checker-bypass negative tests; `cargo-deny 0.20.2` with a freshly refreshed and verified RustSec DB, `DENY_PROBE_RESULT=refused`; `release_smoke=verified accepted_exit=0 refused_exit=2`; `reproducibility=verified` across clean builds; `lock_sha256=bf421c6e17034eb642cccfceeba22e01b5bea5ed138f03a3e5daf1c833086723`; all N076/N079/N081/N083/N085/N087/N089 regressions and the public CLI byte/exit contracts unchanged. The single `test result: FAILED` group per host is the intentionally injected architecture tripwire, proven to reject, inside a step and both jobs that concluded **success**; it was not suppressed.
 
-| Run | SHA | Event | Ubuntu | Windows | Failed step |
-| --- | --- | --- | --- | --- | --- |
-| `43399960036` | `0608b546` | `workflow_dispatch` | **failure** `131800066583` | **failure** `131800066883` | `15 Format check` (both) |
-| `43400220201` | `052fa5e3` | `workflow_dispatch` | **failure** `131800933619` | success `131800933309` | `16 Strict lint` (Ubuntu) |
-| `43400642204` | `0eb3fcf6` | `workflow_dispatch` | success `131802338873` | success `131802339001` | none |
+## 6. Preservation
 
-**Red run 1 — `rustfmt`, both hosts.** Two assertions whose argument-plus-message exceeded the tool's call width: `media_worker_host.rs:4552` (`assert!(!plan.joins_readers_v1(), "an unverified reap forbids joining")`) and `media_worker_host_smoke.rs:1436` (`assert!(!observed.timed_out, "the corrected proof must finish in budget")`). Correction `052fa5e3` applied exactly the two layouts `rustfmt` printed, touching only the two authorized files. No lint was lowered, no test suppressed, no workflow or Cargo file changed.
+`main` advanced by exactly two commits since baseline — issuance `57b31d0f` and integration `4b9d1152` — and the tracked-path ledger from baseline to integration is exactly **three** paths: `.documents/WIP/workorder-active.md`, `crates/solo-adapters/src/media_worker_host.rs`, `crates/solo-cli/tests/media_worker_host_smoke.rs`.
 
-**Red run 2 — one Linux-only compile error.** `error[E0433]: cannot find type SessionReapV1 in this scope`, and the same for `SessionCleanupPlanV1`, both raised inside `mod linux`, whose explicit `use super::{…}` list did not include the new types. Windows was already fully green in that run, confirming the failure was Linux-seam-only. Correction `0eb3fcf6` added one function-local `use super::{SessionCleanupPlanV1, SessionReapV1};` — `+2 −0`, one path — deliberately chosen over editing the long rustfmt-sorted import block so the already format-verified call lines stayed byte-identical.
+All twelve refs were re-verified after the integration push: `main` at `4b9d1152…`, and `solo-wo-061-r01` `4371af21…`, `069` `e6162cdf…`, `070` `d270f95c…`, `076` `40a40bab…`, `079` `380393dd…`, `081` `cacc0f9b…`, `083` `ccc3ca8f…`, `085` `5bf9082b…`, `087` `8250f742…`, stopped `089` `1236915c…`, accepted `090` `0eb3fcf6…` — every one unmoved locally, in `origin/*` and in `ls-remote`. Only `main` moved. No branch deletion, force push, rebase, history rewrite or second checkout.
 
-Both corrections stayed inside the two authorized files. No branch, workflow, Cargo, guard, architecture check or public contract was altered to obtain a green result, and neither correction touched `main`.
+## 7. Limitations
 
-## 7. Isolation, preservation and truth boundaries
+* **Simulated, not injected.** The failed-reap branch is proven by deterministic pure tests and by source ordering. A real `Child::wait()` failure was never manufactured on an OS process, and a normal positive run does **not** prove that a negative kernel reap failure occurred.
+* **Reap truth, not containment.** The rule guarantees truthful reporting and forbids pre-reap joins; it does not make an unreaped leader safe and does not contain descendants.
+* **Ordering, not permanence.** One read-only query is ordered after one validated line; identity is not pinned, PID reuse is not prevented, and no later action is authorized.
+* **Line endings.** Physical worktree files are CRLF while committed blobs are LF; filter-aware Git object identity governs equivalence, and the `--no-filters` divergences in §3 are mapping only.
+* **Local toolchain.** No local Rust toolchain or linker exists on this Owner host, so all compile, format, lint, kernel, security, release and reproducibility facts are GitHub runner facts. Ignored-file inventory is the only local-only class of observation here.
+* **No integration authorship.** This run promoted accepted blobs only; it did not design, correct or re-verify the source by writing it.
 
-**`main` carries no branch code.** At the issuance commit `2d0314ab…`, `main` holds the accepted WO-088 originals: native `1e698245493f6d10ebb9636282698a797a242865`, façade `2f83c0695da5a49b4539d4472dfc2e2a460e1691`, host integration test `a97c09954e96fbddd6380fb301be182584c183ea` — **not** the WO-089 candidate (`56676fec…` / `99b470f3…`) and **not** the WO-090 corrections (`a1f2bdb9…` / `54440135…`). Text searches for `n089` and `n090` in both files on `main` return **zero** matches. `git diff --name-status 29ccec0b… main` is exactly `M .documents/WIP/workorder-active.md`.
+## 8. Cleanup
 
-**No merge, cherry-pick, path promotion, PR, tag, release or deployment.** No pre-existing branch moved: all ten historical/proof refs were identical at preflight and at the end. The **stopped** `solo-wo-089-r01` remains exactly `1236915cab6e87b17ce84813430897b273fc3230` at tree `57fd4bd4b7fe01cda18c55c3a9ce848c54befeb7`, its history unamended and its report untouched. Only one new ref was added: `solo-wo-090-r01` at `0eb3fcf645851ae752bd59e12fe32b69604197d2`.
+Task-owned scratch was `.temp/solo-wo-091-run/` — two CI job logs and this report draft — created only after the issuance gate was green, recorded, and removed by exact known path at run end. No other temporary path was created or touched: `.temp/solo-wo-073-wip/` (4 files / 46 062 bytes), `architecture-fixtures/`, `toolchain-installer/`, `target/` and prior-session logs are intact. No blanket deletion, reset, clean, stash or destructive command was used.
 
-**Local versus remote facts.** Commit, tree, parent, ledger, blob and ref identities were verified in the Owner-local checkout (`rev-parse`, `hash-object`, `ls-remote`, `for-each-ref`) **and** independently through the GitHub API. Every test, kernel, lint, format, security, release and reproducibility result is a GitHub runner fact. Nothing here is a local build or test claim.
+## 9. Status
 
-## 8. Limitations, stated plainly
+**`LINUX-SESSION-READINESS-REAP-FAIL-CLOSED-INTEGRATED`** is claimed for independent review. The accepted WO-090 correction now lives on `main` at `4b9d115246f5e7070c9981bd123a3de9f8901519` as the exact two accepted blobs, with the complete original two-host suite green at the exact integration commit and fresh real Linux evidence from it.
 
-* **Reap truth, not containment.** The correction guarantees that a failed reap is reported as `HostReapFailed` and that readers are not joined before a confirmed reap. It does not make an unreaped leader safe, and it does not contain descendants.
-* **Ordering, not permanence.** The readiness barrier orders one query after one validated line. It does not pin identity, prevent PID reuse, or authorize any later action.
-* **Trusted, descendant-free child.** Safety against a child leaking pipe handles to descendants remains out of scope; the reader joins occur only after the leader is reaped because of that assumption.
-* **No process-group authority.** `killpg`, negative-pid signals, `pidfd` and process-tree sweeps remain absent by design; cleanup signals only this parent's own `Child` handle.
-* **Pure versus real.** Five of the six `n090_` tests are pure and simulate the reap outcome in ordinary safe Rust; only `n090_01_the_real_parent_reaps_before_joining_after_the_correction`, the retained N087/N089 cases and the inherited kernel cases are execution evidence. A real `wait()` failure was deliberately never manufactured.
-* **Line endings.** The Owner worktree uses `core.autocrlf=true` with `* text=auto`; live files are CRLF while committed blobs are LF, and filter-aware object identity governs equivalence. No EOL policy was changed.
-* **No local Rust toolchain or linker** exists on this Owner host, so every compile, format, lint and kernel fact came from the runners — which is why two iterations were needed for a `rustfmt` and a `rustc` verdict that cannot be produced locally.
-
-## 9. Cleanup
-
-Order-owned scratch was `.temp/solo-wo-090-run/`: three CI job logs and this report draft, created only after the issuance gate was green and deleted by exact known path at run end. Nothing else was created. No other `.temp/` entry was touched: `.temp/solo-wo-073-wip/` (4 files / 46 062 bytes), `architecture-fixtures/`, `toolchain-installer/` and `target/` are intact. No `clean`, reset, stash, blanket deletion, forced push, rebase or history rewrite was used.
-
-## 10. Status
-
-**Implementation-agent claimed outcome: `LINUX-SESSION-READINESS-REAP-FAIL-CLOSED-PROVEN` — on isolated technical branch `solo-wo-090-r01` ONLY**, at `0eb3fcf645851ae752bd59e12fe32b69604197d2`, tree `71a26a58558fcbe6a18ae819c0fe9cdffa9de1d3`, with both original CI jobs green at that exact SHA and fresh real Linux readiness/reap evidence from it.
-
-This is a claim submitted for independent review, **not** self-acceptance. It is **not** `SOLO-WO-089 ACCEPT`, and this report does not assert that WO-089 was accepted or retrospectively compliant: the WO-089 STOP stands permanently, with both of its independent reasons recorded in the header and in §4. No integration, promotion, release, deployment, process-group signalling, descendant handling, Job Object, media decoding or publication was performed, and no further work order was begun. This report's own commit SHA, tree and blob are deliberately absent here and are supplied in the Implementation Agent's final handoff with the report-head CI run and job identifiers.
-
-`R03.C3`, `R03.C` and Stage 03 remain **OPEN**; all containment, media-correctness, publication and release flags remain `false`. The next authority is the Chief Master Architect's independent **ACCEPT / REVISE / STOP** against both the exact branch head `0eb3fcf645851ae752bd59e12fe32b69604197d2` and this report's exact revision.
+This is **not** self-acceptance, **not** `SOLO-WO-089 ACCEPT`, and **not** any claim of containment, sandboxing, media correctness, publication, release or deployment. The WO-089 STOP remains permanent. This report's own future commit SHA, tree and blob are deliberately absent; they are supplied in the Implementation Agent's handoff together with the report-head CI run and job identifiers. `R03.C3`, `R03.C` and Stage 03 remain **OPEN**; all containment, media-correctness, publication and release flags remain **false**. The next authority is the Chief Master Architect's independent **ACCEPT / REVISE / STOP** at this report's exact revision and integration head `4b9d115246f5e7070c9981bd123a3de9f8901519`.
