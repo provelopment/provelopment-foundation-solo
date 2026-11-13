@@ -1436,7 +1436,10 @@ fn n089_04_no_readiness_worker_runs_where_the_boundary_is_unsupported() {
 #[test]
 fn n090_01_the_real_parent_reaps_before_joining_after_the_correction() {
     let observed = run(&["--internal-media-host-probe-v1", "session-parent"]);
-    assert!(!observed.timed_out, "the corrected proof must finish in budget");
+    assert!(
+        !observed.timed_out,
+        "the corrected proof must finish in budget"
+    );
     assert_eq!(
         observed.exit_code,
         Some(0),

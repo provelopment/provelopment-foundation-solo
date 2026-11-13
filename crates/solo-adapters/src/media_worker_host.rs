@@ -4552,7 +4552,10 @@ mod tests {
         ] {
             let plan = SessionCleanupPlanV1::classify_v1(true, reap, refusal);
             assert_eq!(plan.refusal_v1(), SmokeRefusalV1::HostReapFailed);
-            assert!(!plan.joins_readers_v1(), "an unverified reap forbids joining");
+            assert!(
+                !plan.joins_readers_v1(),
+                "an unverified reap forbids joining"
+            );
         }
     }
 
