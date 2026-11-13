@@ -1179,7 +1179,6 @@ fn n087_02_a_direct_session_child_refuses_before_its_sleep() {
     );
 }
 
-
 /// `N087-03`: both new modes are closed and additive on either host, and every malformed, extra,
 /// repeated or misplaced token is the same typed refusal rather than a fall-through.
 #[test]
@@ -1188,9 +1187,17 @@ fn n087_03_every_wrong_session_token_is_refused_by_the_real_binary() {
         vec!["--internal-media-host-probe-v1", "session"],
         vec!["--internal-media-host-probe-v1", "SESSION-PARENT"],
         vec!["--internal-media-host-probe-v1", "session_child"],
-        vec!["--internal-media-host-probe-v1", "session-parent", "session-parent"],
+        vec![
+            "--internal-media-host-probe-v1",
+            "session-parent",
+            "session-parent",
+        ],
         vec!["--internal-media-host-probe-v1", "session-child", "extra"],
-        vec!["--internal-media-host-probe-v1", "session-parent", "session-child"],
+        vec![
+            "--internal-media-host-probe-v1",
+            "session-parent",
+            "session-child",
+        ],
         vec!["--internal-media-host-probe-v1", " session-parent"],
         vec!["--internal-media-host-probe-v1"],
     ];

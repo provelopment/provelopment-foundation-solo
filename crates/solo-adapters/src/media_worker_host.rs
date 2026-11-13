@@ -1714,11 +1714,11 @@ mod linux {
         CPU_DEADLINE_MS, CpuAttemptV1, INTERNAL_PROBE_AS_CHILD_TOKEN_V1,
         INTERNAL_PROBE_CHILD_TOKEN_V1, INTERNAL_PROBE_CPU_CHILD_TOKEN_V1, INTERNAL_PROBE_FLAG_V1,
         INTERNAL_PROBE_SESSION_CHILD_TOKEN_V1, INTERNAL_PROBE_WALL_CHILD_TOKEN_V1,
-        MAX_CHILD_STDERR_BYTES, MAX_CHILD_STDOUT_BYTES, PROFILE_V1_AS_BYTES, PROFILE_V1_CPU_SECONDS,
-        SESSION_CHILD_READY_MARKER_V1, SESSION_CHILD_SLEEP_MS, SESSION_DEADLINE_MS,
-        SMOKE_WALL_DEADLINE_MS, SessionAttemptV1, SmokeObservationV1, SmokeRefusalV1,
-        WALL_CHILD_READY_MARKER_V1, WALL_CHILD_SLEEP_MS, WALL_DEADLINE_MS, WallAttemptV1,
-        classify_child_exit_v1, parse_child_observation_v1, validate_observation_v1,
+        MAX_CHILD_STDERR_BYTES, MAX_CHILD_STDOUT_BYTES, PROFILE_V1_AS_BYTES,
+        PROFILE_V1_CPU_SECONDS, SESSION_CHILD_READY_MARKER_V1, SESSION_CHILD_SLEEP_MS,
+        SESSION_DEADLINE_MS, SMOKE_WALL_DEADLINE_MS, SessionAttemptV1, SmokeObservationV1,
+        SmokeRefusalV1, WALL_CHILD_READY_MARKER_V1, WALL_CHILD_SLEEP_MS, WALL_DEADLINE_MS,
+        WallAttemptV1, classify_child_exit_v1, parse_child_observation_v1, validate_observation_v1,
     };
     use crate::media_worker_host_native::{
         install_linux_child_limits_v1, observe_process_identity_v1, own_process_group_v1,
@@ -2361,7 +2361,9 @@ mod linux {
         install_linux_child_limits_v1(&mut command);
 
         let started = Instant::now();
-        let mut child = command.spawn().map_err(|_| SmokeRefusalV1::HostSpawnFailed)?;
+        let mut child = command
+            .spawn()
+            .map_err(|_| SmokeRefusalV1::HostSpawnFailed)?;
 
         // The one exact positive pid this parent may ever query: its own handle's id.
         let handle_pid = child.id();
