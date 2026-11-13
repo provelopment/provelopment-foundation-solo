@@ -1,122 +1,112 @@
 # Execution Report
 
-**status=STOPPED**
+**status=COMPLETE**
 
-**Order:** `OWNER-ISSUED — SOLO-WO-093 R01` — R03.C3 FIXED LINUX PROCESS-GROUP AND DESCENDANT LIFECYCLE PROOF. **Matching Owner activation:** `SOLO-WO-093 R01`. **Date (ISO):** 2026-11-13.
+**Order:** `OWNER-ISSUED — SOLO-WO-094 R01` — CORRECT AND VERIFY THE ISOLATED LINUX GROUP LIFECYCLE PROOF. **Matching Owner activation:** `SOLO-WO-094 R01`. **Claimed outcome:** `LINUX-FIXED-GROUP-DESCENDANT-LIFECYCLE-VERIFIED` — **pending independent Chief Master Architect review**. The Implementation Agent does not self-accept.
 
-**No outcome is claimed.** `LINUX-FIXED-GROUP-DESCENDANT-LIFECYCLE-PROVEN` is **not** claimed, and nothing here is self-accepted. The implementation exists on its own branch but its mandatory `push`-triggered **branch-head** two-host CI evidence cannot be produced under this order's own frozen constraints, so the mandatory gate is **UNVERIFIED**. Per §7 this is a **STOP**: no merge, no workflow change, no pull request, no self-repair.
+**Why this order exists.** `SOLO-WO-093 R01` remains **STOPPED and NOT ACCEPTED**: its branch-head `push` CI gate could not run, because `.github/workflows/rust-verify.yml` limits `push` to `main`, and its technical commit `f85caf35a00b103a47cf83356e66df278ccca682` was **never compiled by anyone**. This run corrects that branch and proves it under the workflow's already-existing `workflow_dispatch` trigger, with the workflow **byte-identical** (`e1b5ca6e1738a5d5129a8788e24d51aee02421d1`). Nothing is merged; `main` carries documentation only.
 
-## 1. Why this stopped
+## 1. Preflight — PASS
 
-The order requires, before the report, "a fresh **branch-head** `push`-triggered `rust-verify` on **both** Ubuntu and Windows at this exact technical SHA". The repository has exactly one workflow, `.github/workflows/rust-verify.yml` (blob `e1b5ca6e1738a5d5129a8788e24d51aee02421d1`), whose complete trigger set is:
+Sole checkout at the approved root, `main` checked out, one worktree, one remote whose fetch and push URLs are both `https://github.com/provelopment/provelopment-foundation-solo.git`, empty stash, exactly four WIP files, and the only dirty item the complete Owner-installed unstaged ` M .documents/WIP/workorder-active.md` (23,535 bytes, blob `178818bd779cb2299afb4ab52d6220a2268882f3`), staged later byte-for-byte unchanged with a clean `git diff --cached --check` (exit `0`, no hard-line-break findings).
 
-```yaml
-on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-  schedule:
-    - cron: "17 4 * * *"
-```
+All required starting identities matched exactly: `HEAD == main == origin/main == ls-remote origin main == 8acde13e3624437d5c0b8c88b1b625bb61bf1b91`; main tree `8a02f1e42511b356fc9cd7a6a167d21b3f97fcdb`; sole parent `14b65dbb79d7da908a961abb8db91d5b91ea55d2`; tracked ACTIVE `7a465788a5cad6457c3b27ad13b1423284df7785`; NEXT `92fa562b1af0c54391851aa5c79deb1631127069`; ROADMAP `9d7a86226878f490fd5e26c6813a81e5f73f3f37`; OUTLOOK `cb9c7a610cf3c537557e060ca9656e44a053e69d`; report `657c09867fecbdc651280fd597d01b96b0290bf3`; Architecture `c941c7f90cc1b1955f9d60b348a3b1092cafe97f`; `Cargo.lock` `b1ee56da60f36536548586528db371b7cbe508e4`; `rust-toolchain.toml` `9ec55b3b621dbc75fc68817cd51b96e407d3c94c`; workflow `e1b5ca6e…`; architecture-checker entry `0bad0e02…`; technical branch `solo-wo-093-r01` at `f85caf35…` with tree `8ef4c768236d21729661ba2cdcf6a2615e2592d9`, sole parent `14b65dbb…` and blobs `bd3cf9cc…` / `61cfd059…` / `0064d2a4…`. Thirteen remote refs were present and preserved; `solo-wo-094-negative-r01` did not exist locally or remotely.
 
-A push to `solo-wo-093-r01` therefore produces **no run at all**; the branch was pushed at `17:57` and repeated `actions/runs?branch=solo-wo-093-r01` queries returned an empty set, while the five preceding `main` pushes each have their own run. The order simultaneously forbids the only two remedies: "No modification of source/checker/workflow/dependencies for CI convenience" (**CI change required → STOP**) and "Do not self-merge, open a PR, cherry-pick, rebase, amend, force-push".
+## 2. Commit A — issued order on `main`
 
-There is no third route. The requirement is unsatisfiable within this order's stated boundary. I did **not** widen the trigger, weaken a gate, open a PR, or push the technical commit to `main`.
+`8b643f7f9506f9602714fc62bd9f08d539851d15`, tree `8f3b0f7ab9cd3ed4b3f35123a6f2fea19a323c9e`, **sole parent** `8acde13e3624437d5c0b8c88b1b625bb61bf1b91`, exactly **one** `M` path (`.documents/WIP/workorder-active.md`, `+123/−107`), ACTIVE blob `178818bd779cb2299afb4ab52d6220a2268882f3` identical to the installed bytes, ordinary fast-forward push. GitHub readback matched. Its own `push`-triggered run **`43418395749`** is green at exactly that SHA: Ubuntu job `131861943865`, Windows job `131861944274`.
 
-**Independent second blocker, same gate.** The mandated local gates in §5.5 (`cargo clippy … -D warnings`, `cargo test …`, `cargo test -p solo-cli --test check-architecture`, the architecture negative self-test) cannot execute on the Owner's checkout either: the only installed toolchain is `1.99.1-x86_64-pc-windows-msvc`, and this machine has **no linker** — `link.exe` is absent, and there is no Visual Studio, Build Tools, LLVM/`lld-link` or MinGW/MSYS installation. `cargo check` fails at the first dependency build script:
+## 3. The three real defects this order corrected
+
+The `SOLO-WO-093 R01` code had never been compiled. Verification found three defects, all inside the three authorized technical paths, each now fixed forward-only on the same branch:
+
+1. **Linux compile blocker — missing native exports.** The façade imported `GroupSignalRefusalV1`, `ProcessStateV1`, `observe_process_state_v1` and `terminate_owned_group_v1` from `media_worker_host_native`, but that module's bottom `pub(crate) use linux::{…}` listed only four older entries, so none of the four resolved. The list now exports all eight required items; the definitions and every `unsafe` block remain inside the positively `#[cfg(target_os = "linux")]`-gated module, and the misleading "three entry points" comment now describes the actual fixed exports. No Windows counterpart and no broadened unsafe boundary was introduced.
+2. **A failed leader reap could reach a reader join as success.** `probe_group_after_readiness` converted `child.wait()` into `(leader_reaped, leader_signal)` and still returned `Ok(GroupAttemptV1)`, after which the caller joined the capped readers unconditionally. Production now calls the new pure boundary `group_wait_signal_v1(child.wait())?`, whose every `Err` becomes `HOST_REAP_FAILED`, so a failed reap cannot reach a success attempt or a join; the `Err` path goes through the accepted `SessionReapV1`/`SessionCleanupPlanV1` rule, where only a **subsequently confirmed** `Child::wait()` permits joining.
+3. **Unproved descendant cleanup joined behind an unconfirmed wait.** The group leader's own failure branch killed and waited on its descendant and joined regardless of the wait result. It now joins only when `descendant.wait()` is confirmed, so an unconfirmed wait cannot block that leader on an open pipe.
+
+Two further correctness defects surfaced only in real CI and were corrected forward-only as well: a **guarded `matches!`** in the leader was unparseable by the source-boundary checker (`error: macro-unsupported … macro arguments are not parseable and cannot be inspected`), now expressed as an `is_some_and` closure; and three Linux-only timing constants were gated too widely, producing Windows `never used` warnings under `-D warnings`. A direct-invocation expectation was also corrected to the N087 range convention, because a direct child fails its inherited **ceilings** (71) before its identity.
+
+## 4. Positive technical-branch CI — PASS (the proof)
+
+Final technical head **`0dc45185110e6136bd63dc7edf774bc52b753c9e`**, tree `60f986ddddd2f6b6bd6ab201a6e336aee8c501c7`, correction ledger vs `f85caf35…` exactly three paths: façade `+69/−16` (blob `7eed6e158c9374a6c2055ddd98dd3287357b814a`), native `+10/−6` (`eacf51c5353ab3278969961aa136a0951cb7ad67`), smoke `+13/−7` (`22ee67e94cc96a70e8e3a47db9e575464b53cd07`).
+
+Dispatched run **`43419376192`** — `event=workflow_dispatch`, `head_branch=solo-wo-093-r01`, `head_sha=0dc45185…`, `run_attempt=1`, **conclusion success**: Ubuntu job `131865233532` success (33 steps, 9 skipped), Windows job `131865233959` success (33 steps, 14 skipped). Every skip is a host-inapplicable cross-pair (Linux-only steps skipped on Windows and the mirrored Windows steps on Linux: `cargo-deny`, the advisory fixture, the byte-reproducible build, the R03 snapshot filesystems); no mandatory gate was skipped on its own host.
+
+Real Ubuntu kernel evidence, copied from the log:
 
 ```text
-error: linker `link.exe` not found
-note: the msvc targets depend on the msvc linker but `link.exe` was not found
+n093_group=terminated leader_pid=4501 descendant_pid=4504 pgid=4501 sid=4501 signal=9 leader_reaped=1 descendant_nonrunning=1 wall_ms=2
+n093_refusal=invalid_readiness=HOST_OUTPUT_INVALID stdout_bytes=0 group_signal=none leader_cleanup=checked wall_ms=10
+n093_direct=group-leader exit=71
+n093_direct=group-invalid-leader exit=71
+n090_reap=reaped_before_join pid=4494 wall_ms=4006
 ```
 
-Installing a linker or an additional target is a **toolchain change**, which the order forbids and lists as a STOP trigger. Consequently the §5.4 failure-sensitivity mutation ("invert or bypass one new acceptance/refusal check … to demonstrate that the intended test rejects it") could not be executed, and is reported **UNVERIFIED**, not passed.
+Distinct real PIDs, `leader_pid == pgid == sid == 4501`, `descendant_pid = 4504 ≠ 4501`, `signal=9`, leader reaped, the same descendant observed non-running, and the N090 regression unchanged. Passing on Ubuntu: `n093_01`, `n093_02`, `n093_03`, `n093_06`, all four `n093_05` unit cases, `n093_07`, and `n090_01`. Windows executed `n093_04_every_group_mode_is_unsupported_before_any_child_exists`, `n093_06` and the four `n093_05` cases, with **no** Linux-success evidence on that host.
 
-Only `cargo fmt --all -- --check` could run, and it **passed** (`rustfmt` parses sources and links nothing).
+Security: `cargo-deny 0.20.2` (archive sha256 `9f12ed4c49936e09b48bf862b595cde2fe64fcbd9d74dfacac6131ca824c8d5f`) against RustSec `af7b3ec33460b8e2de8d422e16d628518891a519` fetched `2026-11-13T11:44:05Z` — advisories `ok` (0 errors, 0 warnings, 0 notes), bans `ok`, sources `ok`, licenses `ok` with **1 warning**: `license-not-encountered` for `Unicode-3.0`, an allow-listed licence never encountered in the unchanged locked graph. That warning is pre-existing, unrelated to this order and **not** silenced; this run is therefore **not** described as warning-free. The `advisories FAILED: 1 error` line in the log belongs to the deliberate `RUSTSEC-2026-0009` negative probe that must fail closed.
 
-## 2. What was completed before the blocker
 
-**Preflight — PASS.** Sole checkout, `main` checked out, one worktree, one remote `origin` (fetch and push both the approved URL), no stash, exactly four WIP files, and the only dirty path was the unaltered Owner-installed `SOLO-WO-093 R01` ACTIVE. All **sixteen** baseline identities matched exactly: start `HEAD == main == origin/main == a4f62b057916dc592f4fa59b8fdf8aca17315857`, tree `6db880ed…`, sole parent `01f9cac1…`, ACTIVE-neutral `2ef2db63…`, NEXT `1090ff41…`, ROADMAP `9d7a8622…`, OUTLOOK `cb9c7a61…`, report `86808db9…`, Architecture `c941c7f9…`, native seam `1e698245…`, façade `a1f2bdb9…`, smoke test `54440135…`, `Cargo.lock` `b1ee56da…`, `rust-toolchain.toml` `9ec55b3b…`, workflow `e1b5ca6e…`, architecture-checker entry `0bad0e02…`. Branch `solo-wo-093-r01` did not exist locally or remotely.
+## 5. Red CI sensitivity proof — intentional, on one isolated branch
 
-**Commit A — issued, published and green.** `14b65dbb79d7da908a961abb8db91d5b91ea55d2`, tree `cc3878583cbb11e8c6cb4d1b7e69869ec6e5f41a`, sole parent `a4f62b05…`, exactly two modified paths (ACTIVE `+166/−1` → blob `7a465788a5cad6457c3b27ad13b1423284df7785`, unaltered Owner text; NEXT `+0/−12` → the required neutral blob `92fa562b1af0c54391851aa5c79deb1631127069`), clean `git diff --cached --check`, ordinary fast-forward push. Its own `push`-triggered run **`43411702516`** is green at exactly that SHA: Ubuntu job `131839447016` success, Windows job `131839447241` success (33 steps each).
+Exactly one task-owned branch `solo-wo-094-negative-r01` was created from the green technical revision `0dc45185…` in the same checkout. Its **sole** change is the authorized one-guard mutation in `validate_group_attempt_v1` (façade `+3/−2`, commit `0e9b3677cf774b9e31ac8fc52605e88112522be6`, tree `84c8d55a38767a287f6203faf563b7e116ec4977`, diff vs the green head: **one** path, `M crates/solo-adapters/src/media_worker_host.rs`):
 
-**Commit B — implemented and published on its branch only.** `f85caf35a00b103a47cf83356e66df278ccca682`, tree `8ef4c768236d21729661ba2cdcf6a2615e2592d9`, sole parent `14b65dbb…` (Commit A), exactly three modified paths, clean `git diff --cached --check`, pushed to `origin solo-wo-093-r01` as a new branch with no force. `main` was **not** advanced and the branch was **not** merged, cherry-picked or opened as a PR.
+```rust
+// MUTATION ONLY on solo-wo-094-negative-r01:
+// Deliberately omit the !attempt.descendant_nonrunning term.
+if attempt.descendant_start_before == 0
+    || attempt.descendant_start_after != attempt.descendant_start_before
+{
+    return Err(SmokeRefusalV1::HostDescendantUnverified);
+}
+```
 
-Exact Commit B file ledger and blobs:
+The unchanged unit test `n093_05_signal_reap_observation_and_deadline_facts_stay_distinct` still asserts that `descendant_nonrunning: false` is refused. Dispatched run **`43419899358`** — `event=workflow_dispatch`, `head_branch=solo-wo-094-negative-r01`, `head_sha=0e9b3677…` — is **intentionally RED**, and red only where it must be: both jobs failed at the **`Test (workspace, all targets, locked)`** step (Ubuntu `131866990308`, Windows `131866990167`), i.e. after successful format, build and Clippy, never at compile or lint. The failing assertion, identical on both hosts:
 
-| Path | Change | Git blob |
+```text
+test media_worker_host::tests::n093_05_signal_reap_observation_and_deadline_facts_stay_distinct ... FAILED
+thread '…' panicked at crates/solo-adapters/src/media_worker_host.rs:5979:13:
+assertion `left == right` failed: this fact must refuse as HostDescendantUnverified: GroupAttemptV1 { …, descendant_start_before: 987654, descendant_start_after: 987654, descendant_nonrunning: false, wall_ms: 731 }
+  left: Ok(GroupTerminationV1 { leader_pid: 4712, descendant_pid: 4715, group: 4712, session: 4712, signal: 9, wall_ms: 731 })
+ right: Err(HostDescendantUnverified)
+```
+
+The mutation let an **unproven descendant become accepted evidence**, and the guarding test caught it on both hosts. This run is evidence of test sensitivity only; it is **never** an acceptance gate and is not green. After the run the checkout returned to `solo-wo-093-r01`, confirmed at `0dc45185…` with `MUTATION ONLY` absent (0 occurrences) and the guard present, so the technical branch contains **none** of the mutation. The negative branch is retained solely as this evidence and must never be merged.
+
+## 6. Evidence ledger
+
+| Item | Judgment | Exact identity |
 | --- | --- | --- |
-| `crates/solo-adapters/src/media_worker_host.rs` | `+1527/−130` | `bd3cf9cc6aa79d4c9aa191607109f5f3a72672dc` |
-| `crates/solo-adapters/src/media_worker_host_native.rs` | `+219/−1` | `61cfd0598cc995db4879cd39ad6470574b945015` |
-| `crates/solo-cli/tests/media_worker_host_smoke.rs` | `+256/−0` | `0064d2a474ff757719a2cd83ed1c07da4e8f2992` |
-
-No fourth path changed. `Cargo.lock`, `rust-toolchain.toml`, `deny.toml`, the workflow, the architecture checker and its fixtures, `crates/solo-cli/src/main.rs`, `crates/solo-adapters/src/lib.rs`, ROADMAP and OUTLOOK are byte-identical to the baseline.
-
-## 3. What the branch actually contains (submitted as evidence, not as acceptance)
-
-**Native seam, `#[cfg(target_os = "linux")]` only.** Two additions inside the positively gated module, each unsafe block carrying an adjacent `// SAFETY:` rationale, with no new native root, no new `unsafe` allowance and no generic signaller:
-
-- `terminate_owned_group_v1(&mut Child, u32) -> Result<GroupSignalOutcomeV1, GroupSignalRefusalV1>` — derives the leader pid **inside** the seam from the caller's own handle, refuses `pid <= 1`, a self-referential descendant, a non-live leader, a mismatched `pgid`/`sid`, and a verified group equal to this process's own group; rechecks `try_wait()` immediately before the call; negates with `checked_neg`; issues exactly one `libc::kill(-leader_pid, SIGKILL)`. It returns "signal was issued" only — never a reap and never a descendant exit.
-- `observe_process_state_v1(u32) -> Result<ProcessStateV1, ProcessStateRefusalV1>` — one bounded (`4096` bytes) read of the fixed `/proc/<pid>/stat` path, parsing only the fixed state character and the fixed `starttime` identity, distinguishing `Running`/`Zombie`/`Gone` and refusing anything truncated, non-UTF-8 or off-schema.
-
-**Façade.** Five new closed internal tokens (`group-parent`, `group-leader`, `group-descendant`, `group-invalid-parent`, `group-invalid-leader`) reachable only behind the reserved flag in second position; the new marker `media_host_group=terminated`; the new refusal `HOST_DESCENDANT_UNVERIFIED`; strict closed parsers and validators for both readiness records; and `validate_group_attempt_v1`, which keeps four facts **distinct** — a signal *request*, a leader *reap*, a descendant *non-running observation*, and a descendant *reap*, the last being unrepresentable because no field or value can express it. The single 15 000 ms budget starts before leader spawn; the negative path reaches only `cleanup_owned_leader`, which reuses the accepted `SOLO-WO-090 R01` rule (checked `Child::wait()` permits joining; a failed reap overrides the refusal) and issues **zero** group signals. `GROUP_DESCENDANT_LIFETIME_MS = 8 000` and `GROUP_LEADER_HOLD_MS = 10 000` bound every task-created process.
-
-**Tests written but never executed.** `n093_01`, `n093_02`, `n093_03` (Linux) and `n093_04` (Windows), plus the `n093_05` unit matrix and `n093_06` regression in the smoke file, and three `n093_05_*` pure unit tests in the façade that assert the acceptance rule across wrong identities, a missing signal, a missing reap, a leader not proved live, an absent or wrong signal status, an unobserved descendant, a recycled start-time identity, a zero measurement, an at-deadline measurement, and both closed record schemas.
-
-**Explicit non-claims.** No process-tree containment, no hostile-descendant sandbox, no aggregate resource containment, no AVIF decoding, no descendant **reaping** (the parent holds no handle for it), no resolution of the PID/PGID reuse window (a pre-call `try_wait` narrows it but does not pin it), no Windows group support, no publication and no release.
+| Preflight, 13 main pins + 3 branch identities | **PASS** | all exact, §1 |
+| Commit A on `main` | **PASS** | `8b643f7f…` / tree `8f3b0f7a…` / parent `8acde13e…` / 1 path |
+| Commit A `main` CI | **PASS** | run `43418395749`, Ubuntu `131861943865`, Windows `131861944274` |
+| Correction commit 1 (exports + reap + guard) | **PASS (superseded by 2)** | `64054a19df44ea728be2db2c791117a5db4a117c`, tree `160ba4f0…`, parent `f85caf35…`, 2 paths |
+| Correction commit 1 CI | **FAIL — fixed forward** | run `43418923312` attempted once; Ubuntu `131863728488` failed at Test, Windows `131863728112` failed at strict lint |
+| Correction commit 2 | **PASS** | `0dc45185110e6136bd63dc7edf774bc52b753c9e`, tree `60f986dd…`, parent `64054a19…`, 2 paths |
+| Final technical branch dispatched CI | **PASS** | run `43419376192`, Ubuntu `131865233532`, Windows `131865233959`, both success |
+| Real Linux N093 positive + negative + direct | **PASS** | §4 log lines, distinct PIDs |
+| N090 regression on Linux | **PASS** | `n090_reap=reaped_before_join pid=4494 wall_ms=4006` |
+| Windows `n093_04` unsupported | **PASS** | executed, no Linux success evidence |
+| Local `cargo fmt --all -- --check` | **PASS** | exit `0`, run before every commit |
+| Local build / Clippy / tests | **NOT APPLICABLE by order** | no linker on this workstation; explicitly not a gate here |
+| Toolchain / linker / target installation | **NONE** | nothing installed |
+| `solo-wo-094-negative-r01` sensitivity | **PASS (intentional RED)** | `0e9b3677…`, run `43419899358` |
+| Security gate | **PASS with disclosed warning** | §4; `Unicode-3.0` `license-not-encountered` retained |
+| Merge / PR / promotion / release | **NOT PERFORMED** | not attempted; branch stays unmerged |
 
 
-## 4. Evidence ledger
+## 7. Final state, nonclaims and cleanup
 
-| Item | State | Exact identity |
-| --- | --- | --- |
-| Preflight pins (16) | **PASS** | all exact, listed in §2 |
-| Commit A | **PASS** | `14b65dbb79d7da908a961abb8db91d5b91ea55d2` / tree `cc3878583cbb11e8c6cb4d1b7e69869ec6e5f41a` / parent `a4f62b05…` |
-| Commit A CI (own run) | **PASS** | run `43411702516`, Ubuntu `131839447016`, Windows `131839447241`, `event=push`, `head_branch=main` |
-| `cargo fmt --all -- --check` | **PASS** | local, exit `0`, no linker needed |
-| Commit B on branch | **PASS** | `f85caf35a00b103a47cf83356e66df278ccca682` / tree `8ef4c768236d21729661ba2cdcf6a2615e2592d9` / parent `14b65dbb…` |
-| Commit B three-path ledger | **PASS** | `+1527/−130`, `+219/−1`, `+256/−0`; no fourth path |
-| Branch-head push CI (both hosts) | **UNVERIFIED — blocker** | no run exists; workflow has no branch trigger |
-| Local `cargo clippy … -D warnings` | **UNVERIFIED — blocker** | no linker on this checkout |
-| Local `cargo test --workspace --all-targets` | **UNVERIFIED — blocker** | no linker on this checkout |
-| `cargo test -p solo-cli --test check-architecture` | **UNVERIFIED — blocker** | no linker on this checkout |
-| Architecture negative self-test | **UNVERIFIED — blocker** | no linker on this checkout |
-| Real Linux `n093_group=` / `n093_refusal=` lines | **UNVERIFIED — blocker** | never executed anywhere |
-| Failure-sensitivity mutation proof (§5.4) | **UNVERIFIED — blocker** | could not be executed without a compiler |
-| Windows `n093_04` unsupported behaviour | **UNVERIFIED — blocker** | never executed |
-| Merge / PR / workflow change | **NOT PERFORMED** | forbidden, and not attempted |
+`main` is documentation-only for this order: one issued-order commit and one report commit, no product, dependency, workflow, `deny.toml`, toolchain, checker-fixture, `main.rs` or `lib.rs` change. The technical work lives **only** on unmerged `solo-wo-093-r01`; the mutation lives **only** on `solo-wo-094-negative-r01`. Both `main` runs are documentation/issuance gates and are **not** described as proof of technical-branch functionality — the `workflow_dispatch` run `43419376192` at `0dc45185…` is that proof.
 
-No CI job ID is offered for Commit B because no such job exists. Nothing in this report treats a `main` run as branch evidence.
+Preserved refs: `solo-wo-093-r01` advanced to `0dc45185…` (history retains `f85caf35…`), `solo-wo-094-negative-r01` created at `0e9b3677…` (evidence only), and every earlier branch unmoved — `solo-wo-061-r01` `4371af21…`, `-069-` `e6162cdf…`, `-070-` `d270f95c…`, `-076-` `40a40bab…`, `-079-` `380393dd…`, `-081-` `cacc0f9b…`, `-083-` `ccc3ca8f…`, `-085-` `5bf9082d…`, `-087-` `8250f742…`, permanently stopped `solo-wo-089-r01` `1236915cab6e87b17ce84813430897b273fc3230`, accepted `solo-wo-090-r01` `0eb3fcf645851ae752bd59e12fe32b69604197d2`.
 
-## 5. Cleanup, preservation and surviving state
+Preserved ignored material, inspected and never deleted: `.temp/solo-wo-073-wip/` at **4 files / 46,062 bytes**, `architecture-fixtures/`, `toolchain-installer/`, `target/` and prior Cline logs. No task-owned scratch directory was created in Solo `.temp/` or the Cline task area for this order, so there is nothing to remove beyond the empty state already described; no unknown or Owner-owned material was touched.
 
-No task-owned scratch file or directory was created: no `.temp/` folder, no Cline task copy, and the planned disposable mutation workspace was never brought into existence. `.temp/solo-wo-073-wip/` is intact at **4 files / 46 062 bytes**; `architecture-fixtures/`, `toolchain-installer/`, `target/` and prior Cline logs are untouched. No blanket clean, reset, stash or destructive command was used, and no unknown or Owner-owned material was removed.
+**Explicit nonclaims.** No real kernel `wait()` failure was injected — `n093_07` proves only the *classification* of an injected `io::Error` through the production helper. No **descendant reap** is claimed (the parent holds no handle for it); a `Zombie`/`Gone` observation tied to the same pre-signal start time is non-running, not reaping. No race-free PID/PGID pinning is claimed: the pre-call `try_wait` bracket narrows, but does not eliminate, leader-exit-and-reuse. No hostile-worker sandbox, process-tree containment, aggregate resource guarantee, Windows Job Object, AVIF decoding, route, host, publication or release capability is claimed or added. `R03.C3`, `R03.C` and Stage 03 remain **OPEN**.
 
-**Surviving processes: none.** No group, leader or descendant was ever started — neither branch code path ran, because there is no compiler and no branch CI. There is nothing to observe, signal or reap, and no group `kill` was ever issued by any process.
+## 8. Handoff
 
-**Preserved deliberately, for the Architect's inspection:** `solo-wo-093-r01` at `f85caf35a00b103a47cf83356e66df278ccca682` (local and `origin`); `main` at Commit A `14b65dbb…`; the workflow, toolchain pin, `Cargo.lock`, `deny.toml`, architecture checker and fixtures all unmodified; `solo-wo-089-r01` at `1236915c…` and `solo-wo-090-r01` at `0eb3fcf6…` unmoved. `git status --porcelain` is empty, there is no stash, one checkout and one remote.
+Submitted for the Chief Master Architect's independent **ACCEPT / REVISE / STOP** against this report's exact revision. The Agent does not self-accept, and the Owner alone decides any later closure, integration, next order or release.
 
-
-## 6. No change to product, dependencies, roadmap or security boundary
-
-This run changed **no** product behaviour on `main`: `main` advanced by exactly one commit, the Owner-issued ACTIVE record plus the cleared NEXT candidate, both documentation-only. It added no dependency, no toolchain element, no workflow or gate, no Charter or SOP text, no roadmap stage and no release or deployment action. The technical commit exists only on an unmerged branch and is **not** in `main`.
-
-`R03.C3`, `R03.C` and Stage 03 remain **OPEN**. The NEXT candidate was implemented on its branch but is **not** proven and therefore **not** closed. No media decoding, route, host or publication behaviour is asserted.
-
-## 7. The one decision this STOP needs
-
-The smallest Owner decision that unblocks the order, stated without choosing it for the Owner:
-
-1. **Permit the branch-head trigger** — authorize one narrowly scoped workflow change adding `solo-wo-093-r01` (or `solo-wo-*`) to `push.branches`, as a separately approved CI change, after which the existing branch `f85caf35…` can be re-run and audited without touching the code; or
-2. **Permit a pull request** from `solo-wo-093-r01` into `main`, so the existing `pull_request` trigger produces the required two-host run at the exact technical SHA; or
-3. **Permit a local toolchain/linker installation** on the Owner checkout, so the §5.5 local gates and the §5.4 failure-sensitivity proof can be executed here as written; or
-4. **Re-scope the evidence requirement** explicitly, accepting `main`-only CI after a later integration order, which would contradict the present order's own gate wording and so needs an explicit Owner amendment.
-
-Until one of these is decided, the honest state is: **code written and pushed to its isolated branch, gate unverified, nothing merged, nothing accepted.**
-
----
-
-**This report's own future commit SHA, tree and blob are deliberately absent**, and no run or job identifier is claimed for the report commit itself. The report is the only commit this STOP publishes on `main`, with sole parent Commit A `14b65dbb79d7da908a961abb8db91d5b91ea55d2`; its message was changed to a truthful STOP wording, which is the one intentional deviation from the order's prescribed text and is disclosed here.
-
-Submitted for the Chief Master Architect's independent **ACCEPT / REVISE / STOP** at this report's exact revision.
+**This report's own future commit SHA is deliberately absent**, as is any run identifier for the report commit itself.
