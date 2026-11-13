@@ -247,6 +247,10 @@ pub const SESSION_EVIDENCE_MARKER_V1: &str = "media_host_session=live_attested";
 /// It burns no CPU, allocates no large memory, opens nothing, forks nothing and starts no thread.
 /// Its only purpose is to keep a descendant-free child alive long enough for the parent's own
 /// read-only kernel observation of a still-live handle. It is not a timeout or CPU-limit negative.
+///
+/// Linux-only, because only the Linux pre-exec boundary creates the session child that sleeps; a
+/// non-Linux build has no such child and therefore no such window.
+#[cfg(target_os = "linux")]
 pub const SESSION_CHILD_SLEEP_MS: u64 = 4_000;
 
 /// The fixed parent wall deadline of the session attestation: **15 000 milliseconds**.
@@ -4111,25 +4115,32 @@ mod tests {
         }
     }
 
-    /// `N087-03`: the fixed four-second window and the fixed 15 000 ms parent deadline are the
-    /// order's own numbers on every host, and the two fixed markers stay exactly as specified.
+    /// `N087-03`: the fixed 15 000 ms parent deadline and both fixed markers are the order's own
+    /// values on **every** host, including the hosts that can only refuse.
     ///
-    /// Read through locals so this stays a runtime comparison rather than a lintable constant
-    /// assertion, and so the windows are pinned for both hosts' neutral test runs.
+    /// Read through a local so this stays a runtime comparison rather than a lintable constant
+    /// assertion.
     #[test]
-    fn n087_03_the_fixed_session_window_and_deadline_are_the_ordered_values() {
-        let window_ms = SESSION_CHILD_SLEEP_MS;
+    fn n087_03_the_fixed_session_deadline_and_markers_are_the_ordered_values() {
         let deadline_ms = SESSION_DEADLINE_MS;
-        assert_eq!(window_ms, 4_000, "the child sleeps exactly four seconds");
         assert_eq!(deadline_ms, 15_000, "the parent deadline is 15 000 ms");
-        assert!(
-            window_ms < deadline_ms,
-            "the child's window must close inside the parent's deadline"
-        );
         assert_eq!(SESSION_CHILD_READY_MARKER_V1, "SOLO-MEDIA-HOST-SESSION-V1");
         assert_eq!(
             SESSION_EVIDENCE_MARKER_V1,
             "media_host_session=live_attested"
+        );
+    }
+
+    /// `N087-03`: on the only host that creates the child, the fixed window is exactly four
+    /// seconds and closes strictly inside the parent's deadline.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn n087_03_the_fixed_session_window_is_four_seconds_inside_the_deadline() {
+        let window_ms = SESSION_CHILD_SLEEP_MS;
+        assert_eq!(window_ms, 4_000, "the child sleeps exactly four seconds");
+        assert!(
+            window_ms < SESSION_DEADLINE_MS,
+            "the child's window must close inside the parent's deadline"
         );
     }
 }
