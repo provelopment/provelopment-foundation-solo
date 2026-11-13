@@ -27,8 +27,6 @@
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
-use image::GenericImageView as _;
-
 use solo_application::{
     GRAPHIC_IMAGE_INSPECTION_GRANTS_PUBLICATION_AUTHORITY, GraphicAssetObligationInventoryV1,
     GraphicAssetReadSetOutcomeV1, GraphicAssetSourceSetV1, GraphicImageFormatV1,
@@ -764,9 +762,8 @@ pub(crate) fn parse_image_worker_frame_v1(line: &str) -> Option<ParsedImageFrame
     };
 
     let host = next()?;
-    let mut limits_claimed = false;
     #[cfg(target_os = "linux")]
-    {
+    let limits_claimed = {
         if host != "linux" {
             return None;
         }
@@ -774,23 +771,23 @@ pub(crate) fn parse_image_worker_frame_v1(line: &str) -> Option<ParsedImageFrame
         let address_hard = next()?.parse::<u64>().ok()?;
         let cpu_soft = next()?.parse::<u64>().ok()?;
         let cpu_hard = next()?.parse::<u64>().ok()?;
-        limits_claimed = address_soft == address_hard
+        address_soft == address_hard
             && address_soft == crate::media_worker_host::PROFILE_V1_AS_BYTES
             && cpu_soft == cpu_hard
-            && cpu_soft == crate::media_worker_host::PROFILE_V1_CPU_SECONDS;
-    }
+            && cpu_soft == crate::media_worker_host::PROFILE_V1_CPU_SECONDS
+    };
     #[cfg(windows)]
-    {
+    let limits_claimed = {
         if host != "windows" {
             return None;
         }
-        limits_claimed = next()? == "member";
-    }
+        next()? == "member"
+    };
     #[cfg(not(any(target_os = "linux", windows)))]
-    {
+    let limits_claimed = {
         let _ = host;
         return None;
-    }
+    };
 
     let claimed_pid = next()?.parse::<u32>().ok()?;
     #[cfg(target_os = "linux")]
