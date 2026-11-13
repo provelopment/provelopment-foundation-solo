@@ -2,59 +2,70 @@
 
 **status=STOPPED**
 
-**Order:** `OWNER-ISSUED — SOLO-WO-097 R01` — confined Entity PNG/JPEG/WebP image-byte inspection. **Required outcome:** `R03C-CONFINED-PNG-JPEG-WEBP-IMAGE-INSPECTION-VERIFIED` — **not achieved.** No acceptance is claimed, no gate was weakened, and no completion is implied.
+**Order:** `OWNER-ISSUED — SOLO-WO-098 R01` — required outcome `R03C-CONFINED-PNG-JPEG-WEBP-IMAGE-INSPECTION-VERIFIED-AND-INTEGRATED` — **not achieved.** Phases 1–3 and the whole local WSL loop succeeded; the Windows half of §7 cannot be built inside the authorized file because two frozen, out-of-ledger gates forbid it. No gate was weakened, no unverified code was promoted, and `main` is left **green**.
 
-## 1. What was verified before any write
+## 1. Preflight (all matched)
 
-Preflight at `b6b4df924745a2e6c304d50b85bbf07af1be0f24` matched every pinned identity: tree `a8fb73859bab3c27a9bfcebfcf96708a2087ebbe`, sole parent `49df191f…`, neutral ACTIVE `2ef2db63…`, NEXT `12ecc6d1…`, ROADMAP `9d7a8622…`, OUTLOOK `cb9c7a61…`, report `dc61e06d…`, Architecture `c941c7f9…`, both SOPs, `Cargo.toml` `14505be4…`, `Cargo.lock` `b1ee56da…`, toolchain `9ec55b3b…`, workflow `e1b5ca6e…`, checker entry `0bad0e02…`, `graphic_asset_read.rs` `6499421d…`, the AVIF port `crates/solo-application/src/media_worker.rs` `13811c58…` (the order's "AVIF-port" row resolves to this path and blob exactly), the façade `7eed6e15…`, native `eacf51c5…`, smoke `22ee67e9…`; one worktree, one `origin`, empty stash, four WIP files, 14 remote refs, `solo-wo-097-negative-r01` absent. Only ` M .documents/WIP/workorder-active.md` was dirty.
+`HEAD == main == origin/main == ls-remote == 93c2658c92cc5d3377ba267a2122d7b122551c23`, tree `c16aeb10…`, sole parent `816680fc…`; report `7eb21b56…` = `status=STOPPED` / `SOLO-WO-097 R01`; tracked ACTIVE `66f5d61a…` with only ` M .documents/WIP/workorder-active.md` dirty (WO-098 bytes, `946b6162…`, unmodified); NEXT `92fa562b…`; ROADMAP `9d7a8622…`; OUTLOOK `cb9c7a61…`; Architecture `c941c7f9…`; both SOPs; green WO-097 A `e7de2e11…` tree `9ee75648…` parent `b6b4df92…`; 14 refs; `solo-wo-093-r01=0dc45185…`, `solo-wo-094-negative-r01=0e9b3677…`; no `solo-wo-098-*` ref existed; one worktree, one remote, empty stash.
 
-**Dependency audit (SOP §7B(e1/e2)).** `image =0.25.10` exists, is not yanked, is `MIT OR Apache-2.0`, MSRV 1.88.0 (toolchain 1.99.1). Its added graph is additive only: adler2 2.0.1, autocfg 1.5.1, bytemuck 1.25.2, byteorder-lite 0.1.0, cfg-if 1.0.5, crc32fast 1.5.5, fdeflate 0.3.7, flate2 1.1.5, image-webp 0.2.4, miniz_oxide 0.8.9, moxcms 0.8.1, num-traits 0.2.19, png 0.18.1, pfxm 0.1.30, quick-error 2.0.1, simd-adler32 0.3.10, zune-core 0.5.3, zune-jpeg 0.5.15. Every licence has an allowed alternative (`Unlicense OR MIT`, `Zlib OR Apache-2.0 OR MIT`, `BSD-3-Clause OR Apache-2.0` all satisfied by the existing allow list). Only two RustSec entries exist for `image` (`RUSTSEC-2019-0014` patched `>=0.21.3`, `RUSTSEC-2020-0073` patched `>=0.23.12`); neither applies to 0.25.10. `flate2` was pinned to 1.1.5 so the graph keeps **one** `miniz_oxide` (0.8.9), satisfying `multiple-versions = "deny"`; the CI security gate confirmed advisories, bans, licenses and sources independently at B4.
+## 2. Commits
 
-## 2. Commits (all pushed to `main`)
+| Phase | SHA | Tree | Parent | CI |
+| --- | --- | --- | --- | --- |
+| A (issue WO-098) | `c85d6a772d8856a04cced9a90b6a2ed1c5c0b999` | `1fd30c7c…` | `93c2658c…` | **red as predicted** — run `43442837445`; Ubuntu `131944579847`, Windows `131944580108`, both failing at *Strict lint* (code still the red WO-097 tree) |
+| B (recover green tree) | `ed938267001e4a1b20cc3001af8fafb3c82f40b5` | `837ebe629c742b474f06068b94cfee2d8a59da0b` | `c85d6a77…` | **GREEN** — run `43442905821`; Ubuntu job `131944821076`, Windows job `131944820685`, all original gates |
 
-| # | SHA | Result |
-| --- | --- | --- |
-| A | `e7de2e11509488b813f29a03e25a75f7c474a05d` | **green** — run `43430492911`, Ubuntu `131902466649`, Windows `131902466167`; ACTIVE `66f5d61a…` (Owner bytes, unmodified), NEXT neutral `92fa562b…`, five disclosed Owner hard-break whitespace findings, nothing else |
-| B | `24ea561ecbe545cddeac921f4f313b49fee02314` | **red** — run `43435300870`, strict lint on both hosts |
-| B2 | `63190e7100cb7d9cfb07497e414bcf3a6761a65d` | **red** — run `43435752257` |
-| B3 | `0d00c6cec0f7c1eb8f61dd01b4984c0cfe64dd01` | **red** — run `43436065749` |
-| B4 | `816680fc469bc906afbc31ecaae871359247be9b` | **red** — run `43436576617`, Ubuntu `131923125576`, Windows `131923125999`, both failing at *Strict lint (warnings are errors)* |
+Commit B restored exactly the twelve §3 technical paths from green A: 10 restored byte-identically and 2 known-unaccepted new files removed, verified path-by-path (`path_mismatches=0/12`, including absence at A); nothing else staged; `git diff --cached --check` clean.
 
-## 3. The blocker, precisely
+## 3. WSL local loop (established, used, and recorded)
 
-The workspace **compiles** (format, locked fetch and the component security gate all passed at B4), but the new adapter does not pass strict lint. The last exact-head run reports **29 errors**, dominated by one structural defect:
+`wsl.exe --list --verbose` → **Ubuntu-26.04**, WSL 2, running. Inside it: `Linux x86_64`, `Ubuntu 26.04.1 LTS`, pre-existing `rustup` and `gcc`; `cc (Ubuntu 15.2.0-16ubuntu1) 15.2.0`. `rustup` auto-installed the repository-pinned **1.99.1-x86_64-unknown-linux-gnu** with `rustfmt` and `clippy` (triggered by `rust-toolchain.toml`; no system-wide switch, no extra package). Verified `cargo 1.99.1`, `rustc 1.99.1`, `git rev-parse --show-toplevel` = `/mnt/c/Users/Sean/Documents/Provelopment/00.foundation-solo`, one worktree, clean tree — the same single checkout, no Linux clone.
 
-- `cannot find type ImageWorkerRunV1` / `ImageWorkerRunRefusalV1`, and `unresolved import crate::media_worker_host::ImageWorkerRunV1` — the new supervisor types sit one block too deep in `media_worker_host.rs`, so they never reach module scope;
-- `cannot find function terminate_own_group_v1 in module linux`, with `observe_process_identity_v1` and `install_linux_child_limits_v1` now reported private — the same mis-nesting reaches the native re-exports;
-- `cannot find function child_image_worker_confinement_v1 in module crate::media_worker_host`;
-- two `mismatched types`, and one `empty line after doc comment` from inserting the new section between an existing doc comment and its item.
+At recovery B, inside WSL: `cargo fetch --locked` → 0; `cargo fmt --all -- --check` → 0; `cargo check --workspace --all-targets --all-features --locked` → 0; `cargo clippy … -D warnings` → 0.
 
-Earlier rounds exposed, and I fixed, `clippy::manual_find`, `clippy::too_many_arguments` (the observation is now a public-field value struct), `clippy::assertions_on_constants` (`const { assert!(…) }`), a duplicated `pub use media_worker_host` block, an unused `image::GenericImageView` import and an unused assignment. Each fix was pushed and re-verified by a fresh exact-SHA run; none removed a security, architecture or test gate.
+Full `cargo test --workspace --all-targets --locked --no-fail-fast` was **not** clean locally, and the reason is environmental, proven by direct log text rather than asserted: the five real-filesystem suites refuse to run because the workflow's fixture roots are absent, e.g. `panicked at crates/solo-adapters/tests/source_read.rs:43: SOLO_TEST_SOURCE_FS_ROOT must name the R03 snapshot fixture filesystem`. Creating those fixtures locally is impossible here: `sudo -n` reports `interactive authentication is required` and `mkfs.btrfs` is absent, so no loopback btrfs can be created without an unapproved installation. Those suites are **LOCAL-UNVERIFIED** and remain covered by the mandatory exact-head CI, which supplies the fixtures (proved green at B).
 
-**A self-inflicted defect is disclosed:** a PowerShell list-splice truncated the untracked `crates/solo-adapters/src/graphic_image_inspection.rs`; I rewrote that file from the reviewed design rather than restoring a hidden copy, and it parses and formats cleanly. It is not the cause of the lint failures above.
+## 4. Branch work actually completed before the blocker
 
-## 4. What was *not* reached
+`solo-wo-098-image-r01` was created from recovery B in the same checkout and the twelve WO-097 technical paths restored from `816680fc…`. The §7 repairs were applied and **verified locally**:
 
-- No green two-host run at any code commit, so **no** N097 real-process evidence exists: no positive PNG/JPEG/WebP decode record, no Linux `RLIMIT` readback record, no Windows suspended-before-job-attach record, and no child pid/limit/wall measurement.
-- The mandatory negative sensitivity branch `solo-wo-097-negative-r01` was **not** created; no `workflow_dispatch` red run exists, so failure sensitivity is **unproven**.
-- The architecture counts were not validated by a passing real-tree checker: `edges=68` and the 37-entry adapter closure are my locally computed values from `cargo metadata`, not yet confirmed in CI.
-- `R03.C3`, `R03.C` and Stage 03 remain **OPEN**. Nothing in AVIF, video/WebVTT, the platform catalogue, public projection, publication, HTTP/browser behaviour, release or deployment was implemented, and no publication authority exists.
+1. **Brace/scope defect (item 1)** — `ImageWorkerConfinementV1::frame_fields_v1` now closes immediately after its `match self.host`, the `impl` closes next, and `child_image_worker_confinement_v1` ×3, `ImageWorkerRunRefusalV1`, `ImageWorkerRunV1` and their impls are module-level. The orphaned `/// The Linux half …` doc comment was moved directly onto `#[cfg(target_os = "linux")] mod linux`, with no blank line after the doc text.
+2. **Linux native helper (item 2)** — `terminate_own_group_v1` moved out of `#[cfg(test)] mod tests` into ordinary `pub(crate)` scope inside `mod linux`, behaviour unchanged: own-child PID/group/session checks, `try_wait` brackets, `SIGKILL` error handling and `// SAFETY:` rationale preserved; the bottom `pub(crate) use linux::{…}` re-export stays valid.
+3. **Windows Job Object names (item 3)** — all eight `JOB_OBJECT_*_INFORMATION` type uses corrected to `JOBOBJECT_BASIC_ACCOUNTING_INFORMATION` / `JOBOBJECT_EXTENDED_LIMIT_INFORMATION`; the `JOB_OBJECT_LIMIT_*` flag names and `JobObject…Information` class constants are unchanged.
+4. **Option/Result (item 4)** — `SuspendedWorkerV1::spawn` now converts with `.ok_or(ImageWorkerRunRefusalV1::SpawnFailed)?`.
 
-## 5. Ledger disclosure (permanent paths touched)
+Two further real defects surfaced only because the WSL loop existed: the façade's `linux` module imported the native helpers **privately**, so the new module-level supervisors could not see them (now `pub(crate) use`); and the smoke test cannot name `solo_domain` at all, because that crate is not a dependency of `solo-cli` and its manifest is outside the ledger — so a confined `test_inventory_v1` builder was added inside the authorized adapter file, and the fixture references were corrected to the reader's real convention (`hero.png` beneath the `assets/` namespace, matching the adapter's own tests).
 
-Beyond the order's ledger I had to change one further file: `crates/solo-cli/tests/architecture_checks/graph.rs`. The approved `image` root and its audited closure cannot be recognised by the real-tree checker from `check_architecture.rs` alone, because the allow-lists live in that module. The edits are strictly additive (one approved external root, the exact new closure entries, both array lengths corrected) and no negative case, fixture or gate was weakened — but this is a **ledger extension the order did not literally name** and it needs the Architect's ruling.
+Local results on the branch: `cargo check` and strict `cargo clippy` **clean**; `n097_09` (wrong-source, wrong-output, short-output, trailing, child-refused, mislabeled-polyglot — all through the real supervisor, real Linux confinement and framed protocol) **pass**; `n097_10` **pass** with real evidence `n097_deadline=elapsed_ms=15006`; `n097_11` **pass**. `n097_01…08` stop locally at `SourceRead(… Unsupported …)`, the reader's filesystem-capability guard on a reflink-less host — the same refusal the repository's own suites produce without the CI fixture — so those eight are **LOCAL-UNVERIFIED** pending CI.
 
-Everything else is inside the ledger: `crates/solo-application/src/graphic_image_inspection.rs` (new), `crates/solo-application/src/lib.rs`, `crates/solo-adapters/src/graphic_image_inspection.rs` (new), `crates/solo-adapters/src/{lib.rs,media_worker_host.rs,media_worker_host_native.rs,Cargo.toml}`, `Cargo.lock`, `crates/solo-cli/src/main.rs`, `crates/solo-cli/tests/media_worker_host_smoke.rs` and `.github/workflows/rust-verify.yml`. ROADMAP, OUTLOOK, Architecture, the SOPs, `deny.toml`, the toolchain, the existing AVIF protocol and the older asset-read modules are byte-identical.
+## 5. The blocker (exact, reproducible, out of ledger)
 
-## 6. Local state, cleanup and nonclaims
+Adding the Windows Job Object seam to `crates/solo-adapters/src/media_worker_host_native.rs` is refused by gates the order does not authorize me to change:
 
-Local `cargo fmt --all -- --check` passes; cargo 1.99.1 was found off `PATH` and used, not installed. No local build, test, Clippy or OS proof is claimed: this workstation has no linker and none was added. Task-owned scratch in the OS temp area (one extracted-crate inspection copy and one base64 staging file) is removed at run end; `.temp/solo-wo-073-wip/` (4 files / 46,062 B), `architecture-fixtures/`, `toolchain-installer/` and `target/` were inspected and left intact. The working tree is clean and no untracked file remains.
+- `cargo test -p solo-cli --test check-architecture` → `error: unsafe-code: crates/solo-adapters/src/media_worker_host_native.rs: unsafe code outside a #[cfg(windows)] scope is forbidden in this workspace, and outside a positive #[cfg(target_os = "linux")] scope too`.
+- `cargo test -p solo-cli --test unsafe_boundary` → `no_first_party_file_outside_the_native_module_uses_unsafe`: `crates/solo-adapters/src/lib.rs: asks for allow(unsafe_code) outside the single approved Windows gate`; and `the_adapter_lint_arrangement_is_exactly_the_approved_one` requires exactly one `#[cfg_attr(windows, allow(unsafe_code))]` in the adapter root (the source reader).
+
+Every ledger-legal arrangement was tried: one `#[cfg(any(linux, windows))]` gate (erases the provable platform gate, making the whole file unscoped and refusing every `libc::` use), a Windows twin module with a second crate-root allowance (fails the "exactly one Windows allowance" assertion), and a module-scoped inner `#![allow(unsafe_code)]` (judged an ungated allowance). None satisfies all three frozen tests. §7 item 3 is therefore **unimplementable** in the authorized file, and Linux-only containment would not meet the required outcome — it would fake the Windows host fact that the order forbids faking.
+
+
+## 6. State, evidence and cleanup
+
+`main` is at `ed938267…` (green recovery B): tree clean, stash empty, one worktree, one remote, four WIP files, ACTIVE still the Owner-installed WO-098 `946b6162…`, NEXT neutral, ROADMAP/OUTLOOK/Architecture/SOPs/`deny.toml`/toolchain untouched; all 13 non-main remote refs frozen at their preflight SHAs.
+
+Retained, task-owned, each with a cleanup trigger:
+
+- `.temp/solo-wo-098-wip/unverified-attempt.patch` (**244,647 B**) — the complete, never-pushed branch attempt, kept only as audit evidence. Trigger: delete when the follow-up order lands or the Owner declines it.
+- `.temp/solo-wsl-target/` — the WSL build cache; holds no source and is disposable at will.
+- Local branch `solo-wo-098-image-r01` at the same commit as `main`, **never pushed**; not deleted, because branch deletion is outside this order's permissions.
+
+No AVIF, platform catalogue, public projection, route, release, deployment or Stage 03 closure was attempted; `R03.C3`, `R03.C` and Stage 03 remain **OPEN**. Nothing was measured on Windows, so no Windows runtime fact is claimed anywhere in this report.
 
 ## 7. Requested Owner decision
 
-The smallest necessary decision, in preference order:
+One of these is required before the Windows half can exist:
 
-1. authorise a follow-up correction order limited to repairing the nesting in `crates/solo-adapters/src/media_worker_host.rs` (and, if still reported, the private native re-exports) and re-running the two-host gates; **or**
-2. authorise reverting B–B4 so `main` returns to the green `e7de2e11` state while the code is revisited.
+1. authorise a **second** approved native file (or an explicit exception) for the Windows Job Object seam, leaving `unsafe_boundary.rs` and the source checker unchanged; **or**
+2. authorise a specific, reviewed amendment to `crates/solo-cli/tests/unsafe_boundary.rs` and `architecture_checks/source.rs` that recognises a Windows-scoped process seam inside the reserved file — a governance change, not a code fix; **or**
+3. explicitly narrow this slice to Linux containment and record the Windows Job Object proof as deferred.
 
-I deliberately did **not** revert, force-push, self-accept, merge, release or deploy anything, and I touched no branch other than `main`. This report is submitted for independent Chief Master Architect `ACCEPT / REVISE / STOP`, and it records a STOP rather than a completion.
+I did not push a failing implementation commit, did not create the negative branch, did not merge, force-push, reset, tag, release or deploy, and did not promote unverified code to `main`. This report claims no completion and is submitted for independent Chief Master Architect `ACCEPT / REVISE / STOP`.
