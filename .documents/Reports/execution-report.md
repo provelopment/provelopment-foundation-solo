@@ -16,7 +16,7 @@
 
 ## 3. §5 implementation completed and type-checked — then blocked by a checker contradiction
 
-Delivered on the local branch (never pushed) in `330c08e0b105e1e4e8c6e4f80888456ee0d31044`, parent `f6e11372…`, touching only authorised paths:
+Delivered as an unpushed change on the reserved native module, captured in `.temp/solo-wo-098-wip/wo100-branch-work.patch` (187,820 B, exactly the twelve authorised paths against `bcd18f3f…`). Touching only authorised paths:
 
 - **§5.1 allowlist.** `AttributeListV1` RAII owner in the Windows module: documented null-list size probe that must fail with a sane bounded size (`> 0`, `≤ 4096` B), checked `bytes_needed → Vec<usize>` sizing with `usize` alignment and no reallocation, real `InitializeProcThreadAttributeList`, `UpdateProcThreadAttribute(PROC_THREAD_ATTRIBUTE_HANDLE_LIST, …)` over a fixed `[HANDLE; 2]` (stdin read + stdout write only, validated non-null and distinct), and `DeleteProcThreadAttributeList` exactly once in `Drop` — never after a failed initialisation. `STARTUPINFOEXW` with `cb = size_of::<STARTUPINFOEXW>()`, `STARTF_USESTDHANDLES`, `hStdError = hStdOutput`, a live `lpAttributeList`, and `CreateProcessW(…, TRUE, CREATE_SUSPENDED | EXTENDED_STARTUPINFO_PRESENT | CREATE_UNICODE_ENVIRONMENT, env, cwd, &startup.StartupInfo, &mut info)`. Signatures were read from the vendored `windows-sys-0.61.2` source, not guessed.
 - **§5.2 environment.** `minimal_environment_v1()` builds a fresh sorted, double-NUL-terminated UTF-16 block admitting only `SystemRoot` (and `WINDIR` when different), each validated as non-empty, ≤ 260, NUL-free, ASCII and absolute, with `PATH`, profile, temp, token, cloud, repository and every ambient value refused; the working directory is bound to the verified executable's own parent.
@@ -33,9 +33,11 @@ Not performed, therefore not claimed: §5.3 Windows canary tests (extra inherita
 
 ## 4. State, preservation and cleanup
 
-`main` is at `e085a4e9…` (green Commit A), working tree clean after this report, no stash, one worktree, one remote, four WIP files, WO-100 ACTIVE installed and unmodified, NEXT neutral, ROADMAP/OUTLOOK/SOP/Architecture/protected files identical, 14 remote refs unchanged. Local branches preserved without any history operation: `solo-wo-099-image-r01` now at `330c08e0…` (forward from `f6e11372…`), `solo-wo-098-image-r01` at `ed938267…`; neither deleted, reset nor rebased.
+`main` is at `e085a4e9…` (green Commit A) plus this report, working tree clean, no stash, one worktree, one remote, four WIP files, WO-100 ACTIVE installed and unmodified, NEXT neutral, ROADMAP/OUTLOOK/SOP/Architecture/protected files identical, 14 remote refs unchanged. Local branches: `solo-wo-099-image-r01` restored to its verified pin `f6e11372…`, `solo-wo-098-image-r01` at `ed938267…`; neither deleted nor rebased.
 
-Retained task-owned evidence with cleanup triggers: `.temp/solo-wo-098-wip/unverified-attempt.patch` (244,647 B), `wo099-branch-work.patch` (180,065 B), **`wo100-branch-work.patch` (187,820 B — exact `bcd18f3f..330c08e0`)** and `.temp/solo-wsl-target/`. Owner `.temp/solo-wo-073-wip/` (46,062 B) and all other ignored paths untouched.
+**Object-store loss, disclosed.** While this run was in progress the git object for the implementation commit I had just made on the local branch (`330c08e0…`) disappeared from the object store and could not be recovered (`git cat-file -t` refuses it); `f6e11372…` and `4b722825…` are intact. No `git gc`, prune or history operation was run by me, and `main` and every remote ref are unaffected. The work itself is fully preserved: its tree was still readable, and it was re-derived from that tree into `wo100-branch-work.patch` (187,820 B, twelve paths, identical size to the pre-loss capture), so nothing was lost except the commit wrapper, which is why the branch was reset to its pinned head rather than left pointing at a commit with a missing parent.
+
+Retained task-owned evidence with cleanup triggers: `.temp/solo-wo-098-wip/unverified-attempt.patch` (244,647 B), `wo099-branch-work.patch` (180,065 B), `wo100-branch-work.patch` (187,820 B) and `.temp/solo-wsl-target/`. Owner `.temp/solo-wo-073-wip/` (46,062 B) and all other ignored paths untouched.
 
 ## 5. Requested decision — one narrow ruling is needed
 
@@ -43,4 +45,4 @@ Retained task-owned evidence with cleanup triggers: `.temp/solo-wo-098-wip/unver
 2. amend the **governance guard** to accept exactly the twin declaration with the `windows` predicate and one documented `#[path]` onto the same reserved file; or
 3. authorise a **second reserved native file** for the Windows half (an Architecture change).
 
-With any one of these the branch continues from `330c08e0…`: the §5 worker code is written and type-checked on both targets, and needs only §5.3 canaries plus host CI. No gate was weakened, no uncontained decoder was used, no evidence was invented, no red branch was merged, and nothing was released, deployed or self-accepted. Submitted for independent Chief Master Architect `ACCEPT / REVISE / STOP`.
+With any one of these the work resumes by applying `wo100-branch-work.patch` onto `f6e11372…`: the §5 worker code is written and type-checked on both targets, and needs only §5.3 canaries plus host CI. No gate was weakened, no uncontained decoder was used, no evidence was invented, no red branch was merged, and nothing was released, deployed or self-accepted. Submitted for independent Chief Master Architect `ACCEPT / REVISE / STOP`.
