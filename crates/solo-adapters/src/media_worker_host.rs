@@ -1322,7 +1322,9 @@ pub fn validate_session_attempt_v1(
     if !attempt.readiness_validated {
         return Err(SmokeRefusalV1::HostOutputInvalid);
     }
-    let early = attempt.readiness_line.ok_or(SmokeRefusalV1::HostOutputInvalid)?;
+    let early = attempt
+        .readiness_line
+        .ok_or(SmokeRefusalV1::HostOutputInvalid)?;
     let bytes = attempt.stdout.ok_or(SmokeRefusalV1::HostOutputInvalid)?;
     // The early prefix the parent gated on and the complete stream captured through EOF must be the
     // same bytes, so trailing, duplicated or late output can never be folded into a success.
@@ -2657,7 +2659,9 @@ mod linux {
             if remaining == 0 {
                 break;
             }
-            let want = usize::try_from(remaining).unwrap_or(usize::MAX).min(chunk.len());
+            let want = usize::try_from(remaining)
+                .unwrap_or(usize::MAX)
+                .min(chunk.len());
             match stream.read(&mut chunk[..want]) {
                 Ok(0) => break,
                 Ok(read) => {
