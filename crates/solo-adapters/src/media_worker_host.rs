@@ -1354,6 +1354,78 @@ pub fn validate_session_attempt_v1(
     })
 }
 
+/// What one bounded early-readiness refusal cleanup established about its own leader.
+///
+/// Only a checked `Child::wait()` result can produce [`Self::Reaped`]. A `Child::kill()` result is
+/// deliberately absent from this type: an accepted signal says nothing about whether the leader
+/// exited, and a rejected one is legitimate when the leader had already exited on its own.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg(any(target_os = "linux", test))]
+pub enum SessionReapV1 {
+    /// `Child::wait()` returned `Ok`: the directly owned leader is confirmed exited and reaped.
+    Reaped,
+    /// `Child::wait()` returned `Err`: no leader exit and no reap were established.
+    Unreaped,
+}
+
+#[cfg(any(target_os = "linux", test))]
+impl SessionReapV1 {
+    /// Maps the actual checked `Child::wait()` outcome; only `Ok` proves a completed reap.
+    ///
+    /// Every other observation the cleanup made — including whether the kill was accepted — is
+    /// excluded here, so no signal result can be mistaken for a reap.
+    fn from_wait_outcome_v1(wait: std::io::Result<std::process::ExitStatus>) -> Self {
+        match wait {
+            Ok(_) => Self::Reaped,
+            Err(_) => Self::Unreaped,
+        }
+    }
+}
+
+/// The terminal plan for one early-readiness refusal cleanup.
+///
+/// This is the production decision rule for that path: it decides **both** whether the capped
+/// readers may be joined and which refusal is finally reported, so a failed reap can never be
+/// masked by the readiness refusal that caused the cleanup. Neither variant can express success,
+/// and the caller always returns `Err`, so cleanup can never be converted into evidence.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg(any(target_os = "linux", test))]
+pub enum SessionCleanupPlanV1 {
+    /// A reap was confirmed: the readers may be joined, then the original refusal is reported.
+    JoinThenRefuse(SmokeRefusalV1),
+    /// No reap was confirmed: nothing is joined and the reap failure overrides the refusal.
+    UnverifiedReap,
+}
+
+#[cfg(any(target_os = "linux", test))]
+impl SessionCleanupPlanV1 {
+    /// Classifies one early-refusal cleanup from the checked wait outcome.
+    ///
+    /// `kill_accepted` is accepted for the record and deliberately excluded from the decision: a
+    /// failed kill must not look like a terminated child, and a successful one still requires a
+    /// reap before any reader may be joined.
+    fn classify_v1(kill_accepted: bool, reap: SessionReapV1, refusal: SmokeRefusalV1) -> Self {
+        let _ = kill_accepted;
+        match reap {
+            SessionReapV1::Reaped => Self::JoinThenRefuse(refusal),
+            SessionReapV1::Unreaped => Self::UnverifiedReap,
+        }
+    }
+
+    /// Whether the capped readers may be joined. Only a confirmed reap permits joining.
+    fn joins_readers_v1(self) -> bool {
+        matches!(self, Self::JoinThenRefuse(_))
+    }
+
+    /// The refusal actually reported for this cleanup.
+    fn refusal_v1(self) -> SmokeRefusalV1 {
+        match self {
+            Self::JoinThenRefuse(refusal) => refusal,
+            Self::UnverifiedReap => SmokeRefusalV1::HostReapFailed,
+        }
+    }
+}
+
 /// The one fixed live-attestation line, built only from an already validated attestation.
 ///
 /// The marker states exactly what was proved — a live child observed at this check — and is
@@ -2501,15 +2573,20 @@ mod linux {
             None
         };
 
-        // A refusal before the query is bounded cleanup of this parent's own handle only: that
-        // leader is signalled and reaped, the readers are joined once it is gone, and no partial
-        // readiness prefix is ever reported as success.
+        // A refusal before the query is bounded cleanup of this parent's own handle only. The kill
+        // result is captured but is never evidence that the leader terminated, and the capped
+        // readers are joined only after a checked `Child::wait()` has established the reap. If that
+        // wait fails, the reap failure overrides the readiness refusal and no reader is joined, so
+        // cleanup can never be reported as completed when it was not.
         if let Some(refusal) = readiness_failure {
-            let _ = child.kill();
-            let _ = child.wait();
-            let _ = join_reader(out_reader);
-            let _ = join_reader(err_reader);
-            return Err(refusal);
+            let kill_ok = child.kill().is_ok();
+            let reap = SessionReapV1::from_wait_outcome_v1(child.wait());
+            let plan = SessionCleanupPlanV1::classify_v1(kill_ok, reap, refusal);
+            if plan.joins_readers_v1() {
+                let _ = join_reader(out_reader);
+                let _ = join_reader(err_reader);
+            }
+            return Err(plan.refusal_v1());
         }
         let outcome = loop {
             match child.try_wait() {
@@ -4443,5 +4520,99 @@ mod tests {
             validate_session_readiness_v1(off_profile.as_bytes(), 4242),
             Err(SmokeRefusalV1::HostLimitUnavailable)
         );
+    }
+
+    /// `N090-01`: a confirmed reap keeps the original readiness refusal and is the only outcome that
+    /// permits the reader-join phase, so cleanup success stays a refusal and never becomes evidence.
+    #[test]
+    fn n090_01_a_confirmed_reap_keeps_the_refusal_and_permits_joining() {
+        let reap = SessionReapV1::Reaped;
+        for refusal in [
+            SmokeRefusalV1::HostOutputInvalid,
+            SmokeRefusalV1::HostWallTimeout,
+            SmokeRefusalV1::HostLimitUnavailable,
+        ] {
+            let plan = SessionCleanupPlanV1::classify_v1(true, reap, refusal);
+            assert_eq!(plan.refusal_v1(), refusal);
+            assert!(plan.joins_readers_v1(), "a confirmed reap permits joining");
+        }
+    }
+
+    /// `N090-02`: a failed `Child::wait()` is a reap failure that overrides the readiness refusal
+    /// which caused the cleanup, and it forbids the reader-join phase entirely.
+    #[test]
+    fn n090_02_a_failed_reap_overrides_the_readiness_refusal() {
+        let error = std::io::Error::other("the leader could not be reaped");
+        let reap = SessionReapV1::from_wait_outcome_v1(Err(error));
+        assert_eq!(reap, SessionReapV1::Unreaped);
+        for refusal in [
+            SmokeRefusalV1::HostOutputInvalid,
+            SmokeRefusalV1::HostWallTimeout,
+            SmokeRefusalV1::HostLimitUnavailable,
+        ] {
+            let plan = SessionCleanupPlanV1::classify_v1(true, reap, refusal);
+            assert_eq!(plan.refusal_v1(), SmokeRefusalV1::HostReapFailed);
+            assert!(!plan.joins_readers_v1(), "an unverified reap forbids joining");
+        }
+    }
+
+    /// `N090-03`: an accepted or rejected `Child::kill()` cannot stand in for a reap. Only the
+    /// checked wait outcome decides, so a kill result never upgrades a cleanup.
+    #[test]
+    fn n090_03_a_kill_result_cannot_stand_in_for_a_reap() {
+        let refusal = SmokeRefusalV1::HostOutputInvalid;
+        let unreaped = SessionReapV1::Unreaped;
+        let reaped = SessionReapV1::Reaped;
+
+        // A kill the kernel accepted is still not evidence that the leader exited.
+        let lost = SessionCleanupPlanV1::classify_v1(true, unreaped, refusal);
+        assert_eq!(lost.refusal_v1(), SmokeRefusalV1::HostReapFailed);
+        assert!(!lost.joins_readers_v1());
+
+        // A rejected kill is legitimate when the leader exited on its own: the reap still wins.
+        let kept = SessionCleanupPlanV1::classify_v1(false, reaped, refusal);
+        assert_eq!(kept.refusal_v1(), refusal);
+        assert!(kept.joins_readers_v1());
+    }
+
+    /// `N090-04`: the production rule is a total truth table over every early refusal and both reap
+    /// outcomes, so no combination can report a cleanup that was not established.
+    #[test]
+    fn n090_04_the_cleanup_rule_is_total_over_every_refusal() {
+        for refusal in [
+            SmokeRefusalV1::HostOutputInvalid,
+            SmokeRefusalV1::HostWallTimeout,
+            SmokeRefusalV1::HostLimitUnavailable,
+        ] {
+            for kill_ok in [true, false] {
+                for reap in [SessionReapV1::Reaped, SessionReapV1::Unreaped] {
+                    let plan = SessionCleanupPlanV1::classify_v1(kill_ok, reap, refusal);
+                    let expected = match reap {
+                        SessionReapV1::Reaped => refusal,
+                        SessionReapV1::Unreaped => SmokeRefusalV1::HostReapFailed,
+                    };
+                    assert_eq!(plan.refusal_v1(), expected);
+                    assert_eq!(plan.joins_readers_v1(), reap == SessionReapV1::Reaped);
+                }
+            }
+        }
+    }
+
+    /// `N090-05`: a reader that failed to capture the stream still refuses on the accepted path, and
+    /// no early-refusal plan can be mistaken for acceptance.
+    #[test]
+    fn n090_05_a_reader_failure_cannot_become_success() {
+        let mut unreadable = session_attempt();
+        unreadable.stdout = None;
+        assert_eq!(
+            validate_session_attempt_v1(unreadable),
+            Err(SmokeRefusalV1::HostOutputInvalid)
+        );
+
+        let reap = SessionReapV1::Reaped;
+        let refusal = SmokeRefusalV1::HostOutputInvalid;
+        let plan = SessionCleanupPlanV1::classify_v1(true, reap, refusal);
+        assert!(plan.joins_readers_v1());
+        assert_eq!(plan.refusal_v1(), refusal);
     }
 }

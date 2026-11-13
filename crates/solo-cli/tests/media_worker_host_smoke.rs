@@ -1429,3 +1429,102 @@ fn n089_04_no_readiness_worker_runs_where_the_boundary_is_unsupported() {
         );
     }
 }
+
+/// `N090-01`: after the corrected early-refusal cleanup the real parent still emits exactly one
+/// unchanged live-attested record, and its leader was reaped before the capped readers were joined.
+#[cfg(target_os = "linux")]
+#[test]
+fn n090_01_the_real_parent_reaps_before_joining_after_the_correction() {
+    let observed = run(&["--internal-media-host-probe-v1", "session-parent"]);
+    assert!(!observed.timed_out, "the corrected proof must finish in budget");
+    assert_eq!(
+        observed.exit_code,
+        Some(0),
+        "the corrected proof must succeed: stdout={:?} stderr={:?}",
+        observed.stdout,
+        observed.stderr
+    );
+    assert!(
+        observed.stderr.is_empty(),
+        "a live, ordered run says nothing on stderr"
+    );
+    assert!(
+        observed
+            .stdout
+            .starts_with("media_host_session=live_attested "),
+        "the accepted marker is unchanged: {:?}",
+        observed.stdout
+    );
+    assert_eq!(
+        observed.stdout.matches('\n').count(),
+        1,
+        "exactly one evidence line, never a partial one first"
+    );
+    assert!(
+        !observed.stdout.contains("SOLO-MEDIA-HOST-SESSION-V1"),
+        "the consumed readiness record must not leak into the accepted line"
+    );
+
+    let fields = evidence_fields(&observed.stdout);
+    assert_eq!(
+        fields.len(),
+        12,
+        "the marker plus eleven fixed fields: {fields:?}"
+    );
+    assert_eq!(fields[0].0, "media_host_session");
+    assert_eq!(fields[0].1, "live_attested");
+    assert_eq!(numeric(&fields, "as_soft"), PROFILE_AS_BYTES);
+    assert_eq!(numeric(&fields, "as_hard"), PROFILE_AS_BYTES);
+    assert_eq!(numeric(&fields, "cpu_soft"), PROFILE_CPU_SECONDS);
+    assert_eq!(numeric(&fields, "cpu_hard"), PROFILE_CPU_SECONDS);
+
+    let pid = numeric(&fields, "pid");
+    assert!(pid > 0, "a real child has a positive pid");
+    assert_eq!(numeric(&fields, "pgid"), pid, "setsid made it the leader");
+    assert_eq!(numeric(&fields, "sid"), pid, "setsid made it the session");
+    assert_eq!(
+        numeric(&fields, "observed_pgid"),
+        pid,
+        "the parent's own group query must agree with the child"
+    );
+    assert_eq!(
+        numeric(&fields, "observed_sid"),
+        pid,
+        "the parent's own session query must agree with the child"
+    );
+    assert_eq!(numeric(&fields, "reaped"), 1, "the leader was reaped");
+
+    let wall_ms = numeric(&fields, "wall_ms");
+    assert!(
+        wall_ms > 0 && wall_ms < SESSION_DEADLINE_MS,
+        "the run decided itself strictly inside the 15 000 ms deadline: {wall_ms}"
+    );
+    report_observation(
+        "n090_reap",
+        &format!("reaped_before_join pid={pid} wall_ms={wall_ms}"),
+    );
+}
+
+/// `N090-02`: the correction adds no Windows capability — both private session modes still refuse
+/// before any child exists, with no readiness worker, no evidence and no kernel marker.
+#[cfg(not(target_os = "linux"))]
+#[test]
+fn n090_02_both_session_modes_stay_unsupported_after_the_correction() {
+    for mode in ["session-parent", "session-child"] {
+        let observed = run(&["--internal-media-host-probe-v1", mode]);
+        assert!(!observed.timed_out, "{mode} must not hang");
+        assert_eq!(
+            observed.exit_code,
+            Some(3),
+            "the {mode} mode must refuse on this host"
+        );
+        assert!(
+            observed.stdout.is_empty(),
+            "no readiness line and no evidence without a child: {mode}"
+        );
+        assert_eq!(
+            observed.stderr, "error: MEDIA_HOST_PROBE_REFUSED: HOST_UNSUPPORTED\n",
+            "the {mode} mode must name HOST_UNSUPPORTED"
+        );
+    }
+}
