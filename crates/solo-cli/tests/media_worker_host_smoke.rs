@@ -3265,4 +3265,148 @@ mod n108 {
             }
         }
     }
+
+    /// One 1x1 GIF89a with the shared RED/BLUE palette and one RED frame per authored delay, so the
+    /// loop extension and per-frame timing are the only variables.
+    fn gif89a_red_delays(loop_count: Option<u16>, delays: &[u16]) -> Vec<u8> {
+        let frames = delays
+            .iter()
+            .map(|delay| {
+                let mut frame = frame_v1(1, 1, &[0]);
+                frame.delay = *delay;
+                frame
+            })
+            .collect();
+        GifSpecV1 {
+            version: b"GIF89a",
+            width: 1,
+            height: 1,
+            background_index: 0,
+            global_palette: Some(vec![RED, BLUE]),
+            loop_count,
+            graphic_control: true,
+            frames,
+        }
+        .to_bytes()
+    }
+
+    /// Every accepted observation must prove the real supervised child ran and stays internally
+    /// consistent: matching source digest, bounded nonzero transcript and a reaped, confined PID.
+    fn assert_real_child_evidence(obs: &solo_adapters::GifWorkerObservationV1, bytes: &[u8]) {
+        assert_eq!(obs.source_digest(), &sha256_media_worker_bytes_v1(bytes));
+        assert!(obs.transcript_len() > 0);
+        assert_ne!(obs.worker_pid(), 0);
+        assert!(obs.limits_verified() && obs.cleanup_verified());
+    }
+
+    #[test]
+    fn n108_05_gif89a_absent_finite_infinite_loops_and_zero_delay() {
+        let red = sha256_media_worker_bytes_v1(&canvas_v1(&[[255, 0, 0, 255]]));
+
+        // 1. No repeat extension at all: absent, not implicit infinite, and zero delay stays zero.
+        let absent = gif89a_red_delays(None, &[0]);
+        let obs = inspect_gif_bytes_with_executable_v1(Path::new(super::BIN), &absent)
+            .expect("extension-free GIF89a must pass the real confined worker");
+        assert_eq!(obs.loop_semantics(), GifLoopV1::Absent);
+        assert_eq!(obs.one_cycle_delay_ms(), 0);
+        assert_eq!(obs.frame_count(), 1);
+        assert!(!obs.is_animated());
+        assert_eq!(obs.frames()[0].delay_centiseconds(), 0);
+        assert_eq!(obs.frames()[0].composite_digest(), &red);
+        assert_real_child_evidence(&obs, &absent);
+        println!(
+            "n108_gif=loop case=absent loop={} cycle_ms={} frames={} pid={} src={} transcript={}",
+            obs.loop_semantics().token(),
+            obs.one_cycle_delay_ms(),
+            obs.frame_count(),
+            obs.worker_pid(),
+            obs.source_digest().to_hex(),
+            obs.transcript_digest().to_hex()
+        );
+
+        // 2. Finite one: an authored single repeat is finite, never collapsed into "absent".
+        let one = gif89a_red_delays(Some(1), &[1]);
+        let obs = inspect_gif_bytes_with_executable_v1(Path::new(super::BIN), &one)
+            .expect("finite-one GIF89a must pass the real confined worker");
+        assert_eq!(obs.loop_semantics(), GifLoopV1::Finite(1));
+        assert_eq!(obs.one_cycle_delay_ms(), 10);
+        assert_eq!(obs.frames()[0].delay_centiseconds(), 1);
+        assert_eq!(obs.frames()[0].composite_digest(), &red);
+        assert_real_child_evidence(&obs, &one);
+        println!(
+            "n108_gif=loop case=finite-one loop={} cycle_ms={} frames={} pid={} src={} transcript={}",
+            obs.loop_semantics().token(),
+            obs.one_cycle_delay_ms(),
+            obs.frame_count(),
+            obs.worker_pid(),
+            obs.source_digest().to_hex(),
+            obs.transcript_digest().to_hex()
+        );
+
+        // 3. Finite two with a five-centisecond frame delay.
+        let two = gif89a_red_delays(Some(2), &[5]);
+        let obs = inspect_gif_bytes_with_executable_v1(Path::new(super::BIN), &two)
+            .expect("finite-two GIF89a must pass the real confined worker");
+        assert_eq!(obs.loop_semantics(), GifLoopV1::Finite(2));
+        assert_eq!(obs.one_cycle_delay_ms(), 50);
+        assert_eq!(obs.frames()[0].delay_centiseconds(), 5);
+        assert_real_child_evidence(&obs, &two);
+        println!(
+            "n108_gif=loop case=finite-two loop={} cycle_ms={} frames={} pid={} src={} transcript={}",
+            obs.loop_semantics().token(),
+            obs.one_cycle_delay_ms(),
+            obs.frame_count(),
+            obs.worker_pid(),
+            obs.source_digest().to_hex(),
+            obs.transcript_digest().to_hex()
+        );
+
+        // 4. Repeat count zero is infinite: one authored frame, so the timeline is still a still.
+        let infinite = gif89a_red_delays(Some(0), &[0]);
+        let obs = inspect_gif_bytes_with_executable_v1(Path::new(super::BIN), &infinite)
+            .expect("infinite-loop GIF89a must pass the real confined worker");
+        assert_eq!(obs.loop_semantics(), GifLoopV1::Infinite);
+        assert_eq!(obs.one_cycle_delay_ms(), 0);
+        assert_eq!(obs.frame_count(), 1);
+        assert!(!obs.is_animated());
+        assert_real_child_evidence(&obs, &infinite);
+        println!(
+            "n108_gif=loop case=infinite loop={} cycle_ms={} frames={} pid={} src={} transcript={}",
+            obs.loop_semantics().token(),
+            obs.one_cycle_delay_ms(),
+            obs.frame_count(),
+            obs.worker_pid(),
+            obs.source_digest().to_hex(),
+            obs.transcript_digest().to_hex()
+        );
+
+        // 5. Mixed authored delays are kept exactly, never normalised to a browser minimum.
+        let mixed = gif89a_red_delays(None, &[0, 7, 3]);
+        let obs = inspect_gif_bytes_with_executable_v1(Path::new(super::BIN), &mixed)
+            .expect("multi-frame GIF89a must pass the real confined worker");
+        assert_eq!(obs.frame_count(), 3);
+        assert!(obs.is_animated());
+        assert_eq!(obs.one_cycle_delay_ms(), 100);
+        assert_eq!(
+            obs.frames()
+                .iter()
+                .map(|frame| frame.delay_centiseconds())
+                .collect::<Vec<_>>(),
+            [0, 7, 3]
+        );
+        assert_real_child_evidence(&obs, &mixed);
+        println!(
+            "n108_gif=loop case=mixed-delays loop={} cycle_ms={} frames={} delays={:?} pid={} src={} transcript={}",
+            obs.loop_semantics().token(),
+            obs.one_cycle_delay_ms(),
+            obs.frame_count(),
+            obs.frames()
+                .iter()
+                .map(|frame| frame.delay_centiseconds())
+                .collect::<Vec<_>>(),
+            obs.worker_pid(),
+            obs.source_digest().to_hex(),
+            obs.transcript_digest().to_hex()
+        );
+    }
 }
