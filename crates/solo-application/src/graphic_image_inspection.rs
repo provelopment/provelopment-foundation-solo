@@ -2003,11 +2003,12 @@ mod v2_tests {
             declared(AssetNamespace::Entity, "assets/deep/a.jpeg"),
             Some(GraphicImageFormatV2::Jpeg)
         );
-        // `SOLO-WO-113 R01` STOP evidence: the frozen domain registry admits exactly
-        // `png|jpg|jpeg|webp|avif` (`ACCEPTED_IMAGE_EXTENSIONS`), so `assets/a.gif` cannot be
-        // parsed into an authored reference at all and this gate is unreachable for GIF today.
-        // The probe is recorded in the execution report; it is not asserted here as a permanent
-        // expectation of either outcome.
+        // `SOLO-WO-113 R02` admitted the lowercase `gif` token, so a real authored GIF reference
+        // now declares a V2 format through the same extension-only rule as the still formats.
+        assert_eq!(
+            declared(AssetNamespace::Entity, "assets/a.gif"),
+            Some(GraphicImageFormatV2::Gif)
+        );
         assert_eq!(
             declared(AssetNamespace::Entity, "assets/a.png"),
             Some(GraphicImageFormatV2::Png)

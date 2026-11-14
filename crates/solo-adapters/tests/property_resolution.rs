@@ -1871,17 +1871,51 @@ fn r03c1_09_reference_grammar_is_unchanged_and_no_media_is_attested() {
     let unsupported = ManifestPropertyRefusalKind::DeclarationRefused(
         PropertyRefusalKind::UnsupportedAssetExtension,
     );
-    for reference in ["media/logo.svg", "media/logo.gif"] {
-        assert_eq!(
-            page_level_refusal_kind(&graphic_page_properties(
-                "graphic.logo",
-                reference,
-                "public"
-            )),
-            unsupported,
-            "reference `{reference}` must refuse as an unsupported extension"
-        );
-    }
+    // `SOLO-WO-113 R02` admitted exactly the lowercase `gif` token, so only SVG remains
+    // unsupported here; the accepted GIF case is asserted positively below through the same real
+    // validation and inventory path.
+    assert_eq!(
+        page_level_refusal_kind(&graphic_page_properties(
+            "graphic.logo",
+            "media/logo.svg",
+            "public"
+        )),
+        unsupported,
+        "reference `media/logo.svg` must refuse as an unsupported extension"
+    );
+
+    // `SOLO-WO-113 R02`: a lowercase GIF reference now resolves through the same real validation
+    // and inventory path as the still formats, and it grants nothing.
+    let gif_document = manifest(
+        NO_PROPERTIES,
+        NO_PROPERTIES,
+        NO_PROPERTIES,
+        &graphic_page_properties("graphic.background", "media/scene.gif", "public"),
+        NO_PROPERTIES,
+    );
+    let gif_parsed = parse_document(&gif_document);
+    let gif_graph = graph_from(&gif_parsed);
+    let gif_candidate =
+        validate_manifest_property_candidate_v1(&gif_parsed, &gif_graph, &representation_owner())
+            .expect("an admitted GIF reference resolves");
+    let gif_inventory =
+        collect_graphic_asset_obligations_v1(gif_candidate.candidate()).expect("collects");
+    assert_eq!(gif_inventory.len(), 1);
+    assert_eq!(
+        gif_inventory.obligations()[0].reference_text(),
+        "media/scene.gif"
+    );
+    assert!(!gif_inventory.grants_publication_authority());
+
+    // A GIF favicon is still refused by the property rule, not by the extension allowlist.
+    assert_eq!(
+        page_level_refusal_kind(&graphic_page_properties(
+            "graphic.favicon",
+            "media/favicon.gif",
+            "public"
+        )),
+        ManifestPropertyRefusalKind::DeclarationRefused(PropertyRefusalKind::FaviconNotPng)
+    );
 
     // A favicon remains PNG-only.
     assert_eq!(
