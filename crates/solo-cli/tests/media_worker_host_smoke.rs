@@ -4296,3 +4296,713 @@ mod n108 {
         assert_ne!(a1.worker_pid(), a2.worker_pid());
     }
 }
+
+// `SOLO-WO-116 R03` — the four mandatory five-format real-host cases.
+//
+// They live in a sibling support module of `n097` because that is the existing legitimate
+// real-fixture seam: the same `SOLO_TEST_SOURCE_FS_ROOT` Btrfs root, the same real confined source
+// reader and the same real supervised worker binary. Nothing here is a mock port, a fabricated
+// source set or a synthetic completed inspection.
+#[cfg(test)]
+mod n116 {
+    use std::fs;
+    use std::path::PathBuf;
+
+    use solo_adapters::{
+        ContentRootCapability, EntityImageOutcomeV3, RootProvenanceV1, SvgWorkerRefusalV1,
+        SvgWorkerTestModeV1, TestOwnerV1, inspect_entity_graphic_images_v3,
+        inspect_svg_bytes_with_executable_v1, inspect_svg_bytes_with_test_mode_v1,
+        test_inventory_suppressed_v1, test_inventory_v1,
+    };
+    use solo_application::{
+        GraphicAssetObligationInventoryV1, GraphicImageFormatV3, GraphicImageInspectRefusalKindV3,
+        GraphicImageInspectionSetV3, IMAGE_MIME_SVG_V3,
+    };
+
+    /// The one worker binary these cases start.
+    const BIN: &str = super::BIN;
+
+    /// The trusted provenance marker for an adopted root.
+    const TRUSTED: RootProvenanceV1 = RootProvenanceV1::OperatorDesignatedContentRoot;
+
+    /// Independently pinned SHA-256 of the canonical vector for [`rich_svg`].
+    ///
+    /// This literal is the expected value authored for review; both hosts must reproduce it.
+    const RICH_CANONICAL_SHA256: &str =
+        "0403e0677a174ccafe18191a8a9f1c5a30993477bb074f49078b005f513caaba";
+
+    /// Independently pinned SHA-256 of the canonical vector for the pinned Foundation icon.
+    const ICON_CANONICAL_SHA256: &str =
+        "ce9ea48a3d7bc41673f969727c49eb5dd111d27451d27adab403faf3fa3362d5";
+
+    /// A four-pixel 2×2 PNG (red/green/blue/white), the accepted `n097` fixture.
+    const FIXTURE_PNG: &str = "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFklEQVR4AWL6z8DwHwSZGEEkw38GAAAAAP//4+5legAAAAZJREFUAwBBDwb/5c5bAAAAAABJRU5ErkJggg==";
+
+    /// The same pixels as a 2×2 baseline JPEG, the accepted `n097` fixture.
+    const FIXTURE_JPEG: &str = "/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDAAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/2wBDAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/wAARCAACAAIDAREAAhEBAxEB/8QAFAABAAAAAAAAAAAAAAAAAAAACv/EABsQAAIDAQEBAAAAAAAAAAAAAAQFAwYHAggJ/8QAFQEBAQAAAAAAAAAAAAAAAAAABgf/xAAbEQACAwEBAQAAAAAAAAAAAAAEBgMFBwIIAf/aAAwDAQACEQMRAD8AWB84MIw+y/PHwZYrFjWUv7A/8YeXHT166zuoNXLpy1w+jHNGzZocnnNZM2Rs85h55k8xRhU0pBEsk0nffSD1D58wOq9MeiaurxDIK2trd01sCurgM0TAwQAQ39gHECCEHpYxxRBR444BxoI44YIY+IouOeOeefkfPxfHX0416esnzR0dnQslscXFsRFZjamxqY5u7hhZmZhuKoy3vmC9tzDLS5ubQwqxtLEok44mcmeWXr//2Q==";
+
+    /// The same pixels as a 2×2 WebP still container, the accepted `n097` fixture.
+    const FIXTURE_WEBP: &str = "UklGRg4CAABXRUJQVlA4WAoAAAAgAAAAAQAAAQAASUNDUMgBAAAAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADZWUDhMHwAAAC8BQAAAHyAQSN4fOo35FxAU/B/d/EdkD+AGDBH9DwEA";
+
+    /// A complete two-frame GIF87a with an explicit transparent index and disposal 2.
+    const FIXTURE_GIF: &[u8] = &[
+        0x47, 0x49, 0x46, 0x38, 0x37, 0x61, 0x02, 0x00, 0x02, 0x00, 0x80, 0x00, 0x00, 0xff, 0x00,
+        0x00, 0x00, 0xff, 0x00, 0x21, 0xf9, 0x04, 0x01, 0x0a, 0x00, 0x01, 0x00, 0x2c, 0x00, 0x00,
+        0x00, 0x00, 0x02, 0x00, 0x02, 0x00, 0x00, 0x02, 0x03, 0x44, 0x04, 0x05, 0x00, 0x21, 0xf9,
+        0x04, 0x01, 0x0a, 0x00, 0x01, 0x00, 0x2c, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x02, 0x00,
+        0x00, 0x02, 0x03, 0x4c, 0x05, 0x06, 0x00, 0x3b,
+    ];
+
+    fn decode_base64(text: &str) -> Vec<u8> {
+        let mut out: Vec<u8> = Vec::with_capacity(text.len() / 4 * 3);
+        let mut accumulator: u32 = 0;
+        let mut bits = 0u32;
+        for character in text.trim().chars() {
+            let value = match character {
+                'A'..='Z' => character as u32 - 'A' as u32,
+                'a'..='z' => character as u32 - 'a' as u32 + 26,
+                '0'..='9' => character as u32 - '0' as u32 + 52,
+                '+' => 62,
+                '/' => 63,
+                '=' => continue,
+                other => panic!("unexpected base64 character {other:?}"),
+            };
+            accumulator = (accumulator << 6) | value;
+            bits += 6;
+            if bits >= 8 {
+                bits -= 8;
+                out.push(u8::try_from((accumulator >> bits) & 0xff).expect("one byte"));
+            }
+        }
+        out
+    }
+
+    fn png() -> Vec<u8> {
+        decode_base64(FIXTURE_PNG)
+    }
+
+    fn jpeg() -> Vec<u8> {
+        decode_base64(FIXTURE_JPEG)
+    }
+
+    fn webp() -> Vec<u8> {
+        decode_base64(FIXTURE_WEBP)
+    }
+
+    /// A disposable confined content root holding exactly the files a case declares.
+    pub(super) struct Root {
+        dir: PathBuf,
+    }
+
+    impl Root {
+        fn parent() -> PathBuf {
+            #[cfg(target_os = "linux")]
+            {
+                match std::env::var_os("SOLO_TEST_SOURCE_FS_ROOT") {
+                    Some(root) if !root.is_empty() => PathBuf::from(root),
+                    _ => panic!(
+                        "SOLO_TEST_SOURCE_FS_ROOT must name the R03 snapshot fixture filesystem; \
+                         refusing to run the real five-format suite on an unverified filesystem"
+                    ),
+                }
+            }
+            #[cfg(not(target_os = "linux"))]
+            {
+                std::env::temp_dir()
+            }
+        }
+
+        pub(super) fn new(tag: &str, assets: &[(&str, &[u8])]) -> Self {
+            let dir = Self::parent().join(format!("solo-n116-{}-{tag}", std::process::id()));
+            let _ = fs::remove_dir_all(&dir);
+            fs::create_dir_all(dir.join("assets")).expect("scratch assets directory");
+            for (name, bytes) in assets {
+                fs::write(dir.join("assets").join(name), bytes).expect("fixture write");
+            }
+            Self { dir }
+        }
+
+        pub(super) fn capability(&self) -> ContentRootCapability {
+            ContentRootCapability::adopt_bootstrap_path(&self.dir, TRUSTED).expect("adopted root")
+        }
+    }
+
+    impl Drop for Root {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.dir);
+        }
+    }
+
+    pub(super) fn inventory_of(
+        entries: &[(TestOwnerV1, &str, &str, &str)],
+    ) -> GraphicAssetObligationInventoryV1 {
+        test_inventory_v1(entries).expect("a validated test inventory")
+    }
+
+    /// The same validation with every declaration **suppressing** inheritance, so a declared
+    /// source is present but not publishable — it must still be inspected.
+    pub(super) fn suppressed_inventory_of(
+        entries: &[(TestOwnerV1, &str, &str, &str)],
+    ) -> GraphicAssetObligationInventoryV1 {
+        test_inventory_suppressed_v1(entries).expect("a validated suppressing inventory")
+    }
+
+    /// The rich static-vector positive: every mandated construct in one document.
+    pub(super) fn rich_svg() -> String {
+        let mut svg = String::new();
+        svg.push_str("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" ");
+        svg.push_str("viewBox=\"0 0 24 24\">");
+        svg.push_str("<defs>");
+        svg.push_str("<linearGradient id=\"lg\" x1=\"0\" y1=\"0\" x2=\"1\" y2=\"1\">");
+        svg.push_str("<stop offset=\"0\" stop-color=\"#ff0000\"/>");
+        svg.push_str("<stop offset=\"100%\" stop-color=\"#0000ff\"/></linearGradient>");
+        svg.push_str("<radialGradient id=\"rg\" cx=\"0.5\" cy=\"0.5\" r=\"0.5\">");
+        svg.push_str("<stop offset=\"0.5\" stop-color=\"#00ff00\"/></radialGradient>");
+        svg.push_str("<clipPath id=\"cp\"><rect x=\"0\" y=\"0\" width=\"8\" height=\"8\"/>");
+        svg.push_str("</clipPath>");
+        svg.push_str("<mask id=\"mk\"><circle cx=\"4\" cy=\"4\" r=\"3\"/></mask>");
+        svg.push_str("<filter id=\"fl\">");
+        svg.push_str("<feGaussianBlur in=\"SourceGraphic\" stdDeviation=\"1.5\" result=\"b\"/>");
+        svg.push_str("<feOffset in=\"b\" dx=\"1\" dy=\"1\" result=\"o\"/>");
+        svg.push_str("<feComposite in=\"o\" in2=\"SourceAlpha\" operator=\"over\" result=\"c\"/>");
+        svg.push_str("<feMerge><feMergeNode in=\"c\"/></feMerge></filter></defs>");
+        svg.push_str("<g transform=\"translate(1 2) rotate(30)\" clip-path=\"url(#cp)\" ");
+        svg.push_str("mask=\"url(#mk)\" filter=\"url(#fl)\">");
+        svg.push_str("<path d=\"M1 1L2 2H3V4C5 5 6 6 7 7S8 8 9 9Q10 10 11 11T12 12");
+        svg.push_str("A3 3 0 0 1 13 13Z\" fill=\"url(#lg)\"/>");
+        svg.push_str(
+            "<rect x=\"1\" y=\"1\" width=\"2\" height=\"3\" rx=\"1\" stroke=\"url(#rg)\"/>",
+        );
+        svg.push_str("<circle cx=\"4\" cy=\"4\" r=\"2\"/>");
+        svg.push_str("<ellipse cx=\"4\" cy=\"4\" rx=\"2\" ry=\"3\"/>");
+        svg.push_str("<line x1=\"0\" y1=\"0\" x2=\"4\" y2=\"4\"/>");
+        svg.push_str("<polyline points=\"0,0 1,1 2,0\"/>");
+        svg.push_str("<polygon points=\"0,0 2,0 1,2\"/></g>");
+        svg.push_str("<text x=\"2\" y=\"3\" font-size=\"14\" fill=\"currentColor\">Hi 42</text>");
+        svg.push_str("</svg>");
+        svg
+    }
+
+    /// The pinned Foundation donor icon, normalised from the checkout's line endings to the exact
+    /// pinned LF fixture bytes **before** hashing. The pinned file itself is never modified.
+    pub(super) fn icon_home_lf() -> Vec<u8> {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/svg/icon-home.svg"
+        );
+        let raw = fs::read(path).expect("pinned Foundation icon present");
+        let mut out = Vec::with_capacity(raw.len());
+        let mut index = 0;
+        while index < raw.len() {
+            if raw[index] == b'\r' && raw.get(index + 1) == Some(&b'\n') {
+                index += 1;
+                continue;
+            }
+            out.push(raw[index]);
+            index += 1;
+        }
+        out
+    }
+
+    /// The closed set of hostile documents the refusal cases draw from.
+    pub(super) fn hostile(name: &str) -> Vec<u8> {
+        let body = match name {
+            "script" => "<svg xmlns=\"http://www.w3.org/2000/svg\"><script>alert(1)</script></svg>",
+            "dtd" => {
+                "<!DOCTYPE svg [<!ENTITY x SYSTEM \"file:///e\">]><svg xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M0 0\"/></svg>"
+            }
+            "pi" => {
+                "<?xml version=\"1.0\"?><svg xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M0 0\"/></svg>"
+            }
+            "comment" => {
+                "<svg xmlns=\"http://www.w3.org/2000/svg\"><!-- c --><path d=\"M0 0\"/></svg>"
+            }
+            "foreign" => {
+                "<svg xmlns=\"http://www.w3.org/2000/svg\"><foreignObject><div/></foreignObject></svg>"
+            }
+            "event" => {
+                "<svg xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M0 0\" onclick=\"x()\"/></svg>"
+            }
+            "css" => "<svg xmlns=\"http://www.w3.org/2000/svg\"><style>.a{fill:red}</style></svg>",
+            "remote" => {
+                "<svg xmlns=\"http://www.w3.org/2000/svg\"><rect fill=\"url(http://e.com/a)\"/></svg>"
+            }
+            "cycle" => {
+                "<svg xmlns=\"http://www.w3.org/2000/svg\"><defs><clipPath id=\"a\"><rect clip-path=\"url(#a)\"/></clipPath></defs></svg>"
+            }
+            "dup" => {
+                "<svg xmlns=\"http://www.w3.org/2000/svg\"><defs><clipPath id=\"a\"/><mask id=\"a\"/></defs></svg>"
+            }
+            "wrongns" => "<svg xmlns=\"http://example.com/not-svg\"><path d=\"M0 0\"/></svg>",
+            "text" => {
+                "<svg xmlns=\"http://www.w3.org/2000/svg\"><text font-family=\"Helvetica\">x</text></svg>"
+            }
+            "animate" => {
+                "<svg xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M0 0\"><animate attributeName=\"d\"/></path></svg>"
+            }
+            other => panic!("unknown hostile document {other:?}"),
+        };
+        body.as_bytes().to_vec()
+    }
+
+    /// Whether the deliberate-RED switch is engaged. It changes only this test's expectation.
+    pub(super) fn red_oracle() -> bool {
+        std::env::var("SOLO_N116_RED_ORACLE").is_ok_and(|value| value == "wrong")
+    }
+
+    // ---- the four mandatory cases -----------------------------------------------------------
+
+    fn hex(digest: &solo_application::MediaWorkerDigestV1) -> String {
+        digest.to_hex()
+    }
+
+    fn complete(outcome: EntityImageOutcomeV3) -> GraphicImageInspectionSetV3 {
+        match outcome {
+            EntityImageOutcomeV3::Complete(set) => set,
+            EntityImageOutcomeV3::ReadRefused(refusal) => {
+                panic!("source read refused: {refusal:?}")
+            }
+            EntityImageOutcomeV3::Refused(refusal) => {
+                panic!("expected a complete inspection, got {refusal:?}")
+            }
+        }
+    }
+
+    fn refusal_kind(outcome: EntityImageOutcomeV3) -> GraphicImageInspectRefusalKindV3 {
+        match outcome {
+            EntityImageOutcomeV3::Complete(set) => {
+                panic!("expected a refusal, got {} inspections", set.len())
+            }
+            EntityImageOutcomeV3::ReadRefused(refusal) => {
+                panic!("source read refused: {refusal:?}")
+            }
+            EntityImageOutcomeV3::Refused(refusal) => refusal.kind(),
+        }
+    }
+
+    /// `n116_01` — one real Entity inventory with five distinct original declarations across the
+    /// whole EFS chain, inspected through the real confined reader and five real child workers.
+    #[test]
+    fn n116_01_mixed_five_formats_real_host() {
+        let svg_bytes = rich_svg().into_bytes();
+        let root = Root::new(
+            "mixed",
+            &[
+                ("icon.png", &png()),
+                ("logo.jpg", &jpeg()),
+                ("banner.webp", &webp()),
+                ("scene.gif", FIXTURE_GIF),
+                ("mark.svg", &svg_bytes),
+            ],
+        );
+        let inventory = inventory_of(&[
+            (TestOwnerV1::Entity, "favicon", "assets/icon.png", "public"),
+            (TestOwnerV1::Facet, "logo", "assets/logo.jpg", "public"),
+            (
+                TestOwnerV1::Site,
+                "banner",
+                "assets/banner.webp",
+                "internal",
+            ),
+            (
+                TestOwnerV1::Page,
+                "background",
+                "assets/scene.gif",
+                "public",
+            ),
+            (
+                TestOwnerV1::Representation,
+                "social-preview",
+                "assets/mark.svg",
+                "public",
+            ),
+        ]);
+
+        let set = complete(inspect_entity_graphic_images_v3(
+            &root.capability(),
+            &inventory,
+            std::path::Path::new(BIN),
+        ));
+
+        assert_eq!(set.len(), 5, "five distinct obligations are inspected");
+        let formats: Vec<GraphicImageFormatV3> =
+            set.inspections().iter().map(|item| item.format()).collect();
+        assert_eq!(
+            formats,
+            vec![
+                GraphicImageFormatV3::Png,
+                GraphicImageFormatV3::Jpeg,
+                GraphicImageFormatV3::WebP,
+                GraphicImageFormatV3::Gif,
+                GraphicImageFormatV3::Svg,
+            ],
+            "the accepted order is the declared order"
+        );
+
+        let mut pids: Vec<u32> = Vec::new();
+        for item in set.inspections() {
+            assert!(item.worker_pid() > 0, "a real child was observed");
+            assert_ne!(
+                item.source_digest().as_bytes(),
+                &[0u8; 32],
+                "a real source digest exists"
+            );
+            pids.push(item.worker_pid());
+        }
+        let mut unique = pids.clone();
+        unique.sort_unstable();
+        unique.dedup();
+        assert_eq!(unique.len(), 5, "five distinct worker processes: {pids:?}");
+
+        let animation = set
+            .inspections()
+            .iter()
+            .find_map(|item| item.animation())
+            .expect("the GIF obligation yields a timeline");
+        assert_eq!(animation.frames.len(), 2, "two authored frames");
+        assert_eq!(animation.width, 2);
+        assert_eq!(animation.height, 2);
+
+        let vector = set
+            .inspections()
+            .iter()
+            .find_map(|item| item.vector())
+            .expect("the SVG obligation yields a vector result");
+        assert_eq!(vector.width, 24);
+        assert_eq!(vector.height, 24);
+        assert!(!vector.canonical().is_empty());
+        assert_eq!(
+            *set.inspections()[4].source_digest(),
+            vector.source_digest,
+            "the vector source digest is the one the adapter read"
+        );
+        let canonical = String::from_utf8_lossy(vector.canonical()).to_string();
+        assert!(canonical.starts_with("<svg"), "canonical SVG text");
+        assert!(!canonical.contains("<text"), "no text element survives");
+        assert_eq!(set.inspections()[4].mime(), IMAGE_MIME_SVG_V3);
+        assert!(!set.inspections()[4].is_raster(), "not a raster substitute");
+
+        assert!(!set.grants_publication_authority());
+        assert!(!set.proves_whole_publication());
+
+        // AVIF is named by the grammar and refused before any worker exists.
+        let avif_root = Root::new(
+            "avif",
+            &[(
+                "mark.avif",
+                b"\x00\x00\x00\x20ftypavif\x00\x00\x00\x00avifmif1miafMA1B".as_slice(),
+            )],
+        );
+        let avif_inventory =
+            inventory_of(&[(TestOwnerV1::Entity, "logo", "assets/mark.avif", "public")]);
+        assert_eq!(
+            refusal_kind(inspect_entity_graphic_images_v3(
+                &avif_root.capability(),
+                &avif_inventory,
+                std::path::Path::new(BIN)
+            )),
+            GraphicImageInspectRefusalKindV3::AvifUnsupported
+        );
+
+        println!(
+            "n116_evidence case=n116_01 formats=png,jpeg,webp,gif,svg pids={pids:?} \
+             gif_frames={} vector_canonical_sha256={} avif=avif-unsupported-v3 \
+             partial=false publication=false",
+            animation.frames.len(),
+            hex(&vector.output_digest)
+        );
+    }
+    /// `n116_02` — every mandated static-vector construct plus the pinned Foundation icon, with an
+    /// independently authored canonical-sha oracle and cross-host equality.
+    #[test]
+    fn n116_02_safe_vector_semantics_and_cross_host_digest() {
+        let rich = rich_svg().into_bytes();
+        let observation = inspect_svg_bytes_with_executable_v1(std::path::Path::new(BIN), &rich)
+            .expect("the rich static vector is accepted");
+        assert_eq!(observation.width(), 24);
+        assert_eq!(observation.height(), 24);
+        assert!(
+            observation.references() >= 3,
+            "linear, radial and clip refs"
+        );
+        assert!(
+            observation.path_commands() >= 12,
+            "M/L/H/V/C/S/Q/T/A/Z cover"
+        );
+        assert!(observation.filters() >= 1);
+        assert!(observation.limits_verified() && observation.cleanup_verified());
+
+        let canonical = String::from_utf8_lossy(observation.canonical()).to_string();
+        // Independently authored semantic oracle: nothing active, ambient or raster survives.
+        for forbidden in [
+            "<text",
+            "font-family",
+            "font-face",
+            "<style",
+            "<script",
+            "foreignObject",
+            "<image",
+            "xlink:href=\"http",
+            "url(http",
+            "onclick",
+            "<animate",
+            "<?xml",
+            "<!DOCTYPE",
+            "<!--",
+        ] {
+            assert!(
+                !canonical.contains(forbidden),
+                "canonical output must not contain {forbidden:?}"
+            );
+        }
+        assert!(canonical.starts_with("<svg"));
+        assert!(canonical.ends_with("</svg>") || canonical.ends_with("</svg>\n"));
+        assert!(!canonical.contains('\r'), "canonical form is LF only");
+        // `currentColor` is resolved to a fixed literal, never left ambient.
+        assert!(!canonical.contains("currentColor"));
+        // The geometric text became real path sub-paths.
+        let paths = canonical.matches("<path").count();
+        assert!(paths >= 2, "glyph outlines are emitted as paths: {paths}");
+
+        // Idempotence: re-sanitising the canonical bytes reproduces them exactly.
+        let second = inspect_svg_bytes_with_executable_v1(
+            std::path::Path::new(BIN),
+            observation.canonical(),
+        )
+        .expect("canonical bytes are themselves accepted");
+        assert_eq!(
+            second.canonical(),
+            observation.canonical(),
+            "canonical serialisation is idempotent"
+        );
+        assert_eq!(
+            hex(second.output_digest()),
+            hex(observation.output_digest())
+        );
+
+        // The pinned Foundation donor icon, normalised to its pinned LF bytes before hashing.
+        let icon = icon_home_lf();
+        assert!(icon.windows(4).all(|w| w != b"\r\n"), "test source is LF");
+        let icon_observation =
+            inspect_svg_bytes_with_executable_v1(std::path::Path::new(BIN), &icon)
+                .expect("the pinned Foundation icon is accepted");
+        assert_eq!(icon_observation.width(), 24);
+        assert_eq!(icon_observation.height(), 24);
+
+        // The independently pinned oracle: one literal per document, identical on both hosts.
+        let expected_rich = if red_oracle() {
+            "00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff"
+        } else {
+            RICH_CANONICAL_SHA256
+        };
+        assert_eq!(
+            hex(observation.output_digest()),
+            expected_rich,
+            "rich canonical sha-256 must equal the independently pinned reference"
+        );
+        assert_eq!(
+            hex(icon_observation.output_digest()),
+            ICON_CANONICAL_SHA256,
+            "pinned Foundation icon canonical sha-256"
+        );
+        println!(
+            "n116_evidence case=n116_02 rich_canonical_sha256={} icon_canonical_sha256={} \
+             elements={} references={} path_commands={} filters={} oracle={}",
+            hex(observation.output_digest()),
+            hex(icon_observation.output_digest()),
+            observation.elements(),
+            observation.references(),
+            observation.path_commands(),
+            observation.filters(),
+            if red_oracle() { "RED" } else { "GREEN" }
+        );
+    }
+    /// `n116_03` — active SVG, hidden obligations and later corrupt assets refuse the whole set.
+    #[test]
+    fn n116_03_active_svg_and_hidden_obligation_refuse_whole() {
+        let mut refusals: Vec<(&str, GraphicImageInspectRefusalKindV3)> = Vec::new();
+
+        // Every hostile document refuses whole, one at a time.
+        for name in [
+            "script", "dtd", "pi", "comment", "foreign", "event", "css", "remote", "cycle", "dup",
+            "wrongns", "text", "animate",
+        ] {
+            let bad = hostile(name);
+            let root = Root::new(name, &[("mark.svg", &bad)]);
+            let inventory =
+                inventory_of(&[(TestOwnerV1::Entity, "logo", "assets/mark.svg", "public")]);
+            let kind = refusal_kind(inspect_entity_graphic_images_v3(
+                &root.capability(),
+                &inventory,
+                std::path::Path::new(BIN),
+            ));
+            refusals.push((name, kind));
+            assert_ne!(
+                kind,
+                GraphicImageInspectRefusalKindV3::UnsupportedFormat,
+                "{name} is admitted by the grammar and refused by inspection"
+            );
+        }
+
+        // A later corrupt SVG discards every earlier success: four good, one bad, no partial set.
+        let good = rich_svg().into_bytes();
+        let late = Root::new(
+            "late",
+            &[
+                ("icon.png", &png()),
+                ("logo.jpg", &jpeg()),
+                ("banner.webp", &webp()),
+                ("scene.gif", FIXTURE_GIF),
+                ("z-mark.svg", &hostile("script")),
+            ],
+        );
+        let late_inventory = inventory_of(&[
+            (TestOwnerV1::Entity, "favicon", "assets/icon.png", "public"),
+            (TestOwnerV1::Facet, "logo", "assets/logo.jpg", "public"),
+            (TestOwnerV1::Site, "banner", "assets/banner.webp", "public"),
+            (
+                TestOwnerV1::Page,
+                "background",
+                "assets/scene.gif",
+                "public",
+            ),
+            (
+                TestOwnerV1::Representation,
+                "social-preview",
+                "assets/z-mark.svg",
+                "public",
+            ),
+        ]);
+        let late_outcome = inspect_entity_graphic_images_v3(
+            &late.capability(),
+            &late_inventory,
+            std::path::Path::new(BIN),
+        );
+        assert!(
+            matches!(late_outcome, EntityImageOutcomeV3::Refused(_)),
+            "one bad later obligation refuses the whole candidate"
+        );
+        let late_kind = refusal_kind(late_outcome);
+        refusals.push(("late", late_kind));
+
+        // A suppressed (hidden) declaration cannot escape validation by being unpublishable.
+        let hidden = Root::new(
+            "hidden",
+            &[("mark.svg", &hostile("dtd")), ("logo.jpg", &jpeg())],
+        );
+        let hidden_inventory = suppressed_inventory_of(&[
+            (TestOwnerV1::Entity, "logo", "assets/logo.jpg", "public"),
+            (
+                TestOwnerV1::Representation,
+                "social-preview",
+                "assets/mark.svg",
+                "internal",
+            ),
+        ]);
+        let hidden_outcome = inspect_entity_graphic_images_v3(
+            &hidden.capability(),
+            &hidden_inventory,
+            std::path::Path::new(BIN),
+        );
+        assert!(
+            matches!(hidden_outcome, EntityImageOutcomeV3::Refused(_)),
+            "a suppressed declaration is still inspected and still refuses"
+        );
+
+        // Registered role policy, grammar case and unsupported declarations.
+        let svg_bytes = good.clone();
+        let role_root = Root::new("roles", &[("icon.svg", &svg_bytes)]);
+        assert_eq!(
+            refusal_kind(inspect_entity_graphic_images_v3(
+                &role_root.capability(),
+                &inventory_of(&[(TestOwnerV1::Entity, "favicon", "assets/icon.svg", "public")]),
+                std::path::Path::new(BIN)
+            )),
+            GraphicImageInspectRefusalKindV3::FaviconNotPng,
+            "the favicon role is PNG-only"
+        );
+        let gif_role_root = Root::new("gifrole", &[("icon.gif", FIXTURE_GIF)]);
+        assert_eq!(
+            refusal_kind(inspect_entity_graphic_images_v3(
+                &gif_role_root.capability(),
+                &inventory_of(&[(TestOwnerV1::Entity, "favicon", "assets/icon.gif", "public")]),
+                std::path::Path::new(BIN)
+            )),
+            GraphicImageInspectRefusalKindV3::FaviconNotPng
+        );
+
+        // A missing file is a real source-read refusal, never a silent skip.
+        let missing_root = Root::new("missing", &[("logo.jpg", &jpeg())]);
+        let missing = inspect_entity_graphic_images_v3(
+            &missing_root.capability(),
+            &inventory_of(&[
+                (TestOwnerV1::Entity, "logo", "assets/logo.jpg", "public"),
+                (TestOwnerV1::Facet, "banner", "assets/absent.png", "public"),
+            ]),
+            std::path::Path::new(BIN),
+        );
+        assert!(
+            matches!(missing, EntityImageOutcomeV3::ReadRefused(_)),
+            "an absent declared source refuses the read"
+        );
+
+        assert!(refusals.len() >= 14);
+        println!(
+            "n116_evidence case=n116_03 refusals={} late_refusal={} hidden_refused=true \
+             favicon_svg=favicon-not-png-v3 favicon_gif=favicon-not-png-v3 \
+             missing=read-refused partial=false fallback=none",
+            refusals.len(),
+            late_kind.token()
+        );
+    }
+    /// `n116_04` — genuine worker forgery refused, plus the deliberate-RED oracle.
+    #[test]
+    fn n116_04_svg_forgery_and_deliberate_red_oracle() {
+        let source = rich_svg().into_bytes();
+
+        // A child that lies about the source digest cannot produce a result.
+        assert_eq!(
+            inspect_svg_bytes_with_test_mode_v1(
+                std::path::Path::new(BIN),
+                &source,
+                SvgWorkerTestModeV1::WrongSource
+            )
+            .expect_err("a forged source digest refuses"),
+            SvgWorkerRefusalV1::SourceDigestMismatch
+        );
+
+        // A child that lies about its canonical output digest cannot produce a result.
+        assert_eq!(
+            inspect_svg_bytes_with_test_mode_v1(
+                std::path::Path::new(BIN),
+                &source,
+                SvgWorkerTestModeV1::WrongOutput
+            )
+            .expect_err("a forged output digest refuses"),
+            SvgWorkerRefusalV1::OutputDigestMismatch
+        );
+
+        // The genuine path still succeeds on the same bytes.
+        let genuine = inspect_svg_bytes_with_executable_v1(std::path::Path::new(BIN), &source)
+            .expect("the genuine worker path still succeeds");
+
+        // Deliberate RED: the switch changes only this expectation, never production code.
+        let expected = if red_oracle() {
+            "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        } else {
+            RICH_CANONICAL_SHA256
+        };
+        assert_eq!(
+            hex(genuine.output_digest()),
+            expected,
+            "canonical sha-256 oracle (RED when SOLO_N116_RED_ORACLE=wrong)"
+        );
+
+        println!(
+            "n116_evidence case=n116_04 forged_source=source-digest-mismatch \
+             forged_output=output-digest-mismatch genuine_canonical_sha256={} oracle={}",
+            hex(genuine.output_digest()),
+            if red_oracle() { "RED" } else { "GREEN" }
+        );
+    }
+}

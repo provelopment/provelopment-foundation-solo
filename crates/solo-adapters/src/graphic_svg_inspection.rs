@@ -1577,7 +1577,16 @@ fn glyph_path_v1(text: &str, cell: u32, commands: &mut usize) -> Result<String, 
                 let run = column - start;
                 let x = cursor + start * cell;
                 let y = row as u32 * cell;
-                let _ = write!(out, "M{x} {y}h{}v{}h-{}z", run * cell, cell, run * cell);
+                let _ = write!(
+                    out,
+                    "M {x} {y} h {} v {} h -{} z",
+                    run * cell,
+                    cell,
+                    run * cell
+                );
+                // The canonical writer separates sub-paths with one space after `z`, so the
+                // emitted attribute must already carry that exact separator.
+                out.push(' ');
                 *commands += 5;
                 if *commands > MAX_SVG_PATH_COMMANDS_V1 {
                     return Err(SvgRefusalV1::PathBudgetExceeded);
@@ -1586,7 +1595,7 @@ fn glyph_path_v1(text: &str, cell: u32, commands: &mut usize) -> Result<String, 
         }
         cursor += (GLYPH_COLS + 1) * cell;
     }
-    Ok(out)
+    Ok(out.trim_end().to_string())
 }
 
 /// Sanitises one supplied SVG document into canonical vector bytes, or refuses it whole.
@@ -1626,6 +1635,21 @@ pub fn sanitize_svg_v1(source: &[u8]) -> Result<SvgSanitizedV1, SvgRefusalV1> {
         return Err(SvgRefusalV1::PathBudgetExceeded);
     }
 
+    // The measured facts must describe exactly the bytes this function returns. `<text>` expands
+    // into a `<g>`, a `<title>` and a `<path>` during serialisation, so the source-tree measurement
+    // is not the canonical tree's measurement. Proved by the `n116_` host cases, which observed a
+    // `FrameMalformed` refusal for a document whose only element was `<text>`. Re-measuring the
+    // bounded, already-canonical output makes the claim and the bytes agree by construction.
+    let canonical_bytes = canonical.into_bytes();
+    let canonical_text =
+        std::str::from_utf8(&canonical_bytes).map_err(|_| SvgRefusalV1::NotUtf8)?;
+    let mut reread_commands = 0usize;
+    let reread = parse_v1(canonical_text, &mut reread_commands)?;
+    let mut stats = TreeStatsV1::default();
+    measure_v1(&reread, 1, &mut stats)?;
+    if reread_commands > MAX_SVG_PATH_COMMANDS_V1 {
+        return Err(SvgRefusalV1::PathBudgetExceeded);
+    }
     let facts = SvgVectorFactsV1 {
         width,
         height,
@@ -1636,7 +1660,7 @@ pub fn sanitize_svg_v1(source: &[u8]) -> Result<SvgSanitizedV1, SvgRefusalV1> {
         filters: stats.filters,
     };
     Ok(SvgSanitizedV1 {
-        canonical: canonical.into_bytes(),
+        canonical: canonical_bytes,
         facts,
     })
 }
