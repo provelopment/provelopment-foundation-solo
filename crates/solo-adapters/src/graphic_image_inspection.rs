@@ -1236,6 +1236,219 @@ pub fn inspect_entity_graphic_images_v1(
     }
 }
 
+/// The real V2 four-format adapter: the accepted still port plus the real confined GIF worker.
+///
+/// One instance is bound to one already-resolved executable path, exactly like the V1 adapter, so
+/// nothing about which program runs can be influenced by authored content. Each request is routed
+/// by its declared format only:
+///
+/// * PNG/JPEG/WebP delegate to [`ConfinedImageInspectAdapterV1`] unchanged — the same confined
+///   still decoder, the same parent validation and the same observation shape. No still path is
+///   forked.
+/// * GIF runs the real contained GIF worker through [`inspect_gif_bytes_with_executable_v1`] and is
+///   translated into the inward animation evidence; no decoder handle and no adapter type crosses
+///   into the application crate.
+///
+/// The adapter reports what the host proved. The application policy re-checks every claim, so a
+/// successful return here is never by itself an accepted result.
+pub struct ConfinedGraphicInspectAdapterV2 {
+    executable: PathBuf,
+}
+
+impl ConfinedGraphicInspectAdapterV2 {
+    /// Binds the adapter to one already-resolved executable path.
+    #[must_use]
+    pub fn new(executable: impl Into<PathBuf>) -> Self {
+        Self {
+            executable: executable.into(),
+        }
+    }
+
+    /// Binds the adapter to this process's own image, which is how a composition root wires it.
+    #[must_use]
+    pub fn for_current_exe() -> Option<Self> {
+        std::env::current_exe().ok().map(Self::new)
+    }
+
+    /// The executable this adapter starts. Never influenced by authored input.
+    #[must_use]
+    pub fn executable(&self) -> &Path {
+        &self.executable
+    }
+}
+
+/// Maps one accepted V1 still refusal onto its V2 counterpart.
+///
+/// The mapping is one-to-one and exhaustive over the V1 set, so a new V1 refusal kind cannot be
+/// silently swallowed as `PortRefused`.
+const fn map_still_refusal_v2(
+    kind: GraphicImageInspectRefusalKindV1,
+) -> solo_application::GraphicImageInspectRefusalKindV2 {
+    use solo_application::GraphicImageInspectRefusalKindV2 as V2;
+    match kind {
+        GraphicImageInspectRefusalKindV1::UnsupportedFormat => V2::UnsupportedFormat,
+        GraphicImageInspectRefusalKindV1::EmptySource => V2::EmptySource,
+        GraphicImageInspectRefusalKindV1::OversizeSource => V2::OversizeSource,
+        GraphicImageInspectRefusalKindV1::PortRefused => V2::PortRefused,
+        GraphicImageInspectRefusalKindV1::FormatMismatch => V2::FormatMismatch,
+        GraphicImageInspectRefusalKindV1::MimeMismatch => V2::MimeMismatch,
+        GraphicImageInspectRefusalKindV1::SourceDigestMismatch => V2::SourceDigestMismatch,
+        GraphicImageInspectRefusalKindV1::DimensionsOutOfRange => V2::DimensionsOutOfRange,
+        GraphicImageInspectRefusalKindV1::PixelCountOutOfRange => V2::PixelCountOutOfRange,
+        GraphicImageInspectRefusalKindV1::DecodedBytesOutOfRange => V2::DecodedBytesOutOfRange,
+        GraphicImageInspectRefusalKindV1::OutputDigestMismatch => V2::OutputDigestMismatch,
+        GraphicImageInspectRefusalKindV1::UnverifiedWorker => V2::UnverifiedWorker,
+    }
+}
+
+/// Translates one parent-validated GIF observation into the inward animation evidence.
+fn gif_animation_evidence_v2(
+    observation: &GifWorkerObservationV1,
+) -> solo_application::GifAnimationEvidenceV2 {
+    use solo_application::{GifDisposalV2, GifFrameEvidenceV2, GifLoopV2};
+    let frames = observation
+        .frames()
+        .iter()
+        .map(|frame| GifFrameEvidenceV2 {
+            index: frame.index(),
+            delay_centiseconds: frame.delay_centiseconds(),
+            left: frame.left(),
+            top: frame.top(),
+            width: frame.width(),
+            height: frame.height(),
+            disposal: match frame.disposal() {
+                crate::graphic_gif_inspection::GifDisposalV1::Unspecified => {
+                    GifDisposalV2::Unspecified
+                }
+                crate::graphic_gif_inspection::GifDisposalV1::Keep => GifDisposalV2::Keep,
+                crate::graphic_gif_inspection::GifDisposalV1::Background => {
+                    GifDisposalV2::Background
+                }
+                crate::graphic_gif_inspection::GifDisposalV1::Previous => GifDisposalV2::Previous,
+            },
+            transparent_index: frame.transparent_index(),
+            interlaced: frame.interlaced(),
+            local_palette: frame.local_palette(),
+            composite_digest: *frame.composite_digest(),
+        })
+        .collect();
+    let loop_semantics = match observation.loop_semantics() {
+        crate::graphic_gif_inspection::GifLoopV1::Absent => GifLoopV2::Absent,
+        crate::graphic_gif_inspection::GifLoopV1::Finite(count) => GifLoopV2::Finite(count),
+        crate::graphic_gif_inspection::GifLoopV1::Infinite => GifLoopV2::Infinite,
+    };
+    solo_application::GifAnimationEvidenceV2 {
+        signature: observation.signature(),
+        mime: crate::graphic_gif_inspection::GIF_MIME_V1,
+        width: observation.width(),
+        height: observation.height(),
+        frames,
+        loop_semantics,
+        one_cycle_delay_ms: observation.one_cycle_delay_ms(),
+        total_composited_pixels: observation.total_composited_pixels(),
+        source_digest: *observation.source_digest(),
+        transcript_digest: *observation.transcript_digest(),
+        transcript_len: observation.transcript_len(),
+        worker_pid: observation.worker_pid(),
+        limits_verified: observation.limits_verified(),
+        cleanup_verified: observation.cleanup_verified(),
+        wall_ms: observation.wall_ms(),
+    }
+}
+
+impl solo_application::GraphicImageInspectPortV2 for ConfinedGraphicInspectAdapterV2 {
+    fn inspect_v2(
+        &self,
+        request: &solo_application::GraphicImageInspectRequestV2,
+    ) -> solo_application::GraphicImageInspectPortOutcomeV2 {
+        use solo_application::{
+            GraphicImageInspectPortOutcomeV2 as Outcome,
+            GraphicImageInspectRefusalKindV2 as Refusal, GraphicImageObservationV2 as Observation,
+        };
+        let declared = request.declared_format();
+        if declared.is_gif() {
+            return match inspect_gif_bytes_with_executable_v1(&self.executable, request.bytes()) {
+                Ok(observation) => Outcome::Inspected(Box::new(Observation::Animation(Box::new(
+                    gif_animation_evidence_v2(&observation),
+                )))),
+                Err(_refusal) => Outcome::Refused(Refusal::PortRefused),
+            };
+        }
+        let Some(still_format) = declared.as_still_v1() else {
+            return Outcome::Refused(Refusal::UnsupportedFormat);
+        };
+        let still_request =
+            GraphicImageInspectRequestV1::of(request.bytes().to_vec(), still_format);
+        match ConfinedImageInspectAdapterV1::new(&self.executable).inspect(&still_request) {
+            GraphicImageInspectPortOutcomeV1::Inspected(observation) => {
+                Outcome::Inspected(Box::new(Observation::Still(observation)))
+            }
+            GraphicImageInspectPortOutcomeV1::Refused(kind) => {
+                Outcome::Refused(map_still_refusal_v2(kind))
+            }
+        }
+    }
+}
+
+/// Which stage refused one real V2 four-format candidate.
+///
+/// The two stages stay distinguishable: a confined acquisition refusal and an inspection refusal are
+/// different facts, and collapsing them would hide which gate failed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EntityImageRefusalV2 {
+    /// The confined `R03.C2` source acquisition refused the candidate.
+    SourceRead(solo_application::GraphicAssetReadRefusalV1),
+    /// The V2 four-format policy, or the confined worker behind it, refused the candidate.
+    Inspection(solo_application::GraphicImageInspectRefusalV2),
+}
+
+/// The closed result of one real source-read → V2 four-format inspection composition.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EntityImageOutcomeV2 {
+    /// Every declared obligation was acquired and inspected.
+    Complete(solo_application::GraphicImageInspectionSetV2),
+    /// Exactly one typed refusal from the stage that refused.
+    Refused(EntityImageRefusalV2),
+}
+
+impl EntityImageOutcomeV2 {
+    /// Whether this outcome authorizes publication. Always `false`.
+    #[must_use]
+    pub const fn grants_publication_authority(&self) -> bool {
+        solo_application::GRAPHIC_IMAGE_INSPECTION_V2_GRANTS_PUBLICATION_AUTHORITY
+    }
+}
+
+/// Acquires and then inspects every declared Entity graphic source through the V2 four-format gate.
+///
+/// This is the real composition `SOLO-WO-113 R01` exists for: the confined `assets/` reader produces
+/// owned bytes with physical identity, and the V2 policy turns them into inert still or animation
+/// results — or exactly one whole-candidate refusal. Public, internal, unlisted and
+/// descendant-suppressed obligations all take the identical path, because the inventory is the
+/// complete authored set. Nothing here filters by exposure and nothing here publishes.
+#[must_use]
+pub fn inspect_entity_graphic_images_v2(
+    root: &ContentRootCapability,
+    inventory: &GraphicAssetObligationInventoryV1,
+    executable: &Path,
+) -> EntityImageOutcomeV2 {
+    let source_set: GraphicAssetSourceSetV1 = match read_graphic_asset_bytes_v1(inventory, root) {
+        GraphicAssetReadSetOutcomeV1::Complete(set) => set,
+        GraphicAssetReadSetOutcomeV1::Refused(refusal) => {
+            return EntityImageOutcomeV2::Refused(EntityImageRefusalV2::SourceRead(refusal));
+        }
+    };
+    let adapter = ConfinedGraphicInspectAdapterV2::new(executable);
+    match solo_application::inspect_graphic_image_source_set_v2(&source_set, &adapter) {
+        solo_application::GraphicImageInspectionOutcomeV2::Complete(set) => {
+            EntityImageOutcomeV2::Complete(set)
+        }
+        solo_application::GraphicImageInspectionOutcomeV2::Refused(refusal) => {
+            EntityImageOutcomeV2::Refused(EntityImageRefusalV2::Inspection(refusal))
+        }
+    }
+}
+
 /// Which EFS owner a host-test declaration is authored on.
 ///
 /// It exists so the `solo-cli` integration-test crate — which has no `solo-domain` dependency and
@@ -1727,9 +1940,50 @@ pub fn inspect_gif_bytes_v1(source: &[u8]) -> Result<GifWorkerObservationV1, Gif
 /// A closed [`GifWorkerRefusalV1`]: rejected source, unreadable header, refused spawn, unproven
 /// confinement, non-zero exit, oversized output, malformed header or transcript, forged digest,
 /// identity mismatch or impossible cross-field arithmetic.
-pub fn inspect_gif_bytes_with_executable_v1(
+/// The closed worker argument token for one parent-selected GIF mode.
+///
+/// `Decode` is production and passes no mode token at all; the two forged modes reuse the tokens the
+/// accepted child already recognises. Nothing here is free text.
+const fn gif_parent_mode_token_v1(mode: GifWorkerModeV1) -> Option<&'static str> {
+    match mode {
+        GifWorkerModeV1::Decode => None,
+        GifWorkerModeV1::WrongSource => Some(GIF_WORKER_MODE_WRONG_SOURCE_V1),
+        GifWorkerModeV1::WrongTranscript => Some(GIF_WORKER_MODE_WRONG_TRANSCRIPT_V1),
+    }
+}
+
+/// The two forged-evidence modes this crate exposes for sensitivity testing only.
+///
+/// Deliberately narrower than [`GifWorkerModeV1`]: there is no public way to request `Decode`
+/// through the test seam, and no public way to request either forged mode through production.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GifWorkerTestModeV1 {
+    /// Compose correctly but claim a different source digest.
+    WrongSourceDigest,
+    /// Compose correctly but claim a different transcript digest.
+    WrongTranscriptDigest,
+}
+
+impl GifWorkerTestModeV1 {
+    /// The internal closed mode this test mode selects.
+    const fn mode(self) -> GifWorkerModeV1 {
+        match self {
+            Self::WrongSourceDigest => GifWorkerModeV1::WrongSource,
+            Self::WrongTranscriptDigest => GifWorkerModeV1::WrongTranscript,
+        }
+    }
+}
+
+/// Runs one GIF worker attempt in exactly one closed mode and applies the production validation.
+///
+/// This is the single implementation of the GIF inspect path: the production entry point always
+/// selects `Decode`, and the bounded test seam can select only the two existing forged modes. Both
+/// go through the identical parent validator, so the seam cannot prove anything production does not
+/// already enforce.
+fn inspect_gif_bytes_in_mode_v1(
     executable: &std::path::Path,
     source: &[u8],
+    mode: GifWorkerModeV1,
 ) -> Result<GifWorkerObservationV1, GifWorkerRefusalV1> {
     use GifWorkerRefusalV1 as Refusal;
     if source.is_empty()
@@ -1740,12 +1994,18 @@ pub fn inspect_gif_bytes_with_executable_v1(
     }
     let screen = parent_gif_screen_v1(source).ok_or(Refusal::SourceRejected)?;
     let source_digest = sha256_media_worker_bytes_v1(source);
-    let run = run_confined_image_worker_v1(
-        executable,
-        GIF_WORKER_TOKEN_V1,
-        &source_digest.to_hex(),
-        source,
-    )
+    let source_hex = source_digest.to_hex();
+    let run = match gif_parent_mode_token_v1(mode) {
+        None => run_confined_image_worker_v1(executable, GIF_WORKER_TOKEN_V1, &source_hex, source),
+        Some(mode_token) => run_confined_image_worker_mode_v1(
+            executable,
+            GIF_WORKER_TOKEN_V1,
+            &source_hex,
+            Some(mode_token),
+            source,
+            &mut crate::media_worker_host::N102FaultRunV1::production(),
+        ),
+    }
     .map_err(|_| Refusal::SupervisorRefused)?;
     if !run.limits_verified() || !run.cleanup_verified() || run.child_pid() == 0 {
         return Err(Refusal::UnverifiedConfinement);
@@ -1763,6 +2023,38 @@ pub fn inspect_gif_bytes_with_executable_v1(
     observation.wall_ms = run.wall_ms();
     Ok(observation)
 }
+
+/// The production GIF inspection seam for an already-known executable.
+///
+/// # Errors
+///
+/// A closed [`GifWorkerRefusalV1`]: rejected source, unreadable header, refused spawn, unproven
+/// confinement, non-zero exit, oversized output, malformed header or transcript, forged digest,
+/// identity mismatch or impossible cross-field arithmetic.
+pub fn inspect_gif_bytes_with_executable_v1(
+    executable: &std::path::Path,
+    source: &[u8],
+) -> Result<GifWorkerObservationV1, GifWorkerRefusalV1> {
+    inspect_gif_bytes_in_mode_v1(executable, source, GifWorkerModeV1::Decode)
+}
+
+/// The closed GIF sensitivity seam: run the real worker in one of the two forged-evidence modes.
+///
+/// It exists only so a test can prove that the parent's independent source and transcript hashing
+/// rejects a correctly composed but wrongly digested answer. It cannot select `Decode`, cannot
+/// carry a caller-chosen mode string and cannot bypass any validation.
+///
+/// # Errors
+///
+/// A closed [`GifWorkerRefusalV1`], never a partially accepted animation.
+pub fn inspect_gif_bytes_with_test_mode_v1(
+    executable: &std::path::Path,
+    source: &[u8],
+    mode: GifWorkerTestModeV1,
+) -> Result<GifWorkerObservationV1, GifWorkerRefusalV1> {
+    inspect_gif_bytes_in_mode_v1(executable, source, mode.mode())
+}
+
 /// One strict cursor over the received transcript lines. No searching, no early break.
 struct TranscriptCursorV1<'a> {
     lines: &'a [&'a str],

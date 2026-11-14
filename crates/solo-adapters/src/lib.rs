@@ -78,16 +78,18 @@ pub use graphic_gif_inspection::{
     MAX_GIF_TRACE_BYTES_V1,
 };
 pub use graphic_image_inspection::{
-    ConfinedImageInspectAdapterV1, EntityImageOutcomeV1, EntityImageRefusalV1,
-    GIF_WORKER_FRAME_PREFIX_V1, GIF_WORKER_TOKEN_V1, GifFrameEvidenceV2, GifWorkerObservationV1,
-    GifWorkerRefusalV1, IMAGE_WORKER_EXIT_DECODE_FAILED_V1, IMAGE_WORKER_EXIT_INVALID_MEDIA_V1,
+    ConfinedGraphicInspectAdapterV2, ConfinedImageInspectAdapterV1, EntityImageOutcomeV1,
+    EntityImageOutcomeV2, EntityImageRefusalV1, EntityImageRefusalV2, GIF_WORKER_FRAME_PREFIX_V1,
+    GIF_WORKER_TOKEN_V1, GifFrameEvidenceV2, GifWorkerObservationV1, GifWorkerRefusalV1,
+    GifWorkerTestModeV1, IMAGE_WORKER_EXIT_DECODE_FAILED_V1, IMAGE_WORKER_EXIT_INVALID_MEDIA_V1,
     IMAGE_WORKER_EXIT_REFUSED_V1, IMAGE_WORKER_EXIT_UNCONFINED_V1, IMAGE_WORKER_FRAME_PREFIX_V1,
     IMAGE_WORKER_MODE_DECODE_V1, IMAGE_WORKER_MODE_HANG_V1, IMAGE_WORKER_MODE_REFUSE_V1,
     IMAGE_WORKER_MODE_SHORT_OUTPUT_V1, IMAGE_WORKER_MODE_TRAILING_V1,
     IMAGE_WORKER_MODE_WRONG_OUTPUT_V1, IMAGE_WORKER_MODE_WRONG_SOURCE_V1,
     INTERNAL_IMAGE_WORKER_FLAG_V1, MAX_GIF_WORKER_STDOUT_BYTES_V1, MAX_IMAGE_WORKER_FRAME_BYTES_V1,
     MAX_IMAGE_WORKER_STDOUT_BYTES_V1, TestOwnerV1, inspect_entity_graphic_images_v1,
-    inspect_gif_bytes_v1, inspect_gif_bytes_with_executable_v1, inspect_image_bytes_with_mode_v1,
+    inspect_entity_graphic_images_v2, inspect_gif_bytes_v1, inspect_gif_bytes_with_executable_v1,
+    inspect_gif_bytes_with_test_mode_v1, inspect_image_bytes_with_mode_v1,
     run_internal_image_worker_v1, test_inventory_v1,
 };
 pub use media_worker_host::{
