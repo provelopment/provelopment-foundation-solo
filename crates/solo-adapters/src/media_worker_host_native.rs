@@ -725,33 +725,36 @@ mod windows {
     /// The highest injection step this build understands.
     pub(crate) const N102_INJECT_LAST_STEP_V1: u8 = 11;
 
-    /// The production boundary the closed test seam must make refuse; `0` means none.
-    static N102_INJECT_STEP_V1: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
-    /// The boundary that actually refused, so injection evidence stays distinct from kernel proof.
-    static N102_REFUSED_STEP_V1: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
-
-    /// Selects the one production boundary that must refuse, or clears the selection.
-    pub fn n102_select_injection_v1(step: u8) {
-        N102_REFUSED_STEP_V1.store(0, std::sync::atomic::Ordering::SeqCst);
-        N102_INJECT_STEP_V1.store(
-            if step <= N102_INJECT_LAST_STEP_V1 {
-                step
-            } else {
-                0
-            },
-            std::sync::atomic::Ordering::SeqCst,
-        );
+    // The selector and the recorded refusal are thread-local on purpose: the closed seam must be
+    // reachable only from the calling thread, so a host test running concurrently in the same test
+    // binary can never observe an injected refusal it did not ask for.
+    std::thread_local! {
+        /// The boundary this thread's next spawn must make refuse; `0` means none.
+        static N102_INJECT_STEP_V1: std::cell::Cell<u8> = const { std::cell::Cell::new(0) };
+        /// The boundary that actually refused on this thread, distinct from kernel proof.
+        static N102_REFUSED_STEP_V1: std::cell::Cell<u8> = const { std::cell::Cell::new(0) };
     }
 
-    /// The boundary that refused under injection, or `0` when none did.
+    /// Selects the one production boundary this thread's next spawn must make refuse.
+    pub fn n102_select_injection_v1(step: u8) {
+        let selected = if step <= N102_INJECT_LAST_STEP_V1 {
+            step
+        } else {
+            0
+        };
+        N102_REFUSED_STEP_V1.with(|cell| cell.set(0));
+        N102_INJECT_STEP_V1.with(|cell| cell.set(selected));
+    }
+
+    /// The boundary that refused under injection on this thread, or `0` when none did.
     pub fn n102_refused_step_v1() -> u8 {
-        N102_REFUSED_STEP_V1.load(std::sync::atomic::Ordering::SeqCst)
+        N102_REFUSED_STEP_V1.with(std::cell::Cell::get)
     }
 
     /// Whether this boundary is the one the closed test seam selected.
     fn injected_v1(step: u8) -> bool {
-        if N102_INJECT_STEP_V1.load(std::sync::atomic::Ordering::SeqCst) == step {
-            N102_REFUSED_STEP_V1.store(step, std::sync::atomic::Ordering::SeqCst);
+        if N102_INJECT_STEP_V1.with(std::cell::Cell::get) == step {
+            N102_REFUSED_STEP_V1.with(|cell| cell.set(step));
             return true;
         }
         false
