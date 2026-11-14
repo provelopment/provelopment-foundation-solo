@@ -2578,7 +2578,7 @@ mod n102 {
 
 #[cfg(any(target_os = "linux", windows))]
 mod n108 {
-    use solo_adapters::{GifLoopV1, inspect_gif_bytes_with_executable_v1};
+    use solo_adapters::{GifDisposalV1, GifLoopV1, inspect_gif_bytes_with_executable_v1};
     use solo_application::sha256_media_worker_bytes_v1;
     use std::path::Path;
 
@@ -2614,6 +2614,73 @@ mod n108 {
         assert!(obs.limits_verified() && obs.cleanup_verified());
         println!(
             "n108_gif=still frames=1 pid={} src={} transcript={}",
+            obs.worker_pid(),
+            obs.source_digest().to_hex(),
+            obs.transcript_digest().to_hex()
+        );
+    }
+
+    /// Deterministic three-frame 1x1 GIF89a: NETSCAPE2.0 infinite loop, three Graphic
+    /// Control Extensions (10 cs keep / 20 cs background+transparent / 5 cs keep+transparent)
+    /// and three image descriptors sharing the global red/blue palette.
+    fn gif89a_three_frames() -> Vec<u8> {
+        let mut bytes = b"GIF89a".to_vec();
+        bytes.extend_from_slice(&[1, 0, 1, 0, 0x80, 0, 0]);
+        bytes.extend_from_slice(&[255, 0, 0, 0, 0, 255]);
+        bytes.extend_from_slice(&[0x21, 0xff, 11]);
+        bytes.extend_from_slice(b"NETSCAPE2.0");
+        bytes.extend_from_slice(&[3, 1, 0, 0, 0]);
+        for (delay, disposal, transparent) in [(10u8, 1u8, false), (20, 2, true), (5, 1, true)] {
+            let gce = (disposal << 2) | u8::from(transparent);
+            bytes.extend_from_slice(&[0x21, 0xf9, 4, gce, delay, 0, 0, 0]);
+            bytes.extend_from_slice(&[0x2c, 0, 0, 0, 0, 1, 0, 1, 0, 0]);
+            bytes.extend_from_slice(&[2, 2, 0x44, 0x01, 0]);
+        }
+        bytes.push(0x3b);
+        bytes
+    }
+
+    #[test]
+    fn n108_02_gif89a_animation_keeps_frames_delays_and_loop() {
+        let bytes = gif89a_three_frames();
+        let obs = inspect_gif_bytes_with_executable_v1(Path::new(super::BIN), &bytes)
+            .expect("real confined animated GIF89a worker must succeed");
+        assert_eq!(obs.signature(), "GIF89a");
+        assert_eq!((obs.width(), obs.height()), (1, 1));
+        assert_eq!(obs.frame_count(), 3);
+        assert!(obs.is_animated());
+        assert_eq!(obs.loop_semantics(), GifLoopV1::Infinite);
+        assert_eq!(obs.one_cycle_delay_ms(), 350);
+        let frames = obs.frames();
+        assert_eq!(
+            frames.iter().map(|f| f.index()).collect::<Vec<_>>(),
+            [0, 1, 2]
+        );
+        assert_eq!(
+            frames
+                .iter()
+                .map(|f| f.delay_centiseconds())
+                .collect::<Vec<_>>(),
+            [10, 20, 5]
+        );
+        assert_eq!(
+            frames.iter().map(|f| f.disposal()).collect::<Vec<_>>(),
+            [
+                GifDisposalV1::Keep,
+                GifDisposalV1::Background,
+                GifDisposalV1::Keep
+            ]
+        );
+        let red = sha256_media_worker_bytes_v1(&[255, 0, 0, 255]);
+        let clear = sha256_media_worker_bytes_v1(&[0, 0, 0, 0]);
+        assert_eq!(frames[0].composite_digest(), &red);
+        assert_eq!(frames[1].composite_digest(), &red);
+        assert_eq!(frames[2].composite_digest(), &clear);
+        assert_eq!(obs.source_digest(), &sha256_media_worker_bytes_v1(&bytes));
+        assert!(obs.transcript_len() > 0 && obs.worker_pid() != 0);
+        assert!(obs.limits_verified() && obs.cleanup_verified());
+        println!(
+            "n108_gif=animation frames=3 duration_ms=350 pid={} src={} transcript={}",
             obs.worker_pid(),
             obs.source_digest().to_hex(),
             obs.transcript_digest().to_hex()
