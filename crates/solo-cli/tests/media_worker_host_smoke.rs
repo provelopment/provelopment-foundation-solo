@@ -1807,6 +1807,31 @@ fn n093_06_the_public_cli_and_every_earlier_marker_are_unchanged() {
 /// never a decoding path, they grant no authority and they change neither `n108` nor `n097`'s
 /// existing cases.
 mod n113_fixtures {
+    /// A 1×1 GIF87a whose only pixel is palette index 0 of the global red/blue table.
+    ///
+    /// Code width is three bits and the codes are (clear 4, index 0, end 5), packed little-endian
+    /// as `0x0144`.
+    pub fn gif87a_red_pixel() -> Vec<u8> {
+        let mut bytes = b"GIF87a".to_vec();
+        bytes.extend_from_slice(&[1, 0, 1, 0, 0x80, 0, 0]);
+        bytes.extend_from_slice(&[255, 0, 0, 0, 0, 255]);
+        bytes.extend_from_slice(&[0x2c, 0, 0, 0, 0, 1, 0, 1, 0, 0]);
+        bytes.extend_from_slice(&[2, 2, 0x44, 0x01, 0, 0x3b]);
+        bytes
+    }
+
+    /// The same 1×1 canvas whose only pixel is palette index 1, the blue entry.
+    ///
+    /// The codes are (clear 4, index 1, end 5), packed little-endian as `0x014c`.
+    pub fn gif87a_blue_pixel() -> Vec<u8> {
+        let mut bytes = b"GIF87a".to_vec();
+        bytes.extend_from_slice(&[1, 0, 1, 0, 0x80, 0, 0]);
+        bytes.extend_from_slice(&[255, 0, 0, 0, 0, 255]);
+        bytes.extend_from_slice(&[0x2c, 0, 0, 0, 0, 1, 0, 1, 0, 0]);
+        bytes.extend_from_slice(&[2, 2, 0x4c, 0x01, 0, 0x3b]);
+        bytes
+    }
+
     /// Deterministic three-frame 1×1 GIF89a: NETSCAPE2.0 infinite loop and three Graphic Control
     /// Extensions (10 cs keep / 20 cs background+transparent / 5 cs keep+transparent) sharing the
     /// global red/blue palette.
@@ -1833,18 +1858,23 @@ mod n097 {
     use std::path::{Path, PathBuf};
 
     use solo_adapters::{
-        ContentRootCapability, EntityImageOutcomeV1, EntityImageOutcomeV2, EntityImageRefusalV1,
-        IMAGE_WORKER_MODE_REFUSE_V1, IMAGE_WORKER_MODE_SHORT_OUTPUT_V1,
+        ConfinedGraphicInspectAdapterV2, ContentRootCapability, EntityImageOutcomeV1,
+        EntityImageOutcomeV2, EntityImageRefusalV1, EntityImageRefusalV2, GifWorkerRefusalV1,
+        GifWorkerTestModeV1, IMAGE_WORKER_MODE_REFUSE_V1, IMAGE_WORKER_MODE_SHORT_OUTPUT_V1,
         IMAGE_WORKER_MODE_TRAILING_V1, IMAGE_WORKER_MODE_WRONG_OUTPUT_V1,
         IMAGE_WORKER_MODE_WRONG_SOURCE_V1, RootProvenanceV1, TestOwnerV1,
         inspect_entity_graphic_images_v1, inspect_entity_graphic_images_v2,
-        inspect_image_bytes_with_mode_v1, test_inventory_v1,
+        inspect_gif_bytes_with_executable_v1, inspect_gif_bytes_with_test_mode_v1,
+        inspect_image_bytes_with_mode_v1, test_inventory_suppressed_v1, test_inventory_v1,
     };
     use solo_application::{
-        GifDisposalV2, GifLoopV2, GraphicAssetObligationInventoryV1, GraphicImageFormatV1,
-        GraphicImageFormatV2, GraphicImageInspectPortOutcomeV1, GraphicImageInspectRefusalKindV1,
-        GraphicImageInspectionOutcomeV1, MAX_IMAGE_SOURCE_BYTES_V1,
-        inspect_graphic_image_source_set_v1, sha256_media_worker_bytes_v1,
+        GifDisposalV2, GifLoopV2, GraphicAssetObligationInventoryV1, GraphicAssetReadSetOutcomeV1,
+        GraphicImageFormatV1, GraphicImageFormatV2, GraphicImageInspectPortOutcomeV1,
+        GraphicImageInspectRefusalKindV1, GraphicImageInspectRefusalKindV2,
+        GraphicImageInspectionOutcomeV1, GraphicImageInspectionOutcomeV2,
+        MAX_IMAGE_SOURCE_BYTES_V1, inspect_graphic_image_source_set_v1,
+        inspect_graphic_image_source_set_v2, read_graphic_asset_bytes_v1,
+        sha256_media_worker_bytes_v1,
     };
 
     /// The one worker binary these cases start.
@@ -2450,6 +2480,15 @@ mod n097 {
         }
     }
 
+    fn inspection_refusal_v2(outcome: EntityImageOutcomeV2) -> EntityImageRefusalV2 {
+        match outcome {
+            EntityImageOutcomeV2::Complete(set) => {
+                panic!("expected a V2 refusal, got {} inspections", set.len())
+            }
+            EntityImageOutcomeV2::Refused(refusal) => refusal,
+        }
+    }
+
     #[test]
     fn n113_01_mixed_four_formats_real_host() {
         let png_bytes = png();
@@ -2604,7 +2643,353 @@ mod n097 {
         );
     }
 
-    // N113-TESTS
+    #[test]
+    fn n113_02_hidden_obligation_refuses_whole_candidate() {
+        let png_bytes = png();
+        let jpeg_bytes = jpeg();
+        let webp_bytes = webp();
+        let gif_bytes = super::n113_fixtures::gif89a_three_frames();
+        let mut corrupt_gif = gif_bytes.clone();
+        corrupt_gif.truncate(corrupt_gif.len() - 3);
+
+        // (1) A representation-owned declaration is a full obligation of its own, alongside an
+        // `internal` exposure that the graph keeps for verification but never publishes.
+        let root = Root::new(
+            "n113-02a",
+            &[
+                ("favicon.png", &png_bytes),
+                ("logo.jpg", &jpeg_bytes),
+                ("hero.webp", &webp_bytes),
+                ("scene.gif", &gif_bytes),
+            ],
+        );
+        let inventory = inventory_of(&[
+            (TestOwnerV1::Entity, "favicon", "favicon.png", "public"),
+            (TestOwnerV1::Facet, "logo", "logo.jpg", "public"),
+            (TestOwnerV1::Site, "banner", "hero.webp", "internal"),
+            (
+                TestOwnerV1::Representation,
+                "social-preview",
+                "scene.gif",
+                "public",
+            ),
+        ]);
+        let set = complete_v2(inspect_entity_graphic_images_v2(
+            &root.capability(),
+            &inventory,
+            Path::new(BIN),
+        ));
+        assert_eq!(
+            set.len(),
+            4,
+            "every declared owner is verified independently"
+        );
+        let owners: Vec<_> = set
+            .inspections()
+            .iter()
+            .map(|inspection| inspection.obligation().declaring_owner().clone())
+            .collect();
+        assert_ne!(owners[2], owners[3]);
+        assert!(set.inspections()[3].is_animation());
+        println!(
+            "n113_hidden representation_included=true internal_included=true owners=4 \
+             gif_owner_distinct=true"
+        );
+
+        // (2) An invalid `internal` obligation in the middle aborts the whole candidate: the two
+        // earlier successes are discarded and the caller receives one refusal only.
+        let root = Root::new(
+            "n113-02b",
+            &[
+                ("favicon.png", &png_bytes),
+                ("logo.jpg", &jpeg_bytes),
+                ("broken.gif", &corrupt_gif),
+                ("scene.gif", &gif_bytes),
+            ],
+        );
+        let inventory = inventory_of(&[
+            (TestOwnerV1::Entity, "favicon", "favicon.png", "public"),
+            (TestOwnerV1::Facet, "logo", "logo.jpg", "public"),
+            (TestOwnerV1::Site, "banner", "broken.gif", "internal"),
+            (TestOwnerV1::Page, "background", "scene.gif", "public"),
+        ]);
+        match inspection_refusal_v2(inspect_entity_graphic_images_v2(
+            &root.capability(),
+            &inventory,
+            Path::new(BIN),
+        )) {
+            EntityImageRefusalV2::Inspection(refusal) => {
+                assert_eq!(
+                    refusal.kind(),
+                    GraphicImageInspectRefusalKindV2::PortRefused
+                );
+                assert!(refusal.declaring_owner().is_some());
+                assert!(refusal.role().is_some());
+                assert_eq!(refusal.local_index(), Some(0));
+            }
+            other => panic!("expected an inspection refusal, got {other:?}"),
+        }
+        println!("n113_hidden refused_whole=true discarded=2 partial=false");
+
+        // (3) A suppressing descendant still contributes its own authored obligation.
+        let root = Root::new("n113-02c", &[("scene.gif", &gif_bytes)]);
+        let suppressed = test_inventory_suppressed_v1(&[(
+            TestOwnerV1::Page,
+            "background",
+            "scene.gif",
+            "public",
+        )])
+        .expect("a suppressing declaration is valid authored input");
+        assert_eq!(suppressed.len(), 1);
+        let set = complete_v2(inspect_entity_graphic_images_v2(
+            &root.capability(),
+            &suppressed,
+            Path::new(BIN),
+        ));
+        assert_eq!(set.len(), 1);
+        assert!(set.inspections()[0].is_animation());
+        println!("n113_hidden suppressed_declaration_inspected=true");
+    }
+
+    #[test]
+    fn n113_03_declared_format_and_favicon_refusals() {
+        let png_bytes = png();
+        let gif_bytes = super::n113_fixtures::gif89a_three_frames();
+        let mut corrupt_gif = gif_bytes.clone();
+        corrupt_gif.truncate(corrupt_gif.len() - 6);
+
+        // A PNG claimed as a GIF, and a GIF claimed as a PNG: both are refused by the real worker
+        // behind the V2 adapter, and neither yields a candidate.
+        for (tag, name, bytes) in [
+            ("png-as-gif", "scene.gif", &png_bytes),
+            ("gif-as-png", "hero.png", &gif_bytes),
+            ("corrupt-gif", "broken.gif", &corrupt_gif),
+        ] {
+            let root = Root::new(&format!("n113-03-{tag}"), &[(name, bytes)]);
+            let inventory = one_logo(name);
+            match inspection_refusal_v2(inspect_entity_graphic_images_v2(
+                &root.capability(),
+                &inventory,
+                Path::new(BIN),
+            )) {
+                EntityImageRefusalV2::Inspection(refusal) => {
+                    assert_eq!(
+                        refusal.kind(),
+                        GraphicImageInspectRefusalKindV2::PortRefused
+                    );
+                }
+                other => panic!("{tag}: expected an inspection refusal, got {other:?}"),
+            }
+            println!("n113_declared case={tag} refused=true kind=port-refused");
+        }
+
+        // Declaration-level refusals happen at the real property-validation stage, before any read.
+        for (tag, role, reference) in [
+            ("uppercase", "logo", "hero.PNG"),
+            ("svg", "logo", "vector.svg"),
+            ("unknown", "logo", "hero.bmp"),
+            ("favicon-gif", "favicon", "favicon.gif"),
+            ("favicon-webp", "favicon", "favicon.webp"),
+        ] {
+            assert!(
+                test_inventory_v1(&[(TestOwnerV1::Page, role, reference, "public")]).is_none(),
+                "{tag} must be refused by the authored declaration validators"
+            );
+            println!("n113_declared case={tag} refused=true stage=property-validation");
+        }
+
+        // AVIF is a valid *reference* but is outside this four-format gate, so it refuses here.
+        let root = Root::new("n113-03-avif", &[("hero.avif", &png_bytes)]);
+        match inspection_refusal_v2(inspect_entity_graphic_images_v2(
+            &root.capability(),
+            &one_logo("hero.avif"),
+            Path::new(BIN),
+        )) {
+            EntityImageRefusalV2::Inspection(refusal) => {
+                assert_eq!(
+                    refusal.kind(),
+                    GraphicImageInspectRefusalKindV2::UnsupportedFormat
+                );
+            }
+            other => panic!("avif: expected an inspection refusal, got {other:?}"),
+        }
+        println!("n113_declared case=avif refused=true kind=unsupported-format");
+
+        // An empty source refuses rather than decoding nothing.
+        let root = Root::new("n113-03-empty", &[("hero.png", &[][..])]);
+        match inspection_refusal_v2(inspect_entity_graphic_images_v2(
+            &root.capability(),
+            &one_logo("hero.png"),
+            Path::new(BIN),
+        )) {
+            EntityImageRefusalV2::Inspection(refusal) => {
+                assert!(matches!(
+                    refusal.kind(),
+                    GraphicImageInspectRefusalKindV2::EmptySource
+                        | GraphicImageInspectRefusalKindV2::PortRefused
+                ));
+            }
+            EntityImageRefusalV2::SourceRead(refusal) => {
+                println!("n113_declared case=empty refused_at=source-read kind={refusal:?}");
+            }
+        }
+
+        // A source above the 20 MiB ceiling refuses, whichever stage enforces it first.
+        let oversize = vec![0u8; usize::try_from(MAX_IMAGE_SOURCE_BYTES_V1).unwrap() + 1];
+        let root = Root::new("n113-03-oversize", &[("huge.png", &oversize)]);
+        match inspect_entity_graphic_images_v2(
+            &root.capability(),
+            &one_logo("huge.png"),
+            Path::new(BIN),
+        ) {
+            EntityImageOutcomeV2::Refused(EntityImageRefusalV2::Inspection(refusal)) => {
+                assert_eq!(
+                    refusal.kind(),
+                    GraphicImageInspectRefusalKindV2::OversizeSource
+                );
+            }
+            EntityImageOutcomeV2::Refused(EntityImageRefusalV2::SourceRead(refusal)) => {
+                println!("n113_declared case=oversize refused_at=source-read kind={refusal:?}");
+            }
+            other => panic!("oversize: expected a refusal, got {other:?}"),
+        }
+
+        // A declared source that does not exist refuses at the confined read.
+        let empty_root = Root::new("n113-03-absent", &[]);
+        match inspection_refusal_v2(inspect_entity_graphic_images_v2(
+            &empty_root.capability(),
+            &one_logo("absent.png"),
+            Path::new(BIN),
+        )) {
+            EntityImageRefusalV2::SourceRead(refusal) => {
+                println!("n113_declared case=absent refused_at=source-read kind={refusal:?}");
+            }
+            EntityImageRefusalV2::Inspection(refusal) => {
+                panic!("absent: refused at the wrong stage: {refusal:?}")
+            }
+        }
+        println!("n113_declared all_cases_refused=true");
+    }
+
+    #[test]
+    fn n113_04_gif_forgery_and_red_oracle_sensitivity() {
+        let red_gif = super::n113_fixtures::gif87a_red_pixel();
+        let blue_gif = super::n113_fixtures::gif87a_blue_pixel();
+        let red_pixel = sha256_media_worker_bytes_v1(&[255, 0, 0, 255]);
+        let blue_pixel = sha256_media_worker_bytes_v1(&[0, 0, 255, 255]);
+
+        // Phase 1 — the real worker, independent pixel oracle, no filesystem fixture needed.
+        let red_observation = inspect_gif_bytes_with_executable_v1(Path::new(BIN), &red_gif)
+            .expect("the real confined worker must decode the RED asset");
+        let blue_observation = inspect_gif_bytes_with_executable_v1(Path::new(BIN), &blue_gif)
+            .expect("the real confined worker must decode the BLUE asset");
+        assert_eq!(red_observation.frames()[0].composite_digest(), &red_pixel);
+        assert_eq!(blue_observation.frames()[0].composite_digest(), &blue_pixel);
+        assert_ne!(
+            red_observation.source_digest(),
+            blue_observation.source_digest()
+        );
+        assert_ne!(
+            red_observation.transcript_digest(),
+            blue_observation.transcript_digest()
+        );
+
+        // The narrow deliberate-red switch: it may only choose the *wrong expected* digest, and it
+        // is never set by the committed workflow, so the default expectation is always the true RED
+        // oracle. Setting it must make this assertion fail.
+        let expected_red = match std::env::var("SOLO_N113_RED_ORACLE").as_deref() {
+            Ok("wrong") => blue_pixel,
+            _ => red_pixel,
+        };
+        assert_eq!(
+            red_observation.frames()[0].composite_digest(),
+            &expected_red,
+            "the RED asset's independent pixel oracle"
+        );
+        assert_ne!(
+            red_observation.frames()[0].composite_digest(),
+            &blue_pixel,
+            "a RED asset is never equal to the BLUE oracle"
+        );
+        println!(
+            "n113_red red={} blue={} oracle=red source_distinct=true transcript_distinct=true",
+            red_pixel.to_hex(),
+            blue_pixel.to_hex()
+        );
+
+        // Phase 2 — the two closed forged-evidence modes, through the same parent validator.
+        match inspect_gif_bytes_with_test_mode_v1(
+            Path::new(BIN),
+            &red_gif,
+            GifWorkerTestModeV1::WrongSourceDigest,
+        ) {
+            Err(GifWorkerRefusalV1::SourceDigestMismatch) => {}
+            other => panic!("a forged source digest must refuse, got {other:?}"),
+        }
+        match inspect_gif_bytes_with_test_mode_v1(
+            Path::new(BIN),
+            &red_gif,
+            GifWorkerTestModeV1::WrongTranscriptDigest,
+        ) {
+            Err(GifWorkerRefusalV1::TranscriptDigestMismatch) => {}
+            other => panic!("a forged transcript digest must refuse, got {other:?}"),
+        }
+        println!("n113_forged wrong_source=refused wrong_transcript=refused");
+
+        // Phase 3 — both assets through the whole-candidate V2 gate, and the same forged modes
+        // through the real adapter over a real acquired source set: no candidate either way.
+        let root = Root::new("n113-04", &[("red.gif", &red_gif), ("blue.gif", &blue_gif)]);
+        let inventory = inventory_of(&[
+            (TestOwnerV1::Site, "banner", "red.gif", "public"),
+            (TestOwnerV1::Page, "background", "blue.gif", "public"),
+        ]);
+        let set = complete_v2(inspect_entity_graphic_images_v2(
+            &root.capability(),
+            &inventory,
+            Path::new(BIN),
+        ));
+        assert_eq!(set.len(), 2);
+        let red_row = set.inspections()[0]
+            .animation()
+            .expect("the RED row is a timeline");
+        let blue_row = set.inspections()[1]
+            .animation()
+            .expect("the BLUE row is a timeline");
+        assert_eq!(red_row.frames[0].composite_digest, red_pixel);
+        assert_eq!(blue_row.frames[0].composite_digest, blue_pixel);
+        assert_ne!(red_row.source_digest, blue_row.source_digest);
+        assert_ne!(red_row.transcript_digest, blue_row.transcript_digest);
+        assert_ne!(red_row.worker_pid, blue_row.worker_pid);
+
+        let source_set = match read_graphic_asset_bytes_v1(&inventory, &root.capability()) {
+            GraphicAssetReadSetOutcomeV1::Complete(set) => set,
+            GraphicAssetReadSetOutcomeV1::Refused(refusal) => {
+                panic!("the real source read must succeed: {refusal:?}")
+            }
+        };
+        for mode in [
+            GifWorkerTestModeV1::WrongSourceDigest,
+            GifWorkerTestModeV1::WrongTranscriptDigest,
+        ] {
+            let adapter = ConfinedGraphicInspectAdapterV2::with_test_mode(BIN, mode);
+            match inspect_graphic_image_source_set_v2(&source_set, &adapter) {
+                GraphicImageInspectionOutcomeV2::Refused(refusal) => {
+                    assert_eq!(
+                        refusal.kind(),
+                        GraphicImageInspectRefusalKindV2::PortRefused
+                    );
+                }
+                GraphicImageInspectionOutcomeV2::Complete(set) => {
+                    panic!("forged mode {mode:?} produced {} inspections", set.len())
+                }
+            }
+        }
+        println!(
+            "n113_forged adapter_wrong_source=refused adapter_wrong_transcript=refused \
+             partial=false gif_pids={},{}",
+            red_row.worker_pid, blue_row.worker_pid
+        );
+    }
 }
 
 // ---------------------------------------------------------------------------------------------

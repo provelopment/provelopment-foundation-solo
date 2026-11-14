@@ -90,7 +90,7 @@ pub use graphic_image_inspection::{
     MAX_IMAGE_WORKER_STDOUT_BYTES_V1, TestOwnerV1, inspect_entity_graphic_images_v1,
     inspect_entity_graphic_images_v2, inspect_gif_bytes_v1, inspect_gif_bytes_with_executable_v1,
     inspect_gif_bytes_with_test_mode_v1, inspect_image_bytes_with_mode_v1,
-    run_internal_image_worker_v1, test_inventory_v1,
+    run_internal_image_worker_v1, test_inventory_suppressed_v1, test_inventory_v1,
 };
 pub use media_worker_host::{
     CHILD_OBSERVATION_MARKER_V1, EXIT_INTERNAL_PROBE_REFUSED, INTERNAL_PROBE_CHILD_TOKEN_V1,

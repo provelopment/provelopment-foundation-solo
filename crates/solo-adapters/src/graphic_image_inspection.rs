@@ -1253,6 +1253,10 @@ pub fn inspect_entity_graphic_images_v1(
 /// successful return here is never by itself an accepted result.
 pub struct ConfinedGraphicInspectAdapterV2 {
     executable: PathBuf,
+    /// A closed forged-evidence mode, selectable only by the sensitivity seam.
+    ///
+    /// Production construction leaves this `None`, which always means `decode`.
+    test_mode: Option<GifWorkerTestModeV1>,
 }
 
 impl ConfinedGraphicInspectAdapterV2 {
@@ -1261,6 +1265,7 @@ impl ConfinedGraphicInspectAdapterV2 {
     pub fn new(executable: impl Into<PathBuf>) -> Self {
         Self {
             executable: executable.into(),
+            test_mode: None,
         }
     }
 
@@ -1268,6 +1273,20 @@ impl ConfinedGraphicInspectAdapterV2 {
     #[must_use]
     pub fn for_current_exe() -> Option<Self> {
         std::env::current_exe().ok().map(Self::new)
+    }
+
+    /// The closed sensitivity seam: the same adapter, with GIF inspection forced into one of the two
+    /// existing forged-evidence modes.
+    ///
+    /// It exists only so a host test can prove that a correctly framed but wrongly digested worker
+    /// answer cannot pass the V2 adapter or produce a partial candidate. There is no way to select
+    /// `decode`, a mode string or any other behaviour through it, and production never calls it.
+    #[must_use]
+    pub fn with_test_mode(executable: impl Into<PathBuf>, mode: GifWorkerTestModeV1) -> Self {
+        Self {
+            executable: executable.into(),
+            test_mode: Some(mode),
+        }
     }
 
     /// The executable this adapter starts. Never influenced by authored input.
@@ -1367,7 +1386,13 @@ impl solo_application::GraphicImageInspectPortV2 for ConfinedGraphicInspectAdapt
         };
         let declared = request.declared_format();
         if declared.is_gif() {
-            return match inspect_gif_bytes_with_executable_v1(&self.executable, request.bytes()) {
+            let outcome = match self.test_mode {
+                None => inspect_gif_bytes_with_executable_v1(&self.executable, request.bytes()),
+                Some(mode) => {
+                    inspect_gif_bytes_in_mode_v1(&self.executable, request.bytes(), mode.mode())
+                }
+            };
+            return match outcome {
                 Ok(observation) => Outcome::Inspected(Box::new(Observation::Animation(Box::new(
                     gif_animation_evidence_v2(&observation),
                 )))),
@@ -1503,15 +1528,34 @@ impl TestOwnerV1 {
 pub fn test_inventory_v1(
     declarations: &[(TestOwnerV1, &str, &str, &str)],
 ) -> Option<GraphicAssetObligationInventoryV1> {
+    test_inventory_with_inheritance_v1(declarations, solo_domain::Inheritance::Inherit)
+}
+
+/// Builds one validated inventory whose declarations all **suppress** inheritance.
+///
+/// A suppressing declaration excludes every inherited value for its key while keeping its own
+/// authored values, which is how a descendant narrows an inherited selection. It runs the same
+/// validators as production, is used only by the V2 host tests, decodes nothing and grants no
+/// authority. `None` means the specification was itself invalid.
+#[must_use]
+pub fn test_inventory_suppressed_v1(
+    declarations: &[(TestOwnerV1, &str, &str, &str)],
+) -> Option<GraphicAssetObligationInventoryV1> {
+    test_inventory_with_inheritance_v1(declarations, solo_domain::Inheritance::Suppress)
+}
+
+fn test_inventory_with_inheritance_v1(
+    declarations: &[(TestOwnerV1, &str, &str, &str)],
+    inheritance: solo_domain::Inheritance,
+) -> Option<GraphicAssetObligationInventoryV1> {
     use solo_application::{
         PropertyResolutionRequestV1, collect_graphic_asset_obligations_v1,
         resolve_declared_properties_v1,
     };
     use solo_domain::{
         AssetNamespace, AssetReferenceV1, AuthoredPropertyValueV1, CurrentContextV1,
-        DeclaredOwnerPropertiesV1, EfsOwnershipDraft, Exposure, FacetDraft, Inheritance,
-        LocaleKeyV1, PageDraft, PropertyDeclarationV1, PropertyKey, PropertyValueV1,
-        QualifiedOwnerV1, SiteDraft,
+        DeclaredOwnerPropertiesV1, EfsOwnershipDraft, Exposure, FacetDraft, LocaleKeyV1, PageDraft,
+        PropertyDeclarationV1, PropertyKey, PropertyValueV1, QualifiedOwnerV1, SiteDraft,
     };
 
     let entity = solo_domain::EntityIdV1::parse("example").ok()?;
@@ -1543,10 +1587,8 @@ pub fn test_inventory_v1(
         let parsed = AssetReferenceV1::parse(AssetNamespace::Entity, reference).ok()?;
         let value = PropertyValueV1::graphic(parsed);
         let authored = AuthoredPropertyValueV1::new(value, exposure).ok()?;
-        let declaration = PropertyDeclarationV1::new(
-            Inheritance::Inherit,
-            CurrentContextV1::Values(vec![authored]),
-        );
+        let declaration =
+            PropertyDeclarationV1::new(inheritance, CurrentContextV1::Values(vec![authored]));
         let owner = slot.owner_v1();
         match owners.iter_mut().find(|(existing, _)| *existing == owner) {
             Some((_, entries)) => entries.push((key, declaration)),
