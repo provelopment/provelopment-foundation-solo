@@ -46,6 +46,7 @@
 #![deny(unsafe_code)]
 
 mod bootstrap_cli;
+mod graphic_gif_inspection;
 mod graphic_image_inspection;
 mod media_worker_host;
 // One reserved process-native file, available on both hosts. The `any(..)` gates *module
@@ -69,6 +70,12 @@ mod source_set_staging;
 pub use bootstrap_cli::{
     CliOutcome, CliRefusal, CliRefusalCode, EXIT_INTERNAL, EXIT_OK, EXIT_REFUSED, FLAG_BASE_URL,
     FLAG_ENTITY_ID, SUBCOMMAND, parse_request, run,
+};
+pub use graphic_gif_inspection::{
+    GIF_MIME_V1, GIF87A_SIGNATURE_V1, GIF89A_SIGNATURE_V1, GifAnimationEvidenceV1, GifDisposalV1,
+    GifFrameEvidenceV1, GifInspectionRefusalV1, GifLoopV1, MAX_GIF_FRAMES_V1,
+    MAX_GIF_ONE_CYCLE_DELAY_MS_V1, MAX_GIF_SOURCE_BYTES_V1, MAX_GIF_TOTAL_COMPOSITED_PIXELS_V1,
+    MAX_GIF_TRACE_BYTES_V1, inspect_gif_animation_v1,
 };
 pub use graphic_image_inspection::{
     ConfinedImageInspectAdapterV1, EntityImageOutcomeV1, EntityImageRefusalV1,
