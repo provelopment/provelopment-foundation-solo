@@ -2426,7 +2426,7 @@ mod n102 {
 
     use solo_adapters::{
         INTERNAL_N102_ENV_PARENT_FLAG_V1, N102_ENV_PARENT_PREFIX_V1, N102ExtraInheritableV1,
-        run_n102_handle_probe_v1,
+        run_n102_event_probe_v1, run_n102_handle_probe_v1,
     };
 
     use super::BIN;
@@ -2440,33 +2440,85 @@ mod n102 {
     /// A numeric handle value the child can never legitimately own.
     const IMPOSSIBLE_HANDLE: u32 = 0xffff_fff0;
 
-    /// `n102_01`: one extra real inheritable parent handle, created with `bInheritHandle` set and
+    /// `n102_01`: one extra real inheritable parent event, created with `bInheritHandle` set and
     /// deliberately absent from the two-entry `PROC_THREAD_ATTRIBUTE_HANDLE_LIST`, must not be
     /// reachable from the real child the production spawn creates.
+    ///
+    /// The evidence is object identity rather than a numeric coincidence: the child signals the
+    /// transmitted candidate values, and this parent then asks the kernel about its **own** original
+    /// event objects. A reused integer naming a different object cannot signal them; a genuinely
+    /// inherited event handle would signal the very same kernel object and fail this test.
     #[test]
     fn n102_01_extra_inheritable_handle_is_excluded() {
         let extra = N102ExtraInheritableV1::create().expect("extra inheritable parent handle");
         // A second event in the same parent table created with `bInheritHandle = 0`: its numeric
         // value can never reach the child by inheritance, so it is the ambiguity control that tells
         // a real allowlist exclusion apart from a coincidental reuse of the same numeric value.
-        let shadow = N102ExtraInheritableV1::create_control()
-            .expect("non-inheritable control handle in the same parent table");
-        let answer = run_n102_handle_probe_v1(Path::new(BIN), extra.value(), shadow.value())
-            .expect("bounded handle probe answer from the real child");
+        let control = N102ExtraInheritableV1::create_control()
+            .expect("non-inheritable control event in the same parent table");
+        // Both parent events start nonsignaled and remain owned and alive across the whole probe.
+        assert_eq!(
+            extra.signaled_v1(),
+            Some(false),
+            "the extra inheritable event was already signaled before the probe"
+        );
+        assert_eq!(
+            control.signaled_v1(),
+            Some(false),
+            "the control event was already signaled before the probe"
+        );
+        let answer = run_n102_event_probe_v1(Path::new(BIN), extra.value(), control.value())
+            .expect("bounded event probe answer from the real child");
         assert!(
-            !answer.control_live,
-            "the non-inheritable control resolved in the child, so a numeric match is ambiguous reuse"
+            answer.attempted,
+            "the child did not execute the SetEvent attempts"
         );
         assert!(
-            !answer.handle_live,
-            "an inheritable parent handle outside the allowlist reached the child"
+            answer.witness,
+            "the child could not prove SetEvent plus a zero-timeout wait on its own event"
         );
         assert_ne!(answer.pid, 0, "the child reported no process identifier");
-        println!(
-            "n102_01 extra_handle_excluded={} control_live={} child_pid={}",
-            !answer.handle_live, answer.control_live, answer.pid
+        // The child is fully reaped here, so these report the state of the parent's own original
+        // kernel objects: a genuinely inherited handle would have signaled the same object.
+        let extra_signaled = extra.signaled_v1();
+        let control_signaled = control.signaled_v1();
+        assert_eq!(
+            extra_signaled,
+            Some(false),
+            "the extra inheritable parent event object was signaled by the child"
         );
-        drop(extra);
+        assert_eq!(
+            control_signaled,
+            Some(false),
+            "the non-inheritable control event object was signaled"
+        );
+        // Parent-side positive control: the same two primitives must observe a real state change on
+        // a fresh parent event, otherwise a `false` above would be indistinguishable from a broken
+        // wait or a failed `SetEvent`.
+        let positive =
+            N102ExtraInheritableV1::create_control().expect("parent-side positive-control event");
+        assert_eq!(
+            positive.signaled_v1(),
+            Some(false),
+            "the positive-control event was already signaled"
+        );
+        assert!(
+            positive.signal_parent_v1(),
+            "SetEvent failed on a live parent-owned event"
+        );
+        assert_eq!(
+            positive.signaled_v1(),
+            Some(true),
+            "a zero-timeout wait did not observe a signaled parent event"
+        );
+        println!(
+            "n102_01 extra_event_signaled={} control_event_signaled={} local_witness={} parent_positive_control=true child_pid={}",
+            extra_signaled == Some(true),
+            control_signaled == Some(true),
+            answer.witness,
+            answer.pid
+        );
+        drop((extra, control, positive));
     }
 
     /// `n102_02`: an isolated helper parent carrying one parent-only canary variable launches the
@@ -2573,5 +2625,1092 @@ mod n102 {
         );
         faults.join().expect("fault thread");
         println!("n102_04 concurrent_probe_pid={} unaffected=true", clean.pid);
+    }
+}
+
+#[cfg(any(target_os = "linux", windows))]
+mod n108 {
+    use solo_adapters::{GifDisposalV1, GifLoopV1, inspect_gif_bytes_with_executable_v1};
+    use solo_application::sha256_media_worker_bytes_v1;
+    use std::path::Path;
+
+    /// Valid extension-free GIF87a: 1x1 canvas, global palette red/blue, one image
+    /// descriptor, LZW codes clear / palette-index-0 / end. Code width is three bits:
+    /// codes (4, 0, 5) => 0x0144, little-endian packed.
+    fn gif87a_red_pixel() -> Vec<u8> {
+        let mut bytes = b"GIF87a".to_vec();
+        bytes.extend_from_slice(&[1, 0, 1, 0, 0x80, 0, 0]);
+        bytes.extend_from_slice(&[255, 0, 0, 0, 0, 255]);
+        bytes.extend_from_slice(&[0x2c, 0, 0, 0, 0, 1, 0, 1, 0, 0]);
+        bytes.extend_from_slice(&[2, 2, 0x44, 0x01, 0, 0x3b]);
+        bytes
+    }
+
+    #[test]
+    fn n108_01_gif87a_still_confined_and_parent_verified() {
+        let bytes = gif87a_red_pixel();
+        let obs = inspect_gif_bytes_with_executable_v1(Path::new(super::BIN), &bytes)
+            .expect("real confined GIF87a worker must succeed");
+        assert_eq!(obs.signature(), "GIF87a");
+        assert_eq!((obs.width(), obs.height()), (1, 1));
+        assert_eq!(obs.frame_count(), 1);
+        assert!(!obs.is_animated());
+        assert_eq!(obs.loop_semantics(), GifLoopV1::Absent);
+        assert_eq!(obs.source_digest(), &sha256_media_worker_bytes_v1(&bytes));
+        assert_eq!(
+            obs.frames()[0].composite_digest(),
+            &sha256_media_worker_bytes_v1(&[255, 0, 0, 255])
+        );
+        assert!(obs.transcript_len() > 0);
+        assert_ne!(obs.worker_pid(), 0);
+        assert!(obs.limits_verified() && obs.cleanup_verified());
+        println!(
+            "n108_gif=still frames=1 pid={} src={} transcript={}",
+            obs.worker_pid(),
+            obs.source_digest().to_hex(),
+            obs.transcript_digest().to_hex()
+        );
+    }
+
+    /// Deterministic three-frame 1x1 GIF89a: NETSCAPE2.0 infinite loop, three Graphic
+    /// Control Extensions (10 cs keep / 20 cs background+transparent / 5 cs keep+transparent)
+    /// and three image descriptors sharing the global red/blue palette.
+    fn gif89a_three_frames() -> Vec<u8> {
+        let mut bytes = b"GIF89a".to_vec();
+        bytes.extend_from_slice(&[1, 0, 1, 0, 0x80, 0, 0]);
+        bytes.extend_from_slice(&[255, 0, 0, 0, 0, 255]);
+        bytes.extend_from_slice(&[0x21, 0xff, 11]);
+        bytes.extend_from_slice(b"NETSCAPE2.0");
+        bytes.extend_from_slice(&[3, 1, 0, 0, 0]);
+        for (delay, disposal, transparent) in [(10u8, 1u8, false), (20, 2, true), (5, 1, true)] {
+            let gce = (disposal << 2) | u8::from(transparent);
+            bytes.extend_from_slice(&[0x21, 0xf9, 4, gce, delay, 0, 0, 0]);
+            bytes.extend_from_slice(&[0x2c, 0, 0, 0, 0, 1, 0, 1, 0, 0]);
+            bytes.extend_from_slice(&[2, 2, 0x44, 0x01, 0]);
+        }
+        bytes.push(0x3b);
+        bytes
+    }
+
+    #[test]
+    fn n108_02_gif89a_animation_keeps_frames_delays_and_loop() {
+        let bytes = gif89a_three_frames();
+        let obs = inspect_gif_bytes_with_executable_v1(Path::new(super::BIN), &bytes)
+            .expect("real confined animated GIF89a worker must succeed");
+        assert_eq!(obs.signature(), "GIF89a");
+        assert_eq!((obs.width(), obs.height()), (1, 1));
+        assert_eq!(obs.frame_count(), 3);
+        assert!(obs.is_animated());
+        assert_eq!(obs.loop_semantics(), GifLoopV1::Infinite);
+        assert_eq!(obs.one_cycle_delay_ms(), 350);
+        let frames = obs.frames();
+        assert_eq!(
+            frames.iter().map(|f| f.index()).collect::<Vec<_>>(),
+            [0, 1, 2]
+        );
+        assert_eq!(
+            frames
+                .iter()
+                .map(|f| f.delay_centiseconds())
+                .collect::<Vec<_>>(),
+            [10, 20, 5]
+        );
+        assert_eq!(
+            frames.iter().map(|f| f.disposal()).collect::<Vec<_>>(),
+            [
+                GifDisposalV1::Keep,
+                GifDisposalV1::Background,
+                GifDisposalV1::Keep
+            ]
+        );
+        let red = sha256_media_worker_bytes_v1(&[255, 0, 0, 255]);
+        let clear = sha256_media_worker_bytes_v1(&[0, 0, 0, 0]);
+        assert_eq!(frames[0].composite_digest(), &red);
+        assert_eq!(frames[1].composite_digest(), &red);
+        assert_eq!(frames[2].composite_digest(), &clear);
+        assert_eq!(obs.source_digest(), &sha256_media_worker_bytes_v1(&bytes));
+        assert!(obs.transcript_len() > 0 && obs.worker_pid() != 0);
+        assert!(obs.limits_verified() && obs.cleanup_verified());
+        println!(
+            "n108_gif=animation frames=3 duration_ms=350 pid={} src={} transcript={}",
+            obs.worker_pid(),
+            obs.source_digest().to_hex(),
+            obs.transcript_digest().to_hex()
+        );
+    }
+
+    // ---- Test-only deterministic GIF fixture encoder, ported from the accepted codec tests. ----
+    // It exists only to construct exact inputs for the real child; it is never a decoding path and
+    // it grants no authority. Min code size is pinned to eight bits so dictionary growth cannot mask
+    // a framing bug in these tiny images.
+    const RED: [u8; 3] = [255, 0, 0];
+    const GREEN: [u8; 3] = [0, 255, 0];
+    const BLUE: [u8; 3] = [0, 0, 255];
+    const WHITE: [u8; 3] = [255, 255, 255];
+
+    struct BitPackerV1 {
+        bytes: Vec<u8>,
+        accumulator: u32,
+        bits: u8,
+    }
+
+    impl BitPackerV1 {
+        fn new() -> Self {
+            Self {
+                bytes: Vec::new(),
+                accumulator: 0,
+                bits: 0,
+            }
+        }
+
+        fn write(&mut self, code: u16, width: u8) {
+            self.accumulator |= u32::from(code) << self.bits;
+            self.bits += width;
+            while self.bits >= 8 {
+                self.bytes.push((self.accumulator & 0xFF) as u8);
+                self.accumulator >>= 8;
+                self.bits -= 8;
+            }
+        }
+
+        fn finish(mut self) -> Vec<u8> {
+            if self.bits > 0 {
+                self.bytes.push((self.accumulator & 0xFF) as u8);
+            }
+            self.bytes
+        }
+    }
+
+    fn lzw_encode_v1(min_code_size: u8, indices: &[u8]) -> Vec<u8> {
+        let clear = 1u16 << min_code_size;
+        let end = clear + 1;
+        let mut packer = BitPackerV1::new();
+        let mut code_size = min_code_size + 1;
+        packer.write(clear, code_size);
+        let mut table: std::collections::HashMap<(u16, u8), u16> = std::collections::HashMap::new();
+        let mut next = end + 1;
+        let mut current: Option<u16> = None;
+        for &pixel in indices {
+            match current {
+                None => current = Some(u16::from(pixel)),
+                Some(prefix) => {
+                    if let Some(&known) = table.get(&(prefix, pixel)) {
+                        current = Some(known);
+                    } else {
+                        packer.write(prefix, code_size);
+                        table.insert((prefix, pixel), next);
+                        next += 1;
+                        if next == (1u16 << code_size) && code_size < 12 {
+                            code_size += 1;
+                        }
+                        current = Some(u16::from(pixel));
+                    }
+                }
+            }
+        }
+        if let Some(prefix) = current {
+            packer.write(prefix, code_size);
+        }
+        packer.write(end, code_size);
+        packer.finish()
+    }
+
+    fn table_bits_v1(entries: usize) -> (u8, usize) {
+        let mut size = 2usize;
+        while size < entries {
+            size *= 2;
+        }
+        (
+            u8::try_from(size.trailing_zeros())
+                .unwrap_or(1)
+                .saturating_sub(1),
+            size,
+        )
+    }
+
+    fn table_bytes_v1(palette: &[[u8; 3]]) -> (u8, Vec<u8>) {
+        let (bits, entries) = table_bits_v1(palette.len().max(2));
+        let mut bytes = Vec::with_capacity(entries * 3);
+        for entry in palette {
+            bytes.extend_from_slice(entry);
+        }
+        while bytes.len() < entries * 3 {
+            bytes.push(0);
+        }
+        (bits, bytes)
+    }
+
+    fn write_sub_blocks_v1(out: &mut Vec<u8>, data: &[u8]) {
+        for chunk in data.chunks(255) {
+            out.push(u8::try_from(chunk.len()).unwrap_or(255));
+            out.extend_from_slice(chunk);
+        }
+        out.push(0);
+    }
+
+    struct FrameSpecV1 {
+        left: u16,
+        top: u16,
+        width: u16,
+        height: u16,
+        delay: u16,
+        disposal: u8,
+        transparent: Option<u8>,
+        local_palette: Option<Vec<[u8; 3]>>,
+        interlaced: bool,
+        indices: Vec<u8>,
+    }
+
+    fn frame_v1(width: u16, height: u16, indices: &[u8]) -> FrameSpecV1 {
+        FrameSpecV1 {
+            left: 0,
+            top: 0,
+            width,
+            height,
+            delay: 0,
+            disposal: 1,
+            transparent: None,
+            local_palette: None,
+            interlaced: false,
+            indices: indices.to_vec(),
+        }
+    }
+
+    struct GifSpecV1 {
+        version: &'static [u8; 6],
+        width: u16,
+        height: u16,
+        background_index: u8,
+        global_palette: Option<Vec<[u8; 3]>>,
+        loop_count: Option<u16>,
+        graphic_control: bool,
+        frames: Vec<FrameSpecV1>,
+    }
+
+    impl GifSpecV1 {
+        fn to_bytes(&self) -> Vec<u8> {
+            let mut out = Vec::new();
+            out.extend_from_slice(self.version);
+            out.extend_from_slice(&self.width.to_le_bytes());
+            out.extend_from_slice(&self.height.to_le_bytes());
+            let mut packed = 0u8;
+            let mut table = Vec::new();
+            let mut global_entries = 2usize;
+            if let Some(palette) = &self.global_palette {
+                let (bits, bytes) = table_bytes_v1(palette);
+                let (_, entries) = table_bits_v1(palette.len().max(2));
+                global_entries = entries;
+                packed |= 0x80 | bits;
+                table = bytes;
+            }
+            out.push(packed);
+            out.push(self.background_index);
+            out.push(0);
+            out.extend_from_slice(&table);
+            if let Some(count) = self.loop_count {
+                out.extend_from_slice(&[0x21, 0xFF, 11]);
+                out.extend_from_slice(b"NETSCAPE2.0");
+                out.extend_from_slice(&[3, 1]);
+                out.extend_from_slice(&count.to_le_bytes());
+                out.push(0);
+            }
+            for frame in &self.frames {
+                if self.graphic_control {
+                    let gce = (frame.disposal << 2) | u8::from(frame.transparent.is_some());
+                    out.extend_from_slice(&[
+                        0x21,
+                        0xF9,
+                        4,
+                        gce,
+                        (frame.delay & 0xFF) as u8,
+                        (frame.delay >> 8) as u8,
+                        frame.transparent.unwrap_or(0),
+                        0,
+                    ]);
+                }
+                out.push(0x2C);
+                out.extend_from_slice(&frame.left.to_le_bytes());
+                out.extend_from_slice(&frame.top.to_le_bytes());
+                out.extend_from_slice(&frame.width.to_le_bytes());
+                out.extend_from_slice(&frame.height.to_le_bytes());
+                let mut descriptor = 0u8;
+                let mut local = Vec::new();
+                if let Some(palette) = &frame.local_palette {
+                    let (bits, bytes) = table_bytes_v1(palette);
+                    descriptor |= 0x80 | bits;
+                    local = bytes;
+                }
+                if frame.interlaced {
+                    descriptor |= 0x40;
+                }
+                out.push(descriptor);
+                out.extend_from_slice(&local);
+                let _ = global_entries;
+                let min_code_size = 8u8;
+                out.push(min_code_size);
+                let data = lzw_encode_v1(min_code_size, &frame.indices);
+                write_sub_blocks_v1(&mut out, &data);
+            }
+            out.push(0x3B);
+            out
+        }
+    }
+
+    fn canvas_v1(pixels: &[[u8; 4]]) -> Vec<u8> {
+        let mut out = Vec::with_capacity(pixels.len() * 4);
+        for pixel in pixels {
+            out.extend_from_slice(pixel);
+        }
+        out
+    }
+    #[test]
+    fn n108_03_gif89a_previous_background_palette_interlace_offset() {
+        let red = [255, 0, 0, 255];
+        let blue = [0, 0, 255, 255];
+        let green = [0, 255, 0, 255];
+        let white = [255, 255, 255, 255];
+        let clear = [0, 0, 0, 0];
+
+        // 1. RestorePrevious: opaque red canvas, opaque blue frame disposed Previous, transparent
+        //    reveal. The reveal must show the restored red canvas, not the blue frame.
+        let mut fill_red = frame_v1(2, 2, &[0, 0, 0, 0]);
+        fill_red.delay = 7;
+        let mut fill_blue = frame_v1(2, 2, &[1, 1, 1, 1]);
+        fill_blue.delay = 7;
+        fill_blue.disposal = 3;
+        let mut reveal = frame_v1(1, 1, &[0]);
+        reveal.delay = 7;
+        reveal.transparent = Some(0);
+        let previous = GifSpecV1 {
+            version: b"GIF89a",
+            width: 2,
+            height: 2,
+            background_index: 0,
+            global_palette: Some(vec![RED, BLUE]),
+            loop_count: None,
+            graphic_control: true,
+            frames: vec![fill_red, fill_blue, reveal],
+        }
+        .to_bytes();
+        let obs = inspect_gif_bytes_with_executable_v1(Path::new(super::BIN), &previous)
+            .expect("real confined restore-previous worker must succeed");
+        assert_eq!(obs.signature(), "GIF89a");
+        assert_eq!((obs.width(), obs.height()), (2, 2));
+        assert_eq!(obs.frame_count(), 3);
+        assert_eq!(obs.frames()[1].disposal(), GifDisposalV1::Previous);
+        assert_eq!(
+            obs.frames()[0].composite_digest(),
+            &sha256_media_worker_bytes_v1(&canvas_v1(&[red, red, red, red]))
+        );
+        assert_eq!(
+            obs.frames()[1].composite_digest(),
+            &sha256_media_worker_bytes_v1(&canvas_v1(&[blue, blue, blue, blue]))
+        );
+        assert_eq!(
+            obs.frames()[2].composite_digest(),
+            &sha256_media_worker_bytes_v1(&canvas_v1(&[red, red, red, red]))
+        );
+        assert!(obs.transcript_len() > 0 && obs.worker_pid() != 0);
+        assert!(obs.limits_verified() && obs.cleanup_verified());
+        assert_eq!(
+            obs.source_digest(),
+            &sha256_media_worker_bytes_v1(&previous)
+        );
+        println!(
+            "n108_gif=restore-previous frames=3 pid={} src={} transcript={}",
+            obs.worker_pid(),
+            obs.source_digest().to_hex(),
+            obs.transcript_digest().to_hex()
+        );
+
+        // 2. RestoreBackground with a NONZERO (blue) global background index: the disposed region
+        //    must become the real background colour, never transparent and never a stale red pixel.
+        let fill = frame_v1(2, 2, &[0, 0, 0, 0]);
+        let mut over = frame_v1(1, 1, &[0]);
+        over.left = 1;
+        over.top = 1;
+        over.disposal = 2;
+        let mut reveal_bg = frame_v1(1, 1, &[0]);
+        reveal_bg.transparent = Some(0);
+        let background = GifSpecV1 {
+            version: b"GIF89a",
+            width: 2,
+            height: 2,
+            background_index: 1,
+            global_palette: Some(vec![RED, BLUE]),
+            loop_count: None,
+            graphic_control: true,
+            frames: vec![fill, over, reveal_bg],
+        }
+        .to_bytes();
+        let obs = inspect_gif_bytes_with_executable_v1(Path::new(super::BIN), &background)
+            .expect("real confined opaque-background worker must succeed");
+        assert_eq!(obs.frames()[1].disposal(), GifDisposalV1::Background);
+        let all_red = sha256_media_worker_bytes_v1(&canvas_v1(&[red, red, red, red]));
+        assert_eq!(obs.frames()[0].composite_digest(), &all_red);
+        assert_eq!(obs.frames()[1].composite_digest(), &all_red);
+        assert_eq!(
+            obs.frames()[2].composite_digest(),
+            &sha256_media_worker_bytes_v1(&canvas_v1(&[red, red, red, blue]))
+        );
+        assert_ne!(
+            obs.frames()[2].composite_digest(),
+            &sha256_media_worker_bytes_v1(&canvas_v1(&[red, red, red, clear]))
+        );
+        assert!(obs.transcript_len() > 0 && obs.worker_pid() != 0);
+        assert!(obs.limits_verified() && obs.cleanup_verified());
+        assert_eq!(
+            obs.source_digest(),
+            &sha256_media_worker_bytes_v1(&background)
+        );
+        println!(
+            "n108_gif=background frames=3 pid={} src={} transcript={}",
+            obs.worker_pid(),
+            obs.source_digest().to_hex(),
+            obs.transcript_digest().to_hex()
+        );
+
+        // 3. Local palette: a GREEN/WHITE local table must override the RED/BLUE global table.
+        let mut local = frame_v1(2, 2, &[0, 0, 0, 0]);
+        local.local_palette = Some(vec![GREEN, WHITE]);
+        let palette = GifSpecV1 {
+            version: b"GIF89a",
+            width: 2,
+            height: 2,
+            background_index: 0,
+            global_palette: Some(vec![RED, BLUE]),
+            loop_count: None,
+            graphic_control: true,
+            frames: vec![local],
+        }
+        .to_bytes();
+        let obs = inspect_gif_bytes_with_executable_v1(Path::new(super::BIN), &palette)
+            .expect("real confined local-palette worker must succeed");
+        assert!(obs.frames()[0].local_palette());
+        assert_eq!(
+            obs.frames()[0].composite_digest(),
+            &sha256_media_worker_bytes_v1(&canvas_v1(&[green, green, green, green]))
+        );
+        assert!(obs.transcript_len() > 0 && obs.worker_pid() != 0);
+        assert!(obs.limits_verified() && obs.cleanup_verified());
+        assert_eq!(obs.source_digest(), &sha256_media_worker_bytes_v1(&palette));
+        println!(
+            "n108_gif=local-palette frames=1 pid={} src={} transcript={}",
+            obs.worker_pid(),
+            obs.source_digest().to_hex(),
+            obs.transcript_digest().to_hex()
+        );
+
+        // 4. Interlaced 1x4 frame at left=1 on a 2x4 screen; stored order [0,2,1,3] is the
+        //    interlace pass order (rows 0, 2, 1, 3), so the right column must be RED, GREEN,
+        //    BLUE, WHITE and the untouched left column must stay zero-alpha.
+        let mut interlaced = frame_v1(1, 4, &[0, 2, 1, 3]);
+        interlaced.left = 1;
+        interlaced.interlaced = true;
+        let woven = GifSpecV1 {
+            version: b"GIF89a",
+            width: 2,
+            height: 4,
+            background_index: 0,
+            global_palette: Some(vec![RED, GREEN, BLUE, WHITE]),
+            loop_count: None,
+            graphic_control: true,
+            frames: vec![interlaced],
+        }
+        .to_bytes();
+        let obs = inspect_gif_bytes_with_executable_v1(Path::new(super::BIN), &woven)
+            .expect("real confined interlaced-offset worker must succeed");
+        assert!(obs.frames()[0].interlaced());
+        assert_eq!(
+            (
+                obs.frames()[0].left(),
+                obs.frames()[0].top(),
+                obs.frames()[0].width(),
+                obs.frames()[0].height()
+            ),
+            (1, 0, 1, 4)
+        );
+        assert_eq!(
+            obs.frames()[0].composite_digest(),
+            &sha256_media_worker_bytes_v1(&canvas_v1(&[
+                clear, red, clear, green, clear, blue, clear, white
+            ]))
+        );
+        assert!(obs.transcript_len() > 0 && obs.worker_pid() != 0);
+        assert!(obs.limits_verified() && obs.cleanup_verified());
+        assert_eq!(obs.source_digest(), &sha256_media_worker_bytes_v1(&woven));
+        println!(
+            "n108_gif=interlace-offset frames=1 pid={} src={} transcript={}",
+            obs.worker_pid(),
+            obs.source_digest().to_hex(),
+            obs.transcript_digest().to_hex()
+        );
+    }
+
+    #[test]
+    fn n108_04_gif_extension_signature_trailer_and_mislabeled_input_refuse() {
+        // Positive controls: the known-good fixtures must still be accepted by the real child.
+        let good87 = gif87a_red_pixel();
+        let good89 = gif89a_three_frames();
+        let control87 = inspect_gif_bytes_with_executable_v1(Path::new(super::BIN), &good87)
+            .expect("positive GIF87a control must still be accepted");
+        let control89 = inspect_gif_bytes_with_executable_v1(Path::new(super::BIN), &good89)
+            .expect("positive GIF89a control must still be accepted");
+        assert_eq!(control87.frame_count(), 1);
+        assert_eq!(control89.frame_count(), 3);
+        println!(
+            "n108_gif=refusal-controls pids={},{} src87={} src89={}",
+            control87.worker_pid(),
+            control89.worker_pid(),
+            control87.source_digest().to_hex(),
+            control89.source_digest().to_hex()
+        );
+
+        let mut wrong_magic = good87.clone();
+        wrong_magic[..6].copy_from_slice(b"BAD87a");
+        let mut extra_after_trailer = good87.clone();
+        extra_after_trailer.push(0);
+        let truncated = good87[..good87.len() - 2].to_vec();
+        let mut gif87a_with_gce = good87.clone();
+        // Offset 19 is the first image descriptor for this exact fixture: six signature bytes,
+        // seven logical-screen bytes, six global-colour-table bytes (two entries).
+        assert_eq!(gif87a_with_gce[19], 0x2C);
+        gif87a_with_gce.splice(19..19, [0x21, 0xF9, 4, 0x04, 0, 0, 0, 0]);
+
+        // Unsupported extension block (plain text, 0x21 0x01) inserted at the same offset into an
+        // otherwise valid GIF89a.
+        let mut unsupported = gif87a_red_pixel();
+        unsupported[..6].copy_from_slice(b"GIF89a");
+        assert_eq!(unsupported[19], 0x2C);
+        unsupported.splice(
+            19..19,
+            [0x21, 0x01, 12, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        );
+
+        // Logical-screen background index outside the two-entry global colour table.
+        let background_out_of_range = GifSpecV1 {
+            version: b"GIF89a",
+            width: 1,
+            height: 1,
+            background_index: 5,
+            global_palette: Some(vec![RED, BLUE]),
+            loop_count: None,
+            graphic_control: true,
+            frames: vec![frame_v1(1, 1, &[0])],
+        }
+        .to_bytes();
+
+        let png = [
+            0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 0x0D, b'I', b'H', b'D', b'R',
+        ];
+        let jpeg = [
+            0xFF, 0xD8, 0xFF, 0xE0, 0, 0x10, b'J', b'F', b'I', b'F', 0, 1, 1, 0, 0, 1, 0, 1, 0, 0,
+            0xFF, 0xD9,
+        ];
+        let mut webp = b"RIFF".to_vec();
+        webp.extend_from_slice(&[0x1A, 0, 0, 0]);
+        webp.extend_from_slice(b"WEBPVP8 ");
+        webp.extend_from_slice(&[0, 0, 0, 0]);
+
+        let cases: [(&str, &[u8], &str); 8] = [
+            ("wrong-magic", &wrong_magic, "gif-worker-source-rejected"),
+            (
+                "gce-in-gif87a",
+                &gif87a_with_gce,
+                "gif-worker-supervisor-refused",
+            ),
+            ("truncated", &truncated, "gif-worker-supervisor-refused"),
+            (
+                "extra-after-trailer",
+                &extra_after_trailer,
+                "gif-worker-supervisor-refused",
+            ),
+            (
+                "unsupported-extension",
+                &unsupported,
+                "gif-worker-supervisor-refused",
+            ),
+            (
+                "background-out-of-range",
+                &background_out_of_range,
+                "gif-worker-supervisor-refused",
+            ),
+            ("png-as-gif", &png, "gif-worker-source-rejected"),
+            ("webp-as-gif", &webp, "gif-worker-source-rejected"),
+        ];
+        for (label, bytes, expected) in cases {
+            match inspect_gif_bytes_with_executable_v1(Path::new(super::BIN), bytes) {
+                Ok(observation) => panic!(
+                    "{label}: malformed GIF was accepted with {} frames",
+                    observation.frame_count()
+                ),
+                Err(refusal) => {
+                    println!("n108_gif=refusal case={label} token={}", refusal.token());
+                    assert_eq!(
+                        refusal.token(),
+                        expected,
+                        "{label}: unexpected refusal token"
+                    );
+                }
+            }
+        }
+        match inspect_gif_bytes_with_executable_v1(Path::new(super::BIN), &jpeg) {
+            Ok(_) => panic!("jpeg-as-gif: mislabeled JPEG was accepted"),
+            Err(refusal) => {
+                println!(
+                    "n108_gif=refusal case=jpeg-as-gif token={}",
+                    refusal.token()
+                );
+                assert_eq!(refusal.token(), "gif-worker-source-rejected");
+            }
+        }
+    }
+
+    /// One 1x1 GIF89a with the shared RED/BLUE palette and one RED frame per authored delay, so the
+    /// loop extension and per-frame timing are the only variables.
+    fn gif89a_red_delays(loop_count: Option<u16>, delays: &[u16]) -> Vec<u8> {
+        let frames = delays
+            .iter()
+            .map(|delay| {
+                let mut frame = frame_v1(1, 1, &[0]);
+                frame.delay = *delay;
+                frame
+            })
+            .collect();
+        GifSpecV1 {
+            version: b"GIF89a",
+            width: 1,
+            height: 1,
+            background_index: 0,
+            global_palette: Some(vec![RED, BLUE]),
+            loop_count,
+            graphic_control: true,
+            frames,
+        }
+        .to_bytes()
+    }
+
+    /// Every accepted observation must prove the real supervised child ran and stays internally
+    /// consistent: matching source digest, bounded nonzero transcript and a reaped, confined PID.
+    fn assert_real_child_evidence(obs: &solo_adapters::GifWorkerObservationV1, bytes: &[u8]) {
+        assert_eq!(obs.source_digest(), &sha256_media_worker_bytes_v1(bytes));
+        assert!(obs.transcript_len() > 0);
+        assert_ne!(obs.worker_pid(), 0);
+        assert!(obs.limits_verified() && obs.cleanup_verified());
+    }
+
+    #[test]
+    fn n108_05_gif89a_absent_finite_infinite_loops_and_zero_delay() {
+        let red = sha256_media_worker_bytes_v1(&canvas_v1(&[[255, 0, 0, 255]]));
+
+        // 1. No repeat extension at all: absent, not implicit infinite, and zero delay stays zero.
+        let absent = gif89a_red_delays(None, &[0]);
+        let obs = inspect_gif_bytes_with_executable_v1(Path::new(super::BIN), &absent)
+            .expect("extension-free GIF89a must pass the real confined worker");
+        assert_eq!(obs.loop_semantics(), GifLoopV1::Absent);
+        assert_eq!(obs.one_cycle_delay_ms(), 0);
+        assert_eq!(obs.frame_count(), 1);
+        assert!(!obs.is_animated());
+        assert_eq!(obs.frames()[0].delay_centiseconds(), 0);
+        assert_eq!(obs.frames()[0].composite_digest(), &red);
+        assert_real_child_evidence(&obs, &absent);
+        println!(
+            "n108_gif=loop case=absent loop={} cycle_ms={} frames={} pid={} src={} transcript={}",
+            obs.loop_semantics().token(),
+            obs.one_cycle_delay_ms(),
+            obs.frame_count(),
+            obs.worker_pid(),
+            obs.source_digest().to_hex(),
+            obs.transcript_digest().to_hex()
+        );
+
+        // 2. Finite one: an authored single repeat is finite, never collapsed into "absent".
+        let one = gif89a_red_delays(Some(1), &[1]);
+        let obs = inspect_gif_bytes_with_executable_v1(Path::new(super::BIN), &one)
+            .expect("finite-one GIF89a must pass the real confined worker");
+        assert_eq!(obs.loop_semantics(), GifLoopV1::Finite(1));
+        assert_eq!(obs.one_cycle_delay_ms(), 10);
+        assert_eq!(obs.frames()[0].delay_centiseconds(), 1);
+        assert_eq!(obs.frames()[0].composite_digest(), &red);
+        assert_real_child_evidence(&obs, &one);
+        println!(
+            "n108_gif=loop case=finite-one loop={} cycle_ms={} frames={} pid={} src={} transcript={}",
+            obs.loop_semantics().token(),
+            obs.one_cycle_delay_ms(),
+            obs.frame_count(),
+            obs.worker_pid(),
+            obs.source_digest().to_hex(),
+            obs.transcript_digest().to_hex()
+        );
+
+        // 3. Finite two with a five-centisecond frame delay.
+        let two = gif89a_red_delays(Some(2), &[5]);
+        let obs = inspect_gif_bytes_with_executable_v1(Path::new(super::BIN), &two)
+            .expect("finite-two GIF89a must pass the real confined worker");
+        assert_eq!(obs.loop_semantics(), GifLoopV1::Finite(2));
+        assert_eq!(obs.one_cycle_delay_ms(), 50);
+        assert_eq!(obs.frames()[0].delay_centiseconds(), 5);
+        assert_real_child_evidence(&obs, &two);
+        println!(
+            "n108_gif=loop case=finite-two loop={} cycle_ms={} frames={} pid={} src={} transcript={}",
+            obs.loop_semantics().token(),
+            obs.one_cycle_delay_ms(),
+            obs.frame_count(),
+            obs.worker_pid(),
+            obs.source_digest().to_hex(),
+            obs.transcript_digest().to_hex()
+        );
+
+        // 4. Repeat count zero is infinite: one authored frame, so the timeline is still a still.
+        let infinite = gif89a_red_delays(Some(0), &[0]);
+        let obs = inspect_gif_bytes_with_executable_v1(Path::new(super::BIN), &infinite)
+            .expect("infinite-loop GIF89a must pass the real confined worker");
+        assert_eq!(obs.loop_semantics(), GifLoopV1::Infinite);
+        assert_eq!(obs.one_cycle_delay_ms(), 0);
+        assert_eq!(obs.frame_count(), 1);
+        assert!(!obs.is_animated());
+        assert_real_child_evidence(&obs, &infinite);
+        println!(
+            "n108_gif=loop case=infinite loop={} cycle_ms={} frames={} pid={} src={} transcript={}",
+            obs.loop_semantics().token(),
+            obs.one_cycle_delay_ms(),
+            obs.frame_count(),
+            obs.worker_pid(),
+            obs.source_digest().to_hex(),
+            obs.transcript_digest().to_hex()
+        );
+
+        // 5. Mixed authored delays are kept exactly, never normalised to a browser minimum.
+        let mixed = gif89a_red_delays(None, &[0, 7, 3]);
+        let obs = inspect_gif_bytes_with_executable_v1(Path::new(super::BIN), &mixed)
+            .expect("multi-frame GIF89a must pass the real confined worker");
+        assert_eq!(obs.frame_count(), 3);
+        assert!(obs.is_animated());
+        assert_eq!(obs.one_cycle_delay_ms(), 100);
+        assert_eq!(
+            obs.frames()
+                .iter()
+                .map(|frame| frame.delay_centiseconds())
+                .collect::<Vec<_>>(),
+            [0, 7, 3]
+        );
+        assert_real_child_evidence(&obs, &mixed);
+        println!(
+            "n108_gif=loop case=mixed-delays loop={} cycle_ms={} frames={} delays={:?} pid={} src={} transcript={}",
+            obs.loop_semantics().token(),
+            obs.one_cycle_delay_ms(),
+            obs.frame_count(),
+            obs.frames()
+                .iter()
+                .map(|frame| frame.delay_centiseconds())
+                .collect::<Vec<_>>(),
+            obs.worker_pid(),
+            obs.source_digest().to_hex(),
+            obs.transcript_digest().to_hex()
+        );
+    }
+
+    #[test]
+    fn n108_06_gif_resource_budget_and_frame_rectangle_refusals() {
+        let control = gif89a_red_delays(None, &[0]);
+        let accepted = inspect_gif_bytes_with_executable_v1(Path::new(super::BIN), &control)
+            .expect("the 1x1 GIF89a control must stay accepted");
+        assert_eq!(accepted.frame_count(), 1);
+        println!(
+            "n108_gif=budget control frames=1 pid={} src={}",
+            accepted.worker_pid(),
+            accepted.source_digest().to_hex()
+        );
+
+        // 1. 1025 frames: exactly one over MAX_GIF_FRAMES_V1. The whole animation must refuse; no
+        // partial timeline may survive.
+        let frames: Vec<FrameSpecV1> = (0..=1024).map(|_| frame_v1(1, 1, &[0])).collect();
+        let too_many_frames = GifSpecV1 {
+            version: b"GIF89a",
+            width: 1,
+            height: 1,
+            background_index: 0,
+            global_palette: Some(vec![RED, BLUE]),
+            loop_count: None,
+            graphic_control: true,
+            frames,
+        }
+        .to_bytes();
+
+        // 2. Logical screen side 8193 with a compact 1x1 frame: the canvas side limit is eight
+        // thousand one hundred and ninety-two.
+        let over_wide_canvas = GifSpecV1 {
+            version: b"GIF89a",
+            width: 8193,
+            height: 1,
+            background_index: 0,
+            global_palette: Some(vec![RED, BLUE]),
+            loop_count: None,
+            graphic_control: true,
+            frames: vec![frame_v1(1, 1, &[0])],
+        }
+        .to_bytes();
+
+        // 3. 8192 x 8192 logical screen with two 1x1 frames: 2 x 67,108,864 composed pixels exceeds
+        // 128,000,000 and must refuse from the container scan before any canvas allocation. The
+        // fixture stays compact because no large bitmap is ever built.
+        let composed_pixels_exceeded = GifSpecV1 {
+            version: b"GIF89a",
+            width: 8192,
+            height: 8192,
+            background_index: 0,
+            global_palette: Some(vec![RED, BLUE]),
+            loop_count: None,
+            graphic_control: true,
+            frames: vec![frame_v1(1, 1, &[0]), frame_v1(1, 1, &[0])],
+        }
+        .to_bytes();
+        assert_eq!(2u64 * 8192 * 8192, 134_217_728);
+
+        // 4. Six frames of 65,535 centiseconds: 3,932,100 ms exceeds the 3,600,000 ms cycle limit.
+        let duration_exceeded = gif89a_red_delays(None, &[u16::MAX; 6]);
+        assert_eq!(6u64 * 655_350, 3_932_100);
+
+        // 5. Authored frame rectangle outside a 2x2 canvas: no clipping, no partial success.
+        let mut outside = frame_v1(2, 2, &[0, 0, 0, 0]);
+        outside.left = 1;
+        let rectangle_outside = GifSpecV1 {
+            version: b"GIF89a",
+            width: 2,
+            height: 2,
+            background_index: 0,
+            global_palette: Some(vec![RED, BLUE]),
+            loop_count: None,
+            graphic_control: true,
+            frames: vec![outside],
+        }
+        .to_bytes();
+
+        // 6. Exactly one byte over the source ceiling: refused by the parent before any child spawn.
+        let ceiling = usize::try_from(solo_adapters::MAX_GIF_SOURCE_BYTES_V1)
+            .expect("the GIF source ceiling fits usize")
+            + 1;
+        let mut over_source = b"GIF89a".to_vec();
+        over_source.resize(ceiling, 0);
+        assert_eq!(over_source.len(), ceiling);
+
+        let cases: [(&str, &[u8], &str); 6] = [
+            (
+                "frames-1025",
+                &too_many_frames,
+                "gif-worker-supervisor-refused",
+            ),
+            (
+                "canvas-8193",
+                &over_wide_canvas,
+                "gif-worker-supervisor-refused",
+            ),
+            (
+                "composed-134217728",
+                &composed_pixels_exceeded,
+                "gif-worker-supervisor-refused",
+            ),
+            (
+                "duration-3932100",
+                &duration_exceeded,
+                "gif-worker-supervisor-refused",
+            ),
+            (
+                "frame-outside-canvas",
+                &rectangle_outside,
+                "gif-worker-supervisor-refused",
+            ),
+            (
+                "source-over-ceiling",
+                &over_source,
+                "gif-worker-source-rejected",
+            ),
+        ];
+        for (label, bytes, expected) in cases {
+            match inspect_gif_bytes_with_executable_v1(Path::new(super::BIN), bytes) {
+                Ok(observation) => panic!(
+                    "{label}: refused specimen was accepted with {} frames",
+                    observation.frame_count()
+                ),
+                Err(refusal) => {
+                    println!("n108_gif=budget case={label} token={}", refusal.token());
+                    assert_eq!(
+                        refusal.token(),
+                        expected,
+                        "{label}: unexpected refusal token"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn n108_07_gif_application_repeat_and_lzw_corruption_refusals() {
+        // Positive controls: the known-good fixtures must still be accepted by the real child.
+        let good87 = gif87a_red_pixel();
+        let good89 = gif89a_three_frames();
+        let control87 = inspect_gif_bytes_with_executable_v1(Path::new(super::BIN), &good87)
+            .expect("positive GIF87a control must still be accepted");
+        let control89 = inspect_gif_bytes_with_executable_v1(Path::new(super::BIN), &good89)
+            .expect("positive GIF89a control must still be accepted");
+        assert_eq!(control87.frame_count(), 1);
+        assert_eq!(control89.frame_count(), 3);
+        println!(
+            "n108_gif=malformed control87 pid={} src={} control89 pid={} src={}",
+            control87.worker_pid(),
+            control87.source_digest().to_hex(),
+            control89.worker_pid(),
+            control89.source_digest().to_hex()
+        );
+
+        // Duplicate NETSCAPE repeat block: the exact verified nineteen-byte block sits at offset
+        // nineteen, so a second identical copy can be spliced immediately after it.
+        let mut duplicated_repeat = good89.clone();
+        let repeat = duplicated_repeat[19..38].to_vec();
+        assert_eq!(repeat.len(), 19);
+        assert!(repeat.starts_with(&[0x21, 0xff, 11]));
+        assert_eq!(&repeat[3..14], b"NETSCAPE2.0");
+        assert_eq!(&repeat[14..19], &[3, 1, 0, 0, 0]);
+        duplicated_repeat.splice(38..38, repeat);
+
+        // Unknown application identifier with intact block framing.
+        let mut unknown_application = good89.clone();
+        assert_eq!(&unknown_application[22..33], b"NETSCAPE2.0");
+        unknown_application[22..33].copy_from_slice(b"NOTSCAPE2.0");
+
+        // Malformed Graphic Control Extension: block size four mutated to three.
+        let mut short_control = good89.clone();
+        assert_eq!(&short_control[38..41], &[0x21, 0xf9, 4]);
+        short_control[40] = 3;
+
+        // LZW without an end code: the exact one-pixel payload of the GIF87a control is replaced by
+        // a deterministic clear-plus-index stream that never emits the end code the strict decoder
+        // requires (`check_lzw_end_code(true)`).
+        let mut unterminated_lzw = good87.clone();
+        assert_eq!(unterminated_lzw.len(), 35);
+        assert_eq!(unterminated_lzw[29], 2);
+        assert_eq!(unterminated_lzw[30], 2);
+        assert_eq!(&unterminated_lzw[31..33], &[0x44, 0x01]);
+        assert_eq!(unterminated_lzw[33], 0);
+        assert_eq!(unterminated_lzw[34], 0x3b);
+        unterminated_lzw[31] = 0x04;
+        unterminated_lzw[32] = 0x00;
+
+        // Missing sub-block terminator: the verified terminator byte becomes a one-byte block.
+        let mut missing_terminator = good87.clone();
+        assert_eq!(missing_terminator[33], 0);
+        missing_terminator[33] = 1;
+
+        // Compressed sub-block claiming more bytes than the stream still holds.
+        let mut truncated_block = good87.clone();
+        assert_eq!(truncated_block[30], 2);
+        truncated_block[30] = 4;
+
+        let cases: [(&str, &[u8]); 6] = [
+            ("duplicate-repeat", &duplicated_repeat),
+            ("unknown-application", &unknown_application),
+            ("short-graphic-control", &short_control),
+            ("unterminated-lzw", &unterminated_lzw),
+            ("missing-sub-block-terminator", &missing_terminator),
+            ("truncated-compressed-block", &truncated_block),
+        ];
+        for (label, bytes) in cases {
+            match inspect_gif_bytes_with_executable_v1(Path::new(super::BIN), bytes) {
+                Ok(observation) => panic!(
+                    "{label}: corrupt GIF was accepted with {} frames",
+                    observation.frame_count()
+                ),
+                Err(refusal) => {
+                    println!("n108_gif=malformed case={label} token={}", refusal.token());
+                    assert_eq!(
+                        refusal.token(),
+                        "gif-worker-supervisor-refused",
+                        "{label}: unexpected refusal token"
+                    );
+                }
+            }
+        }
+    }
+
+    /// One 1x1 GIF89a selecting `index` from the shared RED/BLUE palette with an authored delay.
+    fn gif89a_index_delay(index: u8, delay: u16) -> Vec<u8> {
+        let mut frame = frame_v1(1, 1, &[index]);
+        frame.delay = delay;
+        GifSpecV1 {
+            version: b"GIF89a",
+            width: 1,
+            height: 1,
+            background_index: 0,
+            global_palette: Some(vec![RED, BLUE]),
+            loop_count: None,
+            graphic_control: true,
+            frames: vec![frame],
+        }
+        .to_bytes()
+    }
+
+    #[test]
+    fn n108_08_gif_source_transcript_and_pixel_change_evidence() {
+        let red = sha256_media_worker_bytes_v1(&canvas_v1(&[[255, 0, 0, 255]]));
+        let blue = sha256_media_worker_bytes_v1(&canvas_v1(&[[0, 0, 255, 255]]));
+
+        let a_bytes = gif89a_index_delay(0, 0);
+        let b_bytes = gif89a_index_delay(1, 0);
+        let c_bytes = gif89a_index_delay(0, 5);
+        assert_ne!(a_bytes, b_bytes, "B must differ from A only by pixel index");
+        assert_ne!(a_bytes, c_bytes, "C must differ from A only by delay");
+
+        let run = |bytes: &Vec<u8>, label: &str| {
+            let obs = inspect_gif_bytes_with_executable_v1(Path::new(super::BIN), bytes)
+                .expect("every valid GIF89a specimen must pass the real confined worker");
+            assert_real_child_evidence(&obs, bytes);
+            assert_eq!(obs.frame_count(), 1);
+            println!(
+                "n108_gif=evidence case={label} pid={} src={} transcript={} pixel={} cycle_ms={}",
+                obs.worker_pid(),
+                obs.source_digest().to_hex(),
+                obs.transcript_digest().to_hex(),
+                obs.frames()[0].composite_digest().to_hex(),
+                obs.one_cycle_delay_ms()
+            );
+            obs
+        };
+
+        // A is inspected twice through separate supervised children.
+        let a1 = run(&a_bytes, "A1");
+        let a2 = run(&a_bytes, "A2");
+        let b = run(&b_bytes, "B");
+        let c = run(&c_bytes, "C");
+
+        // Pixel evidence is asserted independently of the decoder's own digest arithmetic.
+        assert_eq!(a1.frames()[0].composite_digest(), &red);
+        assert_eq!(a2.frames()[0].composite_digest(), &red);
+        assert_eq!(b.frames()[0].composite_digest(), &blue);
+        assert_eq!(c.frames()[0].composite_digest(), &red);
+
+        // A different authored asset changes both the source and the transcript binding.
+        assert_ne!(a1.source_digest(), b.source_digest());
+        assert_ne!(a1.transcript_digest(), b.transcript_digest());
+        assert_ne!(a1.source_digest(), c.source_digest());
+        assert_ne!(a1.transcript_digest(), c.transcript_digest());
+
+        // C keeps A's composited pixels while changing only the timing contract.
+        assert_eq!(
+            a1.frames()[0].composite_digest(),
+            c.frames()[0].composite_digest()
+        );
+        assert_eq!(a1.one_cycle_delay_ms(), 0);
+        assert_eq!(c.one_cycle_delay_ms(), 50);
+
+        // Two separate real children agree on every piece of evidence except their own identity.
+        assert_eq!(a1.source_digest(), a2.source_digest());
+        assert_eq!(a1.transcript_digest(), a2.transcript_digest());
+        assert_eq!(a1.transcript_len(), a2.transcript_len());
+        assert_eq!(
+            a1.frames()[0].composite_digest(),
+            a2.frames()[0].composite_digest()
+        );
+        assert_eq!(a1.one_cycle_delay_ms(), a2.one_cycle_delay_ms());
+        assert_ne!(a1.worker_pid(), a2.worker_pid());
     }
 }
