@@ -41,6 +41,12 @@ image = { version = "=0.25.10", default-features = false, features = [
 # streaming GIF87a/GIF89a frame decoder. Exact version, no default features, no native
 # code, no alternate version, and no second codec of any kind.
 gif = { version = "=0.14.2", default-features = false, features = ["std"] }
+
+# The two pinned pure-Rust SVG grammar roots approved by `SOLO-WO-116 R01` section 2: one strict
+# XML reader and one SVG attribute-grammar parser. Exact versions only, no native code, no font
+# data, no codec and no alternate version.
+quick-xml = "=0.42.0"
+svgtypes = "=0.16.1"
 [target.'cfg(target_os = "linux")'.dependencies]
 rustix = { version = "=1.1.6", default-features = false, features = ["fs", "std"] }
 

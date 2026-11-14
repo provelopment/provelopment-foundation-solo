@@ -48,6 +48,7 @@
 mod bootstrap_cli;
 mod graphic_gif_inspection;
 mod graphic_image_inspection;
+mod graphic_svg_inspection;
 mod media_worker_host;
 // One reserved process-native file, available on both hosts. The `any(..)` gates *module
 // availability* only; it is never a proof of the scope of an `unsafe` expression, and every
@@ -91,6 +92,18 @@ pub use graphic_image_inspection::{
     inspect_entity_graphic_images_v2, inspect_gif_bytes_v1, inspect_gif_bytes_with_executable_v1,
     inspect_gif_bytes_with_test_mode_v1, inspect_image_bytes_with_mode_v1,
     run_internal_image_worker_v1, test_inventory_suppressed_v1, test_inventory_v1,
+};
+pub use graphic_image_inspection::{
+    MAX_SVG_WORKER_STDOUT_BYTES_V1, SVG_WORKER_FRAME_PREFIX_V1, SVG_WORKER_MODE_DECODE_V1,
+    SVG_WORKER_MODE_WRONG_OUTPUT_V1, SVG_WORKER_MODE_WRONG_SOURCE_V1, SVG_WORKER_TOKEN_V1,
+    SvgWorkerModeV1, SvgWorkerObservationV1, SvgWorkerRefusalV1, SvgWorkerTestModeV1,
+    inspect_svg_bytes_with_executable_v1, inspect_svg_bytes_with_test_mode_v1,
+};
+pub use graphic_svg_inspection::{
+    MAX_SVG_ATTRS_V1, MAX_SVG_CANONICAL_BYTES_V1, MAX_SVG_ELEMENTS_V1, MAX_SVG_FILTER_ELEMENTS_V1,
+    MAX_SVG_FILTER_OPERATIONS_V1, MAX_SVG_NESTING_V1, MAX_SVG_PATH_COMMANDS_V1,
+    MAX_SVG_REFERENCES_V1, MAX_SVG_SOURCE_BYTES_V1, SVG_CURRENT_COLOR_V1, SVG_MIME_V1,
+    SVG_NAMESPACE_V1, SvgRefusalV1, SvgSanitizedV1, SvgVectorFactsV1, sanitize_svg_v1,
 };
 pub use media_worker_host::{
     CHILD_OBSERVATION_MARKER_V1, EXIT_INTERNAL_PROBE_REFUSED, INTERNAL_PROBE_CHILD_TOKEN_V1,

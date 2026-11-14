@@ -661,6 +661,27 @@ pub fn run_internal_image_worker_v1(args: &[std::ffi::OsString]) -> Option<u8> {
         }
         return Some(run_gif_worker_child_v1(claimed, mode));
     }
+    // The SVG vector worker is its own closed token: same reserved flag and supervisor, a
+    // completely different payload grammar.
+    if args.get(2).and_then(|token| token.to_str()) == Some(SVG_WORKER_TOKEN_V1) {
+        let Some(claimed) = args
+            .get(3)
+            .and_then(|token| token.to_str())
+            .and_then(MediaWorkerDigestV1::parse_lower_hex)
+        else {
+            return Some(IMAGE_WORKER_EXIT_REFUSED_V1);
+        };
+        let mode = match args.get(4).and_then(|token| token.to_str()) {
+            None | Some(SVG_WORKER_MODE_DECODE_V1) => SvgWorkerModeV1::Decode,
+            Some(SVG_WORKER_MODE_WRONG_SOURCE_V1) => SvgWorkerModeV1::WrongSource,
+            Some(SVG_WORKER_MODE_WRONG_OUTPUT_V1) => SvgWorkerModeV1::WrongOutput,
+            Some(_) => return Some(IMAGE_WORKER_EXIT_REFUSED_V1),
+        };
+        if args.len() > 5 {
+            return Some(IMAGE_WORKER_EXIT_REFUSED_V1);
+        }
+        return Some(run_svg_worker_child_v1(claimed, mode));
+    }
     let Some(format) = args
         .get(2)
         .and_then(|token| token.to_str())
@@ -2475,4 +2496,517 @@ fn parse_gif_transcript_v1(
     }
     let _ = loop_semantics;
     Ok(records)
+}
+
+// ---------------------------------------------------------------------------------------------
+// `SOLO-WO-116 R01` — the contained SVG vector worker.
+//
+// The SVG child reuses the accepted reserved flag, the accepted confinement check and the accepted
+// supervisor; only the payload grammar is new. It emits one fixed header line followed by the
+// canonical vector bytes, exactly as the accepted GIF arm emits a header plus its transcript.
+// ---------------------------------------------------------------------------------------------
+
+/// The closed reserved token that selects the SVG vector worker.
+pub const SVG_WORKER_TOKEN_V1: &str = "svg";
+
+/// The fixed prefix of the SVG worker's single header line.
+pub const SVG_WORKER_FRAME_PREFIX_V1: &str = "SOLO-SVG-WORKER-V1";
+
+/// The production SVG worker mode.
+pub const SVG_WORKER_MODE_DECODE_V1: &str = "decode";
+
+/// The forged-source SVG worker mode, used only to prove parent-side digest refusal.
+pub const SVG_WORKER_MODE_WRONG_SOURCE_V1: &str = "svg-wrong-source";
+
+/// The forged-output SVG worker mode, used only to prove parent-side output digest refusal.
+pub const SVG_WORKER_MODE_WRONG_OUTPUT_V1: &str = "svg-wrong-output";
+
+/// The largest accepted SVG worker response: the canonical ceiling plus one header line.
+pub const MAX_SVG_WORKER_STDOUT_BYTES_V1: u64 =
+    crate::graphic_svg_inspection::MAX_SVG_CANONICAL_BYTES_V1 as u64 + 4096;
+
+/// The closed header keys of the SVG worker frame, in their fixed order.
+const SVG_WORKER_KEYS_V1: [&str; 13] = [
+    "format",
+    "mime",
+    "confinement",
+    "pid",
+    "width",
+    "height",
+    "elements",
+    "depth",
+    "references",
+    "path_commands",
+    "filters",
+    "source_sha256",
+    "output_len",
+];
+
+/// Which SVG worker mode the parent may request.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SvgWorkerModeV1 {
+    /// The production mode.
+    Decode,
+    /// Claim the wrong source digest.
+    WrongSource,
+    /// Claim the wrong canonical output digest.
+    WrongOutput,
+}
+
+/// The closed SVG sensitivity seam a test may select. It can never choose a mode by string.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SvgWorkerTestModeV1 {
+    /// Claim the wrong source digest.
+    WrongSource,
+    /// Claim the wrong canonical output digest.
+    WrongOutput,
+}
+
+impl SvgWorkerTestModeV1 {
+    const fn mode(self) -> SvgWorkerModeV1 {
+        match self {
+            Self::WrongSource => SvgWorkerModeV1::WrongSource,
+            Self::WrongOutput => SvgWorkerModeV1::WrongOutput,
+        }
+    }
+}
+
+/// Which gate refused one confined SVG worker observation. Every refusal is whole-asset.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SvgWorkerRefusalV1 {
+    /// The source was empty or above the accepted ceiling.
+    SourceRejected,
+    /// The supervisor refused to run the child.
+    SupervisorRefused,
+    /// The child exited non-zero.
+    WorkerExited,
+    /// Confinement, cleanup or identity could not be proved.
+    UnverifiedConfinement,
+    /// The response exceeded the accepted ceiling.
+    OutputTooLarge,
+    /// The response header was malformed.
+    FrameMalformed,
+    /// The canonical body length or digest did not match the claim.
+    OutputDigestMismatch,
+    /// The source digest did not match the parent's own digest.
+    SourceDigestMismatch,
+    /// The claimed identity did not match the observed child.
+    IdentityMismatch,
+    /// The returned bytes were not the canonical form of themselves.
+    NotCanonical,
+}
+
+impl SvgWorkerRefusalV1 {
+    /// Stable ASCII refusal token.
+    #[must_use]
+    pub const fn token(self) -> &'static str {
+        match self {
+            Self::SourceRejected => "svg-worker-source-rejected",
+            Self::SupervisorRefused => "svg-worker-supervisor-refused",
+            Self::WorkerExited => "svg-worker-exited",
+            Self::UnverifiedConfinement => "svg-worker-unverified-confinement",
+            Self::OutputTooLarge => "svg-worker-output-too-large",
+            Self::FrameMalformed => "svg-worker-frame-malformed",
+            Self::OutputDigestMismatch => "svg-worker-output-digest-mismatch",
+            Self::SourceDigestMismatch => "svg-worker-source-digest-mismatch",
+            Self::IdentityMismatch => "svg-worker-identity-mismatch",
+            Self::NotCanonical => "svg-worker-not-canonical",
+        }
+    }
+}
+
+/// One parent-validated SVG vector observation.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SvgWorkerObservationV1 {
+    width: u32,
+    height: u32,
+    elements: usize,
+    depth: usize,
+    references: usize,
+    path_commands: usize,
+    filters: usize,
+    canonical: Vec<u8>,
+    source_digest: MediaWorkerDigestV1,
+    output_digest: MediaWorkerDigestV1,
+    worker_pid: u32,
+    wall_ms: u64,
+    limits_verified: bool,
+    cleanup_verified: bool,
+}
+
+impl SvgWorkerObservationV1 {
+    /// The confirmed intrinsic width.
+    #[must_use]
+    pub const fn width(&self) -> u32 {
+        self.width
+    }
+
+    /// The confirmed intrinsic height.
+    #[must_use]
+    pub const fn height(&self) -> u32 {
+        self.height
+    }
+
+    /// The confirmed `width x height` product.
+    #[must_use]
+    pub const fn pixels(&self) -> u64 {
+        self.width as u64 * self.height as u64
+    }
+
+    /// The number of retained elements.
+    #[must_use]
+    pub const fn elements(&self) -> usize {
+        self.elements
+    }
+
+    /// The maximum element depth.
+    #[must_use]
+    pub const fn depth(&self) -> usize {
+        self.depth
+    }
+
+    /// The number of validated references.
+    #[must_use]
+    pub const fn references(&self) -> usize {
+        self.references
+    }
+
+    /// The aggregate path-command count.
+    #[must_use]
+    pub const fn path_commands(&self) -> usize {
+        self.path_commands
+    }
+
+    /// The number of filters.
+    #[must_use]
+    pub const fn filters(&self) -> usize {
+        self.filters
+    }
+
+    /// Exactly the canonical vector bytes the child returned.
+    #[must_use]
+    pub fn canonical(&self) -> &[u8] {
+        &self.canonical
+    }
+
+    /// The parent's digest of exactly the source bytes it sent.
+    #[must_use]
+    pub const fn source_digest(&self) -> &MediaWorkerDigestV1 {
+        &self.source_digest
+    }
+
+    /// The parent's own digest of exactly the canonical bytes it received.
+    #[must_use]
+    pub const fn output_digest(&self) -> &MediaWorkerDigestV1 {
+        &self.output_digest
+    }
+
+    /// The observed child process identifier.
+    #[must_use]
+    pub const fn worker_pid(&self) -> u32 {
+        self.worker_pid
+    }
+
+    /// The measured wall time of the attempt.
+    #[must_use]
+    pub const fn wall_ms(&self) -> u64 {
+        self.wall_ms
+    }
+
+    /// Whether the supervisor proved limits.
+    #[must_use]
+    pub const fn limits_verified(&self) -> bool {
+        self.limits_verified
+    }
+
+    /// Whether the supervisor proved cleanup.
+    #[must_use]
+    pub const fn cleanup_verified(&self) -> bool {
+        self.cleanup_verified
+    }
+}
+
+/// The child half of the SVG worker: prove confinement, then sanitise one owned bounded stream.
+fn run_svg_worker_child_v1(claimed: MediaWorkerDigestV1, mode: SvgWorkerModeV1) -> u8 {
+    let Some(confinement) = crate::media_worker_host::child_image_worker_confinement_v1() else {
+        return IMAGE_WORKER_EXIT_UNCONFINED_V1;
+    };
+    if !confinement.matches_profile_v1() {
+        return IMAGE_WORKER_EXIT_UNCONFINED_V1;
+    }
+
+    let mut source: Vec<u8> = Vec::new();
+    let limit = crate::graphic_svg_inspection::MAX_SVG_SOURCE_BYTES_V1 + 1;
+    let stdin = std::io::stdin();
+    let mut handle = stdin.lock();
+    if handle
+        .by_ref()
+        .take(limit)
+        .read_to_end(&mut source)
+        .is_err()
+    {
+        return IMAGE_WORKER_EXIT_REFUSED_V1;
+    }
+    let transferred = u64::try_from(source.len()).unwrap_or(u64::MAX);
+    if source.is_empty() || transferred > crate::graphic_svg_inspection::MAX_SVG_SOURCE_BYTES_V1 {
+        return IMAGE_WORKER_EXIT_REFUSED_V1;
+    }
+    let actual_source = sha256_media_worker_bytes_v1(&source);
+    if actual_source != claimed {
+        return IMAGE_WORKER_EXIT_REFUSED_V1;
+    }
+
+    let Ok(sanitized) = crate::graphic_svg_inspection::sanitize_svg_v1(&source) else {
+        return IMAGE_WORKER_EXIT_INVALID_MEDIA_V1;
+    };
+    let canonical = sanitized.canonical().to_vec();
+    let facts = sanitized.facts();
+    let actual_output = sha256_media_worker_bytes_v1(&canonical);
+
+    let claimed_source = match mode {
+        SvgWorkerModeV1::WrongSource => flipped_digest_v1(actual_source),
+        SvgWorkerModeV1::Decode | SvgWorkerModeV1::WrongOutput => actual_source,
+    };
+    let claimed_output = match mode {
+        SvgWorkerModeV1::WrongOutput => flipped_digest_v1(actual_output),
+        SvgWorkerModeV1::Decode | SvgWorkerModeV1::WrongSource => actual_output,
+    };
+    let header = format!(
+        "{prefix} format={format} mime={mime} confinement=verified pid={pid} width={width} height={height} elements={elements} depth={depth} references={references} path_commands={paths} filters={filters} source_sha256={source} output_len={length} output_sha256={output}\n",
+        prefix = SVG_WORKER_FRAME_PREFIX_V1,
+        format = SVG_WORKER_TOKEN_V1,
+        mime = crate::graphic_svg_inspection::SVG_MIME_V1,
+        pid = std::process::id(),
+        width = facts.width(),
+        height = facts.height(),
+        elements = facts.elements(),
+        depth = facts.depth(),
+        references = facts.references(),
+        paths = facts.path_commands(),
+        filters = facts.filters(),
+        source = claimed_source.to_hex(),
+        length = canonical.len(),
+        output = claimed_output.to_hex(),
+    );
+    let stdout = std::io::stdout();
+    let mut out = stdout.lock();
+    if out.write_all(header.as_bytes()).is_err()
+        || out.write_all(&canonical).is_err()
+        || out.flush().is_err()
+    {
+        return IMAGE_WORKER_EXIT_REFUSED_V1;
+    }
+    0
+}
+
+/// Maps one selected SVG mode onto its closed child token, or `None` for production.
+const fn svg_parent_mode_token_v1(mode: SvgWorkerModeV1) -> Option<&'static str> {
+    match mode {
+        SvgWorkerModeV1::Decode => None,
+        SvgWorkerModeV1::WrongSource => Some(SVG_WORKER_MODE_WRONG_SOURCE_V1),
+        SvgWorkerModeV1::WrongOutput => Some(SVG_WORKER_MODE_WRONG_OUTPUT_V1),
+    }
+}
+
+/// Validates one SVG worker response against the request that produced it.
+///
+/// The parent never trusts the child's claim: it recomputes the source digest, recomputes the
+/// canonical output digest, re-checks every budget, and re-runs the sanitizer over the returned
+/// canonical bytes to prove they are exactly the canonical form of themselves. A forged digest
+/// therefore cannot survive, and a non-canonical body refuses instead of being normalised.
+fn validate_svg_worker_frame_v1(
+    stdout: &[u8],
+    source_digest: MediaWorkerDigestV1,
+    child_pid: u32,
+) -> Result<SvgWorkerObservationV1, SvgWorkerRefusalV1> {
+    use SvgWorkerRefusalV1 as Refusal;
+    if stdout.contains(&b'\r') {
+        return Err(Refusal::FrameMalformed);
+    }
+    let split = stdout
+        .iter()
+        .position(|byte| *byte == b'\n')
+        .ok_or(Refusal::FrameMalformed)?;
+    let header = std::str::from_utf8(&stdout[..split]).map_err(|_| Refusal::FrameMalformed)?;
+    let rest = header
+        .strip_prefix(SVG_WORKER_FRAME_PREFIX_V1)
+        .and_then(|rest| rest.strip_prefix(' '))
+        .ok_or(Refusal::FrameMalformed)?;
+    let tokens: Vec<&str> = rest.split(' ').collect();
+    if tokens.len() != SVG_WORKER_KEYS_V1.len() + 1 {
+        return Err(Refusal::FrameMalformed);
+    }
+    let mut values: Vec<&str> = Vec::with_capacity(tokens.len());
+    for (token, key) in tokens.iter().zip(SVG_WORKER_KEYS_V1) {
+        let value = token
+            .strip_prefix(key)
+            .and_then(|rest| rest.strip_prefix('='))
+            .ok_or(Refusal::FrameMalformed)?;
+        values.push(value);
+    }
+    let output_digest_token = tokens[SVG_WORKER_KEYS_V1.len()]
+        .strip_prefix("output_sha256=")
+        .ok_or(Refusal::FrameMalformed)?;
+    if values[0] != SVG_WORKER_TOKEN_V1
+        || values[1] != crate::graphic_svg_inspection::SVG_MIME_V1
+        || values[2] != "verified"
+    {
+        return Err(Refusal::FrameMalformed);
+    }
+    let pid = decimal_v1(values[3])
+        .and_then(|value| u32::try_from(value).ok())
+        .ok_or(Refusal::FrameMalformed)?;
+    if pid == 0 || pid != child_pid {
+        return Err(Refusal::IdentityMismatch);
+    }
+    let width = decimal_v1(values[4]).ok_or(Refusal::FrameMalformed)?;
+    let height = decimal_v1(values[5]).ok_or(Refusal::FrameMalformed)?;
+    if !(1..=8192).contains(&width) || !(1..=8192).contains(&height) {
+        return Err(Refusal::FrameMalformed);
+    }
+    if width * height > 32_000_000 {
+        return Err(Refusal::FrameMalformed);
+    }
+    let elements = decimal_v1(values[6]).and_then(|value| usize::try_from(value).ok());
+    let depth = decimal_v1(values[7]).and_then(|value| usize::try_from(value).ok());
+    let references = decimal_v1(values[8]).and_then(|value| usize::try_from(value).ok());
+    let path_commands = decimal_v1(values[9]).and_then(|value| usize::try_from(value).ok());
+    let filters = decimal_v1(values[10]).and_then(|value| usize::try_from(value).ok());
+    let (Some(elements), Some(depth), Some(references), Some(path_commands), Some(filters)) =
+        (elements, depth, references, path_commands, filters)
+    else {
+        return Err(Refusal::FrameMalformed);
+    };
+    if elements == 0
+        || elements > crate::graphic_svg_inspection::MAX_SVG_ELEMENTS_V1
+        || depth == 0
+        || depth > crate::graphic_svg_inspection::MAX_SVG_NESTING_V1
+        || references > crate::graphic_svg_inspection::MAX_SVG_REFERENCES_V1
+        || path_commands > crate::graphic_svg_inspection::MAX_SVG_PATH_COMMANDS_V1
+        || filters > crate::graphic_svg_inspection::MAX_SVG_FILTER_ELEMENTS_V1
+    {
+        return Err(Refusal::FrameMalformed);
+    }
+    let claimed_source = lower_hex_digest_v1(values[11]).ok_or(Refusal::FrameMalformed)?;
+    if claimed_source != source_digest {
+        return Err(Refusal::SourceDigestMismatch);
+    }
+    let body = &stdout[split + 1..];
+    let output_len = decimal_v1(values[12])
+        .and_then(|value| usize::try_from(value).ok())
+        .ok_or(Refusal::FrameMalformed)?;
+    if output_len != body.len() {
+        return Err(Refusal::OutputDigestMismatch);
+    }
+    if output_len > crate::graphic_svg_inspection::MAX_SVG_CANONICAL_BYTES_V1 {
+        return Err(Refusal::OutputTooLarge);
+    }
+    let claimed_output = lower_hex_digest_v1(output_digest_token).ok_or(Refusal::FrameMalformed)?;
+    let received = sha256_media_worker_bytes_v1(body);
+    if received != claimed_output {
+        return Err(Refusal::OutputDigestMismatch);
+    }
+
+    let recanonical =
+        crate::graphic_svg_inspection::sanitize_svg_v1(body).map_err(|_| Refusal::NotCanonical)?;
+    if recanonical.canonical() != body {
+        return Err(Refusal::NotCanonical);
+    }
+    let facts = recanonical.facts();
+    if u64::from(facts.width()) != width
+        || u64::from(facts.height()) != height
+        || facts.elements() != elements
+        || facts.depth() != depth
+        || facts.references() != references
+        || facts.path_commands() != path_commands
+        || facts.filters() != filters
+    {
+        return Err(Refusal::FrameMalformed);
+    }
+
+    Ok(SvgWorkerObservationV1 {
+        width: u32::try_from(width).map_err(|_| Refusal::FrameMalformed)?,
+        height: u32::try_from(height).map_err(|_| Refusal::FrameMalformed)?,
+        elements,
+        depth,
+        references,
+        path_commands,
+        filters,
+        canonical: body.to_vec(),
+        source_digest,
+        output_digest: received,
+        worker_pid: pid,
+        wall_ms: 0,
+        limits_verified: false,
+        cleanup_verified: false,
+    })
+}
+
+/// The production SVG inspection seam for an already-known executable.
+///
+/// # Errors
+///
+/// A closed [`SvgWorkerRefusalV1`], never a partially accepted vector document.
+pub fn inspect_svg_bytes_with_executable_v1(
+    executable: &std::path::Path,
+    source: &[u8],
+) -> Result<SvgWorkerObservationV1, SvgWorkerRefusalV1> {
+    inspect_svg_bytes_in_mode_v1(executable, source, SvgWorkerModeV1::Decode)
+}
+
+/// The closed SVG sensitivity seam: run the real worker in one forged-evidence mode.
+///
+/// # Errors
+///
+/// A closed [`SvgWorkerRefusalV1`], never a partially accepted vector document.
+pub fn inspect_svg_bytes_with_test_mode_v1(
+    executable: &std::path::Path,
+    source: &[u8],
+    mode: SvgWorkerTestModeV1,
+) -> Result<SvgWorkerObservationV1, SvgWorkerRefusalV1> {
+    inspect_svg_bytes_in_mode_v1(executable, source, mode.mode())
+}
+
+/// Runs one confined SVG worker and validates its response.
+fn inspect_svg_bytes_in_mode_v1(
+    executable: &std::path::Path,
+    source: &[u8],
+    mode: SvgWorkerModeV1,
+) -> Result<SvgWorkerObservationV1, SvgWorkerRefusalV1> {
+    use SvgWorkerRefusalV1 as Refusal;
+    if source.is_empty()
+        || u64::try_from(source.len()).unwrap_or(u64::MAX)
+            > crate::graphic_svg_inspection::MAX_SVG_SOURCE_BYTES_V1
+    {
+        return Err(Refusal::SourceRejected);
+    }
+    let source_digest = sha256_media_worker_bytes_v1(source);
+    let source_hex = source_digest.to_hex();
+    let run = match svg_parent_mode_token_v1(mode) {
+        None => run_confined_image_worker_v1(executable, SVG_WORKER_TOKEN_V1, &source_hex, source),
+        Some(mode_token) => run_confined_image_worker_mode_v1(
+            executable,
+            SVG_WORKER_TOKEN_V1,
+            &source_hex,
+            Some(mode_token),
+            source,
+            &mut crate::media_worker_host::N102FaultRunV1::production(),
+        ),
+    }
+    .map_err(|_| Refusal::SupervisorRefused)?;
+    if !run.limits_verified() || !run.cleanup_verified() || run.child_pid() == 0 {
+        return Err(Refusal::UnverifiedConfinement);
+    }
+    if run.exit_code() != Some(0) {
+        return Err(Refusal::WorkerExited);
+    }
+    if u64::try_from(run.stdout().len()).unwrap_or(u64::MAX) > MAX_SVG_WORKER_STDOUT_BYTES_V1 {
+        return Err(Refusal::OutputTooLarge);
+    }
+    let mut observation =
+        validate_svg_worker_frame_v1(run.stdout(), source_digest, run.child_pid())?;
+    observation.limits_verified = true;
+    observation.cleanup_verified = true;
+    observation.wall_ms = run.wall_ms();
+    Ok(observation)
 }

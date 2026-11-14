@@ -2330,3 +2330,44 @@ mod v2_tests {
         );
     }
 }
+
+// ---------------------------------------------------------------------------------------------
+// `SOLO-WO-116 R01` — the additive V3 SVG policy surface.
+//
+// These constants belong to the inward-owned V3 contract. They are declared here, next to the V1
+// and V2 policy, so the confined adapter's codec bounds can never drift from the parent policy that
+// enforces them. They grant no publication authority and admit no new format on their own.
+// ---------------------------------------------------------------------------------------------
+
+/// The canonical MIME of a confirmed SVG vector document.
+pub const IMAGE_MIME_SVG_V3: &str = "image/svg+xml";
+
+/// The canonical MIME of an AVIF image. AVIF is **refused** by the V3 policy in this order.
+pub const IMAGE_MIME_AVIF_V3: &str = "image/avif";
+
+/// Maximum accepted original SVG source, matching the approved 20 MiB media ceiling.
+pub const MAX_SVG_SOURCE_BYTES_V3: u64 = MAX_IMAGE_SOURCE_BYTES_V1;
+
+/// Maximum accepted canonical SVG output: 4 MiB of vector text.
+pub const MAX_SVG_CANONICAL_BYTES_V3: usize = 4 * 1024 * 1024;
+
+/// Maximum accepted number of XML elements in one SVG document.
+pub const MAX_SVG_ELEMENTS_V3: usize = 4096;
+
+/// Maximum accepted SVG element nesting depth.
+pub const MAX_SVG_NESTING_V3: usize = 32;
+
+/// Maximum accepted attributes on one SVG element.
+pub const MAX_SVG_ATTRS_PER_ELEMENT_V3: usize = 32;
+
+/// Maximum accepted SVG `id`/`url(#id)`/`href="#id"` reference count.
+pub const MAX_SVG_REFERENCES_V3: usize = 1024;
+
+/// Maximum accepted aggregate SVG path-command count.
+pub const MAX_SVG_PATH_COMMANDS_V3: usize = 40000;
+
+/// Maximum accepted number of SVG `<filter>` elements.
+pub const MAX_SVG_FILTER_ELEMENTS_V3: usize = 64;
+
+/// Maximum accepted primitive operations inside one SVG `<filter>`.
+pub const MAX_SVG_FILTER_OPERATIONS_V3: usize = 8;
