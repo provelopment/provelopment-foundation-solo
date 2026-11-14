@@ -46,6 +46,7 @@
 #![deny(unsafe_code)]
 
 mod bootstrap_cli;
+mod graphic_gif_inspection;
 mod graphic_image_inspection;
 mod media_worker_host;
 // One reserved process-native file, available on both hosts. The `any(..)` gates *module
@@ -70,16 +71,24 @@ pub use bootstrap_cli::{
     CliOutcome, CliRefusal, CliRefusalCode, EXIT_INTERNAL, EXIT_OK, EXIT_REFUSED, FLAG_BASE_URL,
     FLAG_ENTITY_ID, SUBCOMMAND, parse_request, run,
 };
+pub use graphic_gif_inspection::{
+    GIF_MIME_V1, GIF87A_SIGNATURE_V1, GIF89A_SIGNATURE_V1, GifAnimationEvidenceV1, GifDisposalV1,
+    GifFrameEvidenceV1, GifInspectionRefusalV1, GifLoopV1, MAX_GIF_FRAMES_V1,
+    MAX_GIF_ONE_CYCLE_DELAY_MS_V1, MAX_GIF_SOURCE_BYTES_V1, MAX_GIF_TOTAL_COMPOSITED_PIXELS_V1,
+    MAX_GIF_TRACE_BYTES_V1,
+};
 pub use graphic_image_inspection::{
     ConfinedImageInspectAdapterV1, EntityImageOutcomeV1, EntityImageRefusalV1,
+    GIF_WORKER_FRAME_PREFIX_V1, GIF_WORKER_TOKEN_V1, GifWorkerObservationV1, GifWorkerRefusalV1,
     IMAGE_WORKER_EXIT_DECODE_FAILED_V1, IMAGE_WORKER_EXIT_INVALID_MEDIA_V1,
     IMAGE_WORKER_EXIT_REFUSED_V1, IMAGE_WORKER_EXIT_UNCONFINED_V1, IMAGE_WORKER_FRAME_PREFIX_V1,
     IMAGE_WORKER_MODE_DECODE_V1, IMAGE_WORKER_MODE_HANG_V1, IMAGE_WORKER_MODE_REFUSE_V1,
     IMAGE_WORKER_MODE_SHORT_OUTPUT_V1, IMAGE_WORKER_MODE_TRAILING_V1,
     IMAGE_WORKER_MODE_WRONG_OUTPUT_V1, IMAGE_WORKER_MODE_WRONG_SOURCE_V1,
-    INTERNAL_IMAGE_WORKER_FLAG_V1, MAX_IMAGE_WORKER_FRAME_BYTES_V1,
+    INTERNAL_IMAGE_WORKER_FLAG_V1, MAX_GIF_WORKER_STDOUT_BYTES_V1, MAX_IMAGE_WORKER_FRAME_BYTES_V1,
     MAX_IMAGE_WORKER_STDOUT_BYTES_V1, TestOwnerV1, inspect_entity_graphic_images_v1,
-    inspect_image_bytes_with_mode_v1, run_internal_image_worker_v1, test_inventory_v1,
+    inspect_gif_bytes_v1, inspect_image_bytes_with_mode_v1, run_internal_image_worker_v1,
+    test_inventory_v1,
 };
 pub use media_worker_host::{
     CHILD_OBSERVATION_MARKER_V1, EXIT_INTERNAL_PROBE_REFUSED, INTERNAL_PROBE_CHILD_TOKEN_V1,
