@@ -1458,10 +1458,14 @@ pub fn inspect_entity_graphic_images_v2(
 pub enum TestOwnerV1 {
     /// The Entity itself.
     Entity,
+    /// The single Facet directly under the Entity.
+    Facet,
     /// One Site inside the single Facet.
     Site,
     /// One Page inside that Site.
     Page,
+    /// The `en-001` representation of that Page.
+    Representation,
 }
 
 impl TestOwnerV1 {
@@ -1473,19 +1477,28 @@ impl TestOwnerV1 {
         let page = PageIdV1::parse("home").expect("canonical test Page");
         match self {
             Self::Entity => QualifiedOwnerV1::entity(entity),
+            Self::Facet => QualifiedOwnerV1::facet(entity, facet),
             Self::Site => QualifiedOwnerV1::site(entity, facet, site),
             Self::Page => QualifiedOwnerV1::page(entity, facet, site, page),
+            Self::Representation => QualifiedOwnerV1::representation(
+                entity,
+                facet,
+                site,
+                page,
+                solo_domain::LocaleKeyV1::from_already_canonical("en-001")
+                    .expect("canonical test locale"),
+            ),
         }
     }
 }
 
 /// Builds one real, whole-graph validated inventory for host tests.
 ///
-/// Each entry is `(owner, role, entity reference, exposure)`, where the role is `logo`, `favicon`
-/// or `banner` and the exposure is `public` or `internal`. It runs the same validators the
-/// production inventory uses, so a test cannot smuggle in an invalid declaration; it produces only
-/// an inert inventory, decodes nothing and grants no authority. `None` means the specification was
-/// itself invalid.
+/// Each entry is `(owner, role, entity reference, exposure)`, where the role is `logo`, `favicon`,
+/// `banner`, `background` or `social-preview` and the exposure is `public` or `internal`. It runs the
+/// same validators the production inventory uses, so a test cannot smuggle in an invalid
+/// declaration; it produces only an inert inventory, decodes nothing and grants no authority. `None`
+/// means the specification was itself invalid.
 #[must_use]
 pub fn test_inventory_v1(
     declarations: &[(TestOwnerV1, &str, &str, &str)],
@@ -1518,6 +1531,8 @@ pub fn test_inventory_v1(
             "logo" => PropertyKey::GraphicLogo,
             "favicon" => PropertyKey::GraphicFavicon,
             "banner" => PropertyKey::GraphicBanner,
+            "background" => PropertyKey::GraphicBackground,
+            "social-preview" => PropertyKey::GraphicSocialPreview,
             _ => return None,
         };
         let exposure = match *exposure {

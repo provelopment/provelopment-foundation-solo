@@ -1800,21 +1800,51 @@ fn n093_06_the_public_cli_and_every_earlier_marker_are_unchanged() {
 /// `R03.C2` reader acquires the authored `assets/…` bytes, and the `R03.C3` adapter starts the real
 /// `solo-cli` worker under the platform confinement. No case trusts a worker's printed claim, and no
 /// case substitutes a fake port for a decode.
+/// `SOLO-WO-113 R02` — shared deterministic GIF fixtures for the real four-format host cases.
+///
+/// These are test-only byte builders, copied from the accepted `n108` fixtures so `mod n097` can
+/// build the same canonical specimens. They are inputs to the **real** confined worker; they are
+/// never a decoding path, they grant no authority and they change neither `n108` nor `n097`'s
+/// existing cases.
+mod n113_fixtures {
+    /// Deterministic three-frame 1×1 GIF89a: NETSCAPE2.0 infinite loop and three Graphic Control
+    /// Extensions (10 cs keep / 20 cs background+transparent / 5 cs keep+transparent) sharing the
+    /// global red/blue palette.
+    pub fn gif89a_three_frames() -> Vec<u8> {
+        let mut bytes = b"GIF89a".to_vec();
+        bytes.extend_from_slice(&[1, 0, 1, 0, 0x80, 0, 0]);
+        bytes.extend_from_slice(&[255, 0, 0, 0, 0, 255]);
+        bytes.extend_from_slice(&[0x21, 0xff, 11]);
+        bytes.extend_from_slice(b"NETSCAPE2.0");
+        bytes.extend_from_slice(&[3, 1, 0, 0, 0]);
+        for (delay, disposal, transparent) in [(10u8, 1u8, false), (20, 2, true), (5, 1, true)] {
+            let gce = (disposal << 2) | u8::from(transparent);
+            bytes.extend_from_slice(&[0x21, 0xf9, 4, gce, delay, 0, 0, 0]);
+            bytes.extend_from_slice(&[0x2c, 0, 0, 0, 0, 1, 0, 1, 0, 0]);
+            bytes.extend_from_slice(&[2, 2, 0x44, 0x01, 0]);
+        }
+        bytes.push(0x3b);
+        bytes
+    }
+}
+
 mod n097 {
     use std::fs;
     use std::path::{Path, PathBuf};
 
     use solo_adapters::{
-        ContentRootCapability, EntityImageOutcomeV1, EntityImageRefusalV1,
+        ContentRootCapability, EntityImageOutcomeV1, EntityImageOutcomeV2, EntityImageRefusalV1,
         IMAGE_WORKER_MODE_REFUSE_V1, IMAGE_WORKER_MODE_SHORT_OUTPUT_V1,
         IMAGE_WORKER_MODE_TRAILING_V1, IMAGE_WORKER_MODE_WRONG_OUTPUT_V1,
         IMAGE_WORKER_MODE_WRONG_SOURCE_V1, RootProvenanceV1, TestOwnerV1,
-        inspect_entity_graphic_images_v1, inspect_image_bytes_with_mode_v1, test_inventory_v1,
+        inspect_entity_graphic_images_v1, inspect_entity_graphic_images_v2,
+        inspect_image_bytes_with_mode_v1, test_inventory_v1,
     };
     use solo_application::{
-        GraphicAssetObligationInventoryV1, GraphicImageFormatV1, GraphicImageInspectPortOutcomeV1,
-        GraphicImageInspectRefusalKindV1, GraphicImageInspectionOutcomeV1,
-        MAX_IMAGE_SOURCE_BYTES_V1, inspect_graphic_image_source_set_v1,
+        GifDisposalV2, GifLoopV2, GraphicAssetObligationInventoryV1, GraphicImageFormatV1,
+        GraphicImageFormatV2, GraphicImageInspectPortOutcomeV1, GraphicImageInspectRefusalKindV1,
+        GraphicImageInspectionOutcomeV1, MAX_IMAGE_SOURCE_BYTES_V1,
+        inspect_graphic_image_source_set_v1, sha256_media_worker_bytes_v1,
     };
 
     /// The one worker binary these cases start.
@@ -2408,6 +2438,173 @@ mod n097 {
             panic!("a zero-obligation candidate must not start a worker")
         }
     }
+
+    // ---- `SOLO-WO-113 R02`: the real four-format V2 composition ----
+
+    fn complete_v2(outcome: EntityImageOutcomeV2) -> solo_application::GraphicImageInspectionSetV2 {
+        match outcome {
+            EntityImageOutcomeV2::Complete(set) => set,
+            EntityImageOutcomeV2::Refused(refusal) => {
+                panic!("expected a complete V2 inspection, got {refusal:?}")
+            }
+        }
+    }
+
+    #[test]
+    fn n113_01_mixed_four_formats_real_host() {
+        let png_bytes = png();
+        let jpeg_bytes = jpeg();
+        let webp_bytes = webp();
+        let gif_bytes = super::n113_fixtures::gif89a_three_frames();
+        let root = Root::new(
+            "n113-01",
+            &[
+                ("favicon.png", &png_bytes),
+                ("logo.jpg", &jpeg_bytes),
+                ("hero.webp", &webp_bytes),
+                ("scene.gif", &gif_bytes),
+            ],
+        );
+        // Four distinct real EFS declaring owners, each with its own registered role, so no singular
+        // inherited cardinality is violated and every level contributes an independent obligation.
+        let inventory = inventory_of(&[
+            (TestOwnerV1::Entity, "favicon", "favicon.png", "public"),
+            (TestOwnerV1::Facet, "logo", "logo.jpg", "public"),
+            (TestOwnerV1::Site, "banner", "hero.webp", "internal"),
+            (TestOwnerV1::Page, "background", "scene.gif", "public"),
+        ]);
+        assert_eq!(inventory.len(), 4);
+
+        let set = complete_v2(inspect_entity_graphic_images_v2(
+            &root.capability(),
+            &inventory,
+            Path::new(BIN),
+        ));
+        assert_eq!(set.len(), 4);
+        assert!(!set.grants_publication_authority());
+        assert!(!set.proves_whole_publication());
+
+        let expected = [
+            (
+                GraphicImageFormatV2::Png,
+                "image/png",
+                2u32,
+                2u32,
+                &png_bytes,
+            ),
+            (GraphicImageFormatV2::Jpeg, "image/jpeg", 2, 2, &jpeg_bytes),
+            (GraphicImageFormatV2::WebP, "image/webp", 2, 2, &webp_bytes),
+            (GraphicImageFormatV2::Gif, "image/gif", 1, 1, &gif_bytes),
+        ];
+        let references = ["favicon.png", "logo.jpg", "hero.webp", "scene.gif"];
+        let mut owners = Vec::new();
+        let mut pids = Vec::new();
+        for (position, inspection) in set.inspections().iter().enumerate() {
+            let (format, mime, width, height, bytes) = expected[position];
+            assert_eq!(inspection.format(), format, "inventory order is preserved");
+            assert_eq!(inspection.mime(), mime);
+            assert_eq!((inspection.width(), inspection.height()), (width, height));
+            assert_eq!(inspection.pixels(), u64::from(width) * u64::from(height));
+            assert_eq!(
+                inspection.source_digest(),
+                &sha256_media_worker_bytes_v1(bytes)
+            );
+            assert_eq!(
+                inspection.obligation().reference_text(),
+                references[position]
+            );
+            assert_eq!(inspection.obligation().local_index(), 0);
+            assert!(inspection.logical_path().starts_with("assets/"));
+            assert!(inspection.logical_path().ends_with(references[position]));
+            assert_ne!(inspection.worker_pid(), 0);
+            assert!(!inspection.grants_publication_authority());
+            owners.push(inspection.obligation().declaring_owner().clone());
+            pids.push(inspection.worker_pid());
+            match inspection.still() {
+                Some(still) => {
+                    assert!(!inspection.is_animation());
+                    assert_eq!(
+                        still.decoded_bytes,
+                        u64::from(width) * u64::from(height) * 4
+                    );
+                    assert_ne!(still.decoded_digest, sha256_media_worker_bytes_v1(b""));
+                }
+                None => assert!(inspection.is_animation(), "the GIF row is the timeline"),
+            }
+        }
+        for (left, right) in [(0usize, 1usize), (2, 3)] {
+            assert_ne!(
+                owners[left], owners[right],
+                "each result keeps its own declaring owner"
+            );
+        }
+        assert_eq!(
+            owners.len(),
+            4,
+            "four distinct declaring owners must be retained"
+        );
+        assert_ne!(
+            pids[0], pids[3],
+            "the PNG and GIF rows are separate children"
+        );
+
+        let gif_row = &set.inspections()[3];
+        let gif = gif_row.animation().expect("the GIF row is a timeline");
+        assert_eq!(gif.signature, "GIF89a");
+        assert_eq!(gif.mime, "image/gif");
+        assert_eq!((gif.width, gif.height), (1, 1));
+        assert_eq!(gif.frame_count(), 3);
+        assert!(gif.is_animated());
+        assert_eq!(gif.loop_semantics, GifLoopV2::Infinite);
+        assert_eq!(gif.one_cycle_delay_ms, 350);
+        assert_eq!(gif.total_composited_pixels, 3);
+        assert_eq!(
+            gif.frames
+                .iter()
+                .map(|frame| frame.index)
+                .collect::<Vec<_>>(),
+            [0, 1, 2]
+        );
+        assert_eq!(
+            gif.frames
+                .iter()
+                .map(|frame| frame.delay_centiseconds)
+                .collect::<Vec<_>>(),
+            [10, 20, 5]
+        );
+        assert_eq!(
+            gif.frames
+                .iter()
+                .map(|frame| frame.disposal)
+                .collect::<Vec<_>>(),
+            [
+                GifDisposalV2::Keep,
+                GifDisposalV2::Background,
+                GifDisposalV2::Keep
+            ]
+        );
+        let red = sha256_media_worker_bytes_v1(&[255, 0, 0, 255]);
+        let clear = sha256_media_worker_bytes_v1(&[0, 0, 0, 0]);
+        assert_eq!(gif.frames[0].composite_digest, red);
+        assert_eq!(gif.frames[1].composite_digest, red);
+        assert_eq!(gif.frames[2].composite_digest, clear);
+        assert_eq!(gif.source_digest, sha256_media_worker_bytes_v1(&gif_bytes));
+        assert!(gif.transcript_len > 0);
+        assert_ne!(gif.transcript_digest, gif.source_digest);
+        assert!(gif.limits_verified && gif.cleanup_verified);
+        assert_eq!(gif.worker_pid, pids[3]);
+
+        println!(
+            "n113_mixed formats=4 owners=4 order=png,jpeg,webp,gif pids={pids:?} gif_frames=3 \
+             gif_loop=infinite gif_cycle_ms=350 gif_src={} gif_transcript={} red={} clear={}",
+            gif.source_digest.to_hex(),
+            gif.transcript_digest.to_hex(),
+            red.to_hex(),
+            clear.to_hex()
+        );
+    }
+
+    // N113-TESTS
 }
 
 // ---------------------------------------------------------------------------------------------
