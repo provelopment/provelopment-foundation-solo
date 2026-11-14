@@ -649,7 +649,48 @@ jobs:
       # in the job log rather than only in a captured harness buffer. A failing case fails the job;
       # nothing here is advisory and nothing is allowed to skip on a host.
       - name: Confined image inspection evidence (both hosts)
-        run: cargo test -p solo-cli --test media_worker_host_smoke --locked n097 -- --nocapture --test-threads=1
+        run: cargo test -p solo-cli --test media_worker_host_smoke --locked n097 -- --nocapture --test-threads=1      # Mandatory `SOLO-WO-110 R01` first two real GIF worker canaries. Both hosts execute the same
+      # two qualified cases against the real compiled `solo-cli` under the production confined
+      # supervisor. The gate asserts the exact names, the exact passing count of two, and the absence
+      # of any failed, filtered or missing case; an empty or partially filtered run fails.
+      - name: N108 real GIF worker canaries (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          log="$RUNNER_TEMP/n108-first-two.txt"
+          if ! cargo test -p solo-cli --test media_worker_host_smoke --locked n108_ -- --nocapture --test-threads=1 >"$log" 2>&1; then
+            cat "$log"
+            exit 1
+          fi
+          cat "$log"
+          for name in \
+            n108_01_gif87a_still_confined_and_parent_verified \
+            n108_02_gif89a_animation_keeps_frames_delays_and_loop; do
+            grep -Eq "^test n108::${name} \.\.\." "$log" || exit 1
+          done
+          [ "$(grep -Ec '^test n108::n108_0[12]_[A-Za-z0-9_]+ \.\.\.' "$log")" -eq 2 ]
+          grep -Eq '^test result: ok\. 2 passed; 0 failed; 0 ignored;' "$log"
+          ! grep -Eq '^test n108::.* \.\.\. FAILED|^test result: FAILED' "$log"
+
+      - name: N108 real GIF worker canaries (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $required = @('n108_01_gif87a_still_confined_and_parent_verified',
+                        'n108_02_gif89a_animation_keeps_frames_delays_and_loop')
+          $log = Join-Path $env:RUNNER_TEMP 'n108-first-two.txt'
+          cargo test -p solo-cli --test media_worker_host_smoke --locked n108_ -- --nocapture --test-threads=1 *>&1 | Tee-Object -FilePath $log
+          if ($LASTEXITCODE -ne 0) { throw "N108 real worker test failed: $LASTEXITCODE" }
+          $text = Get-Content -LiteralPath $log -Raw
+          foreach ($name in $required) {
+            $pattern = '(?m)^test n108::' + [regex]::Escape($name) + ' \.\.\.'
+            if (-not ($text -match $pattern)) { throw "N108 case not executed: $name" }
+          }
+          $count = ([regex]::Matches($text, '(?m)^test n108::n108_0[12]_[A-Za-z0-9_]+ \.\.\.')).Count
+          if ($count -ne 2) { throw "N108 executed $count cases, expected 2" }
+          if (-not ($text -match '(?m)^test result: ok\. 2 passed; 0 failed; 0 ignored;')) { throw 'N108 result line missing' }
+          if ($text -match '(?m)^test n108::.* \.\.\. FAILED') { throw 'N108 reported FAILED' }
 
 
       # Mandatory `SOLO-WO-105 R01` Windows canaries. These four cases drive the real production
