@@ -2426,7 +2426,7 @@ mod n102 {
 
     use solo_adapters::{
         INTERNAL_N102_ENV_PARENT_FLAG_V1, N102_ENV_PARENT_PREFIX_V1, N102ExtraInheritableV1,
-        run_n102_handle_probe_v1,
+        run_n102_event_probe_v1, run_n102_handle_probe_v1,
     };
 
     use super::BIN;
@@ -2440,33 +2440,85 @@ mod n102 {
     /// A numeric handle value the child can never legitimately own.
     const IMPOSSIBLE_HANDLE: u32 = 0xffff_fff0;
 
-    /// `n102_01`: one extra real inheritable parent handle, created with `bInheritHandle` set and
+    /// `n102_01`: one extra real inheritable parent event, created with `bInheritHandle` set and
     /// deliberately absent from the two-entry `PROC_THREAD_ATTRIBUTE_HANDLE_LIST`, must not be
     /// reachable from the real child the production spawn creates.
+    ///
+    /// The evidence is object identity rather than a numeric coincidence: the child signals the
+    /// transmitted candidate values, and this parent then asks the kernel about its **own** original
+    /// event objects. A reused integer naming a different object cannot signal them; a genuinely
+    /// inherited event handle would signal the very same kernel object and fail this test.
     #[test]
     fn n102_01_extra_inheritable_handle_is_excluded() {
         let extra = N102ExtraInheritableV1::create().expect("extra inheritable parent handle");
         // A second event in the same parent table created with `bInheritHandle = 0`: its numeric
         // value can never reach the child by inheritance, so it is the ambiguity control that tells
         // a real allowlist exclusion apart from a coincidental reuse of the same numeric value.
-        let shadow = N102ExtraInheritableV1::create_control()
-            .expect("non-inheritable control handle in the same parent table");
-        let answer = run_n102_handle_probe_v1(Path::new(BIN), extra.value(), shadow.value())
-            .expect("bounded handle probe answer from the real child");
+        let control = N102ExtraInheritableV1::create_control()
+            .expect("non-inheritable control event in the same parent table");
+        // Both parent events start nonsignaled and remain owned and alive across the whole probe.
+        assert_eq!(
+            extra.signaled_v1(),
+            Some(false),
+            "the extra inheritable event was already signaled before the probe"
+        );
+        assert_eq!(
+            control.signaled_v1(),
+            Some(false),
+            "the control event was already signaled before the probe"
+        );
+        let answer = run_n102_event_probe_v1(Path::new(BIN), extra.value(), control.value())
+            .expect("bounded event probe answer from the real child");
         assert!(
-            !answer.control_live,
-            "the non-inheritable control resolved in the child, so a numeric match is ambiguous reuse"
+            answer.attempted,
+            "the child did not execute the SetEvent attempts"
         );
         assert!(
-            !answer.handle_live,
-            "an inheritable parent handle outside the allowlist reached the child"
+            answer.witness,
+            "the child could not prove SetEvent plus a zero-timeout wait on its own event"
         );
         assert_ne!(answer.pid, 0, "the child reported no process identifier");
-        println!(
-            "n102_01 extra_handle_excluded={} control_live={} child_pid={}",
-            !answer.handle_live, answer.control_live, answer.pid
+        // The child is fully reaped here, so these report the state of the parent's own original
+        // kernel objects: a genuinely inherited handle would have signaled the same object.
+        let extra_signaled = extra.signaled_v1();
+        let control_signaled = control.signaled_v1();
+        assert_eq!(
+            extra_signaled,
+            Some(false),
+            "the extra inheritable parent event object was signaled by the child"
         );
-        drop(extra);
+        assert_eq!(
+            control_signaled,
+            Some(false),
+            "the non-inheritable control event object was signaled"
+        );
+        // Parent-side positive control: the same two primitives must observe a real state change on
+        // a fresh parent event, otherwise a `false` above would be indistinguishable from a broken
+        // wait or a failed `SetEvent`.
+        let positive =
+            N102ExtraInheritableV1::create_control().expect("parent-side positive-control event");
+        assert_eq!(
+            positive.signaled_v1(),
+            Some(false),
+            "the positive-control event was already signaled"
+        );
+        assert!(
+            positive.signal_parent_v1(),
+            "SetEvent failed on a live parent-owned event"
+        );
+        assert_eq!(
+            positive.signaled_v1(),
+            Some(true),
+            "a zero-timeout wait did not observe a signaled parent event"
+        );
+        println!(
+            "n102_01 extra_event_signaled={} control_event_signaled={} local_witness={} parent_positive_control=true child_pid={}",
+            extra_signaled == Some(true),
+            control_signaled == Some(true),
+            answer.witness,
+            answer.pid
+        );
+        drop((extra, control, positive));
     }
 
     /// `n102_02`: an isolated helper parent carrying one parent-only canary variable launches the

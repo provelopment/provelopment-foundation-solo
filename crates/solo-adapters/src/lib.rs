@@ -139,7 +139,7 @@ pub use source_set_staging::{
 /// command, limit or handle operation, and none adds an `unsafe` allowance.
 #[cfg(windows)]
 pub use media_worker_host::{
-    N102ExtraInheritableV1, n102_probe_environment_v1, n102_probe_handle_v1,
+    N102ExtraInheritableV1, n102_probe_environment_v1, n102_probe_event_v1, n102_probe_handle_v1,
 };
 
 /// `SOLO-WO-104 R01` — the closed N102 probe surface the integration suite drives.
@@ -149,8 +149,9 @@ pub use media_worker_host::{
 /// limit or handle operation is exported, and no `unsafe` allowance is added.
 pub use media_worker_host::{
     INTERNAL_N102_ENV_PARENT_FLAG_V1, N102_ENV_PARENT_PREFIX_V1, N102_LAST_FAULT_STEP_V1,
-    N102EnvironmentProbeV1, N102FaultRunV1, N102HandleProbeV1, N102ProbeRefusalV1,
-    parse_n102_environment_answer_v1, parse_n102_handle_answer_v1,
-    run_internal_n102_environment_parent_v1, run_n102_environment_probe_v1,
-    run_n102_fault_attempt_v1, run_n102_handle_probe_v1,
+    N102EnvironmentProbeV1, N102EventProbeV1, N102FaultRunV1, N102HandleProbeV1,
+    N102ProbeRefusalV1, parse_n102_environment_answer_v1, parse_n102_event_answer_v1,
+    parse_n102_handle_answer_v1, run_internal_n102_environment_parent_v1,
+    run_n102_environment_probe_v1, run_n102_event_probe_v1, run_n102_fault_attempt_v1,
+    run_n102_handle_probe_v1,
 };

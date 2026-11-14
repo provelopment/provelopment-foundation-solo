@@ -88,6 +88,12 @@ pub const N102_HANDLE_PROBE_PREFIX_V1: &str = "SOLO-N102-HANDLE-V1";
 /// The exact first token of the bounded environment-isolation probe answer.
 pub const N102_ENVIRONMENT_PROBE_PREFIX_V1: &str = "SOLO-N102-ENV-V1";
 
+/// The closed reserved mode token for one N102 object-identity event probe.
+pub const IMAGE_WORKER_MODE_PROBE_EVENT_V1: &str = "probe-event";
+
+/// The exact first token of the child's bounded event-probe answer line.
+pub const N102_EVENT_PROBE_PREFIX_V1: &str = "SOLO-N102-EVENT-V1";
+
 /// The largest accepted length of one N102 probe parameter, in bytes.
 pub const MAX_N102_PROBE_PARAMETER_BYTES_V1: usize = 64;
 
@@ -496,6 +502,8 @@ enum ImageWorkerModeV1 {
     ProbeHandle,
     /// Probe this child's own environment for one supplied variable name.
     ProbeEnvironment,
+    /// Attempt one bounded event-object signalling probe from inside this confined child.
+    ProbeEvent,
 }
 
 impl ImageWorkerModeV1 {
@@ -506,6 +514,9 @@ impl ImageWorkerModeV1 {
         }
         if let Some(rest) = token.strip_prefix("probe-environment:") {
             return Some((Self::ProbeEnvironment, Some(rest)));
+        }
+        if let Some(rest) = token.strip_prefix("probe-event:") {
+            return Some((Self::ProbeEvent, Some(rest)));
         }
         let mode = match token {
             IMAGE_WORKER_MODE_DECODE_V1 => Self::Decode,
@@ -522,8 +533,24 @@ impl ImageWorkerModeV1 {
 
     /// Whether this mode is one of the two closed N102 isolation probes.
     fn is_n102_probe(self) -> bool {
-        matches!(self, Self::ProbeHandle | Self::ProbeEnvironment)
+        matches!(
+            self,
+            Self::ProbeHandle | Self::ProbeEnvironment | Self::ProbeEvent
+        )
     }
+}
+
+/// Parses one canonical `u32` decimal for the closed N102 event probe.
+///
+/// Only plain ASCII digits are accepted: sign characters, separators, whitespace, extra colons and
+/// any overflow are refused, so a parameter can never be reinterpreted by a different numeric
+/// parser in the parent than the one the child used.
+#[cfg(windows)]
+fn n102_canonical_u32_v1(text: &str) -> Option<u32> {
+    if text.is_empty() || text.len() > 10 || !text.bytes().all(|byte| byte.is_ascii_digit()) {
+        return None;
+    }
+    text.parse().ok()
 }
 
 /// The bounded answer line for one closed N102 isolation probe, or `None` when it cannot be
@@ -561,6 +588,24 @@ fn n102_probe_answer_v1(mode: ImageWorkerModeV1, parameter: Option<&str>) -> Opt
                 N102_ENVIRONMENT_PROBE_PREFIX_V1,
                 u8::from(canary),
                 u8::from(system_root)
+            ))
+        }
+        ImageWorkerModeV1::ProbeEvent => {
+            let (candidate, control) = parameter.split_once(':')?;
+            let candidate = n102_canonical_u32_v1(candidate)?;
+            let control = n102_canonical_u32_v1(control)?;
+            let (attempted, witness) =
+                crate::media_worker_host::n102_probe_event_v1(candidate, control);
+            if !witness {
+                // Without a positive local witness the child cannot honestly claim to have probed
+                // anything, so it refuses instead of printing an unusable answer.
+                return None;
+            }
+            Some(format!(
+                "{} attempted={} witness={} pid={pid}\n",
+                N102_EVENT_PROBE_PREFIX_V1,
+                u8::from(attempted),
+                u8::from(witness)
             ))
         }
         _ => None,

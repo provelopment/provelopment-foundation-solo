@@ -6691,11 +6691,67 @@ mod tests {
             "the classified refusal keeps its stable public token"
         );
     }
+
+    /// `SOLO-WO-111 R01` — the closed `SOLO-N102-EVENT-V1` answer is exact, never permissive: a
+    /// wrong protocol, a missing or reordered field and any trailing field are all refused, so a
+    /// partially matching child line can never be read as a successful probe.
+    #[test]
+    fn n102_event_answer_refuses_wrong_protocol_and_missing_fields() {
+        assert_eq!(
+            super::parse_n102_event_answer_v1(
+                "SOLO-N102-EVENT-V1 attempted=1 witness=1 pid=4242\n"
+            ),
+            Ok(super::N102EventProbeV1 {
+                attempted: true,
+                witness: true,
+                pid: 4242,
+            })
+        );
+        for bad in [
+            "",
+            "SOLO-N102-HANDLE-V1 attempted=1 witness=1 pid=4242\n",
+            "SOLO-N102-ENV-V1 attempted=1 witness=1 pid=4242\n",
+            "SOLO-N102-EVENT-V1 witness=1 pid=4242\n",
+            "SOLO-N102-EVENT-V1 attempted=1 pid=4242\n",
+            "SOLO-N102-EVENT-V1 attempted=1 witness=1\n",
+            "SOLO-N102-EVENT-V1 witness=1 attempted=1 pid=4242\n",
+            "SOLO-N102-EVENT-V1 attempted=1 witness=1 witness=1 pid=4242\n",
+            "SOLO-N102-EVENT-V1 attempted=1 witness=1 pid=4242 extra=1\n",
+            "SOLO-N102-EVENT-V1 attempted=1 witness=1 pid=4242\nunexpected-second-line\n",
+        ] {
+            assert_eq!(
+                super::parse_n102_event_answer_v1(bad),
+                Err(super::N102ProbeRefusalV1::AnswerInvalid),
+                "accepted an off-protocol event answer: {bad:?}"
+            );
+        }
+    }
+
+    /// The same answer refuses a non-canonical boolean, a signed, zero or over-wide pid, and a
+    /// non-ASCII line: every one of them would otherwise let an unusable probe look answered.
+    #[test]
+    fn n102_event_answer_refuses_noncanonical_values() {
+        for bad in [
+            "SOLO-N102-EVENT-V1 attempted=2 witness=1 pid=4242\n",
+            "SOLO-N102-EVENT-V1 attempted=1 witness=true pid=4242\n",
+            "SOLO-N102-EVENT-V1 attempted=1 witness=1 pid=+4242\n",
+            "SOLO-N102-EVENT-V1 attempted=1 witness=1 pid=0\n",
+            "SOLO-N102-EVENT-V1 attempted=1 witness=1 pid=99999999999\n",
+            "SOLO-N102-EVENT-V1 attempted=1 witness=1 pid=42 42\n",
+            "SOLO-N102-EVENT-V1 attempted=1 witness=1 pid=4é42\n",
+        ] {
+            assert_eq!(
+                super::parse_n102_event_answer_v1(bad),
+                Err(super::N102ProbeRefusalV1::AnswerInvalid),
+                "accepted a non-canonical event answer: {bad:?}"
+            );
+        }
+    }
 }
 
 #[cfg(windows)]
 pub use crate::media_worker_host_native::{
-    N102ExtraInheritableV1, n102_probe_environment_v1, n102_probe_handle_v1,
+    N102ExtraInheritableV1, n102_probe_environment_v1, n102_probe_event_v1, n102_probe_handle_v1,
 };
 // `SOLO-WO-104 R01` — the closed N102 probe seam.
 //
@@ -6831,6 +6887,110 @@ pub fn run_n102_handle_probe_v1(
     )
     .map_err(N102ProbeRefusalV1::Worker)?;
     parse_n102_handle_answer_v1(&String::from_utf8_lossy(run.stdout()))
+}
+
+/// The bounded answer of one closed object-identity event probe.
+///
+/// It carries only booleans and a child pid. The child's attempt result is never decisive: the
+/// caller decides inheritance by observing its own original event objects after the child is reaped.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct N102EventProbeV1 {
+    /// Whether the child really executed both `SetEvent` attempts.
+    pub attempted: bool,
+    /// Whether the child proved `SetEvent` plus a zero-timeout wait work on its own event.
+    pub witness: bool,
+    /// The child's own process identifier; never zero for a real run.
+    pub pid: u32,
+}
+
+fn n102_probe_boolean_value_v1(text: &str) -> Option<bool> {
+    match text {
+        "0" => Some(false),
+        "1" => Some(true),
+        _ => None,
+    }
+}
+
+fn n102_canonical_pid_v1(text: &str) -> Option<u32> {
+    if text.is_empty() || text.len() > 10 || !text.bytes().all(|byte| byte.is_ascii_digit()) {
+        return None;
+    }
+    match text.parse::<u32>().ok()? {
+        0 => None,
+        pid => Some(pid),
+    }
+}
+
+/// Parses one bounded, exactly shaped event-probe answer line.
+///
+/// # Errors
+///
+/// [`N102ProbeRefusalV1::AnswerInvalid`] when the line is absent, off-protocol, over-long, carries a
+/// repeated, reordered or unknown field, a non-canonical boolean or numeric value, or any trailing
+/// data after the pid.
+pub fn parse_n102_event_answer_v1(text: &str) -> Result<N102EventProbeV1, N102ProbeRefusalV1> {
+    let line = text.trim_end_matches(['\r', '\n']);
+    if line.is_empty()
+        || line.len() > crate::graphic_image_inspection::MAX_IMAGE_WORKER_FRAME_BYTES_V1
+        || !line.is_ascii()
+        || line.contains(['\r', '\n'])
+    {
+        return Err(N102ProbeRefusalV1::AnswerInvalid);
+    }
+    let mut parts = line.split(' ');
+    if parts.next() != Some(crate::graphic_image_inspection::N102_EVENT_PROBE_PREFIX_V1) {
+        return Err(N102ProbeRefusalV1::AnswerInvalid);
+    }
+    let attempted = parts
+        .next()
+        .and_then(|part| part.strip_prefix("attempted="))
+        .and_then(n102_probe_boolean_value_v1)
+        .ok_or(N102ProbeRefusalV1::AnswerInvalid)?;
+    let witness = parts
+        .next()
+        .and_then(|part| part.strip_prefix("witness="))
+        .and_then(n102_probe_boolean_value_v1)
+        .ok_or(N102ProbeRefusalV1::AnswerInvalid)?;
+    let pid = parts
+        .next()
+        .and_then(|part| part.strip_prefix("pid="))
+        .and_then(n102_canonical_pid_v1)
+        .ok_or(N102ProbeRefusalV1::AnswerInvalid)?;
+    if parts.next().is_some() {
+        return Err(N102ProbeRefusalV1::AnswerInvalid);
+    }
+    Ok(N102EventProbeV1 {
+        attempted,
+        witness,
+        pid,
+    })
+}
+
+/// Runs one closed object-identity event probe through the real production confined spawn.
+///
+/// # Errors
+///
+/// [`N102ProbeRefusalV1::Worker`] when the confined run itself refuses, or
+/// [`N102ProbeRefusalV1::AnswerInvalid`] when the child's bounded answer is unusable.
+pub fn run_n102_event_probe_v1(
+    executable: &std::path::Path,
+    candidate: u32,
+    control: u32,
+) -> Result<N102EventProbeV1, N102ProbeRefusalV1> {
+    let token = format!(
+        "{}:{candidate}:{control}",
+        crate::graphic_image_inspection::IMAGE_WORKER_MODE_PROBE_EVENT_V1
+    );
+    let run = run_confined_image_worker_mode_v1(
+        executable,
+        "png",
+        N102_PROBE_SOURCE_SHA256_V1,
+        Some(&token),
+        &N102_PROBE_SOURCE_V1,
+        &mut N102FaultRunV1::production(),
+    )
+    .map_err(N102ProbeRefusalV1::Worker)?;
+    parse_n102_event_answer_v1(&String::from_utf8_lossy(run.stdout()))
 }
 
 /// Runs one closed environment-isolation probe through the real production confined spawn.

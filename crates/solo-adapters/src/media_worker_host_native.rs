@@ -657,7 +657,8 @@ pub(crate) use linux::{
 #[cfg(windows)]
 #[cfg(windows)]
 pub use windows::{
-    N102ExtraInheritableV1, N102FaultContextV1, n102_probe_environment_v1, n102_probe_handle_v1,
+    N102ExtraInheritableV1, N102FaultContextV1, n102_probe_environment_v1, n102_probe_event_v1,
+    n102_probe_handle_v1,
 };
 #[cfg(windows)]
 pub(crate) use windows::{SuspendedWorkerV1, in_job_v1};
@@ -688,7 +689,7 @@ mod windows {
 
     use windows_sys::Win32::Foundation::{
         CloseHandle, GetHandleInformation, HANDLE, HANDLE_FLAG_INHERIT, SetHandleInformation,
-        WAIT_OBJECT_0,
+        WAIT_OBJECT_0, WAIT_TIMEOUT,
     };
     use windows_sys::Win32::Security::SECURITY_ATTRIBUTES;
     use windows_sys::Win32::System::JobObjects::{
@@ -705,7 +706,7 @@ mod windows {
         DeleteProcThreadAttributeList, EXTENDED_STARTUPINFO_PRESENT, GetCurrentProcess,
         GetExitCodeProcess, InitializeProcThreadAttributeList, LPPROC_THREAD_ATTRIBUTE_LIST,
         PROC_THREAD_ATTRIBUTE_HANDLE_LIST, PROCESS_INFORMATION, ResumeThread, STARTF_USESTDHANDLES,
-        STARTUPINFOEXW, TerminateProcess, UpdateProcThreadAttribute, WaitForSingleObject,
+        STARTUPINFOEXW, SetEvent, TerminateProcess, UpdateProcThreadAttribute, WaitForSingleObject,
     };
 
     /// The largest attribute-list size this code will allocate for a one-entry list.
@@ -1042,6 +1043,32 @@ mod windows {
         pub fn value(&self) -> u32 {
             self.0.raw() as usize as u32
         }
+
+        /// The kernel's current state of this exact event object.
+        ///
+        /// `Some(false)` is the only evidence of exclusion: a wait that itself failed yields `None`,
+        /// and no caller may read that as "not signaled".
+        pub fn signaled_v1(&self) -> Option<bool> {
+            // SAFETY: the handle is this guard's own live anonymous event and a zero-millisecond
+            // wait only observes its current state without consuming or modifying it.
+            match unsafe { WaitForSingleObject(self.0.raw(), 0) } {
+                WAIT_OBJECT_0 => Some(true),
+                WAIT_TIMEOUT => Some(false),
+                // A failed wait proves nothing about the object, so it is never a negative result.
+                _ => None,
+            }
+        }
+
+        /// Test-only parent-side positive control for the signalling primitives.
+        ///
+        /// The integration suite needs to prove that `SetEvent` plus a zero-timeout wait really
+        /// observe a state change on this host; otherwise a "not signaled" answer would be
+        /// indistinguishable from a broken primitive.
+        pub fn signal_parent_v1(&self) -> bool {
+            // SAFETY: the handle is this guard's own live anonymous event, the call only sets its
+            // state, and the returned boolean is the documented success indicator.
+            (unsafe { SetEvent(self.0.raw()) }) != 0
+        }
     }
 
     /// Whether one numeric handle value is live in this process, plus whether a value the parent
@@ -1061,6 +1088,33 @@ mod windows {
         }
         let ambiguous = live(control);
         (live(value), ambiguous)
+    }
+
+    /// One bounded object-identity event probe executed inside the confined child.
+    ///
+    /// Returns `(attempted, witness)`. `witness` is the child's own positive proof that `SetEvent`
+    /// and a zero-timeout `WaitForSingleObject` really work on an event this process owns, so an
+    /// unusable platform is refused instead of being reported as a clean exclusion. `attempted`
+    /// reports that both transmitted numeric candidates were handed to `SetEvent` exactly once.
+    /// Whether those calls succeeded is deliberately **not** decisive and is never printed: only the
+    /// parent's observation of its own original event objects decides inheritance, because a reused
+    /// numeric value would signal a different object entirely.
+    pub fn n102_probe_event_v1(candidate: u32, control: u32) -> (bool, bool) {
+        let witness = match N102ExtraInheritableV1::create_control() {
+            Some(event) => event.signal_parent_v1() && event.signaled_v1() == Some(true),
+            None => false,
+        };
+        if !witness {
+            // Without a working primitive the child cannot honestly claim to have probed anything.
+            return (false, false);
+        }
+        // SAFETY: the call passes a caller-supplied numeric value as an opaque `HANDLE`. An absent or
+        // unrelated handle makes `SetEvent` fail with `ERROR_INVALID_HANDLE`; no pointer is
+        // dereferenced and no process memory is read.
+        let _candidate_attempt = (unsafe { SetEvent(candidate as usize as HANDLE) }) != 0;
+        // SAFETY: the identical bounded call for the ambiguity-control value.
+        let _control_attempt = (unsafe { SetEvent(control as usize as HANDLE) }) != 0;
+        (true, true)
     }
 
     /// Whether the named variable is visible to this process, and whether `SystemRoot` is present.
