@@ -668,6 +668,16 @@ impl Scanner<'_> {
             aliases: ctx.aliases.clone(),
         };
         child.aliases.extend(facts.aliases.clone());
+        // This one reserved module is *available* on both hosts, so its declaration carries an
+        // `#[cfg(any(target_os = "linux", windows))]` predicate. `OsGate` deliberately reduces
+        // every `any(..)` to `NONE`, because an alternation proves nothing about the platform of
+        // an individual native occurrence. Availability is therefore not permission: the file
+        // starts from its parent's gate instead, and every `unsafe`, `libc` or `windows_sys` use
+        // inside it must still be positively gated by its own inner item, which the scanner
+        // continues to check in full.
+        if approved_dual_host_process_module(self.spec, &ctx.path, module) {
+            child.os_gate = ctx.os_gate;
+        }
         self.report_facts(&facts, &child);
 
         if let Some((_, inner)) = &module.content {
@@ -2462,5 +2472,332 @@ impl FixtureWorld {
             surfaces: self.surfaces.clone(),
             label_root: "fixture".to_owned(),
         }
+    }
+}
+
+/// One platform named by an approved `cfg_attr(.., allow(unsafe_code))` allowance.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum PlatformAllowance {
+    Linux,
+    Windows,
+}
+
+/// `#[cfg(any(target_os = "linux", windows))]`, parsed, with exactly those two operands.
+fn is_exact_linux_or_windows_availability(attribute: &syn::Attribute) -> bool {
+    let syn::Meta::List(list) = &attribute.meta else {
+        return false;
+    };
+    if !list.path.is_ident("cfg") {
+        return false;
+    }
+    let Ok(outer) = list.parse_args_with(meta_list) else {
+        return false;
+    };
+    if outer.len() != 1 {
+        return false;
+    }
+    let Some(syn::Meta::List(any)) = outer.first() else {
+        return false;
+    };
+    if !any.path.is_ident("any") {
+        return false;
+    }
+    let Ok(inner) = any.parse_args_with(meta_list) else {
+        return false;
+    };
+    let mut linux = 0;
+    let mut windows = 0;
+    for meta in &inner {
+        match meta {
+            syn::Meta::Path(path) if path.is_ident("windows") => windows += 1,
+            syn::Meta::NameValue(pair) if pair.path.is_ident("target_os") => {
+                let syn::Expr::Lit(literal) = &pair.value else {
+                    return false;
+                };
+                let syn::Lit::Str(platform) = &literal.lit else {
+                    return false;
+                };
+                if platform.value() != "linux" {
+                    return false;
+                }
+                linux += 1;
+            }
+            _ => return false,
+        }
+    }
+    linux == 1 && windows == 1
+}
+
+/// Which platform one `#[cfg_attr(.., allow(unsafe_code))]` allowance names, if it is exact.
+fn exact_platform_unsafe_allowance(attribute: &syn::Attribute) -> Option<PlatformAllowance> {
+    let syn::Meta::List(list) = &attribute.meta else {
+        return None;
+    };
+    if !list.path.is_ident("cfg_attr") {
+        return None;
+    }
+    let items = list.parse_args_with(meta_list).ok()?;
+    if items.len() != 2 {
+        return None;
+    }
+    let platform = match &items[0] {
+        syn::Meta::Path(path) if path.is_ident("windows") => PlatformAllowance::Windows,
+        syn::Meta::NameValue(pair) if pair.path.is_ident("target_os") => {
+            let syn::Expr::Lit(literal) = &pair.value else {
+                return None;
+            };
+            let syn::Lit::Str(value) = &literal.lit else {
+                return None;
+            };
+            match value.value().as_str() {
+                "linux" => PlatformAllowance::Linux,
+                "windows" => PlatformAllowance::Windows,
+                _ => return None,
+            }
+        }
+        _ => return None,
+    };
+    let syn::Meta::List(allow) = &items[1] else {
+        return None;
+    };
+    if !allow.path.is_ident("allow") {
+        return None;
+    }
+    let allowed = allow.parse_args_with(meta_list).ok()?;
+    let single_unsafe_code = match allowed.first() {
+        Some(syn::Meta::Path(path)) => path.is_ident("unsafe_code"),
+        _ => false,
+    };
+    if allowed.len() != 1 || !single_unsafe_code {
+        return None;
+    }
+    Some(platform)
+}
+
+/// One comma-separated `Meta` list, used to read a predicate structurally.
+fn meta_list(
+    input: syn::parse::ParseStream<'_>,
+) -> syn::Result<syn::punctuated::Punctuated<syn::Meta, syn::token::Comma>> {
+    syn::punctuated::Punctuated::parse_terminated(input)
+}
+
+/// Recognises the one exact dual-host process-native module declaration.
+///
+/// Architecture §6A.8 reserves a single file for positively gated Linux/Windows process
+/// control, and that file has to be reachable on both hosts, so its declaration carries an
+/// `#[cfg(any(target_os = "linux", windows))]` *availability* predicate. Every condition below
+/// is read from the parsed syntax tree — never from text, a filename or a prefix — and any
+/// deviation returns `false`, leaving the ordinary scanner branch in force. This recognition
+/// adds no permission of its own: it only stops the availability predicate from being mistaken
+/// for proof about the platform of the operations inside the file.
+fn approved_dual_host_process_module(
+    spec: &UnitSpec,
+    parent: &Path,
+    module: &syn::ItemMod,
+) -> bool {
+    const MODULE: &str = "media_worker_host_native";
+
+    if spec.package != "solo-adapters"
+        || module.ident != MODULE
+        || module.content.is_some()
+        || !matches!(
+            module_path_selection(&module.attrs),
+            ModulePathSelection::Default
+        )
+    {
+        return false;
+    }
+
+    // The declaration must be the crate root's own default-resolution item, so the module
+    // source is exactly `crates/solo-adapters/src/media_worker_host_native.rs`.
+    let parent = normalize_lexical(parent);
+    if !parent.ends_with(Path::new("crates/solo-adapters/src/lib.rs")) {
+        return false;
+    }
+
+    let mut availability = 0;
+    let mut linux_allowance = 0;
+    let mut windows_allowance = 0;
+    for attribute in &module.attrs {
+        if attribute.path().is_ident("cfg") {
+            if !is_exact_linux_or_windows_availability(attribute) {
+                return false;
+            }
+            availability += 1;
+        } else if attribute.path().is_ident("cfg_attr") {
+            match exact_platform_unsafe_allowance(attribute) {
+                Some(PlatformAllowance::Linux) => linux_allowance += 1,
+                Some(PlatformAllowance::Windows) => windows_allowance += 1,
+                None => return false,
+            }
+        } else {
+            // Any other attribute — including `#[path]`, a `derive`, or another `cfg_attr`
+            // shape — is outside the approved declaration and refuses the recognition.
+            return false;
+        }
+    }
+    availability == 1 && linux_allowance == 1 && windows_allowance == 1
+}
+
+/// Regression tests for the single dual-host process-native module recognition.
+///
+/// These exercise the whole scanner through `check_unit`, not the helper alone: the positive case
+/// must pass, and every adversarial variant must still be refused. Deleting the recognition makes
+/// the positive case fail; widening it makes the adversarial cases pass, which also fails.
+#[cfg(test)]
+mod dual_host_process_module_tests {
+    use super::*;
+
+    const LIB: &str = "crates/solo-adapters/src/lib.rs";
+    const NATIVE: &str = "crates/solo-adapters/src/media_worker_host_native.rs";
+
+    fn spec(package: &str) -> UnitSpec {
+        UnitSpec {
+            package: package.to_owned(),
+            kind: TargetKind::Lib,
+            root_file: PathBuf::from(LIB),
+            package_root: PathBuf::from("crates/solo-adapters"),
+            anchor: PathBuf::from("crates"),
+            workspace_roots: BTreeMap::new(),
+            allowed_external: BTreeSet::new(),
+            dev_roots: BTreeSet::new(),
+            known_crates: BTreeSet::new(),
+            surfaces: BTreeMap::new(),
+            // The scanner prints `label_root` + the package-relative path, and the approved
+            // native-module list is keyed on the repository-relative one.
+            label_root: "crates/solo-adapters".to_owned(),
+        }
+    }
+
+    fn violations(lib: &str, native: &str, package: &str) -> Vec<Violation> {
+        let reader = MapReader::new().with(LIB, lib).with(NATIVE, native);
+        check_unit(&spec(package), &reader)
+    }
+
+    fn refuses(violations: &[Violation], category: &str) -> bool {
+        violations
+            .iter()
+            .any(|violation| violation.category.as_str() == category)
+    }
+
+    fn approved_lib() -> String {
+        concat!(
+            "#[cfg(any(target_os = \"linux\", windows))]\n",
+            "#[cfg_attr(target_os = \"linux\", allow(unsafe_code))]\n",
+            "#[cfg_attr(windows, allow(unsafe_code))]\n",
+            "mod media_worker_host_native;\n"
+        )
+        .to_owned()
+    }
+
+    fn gated_native() -> String {
+        concat!(
+            "#[cfg(target_os = \"linux\")]\n",
+            "mod linux {\n",
+            "    pub fn f() -> i32 {\n",
+            "        // SAFETY: fixture\n",
+            "        unsafe { libc::getrlimit(0, std::ptr::null_mut()) };\n",
+            "        0\n",
+            "    }\n",
+            "}\n",
+            "#[cfg(windows)]\n",
+            "mod windows {\n",
+            "    pub fn f() -> u32 {\n",
+            "        // SAFETY: fixture\n",
+            "        unsafe { windows_sys::Win32::System::Threading::GetCurrentProcessId() }\n",
+            "    }\n",
+            "}\n"
+        )
+        .to_owned()
+    }
+
+    #[test]
+    fn the_exact_dual_host_declaration_passes_with_positive_inner_gates() {
+        let found = violations(&approved_lib(), &gated_native(), "solo-adapters");
+        assert!(
+            !refuses(&found, "unsafe-code"),
+            "the inner gates must be provable: {found:?}"
+        );
+        assert!(
+            !refuses(&found, "dynamic-loading"),
+            "gated libc use must be allowed: {found:?}"
+        );
+    }
+
+    #[test]
+    fn a_naked_unsafe_occurrence_is_still_refused() {
+        let naked = concat!(
+            "pub fn f() -> i32 {\n",
+            "    // SAFETY: fixture\n",
+            "    unsafe { 0 }\n",
+            "}\n"
+        );
+        let found = violations(&approved_lib(), naked, "solo-adapters");
+        assert!(refuses(&found, "unsafe-code"), "{found:?}");
+    }
+
+    #[test]
+    fn a_broadened_or_negated_availability_predicate_is_not_recognised() {
+        for lib in [
+            concat!(
+                "#[cfg(any(target_os = \"linux\", windows, feature = \"x\"))]\n",
+                "#[cfg_attr(target_os = \"linux\", allow(unsafe_code))]\n",
+                "#[cfg_attr(windows, allow(unsafe_code))]\n",
+                "mod media_worker_host_native;\n"
+            ),
+            concat!(
+                "#[cfg(not(target_os = \"windows\"))]\n",
+                "#[cfg_attr(target_os = \"linux\", allow(unsafe_code))]\n",
+                "#[cfg_attr(windows, allow(unsafe_code))]\n",
+                "mod media_worker_host_native;\n"
+            ),
+        ] {
+            let found = violations(lib, &gated_native(), "solo-adapters");
+            assert!(
+                refuses(&found, "unsafe-code"),
+                "an unrecognised predicate must leave the file ungated: {lib} => {found:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_missing_duplicate_or_misdirected_allowance_is_refused() {
+        for lib in [
+            concat!(
+                "#[cfg(any(target_os = \"linux\", windows))]\n",
+                "#[cfg_attr(target_os = \"linux\", allow(unsafe_code))]\n",
+                "mod media_worker_host_native;\n"
+            ),
+            concat!(
+                "#[cfg(any(target_os = \"linux\", windows))]\n",
+                "#[cfg_attr(target_os = \"linux\", allow(unsafe_code))]\n",
+                "#[cfg_attr(windows, allow(unsafe_code))]\n",
+                "#[allow(unsafe_code)]\n",
+                "mod media_worker_host_native;\n"
+            ),
+            concat!(
+                "#[cfg(any(target_os = \"linux\", windows))]\n",
+                "#[cfg_attr(target_os = \"linux\", allow(unsafe_code))]\n",
+                "#[cfg_attr(windows, allow(unsafe_code))]\n",
+                "#[path = \"media_worker_host_native.rs\"]\n",
+                "mod media_worker_host_native;\n"
+            ),
+        ] {
+            let found = violations(lib, &gated_native(), "solo-adapters");
+            assert!(!found.is_empty(), "declaration must be refused: {lib}");
+        }
+    }
+
+    #[test]
+    fn another_package_or_module_name_does_not_acquire_the_exception() {
+        let renamed = approved_lib().replace("media_worker_host_native", "some_other_module");
+        let found = violations(&renamed, &gated_native(), "solo-adapters");
+        assert!(
+            !found.is_empty(),
+            "a renamed declaration is never the approved one: {found:?}"
+        );
+
+        let found = violations(&approved_lib(), &gated_native(), "solo-application");
+        assert!(refuses(&found, "unsafe-code"), "{found:?}");
     }
 }
