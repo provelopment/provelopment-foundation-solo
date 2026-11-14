@@ -718,11 +718,9 @@ mod windows {
     // Two fixed, bounded facts are exposed to the integration suite and to nothing else: an
     // injection selector that makes one production native boundary refuse, and the child-side
     // probes for the two isolation canaries. Neither is reachable from authored content, an
-    // ordinary public argument or any product configuration: the selector is a process-local
-    // atomic set only by the closed test seam, and the probes run only in the reserved internal
-    // worker modes. No handle value, canary value or path is ever logged.
-    /// The highest injection step this build understands.
-
+    // ordinary public argument or any product configuration: the requested step is an immutable
+    // per-run value owned by one invocation, so it cannot leak between runs. The probes run only in
+    // the reserved internal worker modes, and no handle value, canary value or path is ever logged.
     /// One closed per-run N102 fault context: the boundary this invocation must make refuse, the
     /// boundary it actually reached, and whether the cleanup that followed a fault was observed.
     ///
