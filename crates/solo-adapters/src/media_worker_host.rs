@@ -4453,10 +4453,17 @@ fn run_confined_image_worker_platform_v1(
 
     // Only now, with the job attached and its limits read back, may the worker execute.
     if !worker.resume(&mut native_fault) {
+        // A refused resume still owns a live suspended child: it is terminated, its exit is
+        // observed, and both the reached step and the real cleanup outcome are recorded before
+        // the refusal is reported.
         let _ = worker.terminate_job();
         let _ = writer.join();
         let _ = out_reader.join();
-        let _ = worker.wait_ms(10_000, &mut native_fault);
+        let exited = worker.wait_ms(10_000, &mut native_fault).is_some();
+        fault.absorb(
+            native_fault.reached(),
+            native_fault.cleanup_verified() || exited,
+        );
         return Err(ImageWorkerRunRefusalV1::SpawnFailed);
     }
 
@@ -4477,6 +4484,10 @@ fn run_confined_image_worker_platform_v1(
         let _ = worker.terminate_job();
         exit_code = worker.wait_ms(10_000, &mut native_fault);
     }
+    fault.absorb(
+        native_fault.reached(),
+        native_fault.cleanup_verified() || exit_code.is_some(),
+    );
     let cleanup_verified = exit_code.is_some();
     let wall_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
 
