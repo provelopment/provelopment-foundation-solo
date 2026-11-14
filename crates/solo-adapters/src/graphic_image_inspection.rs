@@ -1443,28 +1443,42 @@ impl GifWorkerRefusalV1 {
     }
 }
 
-/// A typed, nonpublishing, parent-validated observation of one complete GIF animation.
+/// One ordered, parent-validated frame record from the strict transcript.
+///
+/// Every field is parsed from fixed-position tokens in the received bytes and cross-checked
+/// against the parent's own geometry and arithmetic, so a host test can assert authored timing,
+/// disposal, palette, interlace, offsets and composite digests without any raw decoder access.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct GifWorkerObservationV1 {
-    source_digest: MediaWorkerDigestV1,
+pub struct GifFrameEvidenceV2 {
+    index: usize,
+    delay_centiseconds: u16,
+    left: u16,
+    top: u16,
     width: u16,
     height: u16,
-    frame_count: usize,
-    is_animated: bool,
-    loop_semantics: crate::graphic_gif_inspection::GifLoopV1,
-    one_cycle_delay_ms: u64,
-    total_composited_pixels: u64,
-    transcript_digest: MediaWorkerDigestV1,
-    worker_pid: u32,
-    limits_verified: bool,
-    cleanup_verified: bool,
-    wall_ms: u64,
+    disposal: crate::graphic_gif_inspection::GifDisposalV1,
+    transparent_index: Option<u8>,
+    interlaced: bool,
+    local_palette: bool,
+    composite_digest: MediaWorkerDigestV1,
 }
 
-impl GifWorkerObservationV1 {
+impl GifFrameEvidenceV2 {
     #[must_use]
-    pub const fn source_digest(&self) -> &MediaWorkerDigestV1 {
-        &self.source_digest
+    pub const fn index(&self) -> usize {
+        self.index
+    }
+    #[must_use]
+    pub const fn delay_centiseconds(&self) -> u16 {
+        self.delay_centiseconds
+    }
+    #[must_use]
+    pub const fn left(&self) -> u16 {
+        self.left
+    }
+    #[must_use]
+    pub const fn top(&self) -> u16 {
+        self.top
     }
     #[must_use]
     pub const fn width(&self) -> u16 {
@@ -1475,12 +1489,74 @@ impl GifWorkerObservationV1 {
         self.height
     }
     #[must_use]
-    pub const fn frame_count(&self) -> usize {
-        self.frame_count
+    pub const fn disposal(&self) -> crate::graphic_gif_inspection::GifDisposalV1 {
+        self.disposal
     }
     #[must_use]
-    pub const fn is_animated(&self) -> bool {
-        self.is_animated
+    pub const fn transparent_index(&self) -> Option<u8> {
+        self.transparent_index
+    }
+    #[must_use]
+    pub const fn interlaced(&self) -> bool {
+        self.interlaced
+    }
+    #[must_use]
+    pub const fn local_palette(&self) -> bool {
+        self.local_palette
+    }
+    #[must_use]
+    pub const fn composite_digest(&self) -> &MediaWorkerDigestV1 {
+        &self.composite_digest
+    }
+}
+
+/// A typed, nonpublishing, parent-validated observation of one complete GIF animation.
+///
+/// It is only ever produced by the trusted parent after the confined child returned exit 0 and
+/// the parent re-verified identity, digests, geometry, arithmetic and the complete transcript
+/// grammar. It carries no raw decoder handle and grants no publication authority.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct GifWorkerObservationV1 {
+    signature: &'static str,
+    width: u16,
+    height: u16,
+    frames: Vec<GifFrameEvidenceV2>,
+    loop_semantics: crate::graphic_gif_inspection::GifLoopV1,
+    one_cycle_delay_ms: u64,
+    total_composited_pixels: u64,
+    source_digest: MediaWorkerDigestV1,
+    transcript_digest: MediaWorkerDigestV1,
+    transcript_len: usize,
+    worker_pid: u32,
+    limits_verified: bool,
+    cleanup_verified: bool,
+    wall_ms: u64,
+}
+
+impl GifWorkerObservationV1 {
+    #[must_use]
+    pub const fn signature(&self) -> &'static str {
+        self.signature
+    }
+    #[must_use]
+    pub const fn width(&self) -> u16 {
+        self.width
+    }
+    #[must_use]
+    pub const fn height(&self) -> u16 {
+        self.height
+    }
+    #[must_use]
+    pub fn frames(&self) -> &[GifFrameEvidenceV2] {
+        &self.frames
+    }
+    #[must_use]
+    pub fn frame_count(&self) -> usize {
+        self.frames.len()
+    }
+    #[must_use]
+    pub fn is_animated(&self) -> bool {
+        self.frames.len() > 1
     }
     #[must_use]
     pub const fn loop_semantics(&self) -> crate::graphic_gif_inspection::GifLoopV1 {
@@ -1495,8 +1571,16 @@ impl GifWorkerObservationV1 {
         self.total_composited_pixels
     }
     #[must_use]
+    pub const fn source_digest(&self) -> &MediaWorkerDigestV1 {
+        &self.source_digest
+    }
+    #[must_use]
     pub const fn transcript_digest(&self) -> &MediaWorkerDigestV1 {
         &self.transcript_digest
+    }
+    #[must_use]
+    pub const fn transcript_len(&self) -> usize {
+        self.transcript_len
     }
     #[must_use]
     pub const fn worker_pid(&self) -> u32 {
@@ -1515,7 +1599,6 @@ impl GifWorkerObservationV1 {
         self.wall_ms
     }
 }
-
 const GIF_WORKER_KEYS_V1: [&str; 14] = [
     "format",
     "mime",
@@ -1543,6 +1626,10 @@ fn decimal_v1(text: &str) -> Option<u64> {
     text.parse::<u64>().ok()
 }
 
+fn bounded_u16_v1(text: &str) -> Option<u16> {
+    decimal_v1(text).and_then(|value| u16::try_from(value).ok())
+}
+
 fn lower_hex_digest_v1(text: &str) -> Option<MediaWorkerDigestV1> {
     if text.len() != 64
         || !text
@@ -1554,22 +1641,51 @@ fn lower_hex_digest_v1(text: &str) -> Option<MediaWorkerDigestV1> {
     MediaWorkerDigestV1::parse_lower_hex(text)
 }
 
-fn transcript_line_value_v1<'a>(line: &'a str, key: &str) -> Option<&'a str> {
-    line.split(' ')
-        .find_map(|token| token.strip_prefix(key)?.strip_prefix('='))
-}
-/// The trusted parent half of the confined GIF worker.
+/// The bounded parent-held GIF header facts: signature prefix and logical screen size.
 ///
-/// The parent never decodes or composites a GIF. It runs the single-use confined child, then
-/// independently verifies the identity, digest, arithmetic and structure of the bounded
-/// transcript it actually received, using the original bytes it already owns.
+/// This reads ten fixed bytes. It is not a decoder, a compositor or a GIF parser.
+fn parent_gif_screen_v1(source: &[u8]) -> Option<(&'static str, u16, u16)> {
+    let signature = match source.get(0..6)? {
+        b"GIF87a" => "GIF87a",
+        b"GIF89a" => "GIF89a",
+        _ => return None,
+    };
+    let width = u16::from_le_bytes([*source.get(6)?, *source.get(7)?]);
+    let height = u16::from_le_bytes([*source.get(8)?, *source.get(9)?]);
+    if width == 0 || height == 0 {
+        return None;
+    }
+    Some((signature, width, height))
+}
+
+/// The supervised GIF observation for the current executable.
 ///
 /// # Errors
 ///
-/// A closed [`GifWorkerRefusalV1`]: rejected source, refused spawn, unproven confinement,
-/// non-zero exit, oversized output, malformed frame or transcript, forged digest or identity
-/// mismatch.
+/// A closed [`GifWorkerRefusalV1`]; see [`inspect_gif_bytes_with_executable_v1`].
 pub fn inspect_gif_bytes_v1(source: &[u8]) -> Result<GifWorkerObservationV1, GifWorkerRefusalV1> {
+    let Ok(executable) = std::env::current_exe() else {
+        return Err(GifWorkerRefusalV1::SupervisorRefused);
+    };
+    inspect_gif_bytes_with_executable_v1(&executable, source)
+}
+
+/// The one narrow trusted composition-root seam.
+///
+/// It exists because an integration test's `current_exe` is the Rust harness, not the product
+/// image. The caller supplies the already-known executable path — `CARGO_BIN_EXE_solo-cli` in the
+/// host tests and `current_exe` in production. Neither the path nor any argument may derive from
+/// authored content, and this function shares exactly the same parent validation.
+///
+/// # Errors
+///
+/// A closed [`GifWorkerRefusalV1`]: rejected source, unreadable header, refused spawn, unproven
+/// confinement, non-zero exit, oversized output, malformed header or transcript, forged digest,
+/// identity mismatch or impossible cross-field arithmetic.
+pub fn inspect_gif_bytes_with_executable_v1(
+    executable: &std::path::Path,
+    source: &[u8],
+) -> Result<GifWorkerObservationV1, GifWorkerRefusalV1> {
     use GifWorkerRefusalV1 as Refusal;
     if source.is_empty()
         || u64::try_from(source.len()).unwrap_or(u64::MAX)
@@ -1577,12 +1693,10 @@ pub fn inspect_gif_bytes_v1(source: &[u8]) -> Result<GifWorkerObservationV1, Gif
     {
         return Err(Refusal::SourceRejected);
     }
+    let screen = parent_gif_screen_v1(source).ok_or(Refusal::SourceRejected)?;
     let source_digest = sha256_media_worker_bytes_v1(source);
-    let Ok(executable) = std::env::current_exe() else {
-        return Err(Refusal::SupervisorRefused);
-    };
     let run = run_confined_image_worker_v1(
-        &executable,
+        executable,
         GIF_WORKER_TOKEN_V1,
         &source_digest.to_hex(),
         source,
@@ -1598,29 +1712,63 @@ pub fn inspect_gif_bytes_v1(source: &[u8]) -> Result<GifWorkerObservationV1, Gif
         return Err(Refusal::OutputTooLarge);
     }
     let mut observation =
-        validate_gif_worker_frame_v1(run.stdout(), source_digest, run.child_pid())?;
+        validate_gif_worker_frame_v1(run.stdout(), source_digest, run.child_pid(), screen)?;
     observation.limits_verified = true;
     observation.cleanup_verified = true;
     observation.wall_ms = run.wall_ms();
     Ok(observation)
+}
+/// One strict cursor over the received transcript lines. No searching, no early break.
+struct TranscriptCursorV1<'a> {
+    lines: &'a [&'a str],
+    at: usize,
+}
+
+impl<'a> TranscriptCursorV1<'a> {
+    fn next_line(&mut self) -> Result<&'a str, GifWorkerRefusalV1> {
+        let line = *self
+            .lines
+            .get(self.at)
+            .ok_or(GifWorkerRefusalV1::TranscriptMalformed)?;
+        self.at += 1;
+        Ok(line)
+    }
+
+    fn expect(&mut self, exact: &str) -> Result<(), GifWorkerRefusalV1> {
+        if self.next_line()? == exact {
+            Ok(())
+        } else {
+            Err(GifWorkerRefusalV1::TranscriptMalformed)
+        }
+    }
+
+    fn value(&mut self, key: &str) -> Result<&'a str, GifWorkerRefusalV1> {
+        self.next_line()?
+            .strip_prefix(key)
+            .and_then(|rest| rest.strip_prefix('='))
+            .ok_or(GifWorkerRefusalV1::TranscriptMalformed)
+    }
 }
 
 fn validate_gif_worker_frame_v1(
     stdout: &[u8],
     source_digest: MediaWorkerDigestV1,
     child_pid: u32,
+    screen: (&'static str, u16, u16),
 ) -> Result<GifWorkerObservationV1, GifWorkerRefusalV1> {
-    use crate::graphic_gif_inspection::{
-        GIF_MIME_V1, GifLoopV1, MAX_GIF_FRAMES_V1, MAX_GIF_ONE_CYCLE_DELAY_MS_V1,
-        MAX_GIF_TOTAL_COMPOSITED_PIXELS_V1, MAX_GIF_TRACE_BYTES_V1,
-    };
+    use crate::graphic_gif_inspection::GIF_MIME_V1;
     use GifWorkerRefusalV1 as Refusal;
+    if stdout.contains(&b'\r') {
+        return Err(Refusal::FrameMalformed);
+    }
     let split = stdout
         .iter()
         .position(|byte| *byte == b'\n')
         .ok_or(Refusal::FrameMalformed)?;
     let header = std::str::from_utf8(&stdout[..split]).map_err(|_| Refusal::FrameMalformed)?;
-    let body = &stdout[split + 1..];
+    if header.len() > crate::graphic_gif_inspection::MAX_GIF_TRACE_BYTES_V1 {
+        return Err(Refusal::OutputTooLarge);
+    }
     let rest = header
         .strip_prefix(GIF_WORKER_FRAME_PREFIX_V1)
         .and_then(|rest| rest.strip_prefix(' '))
@@ -1646,71 +1794,46 @@ fn validate_gif_worker_frame_v1(
     if pid != child_pid {
         return Err(Refusal::IdentityMismatch);
     }
-    let width = decimal_v1(values[4])
-        .and_then(|value| u16::try_from(value).ok())
-        .ok_or(Refusal::FrameMalformed)?;
-    let height = decimal_v1(values[5])
-        .and_then(|value| u16::try_from(value).ok())
-        .ok_or(Refusal::FrameMalformed)?;
-    if width == 0
-        || height == 0
-        || u32::from(width) > MAX_IMAGE_SIDE_V1
-        || u32::from(height) > MAX_IMAGE_SIDE_V1
-    {
-        return Err(Refusal::FrameMalformed);
-    }
-    let canvas = u64::from(width)
-        .checked_mul(u64::from(height))
-        .ok_or(Refusal::FrameMalformed)?;
-    if canvas > MAX_IMAGE_PIXELS_V1 {
+    let width = bounded_u16_v1(values[4]).ok_or(Refusal::FrameMalformed)?;
+    let height = bounded_u16_v1(values[5]).ok_or(Refusal::FrameMalformed)?;
+    if width != screen.1 || height != screen.2 {
         return Err(Refusal::FrameMalformed);
     }
     let frames = decimal_v1(values[6])
         .and_then(|value| usize::try_from(value).ok())
         .ok_or(Refusal::FrameMalformed)?;
-    if frames == 0 || frames > MAX_GIF_FRAMES_V1 {
+    if frames == 0 || frames > crate::graphic_gif_inspection::MAX_GIF_FRAMES_V1 {
         return Err(Refusal::FrameMalformed);
     }
-    let loop_semantics = match values[7] {
-        "absent" => {
-            if values[8] != "none" {
+    let loop_token = values[7];
+    let loop_count = values[8];
+    match loop_token {
+        "absent" | "infinite" => {
+            if loop_count != "none" {
                 return Err(Refusal::FrameMalformed);
             }
-            GifLoopV1::Absent
-        }
-        "infinite" => {
-            if values[8] != "none" {
-                return Err(Refusal::FrameMalformed);
-            }
-            GifLoopV1::Infinite
         }
         "finite" => {
-            let count = decimal_v1(values[8])
-                .and_then(|value| u16::try_from(value).ok())
-                .ok_or(Refusal::FrameMalformed)?;
-            GifLoopV1::Finite(count)
+            if bounded_u16_v1(loop_count).is_none() {
+                return Err(Refusal::FrameMalformed);
+            }
         }
         _ => return Err(Refusal::FrameMalformed),
-    };
+    }
     let delay = decimal_v1(values[9]).ok_or(Refusal::FrameMalformed)?;
-    if delay > MAX_GIF_ONE_CYCLE_DELAY_MS_V1 {
-        return Err(Refusal::FrameMalformed);
-    }
     let pixels = decimal_v1(values[10]).ok_or(Refusal::FrameMalformed)?;
-    if pixels < canvas || pixels > MAX_GIF_TOTAL_COMPOSITED_PIXELS_V1 {
-        return Err(Refusal::FrameMalformed);
-    }
     let claimed_source = lower_hex_digest_v1(values[11]).ok_or(Refusal::FrameMalformed)?;
     if claimed_source != source_digest {
         return Err(Refusal::SourceDigestMismatch);
     }
+    let body = &stdout[split + 1..];
     let transcript_len = decimal_v1(values[12])
         .and_then(|value| usize::try_from(value).ok())
         .ok_or(Refusal::FrameMalformed)?;
     if transcript_len != body.len() {
         return Err(Refusal::TranscriptMalformed);
     }
-    if transcript_len > MAX_GIF_TRACE_BYTES_V1 {
+    if transcript_len > crate::graphic_gif_inspection::MAX_GIF_TRACE_BYTES_V1 {
         return Err(Refusal::OutputTooLarge);
     }
     let claimed_transcript = lower_hex_digest_v1(values[13]).ok_or(Refusal::FrameMalformed)?;
@@ -1718,77 +1841,244 @@ fn validate_gif_worker_frame_v1(
     if received != claimed_transcript {
         return Err(Refusal::TranscriptDigestMismatch);
     }
-    let text = std::str::from_utf8(body).map_err(|_| Refusal::TranscriptMalformed)?;
-    let mut lines = text.lines();
-    if lines.next() != Some("SOLO-GIF-ANIMATION-V1") {
+
+    // The digest proves these are the bytes the worker meant to send. The complete grammar below
+    // proves those bytes are a consistent animation document; a consistent forged digest does not
+    // survive an inconsistent document.
+    let records = parse_gif_transcript_v1(body, screen, source_digest, frames)?;
+    let delay_sum: u64 = records
+        .iter()
+        .map(|frame| u64::from(frame.delay_centiseconds()))
+        .sum::<u64>()
+        .saturating_mul(10);
+    if delay_sum != delay {
         return Err(Refusal::TranscriptMalformed);
     }
-    let mut seen = 0usize;
-    let mut ended = false;
-    for line in lines {
-        if line == "end=SOLO-GIF-ANIMATION-V1" {
-            ended = true;
-            break;
-        }
-        if line.starts_with("frame=") {
-            let index = line
-                .strip_prefix("frame=")
-                .and_then(|rest| rest.split(' ').next())
-                .and_then(decimal_v1)
-                .ok_or(Refusal::TranscriptMalformed)?;
-            if usize::try_from(index).ok() != Some(seen) {
-                return Err(Refusal::TranscriptMalformed);
-            }
-            let delay_cs = transcript_line_value_v1(line, "delay_cs")
-                .and_then(decimal_v1)
-                .ok_or(Refusal::TranscriptMalformed)?;
-            if delay_cs > u64::from(u16::MAX) {
-                return Err(Refusal::TranscriptMalformed);
-            }
-            let disposal =
-                transcript_line_value_v1(line, "disposal").ok_or(Refusal::TranscriptMalformed)?;
-            if !matches!(disposal, "unspecified" | "keep" | "background" | "previous") {
-                return Err(Refusal::TranscriptMalformed);
-            }
-            lower_hex_digest_v1(
-                transcript_line_value_v1(line, "composite_sha256")
-                    .ok_or(Refusal::TranscriptMalformed)?,
-            )
-            .ok_or(Refusal::TranscriptMalformed)?;
-            seen += 1;
-            continue;
-        }
-        let checked = match line.split('=').next() {
-            Some("width") => decimal_v1(&line[6..]) == Some(u64::from(width)),
-            Some("height") => decimal_v1(&line[7..]) == Some(u64::from(height)),
-            Some("frames") => decimal_v1(&line[7..]) == u64::try_from(frames).ok(),
-            Some("loop") => &line[5..] == values[7],
-            Some("one_cycle_delay_ms") => decimal_v1(&line[19..]) == Some(delay),
-            Some("total_composited_pixels") => decimal_v1(&line[24..]) == Some(pixels),
-            Some("source_sha256") => &line[14..] == values[11],
-            Some("signature") | Some("mime") | Some("loop_count") => true,
-            _ => false,
-        };
-        if !checked {
-            return Err(Refusal::TranscriptMalformed);
-        }
-    }
-    if !ended || seen != frames {
+    let canvas = u64::from(width) * u64::from(height);
+    if u64::try_from(records.len()).unwrap_or(u64::MAX) * canvas != pixels {
         return Err(Refusal::TranscriptMalformed);
     }
+    let loop_semantics = match loop_token {
+        "infinite" => crate::graphic_gif_inspection::GifLoopV1::Infinite,
+        "absent" => crate::graphic_gif_inspection::GifLoopV1::Absent,
+        _ => crate::graphic_gif_inspection::GifLoopV1::Finite(
+            bounded_u16_v1(loop_count).ok_or(Refusal::FrameMalformed)?,
+        ),
+    };
     Ok(GifWorkerObservationV1 {
-        source_digest,
+        signature: screen.0,
         width,
         height,
-        frame_count: frames,
-        is_animated: frames > 1,
+        frames: records,
         loop_semantics,
         one_cycle_delay_ms: delay,
         total_composited_pixels: pixels,
+        source_digest,
         transcript_digest: received,
+        transcript_len,
         worker_pid: pid,
         limits_verified: false,
         cleanup_verified: false,
         wall_ms: 0,
     })
+}
+/// The complete, strictly ordered transcript grammar.
+///
+/// Every line is consumed exactly once in a fixed order, every value is canonical, and the
+/// document must end with the single terminator line and nothing else. There is no searching,
+/// no duplicate tolerance and no early break.
+fn parse_gif_transcript_v1(
+    body: &[u8],
+    screen: (&'static str, u16, u16),
+    source_digest: MediaWorkerDigestV1,
+    expected_frames: usize,
+) -> Result<Vec<GifFrameEvidenceV2>, GifWorkerRefusalV1> {
+    use crate::graphic_gif_inspection::{
+        GIF_MIME_V1, GifDisposalV1, MAX_GIF_ONE_CYCLE_DELAY_MS_V1,
+        MAX_GIF_TOTAL_COMPOSITED_PIXELS_V1, MAX_GIF_TRACE_BYTES_V1,
+    };
+    use GifWorkerRefusalV1 as Refusal;
+    if body.len() > MAX_GIF_TRACE_BYTES_V1 {
+        return Err(Refusal::OutputTooLarge);
+    }
+    if body.last() != Some(&b'\n') {
+        return Err(Refusal::TranscriptMalformed);
+    }
+    if body
+        .iter()
+        .any(|byte| *byte == b'\r' || (*byte < 0x20 && *byte != b'\n'))
+    {
+        return Err(Refusal::TranscriptMalformed);
+    }
+    let text = std::str::from_utf8(body).map_err(|_| Refusal::TranscriptMalformed)?;
+    let trimmed = text
+        .strip_suffix('\n')
+        .ok_or(Refusal::TranscriptMalformed)?;
+    let lines: Vec<&str> = trimmed.split('\n').collect();
+    if lines.iter().any(|line| line.is_empty()) {
+        return Err(Refusal::TranscriptMalformed);
+    }
+    let mut cursor = TranscriptCursorV1 {
+        lines: &lines,
+        at: 0,
+    };
+    cursor.expect("SOLO-GIF-ANIMATION-V1")?;
+    if cursor.value("signature")? != screen.0 {
+        return Err(Refusal::TranscriptMalformed);
+    }
+    if cursor.value("mime")? != GIF_MIME_V1 {
+        return Err(Refusal::TranscriptMalformed);
+    }
+    let width = bounded_u16_v1(cursor.value("width")?).ok_or(Refusal::TranscriptMalformed)?;
+    let height = bounded_u16_v1(cursor.value("height")?).ok_or(Refusal::TranscriptMalformed)?;
+    if width != screen.1 || height != screen.2 || width == 0 || height == 0 {
+        return Err(Refusal::TranscriptMalformed);
+    }
+    let frames = decimal_v1(cursor.value("frames")?)
+        .and_then(|value| usize::try_from(value).ok())
+        .ok_or(Refusal::TranscriptMalformed)?;
+    if frames == 0
+        || frames > crate::graphic_gif_inspection::MAX_GIF_FRAMES_V1
+        || frames != expected_frames
+    {
+        return Err(Refusal::TranscriptMalformed);
+    }
+    let loop_token = cursor.value("loop")?;
+    let loop_semantics = match loop_token {
+        "absent" => crate::graphic_gif_inspection::GifLoopV1::Absent,
+        "infinite" => crate::graphic_gif_inspection::GifLoopV1::Infinite,
+        "finite" => {
+            let count =
+                bounded_u16_v1(cursor.value("loop_count")?).ok_or(Refusal::TranscriptMalformed)?;
+            if count == 0 {
+                return Err(Refusal::TranscriptMalformed);
+            }
+            crate::graphic_gif_inspection::GifLoopV1::Finite(count)
+        }
+        _ => return Err(Refusal::TranscriptMalformed),
+    };
+    let delay =
+        decimal_v1(cursor.value("one_cycle_delay_ms")?).ok_or(Refusal::TranscriptMalformed)?;
+    if delay > MAX_GIF_ONE_CYCLE_DELAY_MS_V1 {
+        return Err(Refusal::TranscriptMalformed);
+    }
+    let pixels =
+        decimal_v1(cursor.value("total_composited_pixels")?).ok_or(Refusal::TranscriptMalformed)?;
+    if pixels > MAX_GIF_TOTAL_COMPOSITED_PIXELS_V1 {
+        return Err(Refusal::TranscriptMalformed);
+    }
+    let canvas = u64::from(width) * u64::from(height);
+    if u64::try_from(frames).unwrap_or(u64::MAX) * canvas != pixels {
+        return Err(Refusal::TranscriptMalformed);
+    }
+    let claimed_source =
+        lower_hex_digest_v1(cursor.value("source_sha256")?).ok_or(Refusal::TranscriptMalformed)?;
+    if claimed_source != source_digest {
+        return Err(Refusal::SourceDigestMismatch);
+    }
+    let mut records: Vec<GifFrameEvidenceV2> = Vec::with_capacity(frames);
+    let mut total_delay_cs: u64 = 0;
+    for index in 0..frames {
+        let line = cursor.next_line()?;
+        let Some(rest) = line.strip_prefix("frame=") else {
+            return Err(Refusal::TranscriptMalformed);
+        };
+        let mut parts = rest.split(' ');
+        if parts.next().and_then(decimal_v1) != u64::try_from(index).ok() {
+            return Err(Refusal::TranscriptMalformed);
+        }
+        let delay_cs = parts
+            .next()
+            .and_then(|token| token.strip_prefix("delay_cs="))
+            .and_then(bounded_u16_v1)
+            .ok_or(Refusal::TranscriptMalformed)?;
+        let rect = parts
+            .next()
+            .and_then(|token| token.strip_prefix("rect="))
+            .ok_or(Refusal::TranscriptMalformed)?;
+        let rect_parts: Vec<&str> = rect.split(',').collect();
+        if rect_parts.len() != 4 {
+            return Err(Refusal::TranscriptMalformed);
+        }
+        let left = bounded_u16_v1(rect_parts[0]).ok_or(Refusal::TranscriptMalformed)?;
+        let top = bounded_u16_v1(rect_parts[1]).ok_or(Refusal::TranscriptMalformed)?;
+        let frame_width = bounded_u16_v1(rect_parts[2]).ok_or(Refusal::TranscriptMalformed)?;
+        let frame_height = bounded_u16_v1(rect_parts[3]).ok_or(Refusal::TranscriptMalformed)?;
+        if frame_width == 0
+            || frame_height == 0
+            || u32::from(left) + u32::from(frame_width) > u32::from(width)
+            || u32::from(top) + u32::from(frame_height) > u32::from(height)
+        {
+            return Err(Refusal::TranscriptMalformed);
+        }
+        let disposal = match parts
+            .next()
+            .and_then(|token| token.strip_prefix("disposal="))
+        {
+            Some("unspecified") => GifDisposalV1::Unspecified,
+            Some("keep") => GifDisposalV1::Keep,
+            Some("background") => GifDisposalV1::Background,
+            Some("previous") => GifDisposalV1::Previous,
+            _ => return Err(Refusal::TranscriptMalformed),
+        };
+        let transparent_index = match parts
+            .next()
+            .and_then(|token| token.strip_prefix("transparent="))
+        {
+            Some("none") => None,
+            Some(value) => Some(
+                decimal_v1(value)
+                    .and_then(|index| u8::try_from(index).ok())
+                    .ok_or(Refusal::TranscriptMalformed)?,
+            ),
+            None => return Err(Refusal::TranscriptMalformed),
+        };
+        let interlaced = match parts
+            .next()
+            .and_then(|token| token.strip_prefix("interlaced="))
+        {
+            Some("true") => true,
+            Some("false") => false,
+            _ => return Err(Refusal::TranscriptMalformed),
+        };
+        let local_palette = match parts
+            .next()
+            .and_then(|token| token.strip_prefix("local_palette="))
+        {
+            Some("true") => true,
+            Some("false") => false,
+            _ => return Err(Refusal::TranscriptMalformed),
+        };
+        let composite = parts
+            .next()
+            .and_then(|token| token.strip_prefix("composite_sha256="))
+            .and_then(lower_hex_digest_v1)
+            .ok_or(Refusal::TranscriptMalformed)?;
+        if parts.next().is_some() {
+            return Err(Refusal::TranscriptMalformed);
+        }
+        total_delay_cs = total_delay_cs.saturating_add(u64::from(delay_cs));
+        records.push(GifFrameEvidenceV2 {
+            index,
+            delay_centiseconds: delay_cs,
+            left,
+            top,
+            width: frame_width,
+            height: frame_height,
+            disposal,
+            transparent_index,
+            interlaced,
+            local_palette,
+            composite_digest: composite,
+        });
+    }
+    cursor.expect("end=SOLO-GIF-ANIMATION-V1")?;
+    if cursor.at != lines.len() {
+        return Err(Refusal::TranscriptMalformed);
+    }
+    if total_delay_cs.saturating_mul(10) != delay {
+        return Err(Refusal::TranscriptMalformed);
+    }
+    let _ = loop_semantics;
+    Ok(records)
 }
