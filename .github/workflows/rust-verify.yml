@@ -661,15 +661,25 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
+          $required = @(
+            'n102_01_extra_inheritable_handle_is_excluded',
+            'n102_02_parent_environment_is_excluded',
+            'n102_03_native_failures_refuse_and_cleanup',
+            'n102_04_a_concurrent_worker_is_unaffected_by_a_fault'
+          )
           $log = Join-Path $env:RUNNER_TEMP 'n102-canaries.txt'
           cargo test -p solo-cli --test media_worker_host_smoke --locked n102_ -- --nocapture --test-threads=1 *>&1 | Tee-Object -FilePath $log
           if ($LASTEXITCODE -ne 0) { throw "the N102 canaries failed (exit $LASTEXITCODE)" }
           $text = Get-Content -LiteralPath $log -Raw
-          if ($text -notmatch 'test n102::n102_01_extra_inheritable_handle_is_excluded \.\.\. ok') { throw 'n102_01 did not pass on this host' }
-          if ($text -notmatch 'test n102::n102_02_parent_environment_is_excluded \.\.\. ok') { throw 'n102_02 did not pass on this host' }
-          if ($text -notmatch 'test n102::n102_03_native_failures_refuse_and_cleanup \.\.\. ok') { throw 'n102_03 did not pass on this host' }
-          if ($text -notmatch 'test n102::n102_04_a_concurrent_worker_is_unaffected_by_a_fault \.\.\. ok') { throw 'n102_04 did not pass on this host' }
-          if ($text -notmatch 'test result: ok\. 4 passed; 0 failed; 0 ignored') { throw 'the N102 run did not execute exactly four passing, non-ignored cases' }
+          if ($text -match '\.\.\. FAILED') { throw 'a N102 case failed on this host' }
+          foreach ($name in $required) {
+            if ($text -notmatch ('(?m)^test n102::' + $name + ' \.\.\.')) {
+              throw "required N102 case did not execute on this host: $name"
+            }
+          }
+          if ($text -notmatch 'test result: ok\. 4 passed; 0 failed; 0 ignored') {
+            throw 'the N102 run did not execute exactly four passing, non-ignored cases'
+          }
           Write-Output 'N102 gate: four required canaries executed and passed.'
 
 
