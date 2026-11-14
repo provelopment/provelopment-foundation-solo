@@ -132,6 +132,13 @@ fn main() -> ExitCode {
         return ExitCode::from(emit_internal_probe(&report, &mut stdout, &mut stderr));
     }
 
+    // The second reserved internal mode: the `R03.C3` confined image worker. It writes its own
+    // framed observation and decoded plane to stdout, so this root only translates its exit status.
+    // It is dispatched before the public adapter and is reachable through no public flag.
+    if let Some(status) = solo_adapters::run_internal_image_worker_v1(&arguments) {
+        return ExitCode::from(status);
+    }
+
     let outcome = run(arguments, &BootstrapPreflightService);
     ExitCode::from(emit(&outcome, &mut stdout, &mut stderr))
 }

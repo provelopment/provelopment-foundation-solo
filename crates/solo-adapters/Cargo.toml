@@ -13,6 +13,20 @@ solo-domain = { workspace = true }
 serde = "=1.0.229"
 serde_json = "=1.0.154"
 
+# The single approved offline still-image codec (`SOLO-WO-097 R01`, Architecture §6A).
+#
+# Exactly one version, no default features: the format-specific decoders and every
+# default-on capability (`default-formats`, `rayon`, GIF, TIFF, HDR, native AVIF and
+# native PNG/JPEG/WebP back-ends) stay out of the locked graph, so the only codec code
+# compiled into this crate is the pure-Rust PNG, JPEG and WebP support the accepted
+# `R03.C` slice names. Decoding is always invoked from an already-confined child process
+# over owned in-memory bytes; this crate never decodes in the trusted parent.
+image = { version = "=0.25.10", default-features = false, features = [
+    "png",
+    "jpeg",
+    "webp",
+] }
+
 # The two native source-read roots. Each is target-gated so exactly one is ever
 # compiled, which is what keeps the locked graph free of a duplicate `windows-sys`.
 #
@@ -43,6 +57,9 @@ windows-sys = { version = "=0.61.2", default-features = false, features = [
     "Win32_Security",
     "Win32_Storage_FileSystem",
     "Win32_System_IO",
+    "Win32_System_JobObjects",
     "Win32_System_Memory",
+    "Win32_System_Pipes",
+    "Win32_System_Threading",
 ] }
 

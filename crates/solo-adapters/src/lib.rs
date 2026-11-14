@@ -46,9 +46,15 @@
 #![deny(unsafe_code)]
 
 mod bootstrap_cli;
+mod graphic_image_inspection;
 mod media_worker_host;
-#[cfg(target_os = "linux")]
+// One reserved process-native file, available on both hosts. The `any(..)` gates *module
+// availability* only; it is never a proof of the scope of an `unsafe` expression, and every
+// process-native `unsafe` inside the file still sits in its own positive `#[cfg(target_os =
+// "linux")]` or `#[cfg(windows)]` item, which is what the AST checker proves from real text.
+#[cfg(any(target_os = "linux", windows))]
 #[cfg_attr(target_os = "linux", allow(unsafe_code))]
+#[cfg_attr(windows, allow(unsafe_code))]
 mod media_worker_host_native;
 mod media_worker_protocol;
 mod property_resolution;
@@ -64,14 +70,26 @@ pub use bootstrap_cli::{
     CliOutcome, CliRefusal, CliRefusalCode, EXIT_INTERNAL, EXIT_OK, EXIT_REFUSED, FLAG_BASE_URL,
     FLAG_ENTITY_ID, SUBCOMMAND, parse_request, run,
 };
+pub use graphic_image_inspection::{
+    ConfinedImageInspectAdapterV1, EntityImageOutcomeV1, EntityImageRefusalV1,
+    IMAGE_WORKER_EXIT_DECODE_FAILED_V1, IMAGE_WORKER_EXIT_INVALID_MEDIA_V1,
+    IMAGE_WORKER_EXIT_REFUSED_V1, IMAGE_WORKER_EXIT_UNCONFINED_V1, IMAGE_WORKER_FRAME_PREFIX_V1,
+    IMAGE_WORKER_MODE_DECODE_V1, IMAGE_WORKER_MODE_HANG_V1, IMAGE_WORKER_MODE_REFUSE_V1,
+    IMAGE_WORKER_MODE_SHORT_OUTPUT_V1, IMAGE_WORKER_MODE_TRAILING_V1,
+    IMAGE_WORKER_MODE_WRONG_OUTPUT_V1, IMAGE_WORKER_MODE_WRONG_SOURCE_V1,
+    INTERNAL_IMAGE_WORKER_FLAG_V1, MAX_IMAGE_WORKER_FRAME_BYTES_V1,
+    MAX_IMAGE_WORKER_STDOUT_BYTES_V1, TestOwnerV1, inspect_entity_graphic_images_v1,
+    inspect_image_bytes_with_mode_v1, run_internal_image_worker_v1, test_inventory_v1,
+};
 pub use media_worker_host::{
     CHILD_OBSERVATION_MARKER_V1, EXIT_INTERNAL_PROBE_REFUSED, INTERNAL_PROBE_CHILD_TOKEN_V1,
     INTERNAL_PROBE_FLAG_V1, INTERNAL_PROBE_PARENT_TOKEN_V1, INTERNAL_REFUSAL_PREFIX_V1,
+    ImageWorkerConfinementV1, ImageWorkerHostV1, ImageWorkerRunRefusalV1, ImageWorkerRunV1,
     InternalProbeModeV1, InternalProbeReportV1, MAX_CHILD_STDERR_BYTES, MAX_CHILD_STDOUT_BYTES,
     PARENT_EVIDENCE_MARKER_V1, PROFILE_V1_AS_BYTES, PROFILE_V1_CPU_SECONDS, SMOKE_WALL_DEADLINE_MS,
-    SmokeObservationV1, SmokeRefusalV1, classify_child_exit_v1, classify_internal_arguments_v1,
-    parse_child_observation_v1, run_internal_linux_limit_smoke_v1,
-    run_internal_media_host_probe_v1, validate_observation_v1,
+    SmokeObservationV1, SmokeRefusalV1, child_image_worker_confinement_v1, classify_child_exit_v1,
+    classify_internal_arguments_v1, parse_child_observation_v1, run_confined_image_worker_v1,
+    run_internal_linux_limit_smoke_v1, run_internal_media_host_probe_v1, validate_observation_v1,
 };
 pub use media_worker_protocol::{
     MediaWorkerProtocolRefusalKindV1, MediaWorkerProtocolRefusalV1, parse_media_worker_envelope_v1,
