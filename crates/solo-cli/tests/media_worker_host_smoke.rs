@@ -2409,3 +2409,167 @@ mod n097 {
         }
     }
 }
+
+// ---------------------------------------------------------------------------------------------
+// `SOLO-WO-104 R01` — the Windows N102 isolation canaries
+// ---------------------------------------------------------------------------------------------
+//
+// These cases are the acceptance evidence earlier orders owed. Each one drives the real production
+// `CreateProcessW` / attribute-list / Job Object / minimal-environment path on a Windows host, and
+// each refuses rather than infers when a numeric handle value could be coincidental. Only bounded
+// booleans and a child pid are printed: no handle value, canary value or environment block.
+
+#[cfg(windows)]
+mod n102 {
+    use std::path::Path;
+    use std::process::Command;
+
+    use solo_adapters::{
+        INTERNAL_N102_ENV_PARENT_FLAG_V1, N102_ENV_PARENT_PREFIX_V1, N102ExtraInheritableV1,
+        run_n102_handle_probe_v1,
+    };
+
+    use super::BIN;
+
+    /// The single parent-only canary variable the helper parent is launched with.
+    const PARENT_CANARY: &str = "SOLO_N102_PARENT_CANARY";
+
+    /// A bounded, deterministic, non-secret canary value. It is never printed.
+    const PARENT_CANARY_VALUE: &str = "solo-n102-canary-bounded-value";
+
+    /// A numeric handle value the child can never legitimately own.
+    const IMPOSSIBLE_HANDLE: u32 = 0xffff_fff0;
+
+    /// `n102_01`: one extra real inheritable parent handle, created with `bInheritHandle` set and
+    /// deliberately absent from the two-entry `PROC_THREAD_ATTRIBUTE_HANDLE_LIST`, must not be
+    /// reachable from the real child the production spawn creates.
+    #[test]
+    fn n102_01_extra_inheritable_handle_is_excluded() {
+        let extra = N102ExtraInheritableV1::create().expect("extra inheritable parent handle");
+        let value = extra.value();
+        let answer = run_n102_handle_probe_v1(Path::new(BIN), value, IMPOSSIBLE_HANDLE)
+            .expect("bounded handle probe answer from the real child");
+        // A control value that resolved would mean the child handle table cannot answer this
+        // question at all, so the case fails instead of reporting a false exclusion.
+        assert!(
+            !answer.control_live,
+            "the guaranteed-invalid control resolved in the child, so the answer is ambiguous"
+        );
+        assert!(
+            !answer.handle_live,
+            "an inheritable parent handle outside the allowlist reached the child"
+        );
+        assert_ne!(answer.pid, 0, "the child reported no process identifier");
+        println!(
+            "n102_01 extra_handle_excluded=true control_live=false child_pid={}",
+            answer.pid
+        );
+        drop(extra);
+    }
+
+    /// `n102_02`: an isolated helper parent carrying one parent-only canary variable launches the
+    /// real worker through the production minimal-environment spawn; the child must not see the
+    /// canary and must still have the system variable production installs.
+    #[test]
+    fn n102_02_parent_environment_is_excluded() {
+        let output = Command::new(BIN)
+            .arg(INTERNAL_N102_ENV_PARENT_FLAG_V1)
+            .arg(PARENT_CANARY)
+            .env(PARENT_CANARY, PARENT_CANARY_VALUE)
+            .output()
+            .expect("isolated helper parent launch");
+        let text = String::from_utf8_lossy(&output.stdout);
+        assert_eq!(
+            output.status.code(),
+            Some(0),
+            "the helper parent refused instead of observing: {text}"
+        );
+        assert!(
+            text.starts_with(N102_ENV_PARENT_PREFIX_V1),
+            "the helper parent wrote no bounded line: {text}"
+        );
+        assert!(
+            text.contains("canary_present=0"),
+            "the parent-only canary reached the child: {text}"
+        );
+        assert!(
+            text.contains("system_root_present=1"),
+            "the child lost the system variable production installs: {text}"
+        );
+        println!(
+            "n102_02 parent_canary_excluded=true system_root_present=true line={}",
+            text.trim()
+        );
+    }
+
+    /// `n102_03`: every fixed native boundary the closed seam can reach must refuse the whole
+    /// candidate, keep no observation and leave no unreaped child.
+    #[test]
+    fn n102_03_native_failures_refuse_and_cleanup() {
+        let mut checked = Vec::new();
+        for step in 1..=solo_adapters::N102_LAST_FAULT_STEP_V1 {
+            let (fault, outcome) = solo_adapters::run_n102_fault_attempt_v1(Path::new(BIN), step);
+            assert_eq!(
+                fault.requested(),
+                Some(step),
+                "step {step} was not requested"
+            );
+            assert_eq!(
+                fault.reached(),
+                Some(step),
+                "step {step} never reached its real native boundary"
+            );
+            assert!(
+                outcome.is_err(),
+                "step {step} produced an observation instead of a typed refusal"
+            );
+            if step >= 9 {
+                assert!(
+                    fault.cleanup_verified(),
+                    "step {step} did not observe termination of the owned child"
+                );
+            } else {
+                assert!(
+                    !fault.cleanup_verified(),
+                    "step {step} claimed cleanup before any child existed"
+                );
+            }
+            checked.push((step, fault.cleanup_verified()));
+        }
+        assert_eq!(
+            checked.len(),
+            usize::from(solo_adapters::N102_LAST_FAULT_STEP_V1)
+        );
+        println!(
+            "n102_03 injected_steps_reached={} cleanup_observed={:?}",
+            checked.len(),
+            checked
+        );
+    }
+
+    /// `n102_04`: a per-run fault can never reach a concurrently running worker. The value is
+    /// constructed per invocation and threaded by reference, so no shared or thread-local state
+    /// exists to leak it.
+    #[test]
+    fn n102_04_a_concurrent_worker_is_unaffected_by_a_fault() {
+        let faults = std::thread::spawn(|| {
+            for step in 1..=solo_adapters::N102_LAST_FAULT_STEP_V1 {
+                let (_fault, outcome) =
+                    solo_adapters::run_n102_fault_attempt_v1(Path::new(BIN), step);
+                assert!(outcome.is_err(), "injected step {step} did not refuse");
+            }
+        });
+        let clean = run_n102_handle_probe_v1(Path::new(BIN), IMPOSSIBLE_HANDLE, IMPOSSIBLE_HANDLE)
+            .expect("a concurrent fault must not disturb a normal confined probe");
+        assert!(
+            !clean.control_live,
+            "the child handle-table control resolved"
+        );
+        assert!(
+            !clean.handle_live,
+            "the extra parent handle reached a concurrent child"
+        );
+        faults.join().expect("fault thread");
+        println!("n102_04 concurrent_probe_pid={} unaffected=true", clean.pid);
+    }
+}

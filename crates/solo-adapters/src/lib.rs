@@ -121,3 +121,27 @@ pub use source_set_staging::{
     STAGE_READ_CHUNK_BYTES, STAGE_SHARD_TARGET_BYTES, SourceSetStagingV1, StageReaderV1,
     StagedBodyV1, StagingFaultV1, StagingFaultsV1, StagingRootCapability,
 };
+
+/// `SOLO-WO-104 R01` closed N102 test seam.
+///
+/// Exactly four bounded Windows facts cross this boundary, for the integration suite only: the
+/// injection selector, the boundary that refused, the extra inheritable handle one canary holds
+/// across a real spawn, and the two child-side isolation probes. None of them exposes a process,
+/// command, limit or handle operation, and none adds an `unsafe` allowance.
+#[cfg(windows)]
+pub use media_worker_host::{
+    N102ExtraInheritableV1, n102_probe_environment_v1, n102_probe_handle_v1,
+};
+
+/// `SOLO-WO-104 R01` — the closed N102 probe surface the integration suite drives.
+///
+/// Four bounded facts and two typed refusals only: run one handle probe, run one environment
+/// probe, run the isolated helper parent, and parse either bounded answer. No process, command,
+/// limit or handle operation is exported, and no `unsafe` allowance is added.
+pub use media_worker_host::{
+    INTERNAL_N102_ENV_PARENT_FLAG_V1, N102_ENV_PARENT_PREFIX_V1, N102_LAST_FAULT_STEP_V1,
+    N102EnvironmentProbeV1, N102FaultRunV1, N102HandleProbeV1, N102ProbeRefusalV1,
+    parse_n102_environment_answer_v1, parse_n102_handle_answer_v1,
+    run_internal_n102_environment_parent_v1, run_n102_environment_probe_v1,
+    run_n102_fault_attempt_v1, run_n102_handle_probe_v1,
+};

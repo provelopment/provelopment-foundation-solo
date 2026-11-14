@@ -4260,6 +4260,7 @@ fn run_confined_image_worker_platform_v1(
     source_sha_hex: &str,
     mode_token: Option<&str>,
     source: &[u8],
+    _fault: &mut N102FaultRunV1,
 ) -> Result<ImageWorkerRunV1, ImageWorkerRunRefusalV1> {
     use std::io::Write as _;
     use std::process::{Command, Stdio};
@@ -4400,6 +4401,7 @@ fn run_confined_image_worker_platform_v1(
     source_sha_hex: &str,
     mode_token: Option<&str>,
     source: &[u8],
+    fault: &mut N102FaultRunV1,
 ) -> Result<ImageWorkerRunV1, ImageWorkerRunRefusalV1> {
     use std::io::Write as _;
     use std::time::{Duration, Instant};
@@ -4414,25 +4416,31 @@ fn run_confined_image_worker_platform_v1(
         format_token,
         source_sha_hex,
     ];
-    let mut worker = match mode_token {
+    // One per-run native fault context: production passes no request, so it can never be injected.
+    let mut native_fault = match fault.requested() {
+        Some(step) => native_worker::N102FaultContextV1::requesting(step),
+        None => native_worker::N102FaultContextV1::production(),
+    };
+    let worker = match mode_token {
         Some(mode) => {
             let with_mode = [arguments[0], arguments[1], arguments[2], mode];
-            native_worker::SuspendedWorkerV1::spawn(executable, &with_mode)
+            native_worker::SuspendedWorkerV1::spawn(executable, &with_mode, &mut native_fault)
         }
-        None => native_worker::SuspendedWorkerV1::spawn(executable, &arguments),
-    }
-    .ok_or(ImageWorkerRunRefusalV1::SpawnFailed)?;
+        None => native_worker::SuspendedWorkerV1::spawn(executable, &arguments, &mut native_fault),
+    };
+    fault.absorb(native_fault.reached(), native_fault.cleanup_verified());
+    let mut worker = worker.ok_or(ImageWorkerRunRefusalV1::SpawnFailed)?;
 
     let child_pid = worker.pid();
     let limits_verified = worker.limits_verified();
     let Some(mut stdin) = worker.take_stdin() else {
         let _ = worker.terminate_job();
-        let _ = worker.wait_ms(5_000);
+        let _ = worker.wait_ms(5_000, &mut native_fault);
         return Err(ImageWorkerRunRefusalV1::SpawnFailed);
     };
     let Some(stdout) = worker.take_stdout() else {
         let _ = worker.terminate_job();
-        let _ = worker.wait_ms(5_000);
+        let _ = worker.wait_ms(5_000, &mut native_fault);
         return Err(ImageWorkerRunRefusalV1::SpawnFailed);
     };
 
@@ -4444,11 +4452,11 @@ fn run_confined_image_worker_platform_v1(
     };
 
     // Only now, with the job attached and its limits read back, may the worker execute.
-    if !worker.resume() {
+    if !worker.resume(&mut native_fault) {
         let _ = worker.terminate_job();
         let _ = writer.join();
         let _ = out_reader.join();
-        let _ = worker.wait_ms(10_000);
+        let _ = worker.wait_ms(10_000, &mut native_fault);
         return Err(ImageWorkerRunRefusalV1::SpawnFailed);
     }
 
@@ -4456,7 +4464,7 @@ fn run_confined_image_worker_platform_v1(
     let mut timed_out = false;
     let mut exit_code: Option<u32> = None;
     loop {
-        if let Some(code) = worker.wait_ms(10) {
+        if let Some(code) = worker.wait_ms(10, &mut native_fault) {
             exit_code = Some(code);
             break;
         }
@@ -4467,7 +4475,7 @@ fn run_confined_image_worker_platform_v1(
     }
     if exit_code.is_none() {
         let _ = worker.terminate_job();
-        exit_code = worker.wait_ms(10_000);
+        exit_code = worker.wait_ms(10_000, &mut native_fault);
     }
     let cleanup_verified = exit_code.is_some();
     let wall_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
@@ -4514,6 +4522,7 @@ fn run_confined_image_worker_platform_v1(
     _source_sha_hex: &str,
     _mode_token: Option<&str>,
     _source: &[u8],
+    _fault: &mut N102FaultRunV1,
 ) -> Result<ImageWorkerRunV1, ImageWorkerRunRefusalV1> {
     Err(ImageWorkerRunRefusalV1::HostUnsupported)
 }
@@ -4529,6 +4538,7 @@ pub(crate) fn run_confined_image_worker_mode_v1(
     source_sha_hex: &str,
     mode_token: Option<&str>,
     source: &[u8],
+    fault: &mut N102FaultRunV1,
 ) -> Result<ImageWorkerRunV1, ImageWorkerRunRefusalV1> {
     run_confined_image_worker_platform_v1(
         executable,
@@ -4536,6 +4546,7 @@ pub(crate) fn run_confined_image_worker_mode_v1(
         source_sha_hex,
         mode_token,
         source,
+        fault,
     )
 }
 
@@ -4557,7 +4568,14 @@ pub fn run_confined_image_worker_v1(
     source_sha_hex: &str,
     source: &[u8],
 ) -> Result<ImageWorkerRunV1, ImageWorkerRunRefusalV1> {
-    run_confined_image_worker_platform_v1(executable, format_token, source_sha_hex, None, source)
+    run_confined_image_worker_platform_v1(
+        executable,
+        format_token,
+        source_sha_hex,
+        None,
+        source,
+        &mut N102FaultRunV1::production(),
+    )
 }
 
 #[cfg(test)]
@@ -6648,4 +6666,312 @@ mod tests {
             "the classified refusal keeps its stable public token"
         );
     }
+}
+
+#[cfg(windows)]
+pub use crate::media_worker_host_native::{
+    N102ExtraInheritableV1, n102_probe_environment_v1, n102_probe_handle_v1,
+};
+// `SOLO-WO-104 R01` — the closed N102 probe seam.
+//
+// These helpers let the integration suite observe two real facts through the production confined
+// spawn: which handles the child actually receives and which environment the child actually sees.
+// They accept no command line, no arbitrary executable and no authored content, and they never
+// print a handle value, a variable value or an environment block.
+
+/// Why one closed N102 probe produced no observation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum N102ProbeRefusalV1 {
+    /// The confined worker run itself refused, with its own exact kind preserved.
+    Worker(ImageWorkerRunRefusalV1),
+    /// The child's bounded answer was absent, over-long or off-schema.
+    AnswerInvalid,
+}
+
+/// The bounded answer of one closed handle-isolation probe.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct N102HandleProbeV1 {
+    /// Whether the child's own handle table resolved the parent's extra handle value.
+    pub handle_live: bool,
+    /// Whether the guaranteed-invalid control also resolved, which makes the answer unusable.
+    pub control_live: bool,
+    /// The child's own process identifier.
+    pub pid: u32,
+}
+
+/// The bounded answer of one closed environment-isolation probe.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct N102EnvironmentProbeV1 {
+    /// Whether the parent-only canary variable reached the child.
+    pub canary_present: bool,
+    /// Whether the child still has the system variable production installs.
+    pub system_root_present: bool,
+    /// The child's own process identifier.
+    pub pid: u32,
+}
+
+/// One fixed probe byte, carried only so the supervisor takes its ordinary non-empty path: the
+/// probe modes themselves never read source bytes.
+const N102_PROBE_SOURCE_V1: [u8; 1] = [0x00];
+
+/// The exact digest of that fixed probe byte.
+const N102_PROBE_SOURCE_SHA256_V1: &str =
+    "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d";
+
+/// The exact first token of the helper parent's own bounded answer line.
+pub const N102_ENV_PARENT_PREFIX_V1: &str = "SOLO-N102-ENV-PARENT-V1";
+
+/// The closed internal flag that makes one process the isolated parent of a real worker probe.
+pub const INTERNAL_N102_ENV_PARENT_FLAG_V1: &str = "--internal-n102-env-parent";
+
+fn n102_bounded_boolean_v1(line: &str, key: &str) -> Option<bool> {
+    match line.split(' ').find_map(|part| part.strip_prefix(key)) {
+        Some("0") => Some(false),
+        Some("1") => Some(true),
+        _ => None,
+    }
+}
+
+/// Parses one bounded handle-isolation answer line.
+pub fn parse_n102_handle_answer_v1(text: &str) -> Result<N102HandleProbeV1, N102ProbeRefusalV1> {
+    let line = text.trim_end_matches(['\r', '\n']);
+    if line.is_empty()
+        || line.len() > crate::graphic_image_inspection::MAX_IMAGE_WORKER_FRAME_BYTES_V1
+        || !line.is_ascii()
+        || !line.starts_with(crate::graphic_image_inspection::N102_HANDLE_PROBE_PREFIX_V1)
+    {
+        return Err(N102ProbeRefusalV1::AnswerInvalid);
+    }
+    let handle_live =
+        n102_bounded_boolean_v1(line, "live=").ok_or(N102ProbeRefusalV1::AnswerInvalid)?;
+    let control_live =
+        n102_bounded_boolean_v1(line, "control_live=").ok_or(N102ProbeRefusalV1::AnswerInvalid)?;
+    let pid = line
+        .split(' ')
+        .find_map(|part| part.strip_prefix("pid="))
+        .and_then(|value| value.parse::<u32>().ok())
+        .ok_or(N102ProbeRefusalV1::AnswerInvalid)?;
+    Ok(N102HandleProbeV1 {
+        handle_live,
+        control_live,
+        pid,
+    })
+}
+
+/// Parses one bounded environment-isolation answer line.
+pub fn parse_n102_environment_answer_v1(
+    text: &str,
+) -> Result<N102EnvironmentProbeV1, N102ProbeRefusalV1> {
+    let line = text.trim_end_matches(['\r', '\n']);
+    if line.is_empty()
+        || line.len() > crate::graphic_image_inspection::MAX_IMAGE_WORKER_FRAME_BYTES_V1
+        || !line.is_ascii()
+        || !line.starts_with(crate::graphic_image_inspection::N102_ENVIRONMENT_PROBE_PREFIX_V1)
+    {
+        return Err(N102ProbeRefusalV1::AnswerInvalid);
+    }
+    let canary_present =
+        n102_bounded_boolean_v1(line, "canary=").ok_or(N102ProbeRefusalV1::AnswerInvalid)?;
+    let system_root_present =
+        n102_bounded_boolean_v1(line, "system_root=").ok_or(N102ProbeRefusalV1::AnswerInvalid)?;
+    let pid = line
+        .split(' ')
+        .find_map(|part| part.strip_prefix("pid="))
+        .and_then(|value| value.parse::<u32>().ok())
+        .ok_or(N102ProbeRefusalV1::AnswerInvalid)?;
+    Ok(N102EnvironmentProbeV1 {
+        canary_present,
+        system_root_present,
+        pid,
+    })
+}
+
+/// Runs one closed handle-isolation probe through the real production confined spawn.
+pub fn run_n102_handle_probe_v1(
+    executable: &std::path::Path,
+    value: u32,
+    control: u32,
+) -> Result<N102HandleProbeV1, N102ProbeRefusalV1> {
+    let token = format!(
+        "{}:{value}:{control}",
+        crate::graphic_image_inspection::IMAGE_WORKER_MODE_PROBE_HANDLE_V1
+    );
+    let run = run_confined_image_worker_mode_v1(
+        executable,
+        "png",
+        N102_PROBE_SOURCE_SHA256_V1,
+        Some(&token),
+        &N102_PROBE_SOURCE_V1,
+        &mut N102FaultRunV1::production(),
+    )
+    .map_err(N102ProbeRefusalV1::Worker)?;
+    parse_n102_handle_answer_v1(&String::from_utf8_lossy(run.stdout()))
+}
+
+/// Runs one closed environment-isolation probe through the real production confined spawn.
+pub fn run_n102_environment_probe_v1(
+    executable: &std::path::Path,
+    canary_name: &str,
+) -> Result<N102EnvironmentProbeV1, N102ProbeRefusalV1> {
+    let token = format!(
+        "{}:{canary_name}",
+        crate::graphic_image_inspection::IMAGE_WORKER_MODE_PROBE_ENVIRONMENT_V1
+    );
+    let run = run_confined_image_worker_mode_v1(
+        executable,
+        "png",
+        N102_PROBE_SOURCE_SHA256_V1,
+        Some(&token),
+        &N102_PROBE_SOURCE_V1,
+        &mut N102FaultRunV1::production(),
+    )
+    .map_err(N102ProbeRefusalV1::Worker)?;
+    parse_n102_environment_answer_v1(&String::from_utf8_lossy(run.stdout()))
+}
+
+/// Runs the isolated helper parent when the reserved internal flag is present.
+///
+/// The helper is a separate process on purpose: the integration suite launches it with exactly one
+/// parent-only canary variable through `Command::env`, and this process then starts the real worker
+/// through the production minimal-environment spawn. Exit `0` reports that the canary was absent and
+/// the system variable present, `61` that the canary reached the child, `62` that the system
+/// variable was missing, and `63` that the helper or the worker run refused instead of observing.
+pub fn run_internal_n102_environment_parent_v1(args: &[std::ffi::OsString]) -> Option<u8> {
+    if args.get(1)? != std::ffi::OsStr::new(INTERNAL_N102_ENV_PARENT_FLAG_V1) {
+        return None;
+    }
+    let Some(name) = args.get(2).and_then(|token| token.to_str()) else {
+        return Some(63);
+    };
+    if args.len() > 3 || name.is_empty() || name.len() > 32 || !name.is_ascii() {
+        return Some(63);
+    }
+    // The helper must itself carry the canary, otherwise its child observation proves nothing.
+    if std::env::var_os(name).is_none() {
+        return Some(63);
+    }
+    let Ok(own) = std::env::current_exe() else {
+        return Some(63);
+    };
+    let Ok(answer) = run_n102_environment_probe_v1(&own, name) else {
+        return Some(63);
+    };
+    let code = if answer.canary_present {
+        61
+    } else if !answer.system_root_present {
+        62
+    } else {
+        0
+    };
+    // Only bounded booleans and the child's own identifier leave this process.
+    println!(
+        "{N102_ENV_PARENT_PREFIX_V1} canary_present={} system_root_present={} pid={} status={code}",
+        u8::from(answer.canary_present),
+        u8::from(answer.system_root_present),
+        answer.pid
+    );
+    Some(code)
+}
+
+/// The highest closed N102 fault step the seam can request.
+pub const N102_LAST_FAULT_STEP_V1: u8 = 11;
+
+/// One per-run N102 fault observation: the boundary this run requested, the boundary it actually
+/// reached and whether the cleanup that followed a fault was observed to complete.
+///
+/// Every production image run holds [`Self::production`], which can never inject. A request can only
+/// come from the closed integration seam, and the reached boundary is recorded by the native code at
+/// the boundary itself, so an injected refusal stays distinguishable from a real kernel error.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct N102FaultRunV1 {
+    requested: Option<u8>,
+    reached: Option<u8>,
+    cleanup_verified: bool,
+}
+
+impl N102FaultRunV1 {
+    /// The only context a production image run may hold.
+    #[must_use]
+    pub const fn production() -> Self {
+        Self {
+            requested: None,
+            reached: None,
+            cleanup_verified: false,
+        }
+    }
+
+    /// A run that must make exactly one closed step refuse; `0` and values above 11 are rejected.
+    #[must_use]
+    pub const fn requesting(step: u8) -> Option<Self> {
+        if step == 0 || step > N102_LAST_FAULT_STEP_V1 {
+            return None;
+        }
+        Some(Self {
+            requested: Some(step),
+            reached: None,
+            cleanup_verified: false,
+        })
+    }
+
+    /// The step this run requested, if any.
+    #[must_use]
+    pub const fn requested(self) -> Option<u8> {
+        self.requested
+    }
+
+    /// The boundary this run actually reached, recorded at the native boundary.
+    #[must_use]
+    pub const fn reached(self) -> Option<u8> {
+        self.reached
+    }
+
+    /// Whether the cleanup that followed a fault was observed to complete.
+    #[must_use]
+    pub const fn cleanup_verified(self) -> bool {
+        self.cleanup_verified
+    }
+
+    /// Records the native boundary reached and whether its cleanup was observed.
+    #[cfg_attr(not(windows), allow(dead_code))]
+    pub(crate) fn absorb(&mut self, reached: Option<u8>, cleanup_verified: bool) {
+        if reached.is_some() {
+            self.reached = reached;
+        }
+        self.cleanup_verified |= cleanup_verified;
+    }
+}
+
+/// Runs one closed N102 fault attempt through the real production confined path.
+///
+/// Returns the per-run evidence and the refusal it produced. This is the only way an injected step
+/// can be selected; it is reachable from the integration suite alone and never changes how a
+/// production worker starts.
+pub fn run_n102_fault_attempt_v1(
+    executable: &std::path::Path,
+    step: u8,
+) -> (
+    N102FaultRunV1,
+    Result<N102HandleProbeV1, N102ProbeRefusalV1>,
+) {
+    let Some(mut fault) = N102FaultRunV1::requesting(step) else {
+        return (
+            N102FaultRunV1::production(),
+            Err(N102ProbeRefusalV1::AnswerInvalid),
+        );
+    };
+    let token = format!(
+        "{}:0:4294967280",
+        crate::graphic_image_inspection::IMAGE_WORKER_MODE_PROBE_HANDLE_V1
+    );
+    let outcome = run_confined_image_worker_mode_v1(
+        executable,
+        "png",
+        N102_PROBE_SOURCE_SHA256_V1,
+        Some(&token),
+        &N102_PROBE_SOURCE_V1,
+        &mut fault,
+    )
+    .map_err(N102ProbeRefusalV1::Worker)
+    .and_then(|run| parse_n102_handle_answer_v1(&String::from_utf8_lossy(run.stdout())));
+    (fault, outcome)
 }
