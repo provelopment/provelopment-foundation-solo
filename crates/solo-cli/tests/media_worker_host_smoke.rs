@@ -3094,4 +3094,123 @@ mod n108 {
             obs.transcript_digest().to_hex()
         );
     }
+
+    #[test]
+    fn n108_04_gif_extension_signature_trailer_and_mislabeled_input_refuse() {
+        // Positive controls: the known-good fixtures must still be accepted by the real child.
+        let good87 = gif87a_red_pixel();
+        let good89 = gif89a_three_frames();
+        let control87 = inspect_gif_bytes_with_executable_v1(Path::new(super::BIN), &good87)
+            .expect("positive GIF87a control must still be accepted");
+        let control89 = inspect_gif_bytes_with_executable_v1(Path::new(super::BIN), &good89)
+            .expect("positive GIF89a control must still be accepted");
+        assert_eq!(control87.frame_count(), 1);
+        assert_eq!(control89.frame_count(), 3);
+        println!(
+            "n108_gif=refusal-controls pids={},{} src87={} src89={}",
+            control87.worker_pid(),
+            control89.worker_pid(),
+            control87.source_digest().to_hex(),
+            control89.source_digest().to_hex()
+        );
+
+        let mut wrong_magic = good87.clone();
+        wrong_magic[..6].copy_from_slice(b"BAD87a");
+        let mut extra_after_trailer = good87.clone();
+        extra_after_trailer.push(0);
+        let truncated = good87[..good87.len() - 2].to_vec();
+        let mut gif87a_with_gce = good87.clone();
+        // Offset 19 is the first image descriptor for this exact fixture: six signature bytes,
+        // seven logical-screen bytes, six global-colour-table bytes (two entries).
+        assert_eq!(gif87a_with_gce[19], 0x2C);
+        gif87a_with_gce.splice(19..19, [0x21, 0xF9, 4, 0x04, 0, 0, 0, 0]);
+
+        // Unsupported extension block (plain text, 0x21 0x01) inserted at the same offset into an
+        // otherwise valid GIF89a.
+        let mut unsupported = gif87a_red_pixel();
+        unsupported[..6].copy_from_slice(b"GIF89a");
+        assert_eq!(unsupported[19], 0x2C);
+        unsupported.splice(
+            19..19,
+            [0x21, 0x01, 12, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        );
+
+        // Logical-screen background index outside the two-entry global colour table.
+        let background_out_of_range = GifSpecV1 {
+            version: b"GIF89a",
+            width: 1,
+            height: 1,
+            background_index: 5,
+            global_palette: Some(vec![RED, BLUE]),
+            loop_count: None,
+            graphic_control: true,
+            frames: vec![frame_v1(1, 1, &[0])],
+        }
+        .to_bytes();
+
+        let png = [
+            0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 0x0D, b'I', b'H', b'D', b'R',
+        ];
+        let jpeg = [
+            0xFF, 0xD8, 0xFF, 0xE0, 0, 0x10, b'J', b'F', b'I', b'F', 0, 1, 1, 0, 0, 1, 0, 1, 0, 0,
+            0xFF, 0xD9,
+        ];
+        let mut webp = b"RIFF".to_vec();
+        webp.extend_from_slice(&[0x1A, 0, 0, 0]);
+        webp.extend_from_slice(b"WEBPVP8 ");
+        webp.extend_from_slice(&[0, 0, 0, 0]);
+
+        let cases: [(&str, &[u8], &str); 8] = [
+            ("wrong-magic", &wrong_magic, "gif-worker-source-rejected"),
+            (
+                "gce-in-gif87a",
+                &gif87a_with_gce,
+                "gif-worker-supervisor-refused",
+            ),
+            ("truncated", &truncated, "gif-worker-supervisor-refused"),
+            (
+                "extra-after-trailer",
+                &extra_after_trailer,
+                "gif-worker-supervisor-refused",
+            ),
+            (
+                "unsupported-extension",
+                &unsupported,
+                "gif-worker-supervisor-refused",
+            ),
+            (
+                "background-out-of-range",
+                &background_out_of_range,
+                "gif-worker-supervisor-refused",
+            ),
+            ("png-as-gif", &png, "gif-worker-source-rejected"),
+            ("webp-as-gif", &webp, "gif-worker-source-rejected"),
+        ];
+        for (label, bytes, expected) in cases {
+            match inspect_gif_bytes_with_executable_v1(Path::new(super::BIN), bytes) {
+                Ok(observation) => panic!(
+                    "{label}: malformed GIF was accepted with {} frames",
+                    observation.frame_count()
+                ),
+                Err(refusal) => {
+                    println!("n108_gif=refusal case={label} token={}", refusal.token());
+                    assert_eq!(
+                        refusal.token(),
+                        expected,
+                        "{label}: unexpected refusal token"
+                    );
+                }
+            }
+        }
+        match inspect_gif_bytes_with_executable_v1(Path::new(super::BIN), &jpeg) {
+            Ok(_) => panic!("jpeg-as-gif: mislabeled JPEG was accepted"),
+            Err(refusal) => {
+                println!(
+                    "n108_gif=refusal case=jpeg-as-gif token={}",
+                    refusal.token()
+                );
+                assert_eq!(refusal.token(), "gif-worker-source-rejected");
+            }
+        }
+    }
 }
