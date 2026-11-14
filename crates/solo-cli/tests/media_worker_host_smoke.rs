@@ -2575,3 +2575,48 @@ mod n102 {
         println!("n102_04 concurrent_probe_pid={} unaffected=true", clean.pid);
     }
 }
+
+#[cfg(any(target_os = "linux", windows))]
+mod n108 {
+    use solo_adapters::{GifLoopV1, inspect_gif_bytes_with_executable_v1};
+    use solo_application::sha256_media_worker_bytes_v1;
+    use std::path::Path;
+
+    /// Valid extension-free GIF87a: 1x1 canvas, global palette red/blue, one image
+    /// descriptor, LZW codes clear / palette-index-0 / end. Code width is three bits:
+    /// codes (4, 0, 5) => 0x0144, little-endian packed.
+    fn gif87a_red_pixel() -> Vec<u8> {
+        let mut bytes = b"GIF87a".to_vec();
+        bytes.extend_from_slice(&[1, 0, 1, 0, 0x80, 0, 0]);
+        bytes.extend_from_slice(&[255, 0, 0, 0, 0, 255]);
+        bytes.extend_from_slice(&[0x2c, 0, 0, 0, 0, 1, 0, 1, 0, 0]);
+        bytes.extend_from_slice(&[2, 2, 0x44, 0x01, 0, 0x3b]);
+        bytes
+    }
+
+    #[test]
+    fn n108_01_gif87a_still_confined_and_parent_verified() {
+        let bytes = gif87a_red_pixel();
+        let obs = inspect_gif_bytes_with_executable_v1(Path::new(super::BIN), &bytes)
+            .expect("real confined GIF87a worker must succeed");
+        assert_eq!(obs.signature(), "GIF87a");
+        assert_eq!((obs.width(), obs.height()), (1, 1));
+        assert_eq!(obs.frame_count(), 1);
+        assert!(!obs.is_animated());
+        assert_eq!(obs.loop_semantics(), GifLoopV1::Absent);
+        assert_eq!(obs.source_digest(), &sha256_media_worker_bytes_v1(&bytes));
+        assert_eq!(
+            obs.frames()[0].composite_digest(),
+            &sha256_media_worker_bytes_v1(&[255, 0, 0, 255])
+        );
+        assert!(obs.transcript_len() > 0);
+        assert_ne!(obs.worker_pid(), 0);
+        assert!(obs.limits_verified() && obs.cleanup_verified());
+        println!(
+            "n108_gif=still frames=1 pid={} src={} transcript={}",
+            obs.worker_pid(),
+            obs.source_digest().to_hex(),
+            obs.transcript_digest().to_hex()
+        );
+    }
+}
