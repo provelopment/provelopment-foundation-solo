@@ -661,19 +661,23 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          log="$RUNNER_TEMP/n108-four.txt"
+          log="$RUNNER_TEMP/n108-eight.txt"
           cargo test -p solo-cli --test media_worker_host_smoke --locked n108_ -- --nocapture --test-threads=1 >"$log" 2>&1 || { cat "$log"; exit 1; }
           cat "$log"
           for name in \
             n108_01_gif87a_still_confined_and_parent_verified \
             n108_02_gif89a_animation_keeps_frames_delays_and_loop \
             n108_03_gif89a_previous_background_palette_interlace_offset \
-            n108_04_gif_extension_signature_trailer_and_mislabeled_input_refuse; do
+            n108_04_gif_extension_signature_trailer_and_mislabeled_input_refuse \
+            n108_05_gif89a_absent_finite_infinite_loops_and_zero_delay \
+            n108_06_gif_resource_budget_and_frame_rectangle_refusals \
+            n108_07_gif_application_repeat_and_lzw_corruption_refusals \
+            n108_08_gif_source_transcript_and_pixel_change_evidence; do
             grep -Eq "^test n108::${name} \.\.\." "$log" || { echo "missing $name"; exit 1; }
           done
-          [ "$(grep -Ec '^test n108::n108_0[1-4]_[A-Za-z0-9_]+ \.\.\.' "$log")" -eq 4 ]
-          grep -q 'test result: ok\. 4 passed; 0 failed; 0 ignored' "$log"
-          ! grep -Eq '^test n108::.* \.\.\. FAILED|^test result: FAILED' "$log"
+          [ "$(grep -Ec '^test n108::n108_0[1-8]_[A-Za-z0-9_]+ \.\.\.' "$log")" -eq 8 ]
+          grep -q 'test result: ok\. 8 passed; 0 failed; 0 ignored' "$log"
+          ! grep -Eq '^test n108::.* \.\.\. (FAILED|ignored)|^test result: FAILED' "$log"
 
       - name: N108 real GIF worker canaries (Windows)
         if: runner.os == 'Windows'
@@ -683,8 +687,12 @@ jobs:
             'n108_01_gif87a_still_confined_and_parent_verified',
             'n108_02_gif89a_animation_keeps_frames_delays_and_loop',
             'n108_03_gif89a_previous_background_palette_interlace_offset',
-            'n108_04_gif_extension_signature_trailer_and_mislabeled_input_refuse')
-          $log = Join-Path $env:RUNNER_TEMP 'n108-four.txt'
+            'n108_04_gif_extension_signature_trailer_and_mislabeled_input_refuse',
+            'n108_05_gif89a_absent_finite_infinite_loops_and_zero_delay',
+            'n108_06_gif_resource_budget_and_frame_rectangle_refusals',
+            'n108_07_gif_application_repeat_and_lzw_corruption_refusals',
+            'n108_08_gif_source_transcript_and_pixel_change_evidence')
+          $log = Join-Path $env:RUNNER_TEMP 'n108-eight.txt'
           cargo test -p solo-cli --test media_worker_host_smoke --locked n108_ -- --nocapture --test-threads=1 *>&1 | Tee-Object -FilePath $log
           if ($LASTEXITCODE -ne 0) { throw 'N108 failed' }
           $text = Get-Content -LiteralPath $log -Raw
@@ -693,10 +701,10 @@ jobs:
               throw "required N108 case absent: $name"
             }
           }
-          if (([regex]::Matches($text, '(?m)^test n108::n108_0[1-4]_[A-Za-z0-9_]+ \.\.\.')).Count -ne 4) {
+          if (([regex]::Matches($text, '(?m)^test n108::n108_0[1-8]_[A-Za-z0-9_]+ \.\.\.')).Count -ne 8) {
             throw 'wrong N108 execution count'
           }
-          if ($text -notmatch 'test result: ok\. 4 passed; 0 failed; 0 ignored' -or $text -match '\.\.\. FAILED') {
+          if ($text -notmatch 'test result: ok\. 8 passed; 0 failed; 0 ignored' -or $text -match '\.\.\. (FAILED|ignored)') {
             throw 'N108 refusal or skipped case'
           }
 
