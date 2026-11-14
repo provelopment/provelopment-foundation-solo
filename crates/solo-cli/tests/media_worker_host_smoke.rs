@@ -3543,4 +3543,92 @@ mod n108 {
             }
         }
     }
+
+    #[test]
+    fn n108_07_gif_application_repeat_and_lzw_corruption_refusals() {
+        // Positive controls: the known-good fixtures must still be accepted by the real child.
+        let good87 = gif87a_red_pixel();
+        let good89 = gif89a_three_frames();
+        let control87 = inspect_gif_bytes_with_executable_v1(Path::new(super::BIN), &good87)
+            .expect("positive GIF87a control must still be accepted");
+        let control89 = inspect_gif_bytes_with_executable_v1(Path::new(super::BIN), &good89)
+            .expect("positive GIF89a control must still be accepted");
+        assert_eq!(control87.frame_count(), 1);
+        assert_eq!(control89.frame_count(), 3);
+        println!(
+            "n108_gif=malformed control87 pid={} src={} control89 pid={} src={}",
+            control87.worker_pid(),
+            control87.source_digest().to_hex(),
+            control89.worker_pid(),
+            control89.source_digest().to_hex()
+        );
+
+        // Duplicate NETSCAPE repeat block: the exact verified nineteen-byte block sits at offset
+        // nineteen, so a second identical copy can be spliced immediately after it.
+        let mut duplicated_repeat = good89.clone();
+        let repeat = duplicated_repeat[19..38].to_vec();
+        assert_eq!(repeat.len(), 19);
+        assert!(repeat.starts_with(&[0x21, 0xff, 11]));
+        assert_eq!(&repeat[3..14], b"NETSCAPE2.0");
+        assert_eq!(&repeat[14..19], &[3, 1, 0, 0, 0]);
+        duplicated_repeat.splice(38..38, repeat);
+
+        // Unknown application identifier with intact block framing.
+        let mut unknown_application = good89.clone();
+        assert_eq!(&unknown_application[22..33], b"NETSCAPE2.0");
+        unknown_application[22..33].copy_from_slice(b"NOTSCAPE2.0");
+
+        // Malformed Graphic Control Extension: block size four mutated to three.
+        let mut short_control = good89.clone();
+        assert_eq!(&short_control[38..41], &[0x21, 0xf9, 4]);
+        short_control[40] = 3;
+
+        // LZW without an end code: the exact one-pixel payload of the GIF87a control is replaced by
+        // a deterministic clear-plus-index stream that never emits the end code the strict decoder
+        // requires (`check_lzw_end_code(true)`).
+        let mut unterminated_lzw = good87.clone();
+        assert_eq!(unterminated_lzw.len(), 35);
+        assert_eq!(unterminated_lzw[29], 2);
+        assert_eq!(unterminated_lzw[30], 2);
+        assert_eq!(&unterminated_lzw[31..33], &[0x44, 0x01]);
+        assert_eq!(unterminated_lzw[33], 0);
+        assert_eq!(unterminated_lzw[34], 0x3b);
+        unterminated_lzw[31] = 0x04;
+        unterminated_lzw[32] = 0x00;
+
+        // Missing sub-block terminator: the verified terminator byte becomes a one-byte block.
+        let mut missing_terminator = good87.clone();
+        assert_eq!(missing_terminator[33], 0);
+        missing_terminator[33] = 1;
+
+        // Compressed sub-block claiming more bytes than the stream still holds.
+        let mut truncated_block = good87.clone();
+        assert_eq!(truncated_block[30], 2);
+        truncated_block[30] = 4;
+
+        let cases: [(&str, &[u8]); 6] = [
+            ("duplicate-repeat", &duplicated_repeat),
+            ("unknown-application", &unknown_application),
+            ("short-graphic-control", &short_control),
+            ("unterminated-lzw", &unterminated_lzw),
+            ("missing-sub-block-terminator", &missing_terminator),
+            ("truncated-compressed-block", &truncated_block),
+        ];
+        for (label, bytes) in cases {
+            match inspect_gif_bytes_with_executable_v1(Path::new(super::BIN), bytes) {
+                Ok(observation) => panic!(
+                    "{label}: corrupt GIF was accepted with {} frames",
+                    observation.frame_count()
+                ),
+                Err(refusal) => {
+                    println!("n108_gif=malformed case={label} token={}", refusal.token());
+                    assert_eq!(
+                        refusal.token(),
+                        "gif-worker-supervisor-refused",
+                        "{label}: unexpected refusal token"
+                    );
+                }
+            }
+        }
+    }
 }
