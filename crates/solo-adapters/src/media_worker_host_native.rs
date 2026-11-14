@@ -1389,7 +1389,7 @@ mod windows {
                     std::ptr::null(),
                     1,
                     CREATE_SUSPENDED | EXTENDED_STARTUPINFO_PRESENT | CREATE_UNICODE_ENVIRONMENT,
-                    environment.as_ptr().cast(),
+                    std::ptr::null(),
                     working_directory.as_ptr(),
                     &startup.StartupInfo,
                     &mut info,
