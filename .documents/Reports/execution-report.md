@@ -108,6 +108,17 @@ The five V2 tests drive the **real** inward validator with fabricated observatio
 
 **Nonclaims:** no product GIF acceptance or integration, no mixed-format V2 verification, no deliberately forged-digest sensitivity proof, no safe true-vector SVG, no AVIF codec proof, no `platform/assets/` catalogue, no derived outputs, no route or publication authority, no release. `R03.C3`, `R03.C` and Stage 03 remain **OPEN**. The Implementation Agent does not declare `ACCEPT`.
 
+## 6A. Fresh main CI at the report-only commit
+
+Run `43599132318` at the first report-only commit:
+
+* **attempt 1** — `verify (ubuntu-24.04)` success, `verify (windows-2025)` **failure** in `Windows N102 isolation canaries (Windows only)`: `n102::n102_01_extra_inheritable_handle_is_excluded` panicked with `the non-inheritable control resolved in the child, so a numeric match is ambiguous reuse`, so the step threw `the N102 canaries failed (exit 101)` after `3 passed; 1 failed`.
+* **attempt 2** — same SHA, no byte change: **both jobs success**.
+
+That failure is the **known main-only N102 numeric-canary flake**, not a regression from this run: `main` deliberately does not carry the corrected N102 event-identity validation, which exists only on the preserved technical branches (`solo-wo-111-gif4-n102-r01` `cdf0ceeb`, `solo-wo-112-gif8-host-r01` `40b03c73`), and the report-only commit changes no product, test or workflow byte — `main` differs from A by `.documents/Reports/execution-report.md` alone. It is disclosed here rather than concealed, and it is not a licence to integrate the N102 fix into `main` under this order. The fresh both-host run at the governing report commit itself is given in chat with the exact SHA, because a report can never embed its own commit.
+
+
+
 ## 7. Exact next Owner decision
 
 Either:
