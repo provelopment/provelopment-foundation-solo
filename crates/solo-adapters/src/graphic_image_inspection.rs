@@ -982,14 +982,11 @@ fn validate_image_worker_run_v1(
         );
     }
 
-    // The decoded digest is recomputed here over exactly the bytes this parent received. A worker
-    // claim is never evidence, and this comparison is the guard the sensitivity proof removes.
+    // Deliberately red sensitivity mutation: both digests are computed and consumed, but the parent
+    // no longer compares the worker claim with its own recomputation, so a forged output digest
+    // reaches the accepted path and the unchanged test must fail.
     let received_digest = sha256_media_worker_bytes_v1(body);
-    if received_digest != frame.output_digest {
-        return GraphicImageInspectPortOutcomeV1::Refused(
-            GraphicImageInspectRefusalKindV1::OutputDigestMismatch,
-        );
-    }
+    let _uncompared_digests = (received_digest, frame.output_digest);
     if frame.source_digest != *request.source_digest() {
         return GraphicImageInspectPortOutcomeV1::Refused(
             GraphicImageInspectRefusalKindV1::SourceDigestMismatch,
