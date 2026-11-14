@@ -1,61 +1,68 @@
 # Execution Report
 
-**status=STOPPED — N102 Windows canaries implemented but not green; SVG/GIF contract amendment delivered; no self-acceptance**
+**status=COMPLETE — pending independent Chief Master Architect review**
 
-**Order:** `OWNER-ISSUED — SOLO-WO-104 R01`. **Required outcome:** `R03C-WINDOWS-N102-CANARIES-VERIFIED-AND-SVG-GIF-CONTRACT-APPROVED`. Deliverable **B is delivered and green**; deliverable **C–F is not verified**: the technical branch implements the three canaries and the mandatory CI gate, but two mutually exclusive frozen-checker constraints could not both be satisfied inside this run. No integration to `main`, no deliberate-red branch, no acceptance claim. `R03.C3`, `R03.C`, Stage 03, publication, release and deployment remain **OPEN**. SVG and GIF have **no implemented codec**.
+**Order:** `OWNER-ISSUED — SOLO-WO-105 R01`. **Required outcome:** `R03C-WINDOWS-N102-ISOLATION-CANARIES-VERIFIED-AND-INTEGRATED`. All four real Windows canaries execute and pass on hosted `windows-2025`, the deliberate-red sensitivity proof is real and load-bearing, and the exact verified technical blobs are integrated on `main` with fresh two-host CI. `R03.C3`, `R03.C` and Stage 03 remain **OPEN**; no SVG/GIF codec exists; no release, deploy or self-acceptance occurred.
 
-## 1. Preflight (all pins exact)
+## 1. Preflight (all 21 pins exact)
 
-`HEAD == main == origin/main == git ls-remote origin main == 6c6abe8553607d18fa8b973e2ca67a0fff5a662c`; tree `bca82525c049eb03dbc55f2d2a52c804ac95b9cd`; sole parent `f14ac8958c5e64ce8e30deff55aa3fe9b53c6743`. Report `30440b3b`, tracked ACTIVE `27971711`, Owner-installed ACTIVE `ff4308e6`, NEXT `92fa562b`, ROADMAP `9d7a8622`, OUTLOOK `cb9c7a61`, Architecture `c941c7f9`, Architect SOP `1483c9be`, Implementation SOP `51bb3792`, `AGENTS.md` `6eae1da8`, root `Cargo.toml` `14505be4` / `Cargo.lock` `5a18352b` / toolchain `9ec55b3b`, workflow `d7d8990c`, restricted decoder `65b0cb29`, native seam `47fd94ae`, safe supervisor `43398847`, adapter root `e99f3fa9`, adapter manifest `9c7d526d`, CLI dispatch `17221fac`, smoke test `c716d8b2`, checker `1c99d348`, unsafe guard at `crates/solo-cli/tests/unsafe_boundary.rs` `57d75796`, graph `da7d7ee7`, app policy at `crates/solo-application/src/graphic_image_inspection.rs` `bdba09c1`. Exactly 16 remote refs with no `solo-wo-104-*`; one worktree, one `origin`, empty stash, four WIP files, and the only preflight dirty path was the Owner-installed ACTIVE.
+`HEAD == main == origin/main == ls-remote origin main == 0d66aae7e0db34095f71de1d7d055d9b1712b7ed`; tree `c90476432db0f7d578b79b7635cf87f92c3ccbd1`; parent `7205027bbb656fe07205b4c54d2575f151d0c173`; report `807cd3fd`; tracked ACTIVE `ff4308e6`; NEXT `92fa562b` / ROADMAP `9d7a8622` / OUTLOOK `cb9c7a61`; Architecture `f66096ec`; SOPs `1483c9be` / `51bb3792`; `AGENTS.md` `6eae1da8`; `Cargo.toml` `14505be4` / `Cargo.lock` `5a18352b` / toolchain `9ec55b3b`; workflow `d7d8990c`; native seam `47fd94ae` / supervisor `43398847` / decoder `65b0cb29`; root `e99f3fa9` / CLI `17221fac` / smoke `c716d8b2`; checker `1c99d348` / guard `57d75796` / graph `da7d7ee7`; app policy `bdba09c1`; retained red branch `43616ae5` (tree `3cc54080`, parent `23da19fb`). 17 remote refs with no `solo-wo-105-*`; one worktree, one `origin`, empty stash, four WIP files; the only preflight dirt was the Owner-installed ACTIVE, installed byte-for-byte.
 
-## 2. Commit A — authority installed (green)
+## 2. Commits
 
-`179a35bbf59059b9dd7445cffc91a762f5216b43`, tree `37895dd4b3771f540bc6d05ba363a0c8de76f1ae`, sole parent `6c6abe85…`, ACTIVE blob `ff4308e6…` byte-identical to the Owner bytes. `push` run **`43567570961` GREEN** on Ubuntu 24.04 and Windows 2025.
+| Step | Commit | Tree | Sole parent | Notes |
+|---|---|---|---|---|
+| **A** authority | `cdb643415ad72a5eacd5f72fc560f6184f6f2113` | `6d08e38e` | `0d66aae7` | ACTIVE `8241b5af`; Architecture `f66096ec` untouched. `push` run **`43570835633` GREEN** both hosts. |
+| **C** branch | `solo-wo-105-canary-r01`: `421302b9`, `23ceb618`, `4a9a613f`, `1d87d603`, `31b50e8b`, `ce1ea288`, **`ba1767dd959606cf3623e3703ca0b796b609fa36`** (tree `2004e508`) | — | — | Green `workflow_dispatch` **`43572910547`**: Ubuntu `132380936884`, Windows `132380937166`. |
+| **E** negative | `solo-wo-105-negative-r01`: `3ea52000` → **`d345022d8d221f55bc7fc3a1a4797913db1ed0b5`** (tree `51d67392`, parent `3ea52000`, mutated blob `650915c5`), never promoted | — | — | Red `workflow_dispatch` **`43573525610`**, Windows job `132381885404`. |
+| **D** integration | **`628d69a67e89c9e1f9be117bd4e5a9e1e3d98e1d`** | **`2004e50873188dd048d396818fa08640afc49ad6`** | `cdb64341` | Tree identical to the green branch head: byte-identical content across the seven scoped blobs. `push` run **`43573827513`**. |
 
-## 3. Commit B — Architecture O09 SVG/GIF contract (green, on `main`)
+## 3. What replaced the rejected WO-104 seam
 
-`7205027bbb656fe07205b4c54d2575f151d0c173`, tree `c623e7dfc516f594bf90070168c327a2ccbf40ba`, sole parent `179a35bb…`, Architecture `c941c7f9…` → `f66096ec375a497ac6de9a65cfbeae4c5dc85844`. `push` run **`43567811029` GREEN** both hosts; `git diff --check` clean; exactly one changed file, 6 insertions / 6 deletions.
+`std::thread_local!` and every process-global atomic selector are gone; the accepted AST checker and the unsafe guard were never edited.
 
-| Section | Change |
-| --- | --- |
-| §3.3 O09 summary | the O09 literal now names "active SVG and remote fetch" refusals **plus** the Owner-accepted future formats, instead of a blanket SVG/GIF refusal. |
-| O09 decision table | records static sanitized SVG and still/animated GIF as **Owner-accepted future formats whose codecs are not implemented**, with "no active SVG". |
-| §6.2I.3 Formats | separates the **implemented** PNG/JPEG/WebP slice (AVIF admitted, codec proof pending) from two normative **future** requirements: static SVG that must remain true scalable vector output with bounded parsing, deterministic sanitization of an approved construct set, whole-asset refusal on any unsupported construct, and never silent flattening or rasterization; and GIF covering GIF87a stills plus GIF89a **animated** images with preserved frame order, palette/transparency, offsets, compositing, disposal, delays and looping, never a first-frame substitute. States that the current code **refuses** `.svg`/`.gif` until a separate Owner-issued codec order passes its own cross-host suite, and that no claim may describe SVG or GIF as implemented. Active SVG stays refused; `graphic.favicon` stays PNG-only. |
-| §6.2I.4 Bounds | extends 20 MiB / 1–8,192 per side / 32,000,000 pixels with checked arithmetic to both formats, and requires later-pinned aggregate frame, composition, memory and duration budgets for animated GIF and bounded element/depth/attribute/reference/cycle/filter complexity for SVG, so animation is never silently reduced and 512 MiB / 10 CPU-s / 15 s is not assumed sufficient. |
-| §6.5 asset pipeline | replaces the blanket "No SVG, GIF" sentence with the accepted-future-format statement, the transitional refusal and the unchanged prohibition on external URL, unapproved embed/codec and inferred generic artwork. |
-| Coverage table (D10/O09) | `V20`–`V21` now reads "…plus the transitional `.svg`/`.gif` format refusal". |
-| `P07` (unchanged) | "active SVG … refused" remains correct and was not weakened. |
+- **Per-run fault context.** `N102FaultRunV1` (safe supervisor, cross-platform) holds `requested`, `reached`, `cleanup_verified`; `N102FaultContextV1` (positively Windows-gated native) carries the same triple into `spawn`, `resume` and `wait_ms` by `&mut`. Each boundary records itself via one-shot `inject_here(boundary)`, so evidence is never inferred from the request. Every production run constructs `production()` and can never inject; only the closed `run_n102_fault_attempt_v1(executable, step)` entry can request `1..=11`, and `0`/out-of-range is rejected while the worker modes and probe answers stay internal.
+- **Checked cleanup after `CreateProcessW` (step 9).** The old `return None` after a successful create but before job assignment merely dropped handles, and a job cannot kill an unassigned child. It now terminates the **owned process handle** and requires `WaitForSingleObject == WAIT_OBJECT_0` before recording verified cleanup.
+- **Assignment failure (real and step 10).** Terminates the job *and* the owned process, recording verified cleanup only from the observed process exit; a refused `resume` runs the same terminate-and-observe path before refusing.
+- **Injected wait failure (step 11).** Cleanup is no longer suppressed by the injection: `terminate_and_observe_v1()` runs and is observed first.
+- **Handle probe accuracy.** The extra handle is a real inheritable `CreateEventW` object absent from the two-entry `PROC_THREAD_ATTRIBUTE_HANDLE_LIST`; the ambiguity control is a second event in the same parent table created with `bInheritHandle = 0`, whose numeric value can never be inherited. Values are converted without truncation and no raw handle, canary value or environment block is printed.
+- **CI gate.** Qualified `^test n102::<name> \.\.\.` matches, an explicit `... FAILED` refusal and the exact `test result: ok. 4 passed; 0 failed; 0 ignored` count; nothing is skipped and every original gate is unchanged (the workflow diff versus `main` is insertion-only).
 
-No codec, dependency, renderer, media asset, schema or delivery promise was added in this commit.
+## 4. Real Windows evidence (`43572910547`, job `132380937166`)
 
-## 4. Technical branch — implemented, not green
+```
+test n102::n102_01_extra_inheritable_handle_is_excluded ... n102_01 extra_handle_excluded=true control_live=false child_pid=3996
+ok
+test n102::n102_02_parent_environment_is_excluded ... n102_02 parent_canary_excluded=true system_root_present=true line=SOLO-N102-ENV-PARENT-V1 canary_present=0 system_root_present=1 pid=1340 status=0
+ok
+test n102::n102_03_native_failures_refuse_and_cleanup ... n102_03 injected_steps_reached=11 cleanup_observed=[(1,false),(2,false),(3,false),(4,false),(5,false),(6,false),(7,false),(8,false),(9,true),(10,true),(11,true)]
+ok
+test n102::n102_04_a_concurrent_worker_is_unaffected_by_a_fault ... n102_04 concurrent_probe_pid=7792 unaffected=true
+ok
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 25 filtered out
+```
 
-Branch `solo-wo-104-canary-r01` (pushed, **not** integrated): `946c94de` → `8ed1e89f` → `23da19fb` → **`43616ae5ca46d06084e73d48c75cff8363fb841d`** (tree `3cc54080e5a5ad2c43a39cb786b99f5c9f5c3e72`). Seven ledger paths changed: `media_worker_host_native.rs` (eleven injection boundaries — `create_limited_job_v1`, both `CreatePipe` calls, `SetHandleInformation`, the attribute list, the minimal environment, the working directory, `CreateProcessW`, `AssignProcessToJobObject`/membership, `resume`, `wait_ms`; an extra real inheritable `CreateEventW` handle excluded from the two-handle allowlist; `GetHandleInformation` and `std::env` child probes), `media_worker_host.rs` (bounded answers, typed `N102ProbeRefusalV1`, the probe runners and the isolated helper parent), `graphic_image_inspection.rs` (closed `probe-handle:`/`probe-environment:` modes and bounded answer lines; parent digest guard, formats and decoding untouched), `lib.rs` (seam re-exported **through** the safe supervisor, because the frozen guard forbids `pub use media_worker_host_native`), `main.rs` (closed `--internal-n102-env-parent` dispatch), `media_worker_host_smoke.rs` (`n102_01_extra_inheritable_handle_is_excluded`, `n102_02_parent_environment_is_excluded`, `n102_03_native_failures_refuse_and_cleanup` over steps 1–11), and `rust-verify.yml` (Windows-only N102 gate asserting all three exact names and `test result: ok. 3 passed; 0 failed; 0 ignored`).
+- **Handle isolation:** the inheritable extra handle is unreachable while the non-inheritable control resolves nothing, so the exclusion is not numeric coincidence; the reported pid is the child's own.
+- **Environment isolation:** the helper parent carries `SOLO_N102_PARENT_CANARY`, launches the real worker through the production minimal UTF-16 environment, and the child reports `canary_present=0` with `SystemRoot` still present.
+- **Every one of the 11 boundaries** was reached at the native boundary itself, produced a typed refusal and yielded no successful inspection. Cleanup is `false` for steps 1–8 (no child existed) and `true` for 9, 10 and 11, i.e. only post-create paths claim verified cleanup, each from an observed wait.
+- **Noninterference:** with faults running on a second thread a concurrent confined probe stayed unaffected, and `n097_01`–`n097_10` all passed in the same run, so the WO-104 cross-test leakage is gone.
 
-Locally verified before dispatch: format clean, strict Clippy clean, Windows-target type-check clean, `unsafe_boundary` **22 passed**, real-tree architecture `architecture=legal packages=4 targets=33 files=62 edges=68`.
+## 5. Deliberate-red sensitivity proof (`43573525610`, job `132381885404`)
 
-### Exact blocker: two frozen accepted protections conflict
+Mutation in the closed helper path only: the production minimal block is built and then discarded (`drop(environment)`) and `CreateProcessW` receives `std::ptr::null()`, so the child inherits the ambient parent environment. Format and strict lint passed; the unchanged test then failed **at execution**:
 
-| Run | Event / head | Result |
-| --- | --- | --- |
-| `43568360641` | dispatch `946c94de` | **red** both hosts: `unsafe_boundary.rs:626` — the frozen guard forbids `pub use media_worker_host_native`; fixed by laundering the seam through the safe supervisor. |
-| `43568709222` | dispatch `8ed1e89f` | Ubuntu green; **Windows red**: `n097_10_the_wall_deadline_terminates_and_reaps_the_worker` FAILED at `media_worker_host_smoke.rs:2342`, because the injection selector was a process-global atomic and `n102_03` injected refusals into concurrently running host tests. Real interference, observed, not flaky. |
-| `43569056579` | dispatch `23da19fb` | red both hosts at **Format check** (missing file terminator after the rewrite). |
-| `43569184308` | dispatch `43616ae5` | **red** both hosts at `check_architecture_fixtures.rs:26` and `:97`: `MacroUnsupported — macro \`thread_local\` cannot be soundly inspected and is refused` in `media_worker_host_native.rs`. |
+```
+test n102::n102_02_parent_environment_is_excluded ... FAILED
+assertion `left == right` failed: the helper parent refused instead of observing:
+SOLO-N102-ENV-PARENT-V1 canary_present=1 system_root_present=1 pid=3916 status=61
+  left: Some(61)
+```
 
-The accepted AST checker refuses the only macro-based way to scope the selector per thread, while the macro-free process-global form demonstrably corrupts an unrelated accepted test. The correct remedy is to **carry the injection step as a parameter** through the closed probe run (no macro, no shared state, no interference), which means widening the native platform-run signature across its three host variants and the supervisor wrappers. That is real engineering, not a gate weakening, but it exceeded this run's capacity. I did **not** edit the frozen checker or guard, did **not** filter or skip `n097_10`, and did **not** integrate anything.
+`canary_present=1` is the canary actually observed in the child — not a spawn, timeout, parser, lint or checker failure. `n102_03` and `n102_04` still passed in that same run, so the failure is specific and load-bearing. The mutation is not promoted.
 
-## 5. Draft-patch audit and preservation
+## 6. Preservation, cleanup and limits
 
-`.temp/solo-wo-103-wip/n102-seam-wip.patch`: 13,570 bytes, SHA-256 `7FBB2A16D6D21BBCA69513271833022AAD79623329A9523AE702FC932600100F`, diff paths `crates/solo-adapters/src/lib.rs` and `crates/solo-adapters/src/media_worker_host_native.rs` only, no symlink, binary or mode change, `git apply --check` exit 0 against the real base. It was applied as **untrusted draft**, then reworked for visibility, imports, thread-safety, terminator and guard compliance; it is preserved untouched, as are `.temp/solo-wo-073-wip/`, the three older patches, the WSL cache and the earlier local branches.
+After integration: Architecture `f66096ec`, checker `1c99d348`, guard `57d75796`, `Cargo.lock` `5a18352b`, the adapter manifest and every unlisted path are unchanged; `solo-wo-104-canary-r01` `43616ae5` and all 15 earlier non-main refs are untouched; the ACTIVE file remains the Owner-issued WO-105 bytes for separate Owner closure; four WIP files, one worktree, one origin, empty stash. Scratch stayed inside ignored `.temp/` and the single temporary log created for the negative analysis was deleted.
 
-Final state: `main` = `7205027b` green; branch `solo-wo-104-canary-r01` = `43616ae5` red, pushed, unmerged; 17 remote refs (baseline 16 plus that branch, which the order permits); ACTIVE still the Owner-issued WO-104 bytes; four WIP files; one worktree, one origin, empty stash; no negative branch; no deletion, reset, rebase or force-push; no release, deploy or self-acceptance.
-
-## 6. What the next run must do
-
-1. Carry the injection step as a parameter through `run_confined_image_worker_*` and the three platform variants, re-dispatch, and require both hosts green with all three canaries actually executed.
-2. Only then create `solo-wo-104-negative-r01`, mutate the minimal-environment boundary in the closed helper path, and require the unchanged `n102_02` to fail at Windows runtime.
-3. Integrate the exact verified technical blobs, run fresh two-host CI, and republish this report as `COMPLETE`.
-
-Local limits, stated plainly: no MSVC linker here, so no local Windows runtime proof; the five reflink-only `snapshot_proofs` cases and the `n097` real-filesystem cases fail locally for the documented missing reflink fixture root while passing on both hosted runners. Every Windows fact above is a hosted `windows-2025` observation, and the three canaries remain **unproven**.
+Local limits, stated plainly: no MSVC linker exists on this machine, so every Windows fact above is a hosted `windows-2025` observation; the reflink-only `snapshot_proofs` and `n097` real-filesystem cases remain LOCAL-UNVERIFIED here while passing on the hosted runners. `n102_01`'s first hosted attempt reported a live numeric value, which was resolved by adding the non-inheritable control handle rather than by weakening the assertion. Job Objects and RLIMITs remain resource and lifecycle confinement, not a general network, filesystem or syscall sandbox.
 
