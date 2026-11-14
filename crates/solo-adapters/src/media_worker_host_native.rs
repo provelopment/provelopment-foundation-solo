@@ -945,11 +945,8 @@ mod windows {
         limits.ProcessMemoryLimit = PROCESS_MEMORY_BYTES;
         limits.JobMemoryLimit = JOB_MEMORY_BYTES;
 
-        let Some(length) =
-            u32::try_from(std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>()).ok()
-        else {
-            return None;
-        };
+        let length =
+            u32::try_from(std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>()).ok()?;
 
         // SAFETY: the job handle came from `CreateJobObjectW` just above and is owned by the guard,
         // the information class matches the structure type, and the length is exactly that

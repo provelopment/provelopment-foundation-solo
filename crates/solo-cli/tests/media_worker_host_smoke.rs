@@ -1983,7 +1983,7 @@ mod n097 {
             format!("{:?}", result.obligation().declaring_owner()).contains("entity"),
             "the result keeps the Entity that authored it"
         );
-        assert_eq!(result.logical_path(), "hero.png");
+        assert_eq!(result.logical_path(), "assets/hero.png");
 
         // The four pixels are red, green, blue, white in that order, so the decoded plane is known
         // exactly and its digest is a trusted constant rather than a worker claim.
@@ -2021,7 +2021,7 @@ mod n097 {
             ("webp", "hero.webp", webp(), GraphicImageFormatV1::WebP),
         ] {
             let root = Root::new(tag, &[(name, &fixture)]);
-            let reference = format!("assets/{name}");
+            let reference = name.to_owned();
             let set = complete(inspect_entity_graphic_images_v1(
                 &root.capability(),
                 &one_logo(&reference),
@@ -2055,12 +2055,15 @@ mod n097 {
     #[test]
     fn n097_03_each_declaring_owner_keeps_its_own_independent_result() {
         let fixture = png();
-        let root = Root::new("owners", &[("shared.png", &fixture)]);
+        let root = Root::new(
+            "owners",
+            &[("entity.png", &fixture), ("site.png", &fixture)],
+        );
         let set = complete(inspect_entity_graphic_images_v1(
             &root.capability(),
             &inventory_of(&[
-                (TestOwnerV1::Entity, "logo", "shared.png", "public"),
-                (TestOwnerV1::Site, "logo", "shared.png", "public"),
+                (TestOwnerV1::Entity, "logo", "entity.png", "public"),
+                (TestOwnerV1::Site, "logo", "site.png", "public"),
             ]),
             Path::new(BIN),
         ));
