@@ -38,7 +38,8 @@ pub const APPROVED_DEV_OWNER: &str = "solo-cli";
 /// only for `cfg(target_os = "linux")` and `windows-sys` only for `cfg(windows)` — so a
 /// single host never compiles both, and the locked graph therefore carries exactly one
 /// `windows-sys`, which is what keeps `multiple-versions = "deny"` satisfied.
-pub const APPROVED_ADAPTER_EXTERNAL_NORMAL: [&str; 6] = [
+pub const APPROVED_ADAPTER_EXTERNAL_NORMAL: [&str; 7] = [
+    "gif",
     "image",
     "libc",
     "rustix",
@@ -55,7 +56,7 @@ pub const APPROVED_ADAPTER_EXTERNAL_OWNER: &str = "solo-adapters";
 ///
 /// It is enumerated rather than computed so that a new transitive component cannot
 /// appear silently: an unlisted node is an unapproved reachability and is refused.
-pub const APPROVED_ADAPTER_CLOSURE: [&str; 37] = [
+pub const APPROVED_ADAPTER_CLOSURE: [&str; 39] = [
     "adler2",
     "autocfg",
     "bitflags",
@@ -66,6 +67,7 @@ pub const APPROVED_ADAPTER_CLOSURE: [&str; 37] = [
     "errno",
     "fdeflate",
     "flate2",
+    "gif",
     "image",
     "image-webp",
     "itoa",
@@ -88,6 +90,7 @@ pub const APPROVED_ADAPTER_CLOSURE: [&str; 37] = [
     "simd-adler32",
     "syn",
     "unicode-ident",
+    "weezl",
     "windows-link",
     "windows-sys",
     "zmij",
