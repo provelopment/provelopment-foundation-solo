@@ -6649,3 +6649,202 @@ mod tests {
         );
     }
 }
+
+// `SOLO-WO-104 R01` — the closed N102 probe seam.
+//
+// These helpers let the integration suite observe two real facts through the production confined
+// spawn: which handles the child actually receives and which environment the child actually sees.
+// They accept no command line, no arbitrary executable and no authored content, and they never
+// print a handle value, a variable value or an environment block.
+
+/// Why one closed N102 probe produced no observation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum N102ProbeRefusalV1 {
+    /// The confined worker run itself refused, with its own exact kind preserved.
+    Worker(ImageWorkerRunRefusalV1),
+    /// The child's bounded answer was absent, over-long or off-schema.
+    AnswerInvalid,
+}
+
+/// The bounded answer of one closed handle-isolation probe.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct N102HandleProbeV1 {
+    /// Whether the child's own handle table resolved the parent's extra handle value.
+    pub handle_live: bool,
+    /// Whether the guaranteed-invalid control also resolved, which makes the answer unusable.
+    pub control_live: bool,
+    /// The child's own process identifier.
+    pub pid: u32,
+}
+
+/// The bounded answer of one closed environment-isolation probe.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct N102EnvironmentProbeV1 {
+    /// Whether the parent-only canary variable reached the child.
+    pub canary_present: bool,
+    /// Whether the child still has the system variable production installs.
+    pub system_root_present: bool,
+    /// The child's own process identifier.
+    pub pid: u32,
+}
+
+/// One fixed probe byte, carried only so the supervisor takes its ordinary non-empty path: the
+/// probe modes themselves never read source bytes.
+const N102_PROBE_SOURCE_V1: [u8; 1] = [0x00];
+
+/// The exact digest of that fixed probe byte.
+const N102_PROBE_SOURCE_SHA256_V1: &str =
+    "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d";
+
+/// The exact first token of the helper parent's own bounded answer line.
+pub const N102_ENV_PARENT_PREFIX_V1: &str = "SOLO-N102-ENV-PARENT-V1";
+
+/// The closed internal flag that makes one process the isolated parent of a real worker probe.
+pub const INTERNAL_N102_ENV_PARENT_FLAG_V1: &str = "--internal-n102-env-parent";
+
+fn n102_bounded_boolean_v1(line: &str, key: &str) -> Option<bool> {
+    match line.split(' ').find_map(|part| part.strip_prefix(key)) {
+        Some("0") => Some(false),
+        Some("1") => Some(true),
+        _ => None,
+    }
+}
+
+/// Parses one bounded handle-isolation answer line.
+pub fn parse_n102_handle_answer_v1(text: &str) -> Result<N102HandleProbeV1, N102ProbeRefusalV1> {
+    let line = text.trim_end_matches(['\r', '\n']);
+    if line.is_empty()
+        || line.len() > crate::graphic_image_inspection::MAX_IMAGE_WORKER_FRAME_BYTES_V1
+        || !line.is_ascii()
+        || !line.starts_with(crate::graphic_image_inspection::N102_HANDLE_PROBE_PREFIX_V1)
+    {
+        return Err(N102ProbeRefusalV1::AnswerInvalid);
+    }
+    let handle_live =
+        n102_bounded_boolean_v1(line, "live=").ok_or(N102ProbeRefusalV1::AnswerInvalid)?;
+    let control_live =
+        n102_bounded_boolean_v1(line, "control_live=").ok_or(N102ProbeRefusalV1::AnswerInvalid)?;
+    let pid = line
+        .split(' ')
+        .find_map(|part| part.strip_prefix("pid="))
+        .and_then(|value| value.parse::<u32>().ok())
+        .ok_or(N102ProbeRefusalV1::AnswerInvalid)?;
+    Ok(N102HandleProbeV1 {
+        handle_live,
+        control_live,
+        pid,
+    })
+}
+
+/// Parses one bounded environment-isolation answer line.
+pub fn parse_n102_environment_answer_v1(
+    text: &str,
+) -> Result<N102EnvironmentProbeV1, N102ProbeRefusalV1> {
+    let line = text.trim_end_matches(['\r', '\n']);
+    if line.is_empty()
+        || line.len() > crate::graphic_image_inspection::MAX_IMAGE_WORKER_FRAME_BYTES_V1
+        || !line.is_ascii()
+        || !line.starts_with(crate::graphic_image_inspection::N102_ENVIRONMENT_PROBE_PREFIX_V1)
+    {
+        return Err(N102ProbeRefusalV1::AnswerInvalid);
+    }
+    let canary_present =
+        n102_bounded_boolean_v1(line, "canary=").ok_or(N102ProbeRefusalV1::AnswerInvalid)?;
+    let system_root_present =
+        n102_bounded_boolean_v1(line, "system_root=").ok_or(N102ProbeRefusalV1::AnswerInvalid)?;
+    let pid = line
+        .split(' ')
+        .find_map(|part| part.strip_prefix("pid="))
+        .and_then(|value| value.parse::<u32>().ok())
+        .ok_or(N102ProbeRefusalV1::AnswerInvalid)?;
+    Ok(N102EnvironmentProbeV1 {
+        canary_present,
+        system_root_present,
+        pid,
+    })
+}
+
+/// Runs one closed handle-isolation probe through the real production confined spawn.
+pub fn run_n102_handle_probe_v1(
+    executable: &std::path::Path,
+    value: u32,
+    control: u32,
+) -> Result<N102HandleProbeV1, N102ProbeRefusalV1> {
+    let token = format!(
+        "{}:{value}:{control}",
+        crate::graphic_image_inspection::IMAGE_WORKER_MODE_PROBE_HANDLE_V1
+    );
+    let run = run_confined_image_worker_mode_v1(
+        executable,
+        "png",
+        N102_PROBE_SOURCE_SHA256_V1,
+        Some(&token),
+        &N102_PROBE_SOURCE_V1,
+    )
+    .map_err(N102ProbeRefusalV1::Worker)?;
+    parse_n102_handle_answer_v1(&String::from_utf8_lossy(run.stdout()))
+}
+
+/// Runs one closed environment-isolation probe through the real production confined spawn.
+pub fn run_n102_environment_probe_v1(
+    executable: &std::path::Path,
+    canary_name: &str,
+) -> Result<N102EnvironmentProbeV1, N102ProbeRefusalV1> {
+    let token = format!(
+        "{}:{canary_name}",
+        crate::graphic_image_inspection::IMAGE_WORKER_MODE_PROBE_ENVIRONMENT_V1
+    );
+    let run = run_confined_image_worker_mode_v1(
+        executable,
+        "png",
+        N102_PROBE_SOURCE_SHA256_V1,
+        Some(&token),
+        &N102_PROBE_SOURCE_V1,
+    )
+    .map_err(N102ProbeRefusalV1::Worker)?;
+    parse_n102_environment_answer_v1(&String::from_utf8_lossy(run.stdout()))
+}
+
+/// Runs the isolated helper parent when the reserved internal flag is present.
+///
+/// The helper is a separate process on purpose: the integration suite launches it with exactly one
+/// parent-only canary variable through `Command::env`, and this process then starts the real worker
+/// through the production minimal-environment spawn. Exit `0` reports that the canary was absent and
+/// the system variable present, `61` that the canary reached the child, `62` that the system
+/// variable was missing, and `63` that the helper or the worker run refused instead of observing.
+pub fn run_internal_n102_environment_parent_v1(args: &[std::ffi::OsString]) -> Option<u8> {
+    if args.get(1)? != std::ffi::OsStr::new(INTERNAL_N102_ENV_PARENT_FLAG_V1) {
+        return None;
+    }
+    let Some(name) = args.get(2).and_then(|token| token.to_str()) else {
+        return Some(63);
+    };
+    if args.len() > 3 || name.is_empty() || name.len() > 32 || !name.is_ascii() {
+        return Some(63);
+    }
+    // The helper must itself carry the canary, otherwise its child observation proves nothing.
+    if std::env::var_os(name).is_none() {
+        return Some(63);
+    }
+    let Ok(own) = std::env::current_exe() else {
+        return Some(63);
+    };
+    let Ok(answer) = run_n102_environment_probe_v1(&own, name) else {
+        return Some(63);
+    };
+    let code = if answer.canary_present {
+        61
+    } else if !answer.system_root_present {
+        62
+    } else {
+        0
+    };
+    // Only bounded booleans and the child's own identifier leave this process.
+    println!(
+        "{N102_ENV_PARENT_PREFIX_V1} canary_present={} system_root_present={} pid={} status={code}",
+        u8::from(answer.canary_present),
+        u8::from(answer.system_root_present),
+        answer.pid
+    );
+    Some(code)
+}

@@ -72,6 +72,25 @@ pub const IMAGE_WORKER_MODE_REFUSE_V1: &str = "refuse";
 /// A closed test seam: hold past the fixed wall deadline without writing a frame.
 pub const IMAGE_WORKER_MODE_HANG_V1: &str = "hang";
 
+/// A closed test seam: probe whether one numeric parent handle is visible to this child.
+///
+/// The token carries the parent value and a guaranteed-invalid control as two decimal u32 values
+/// separated by a colon. Only the reserved internal mode reaches it, and only the integration
+/// suite supplies it; nothing here accepts authored content or a public argument.
+pub const IMAGE_WORKER_MODE_PROBE_HANDLE_V1: &str = "probe-handle";
+
+/// A closed test seam: probe whether one named parent variable is visible to this child.
+pub const IMAGE_WORKER_MODE_PROBE_ENVIRONMENT_V1: &str = "probe-environment";
+
+/// The exact first token of the bounded handle-isolation probe answer.
+pub const N102_HANDLE_PROBE_PREFIX_V1: &str = "SOLO-N102-HANDLE-V1";
+
+/// The exact first token of the bounded environment-isolation probe answer.
+pub const N102_ENVIRONMENT_PROBE_PREFIX_V1: &str = "SOLO-N102-ENV-V1";
+
+/// The largest accepted length of one N102 probe parameter, in bytes.
+pub const MAX_N102_PROBE_PARAMETER_BYTES_V1: usize = 64;
+
 /// The exact first token of the worker's framed observation line.
 pub const IMAGE_WORKER_FRAME_PREFIX_V1: &str = "SOLO-IMAGE-WORKER-V1";
 
@@ -473,21 +492,87 @@ enum ImageWorkerModeV1 {
     Refuse,
     /// Hold well past the fixed wall deadline without writing a frame.
     Hang,
+    /// Probe this child's own handle table for one supplied numeric value.
+    ProbeHandle,
+    /// Probe this child's own environment for one supplied variable name.
+    ProbeEnvironment,
 }
 
 impl ImageWorkerModeV1 {
-    fn from_token(token: &str) -> Option<Self> {
-        match token {
-            IMAGE_WORKER_MODE_DECODE_V1 => Some(Self::Decode),
-            IMAGE_WORKER_MODE_WRONG_SOURCE_V1 => Some(Self::WrongSource),
-            IMAGE_WORKER_MODE_WRONG_OUTPUT_V1 => Some(Self::WrongOutput),
-            IMAGE_WORKER_MODE_SHORT_OUTPUT_V1 => Some(Self::ShortOutput),
-            IMAGE_WORKER_MODE_TRAILING_V1 => Some(Self::Trailing),
-            IMAGE_WORKER_MODE_REFUSE_V1 => Some(Self::Refuse),
-            IMAGE_WORKER_MODE_HANG_V1 => Some(Self::Hang),
-            _ => None,
+    /// Parses one closed mode token, with the bounded probe parameter when that mode carries one.
+    fn from_token(token: &str) -> Option<(Self, Option<&str>)> {
+        if let Some(rest) = token.strip_prefix("probe-handle:") {
+            return Some((Self::ProbeHandle, Some(rest)));
         }
+        if let Some(rest) = token.strip_prefix("probe-environment:") {
+            return Some((Self::ProbeEnvironment, Some(rest)));
+        }
+        let mode = match token {
+            IMAGE_WORKER_MODE_DECODE_V1 => Self::Decode,
+            IMAGE_WORKER_MODE_WRONG_SOURCE_V1 => Self::WrongSource,
+            IMAGE_WORKER_MODE_WRONG_OUTPUT_V1 => Self::WrongOutput,
+            IMAGE_WORKER_MODE_SHORT_OUTPUT_V1 => Self::ShortOutput,
+            IMAGE_WORKER_MODE_TRAILING_V1 => Self::Trailing,
+            IMAGE_WORKER_MODE_REFUSE_V1 => Self::Refuse,
+            IMAGE_WORKER_MODE_HANG_V1 => Self::Hang,
+            _ => return None,
+        };
+        Some((mode, None))
     }
+
+    /// Whether this mode is one of the two closed N102 isolation probes.
+    fn is_n102_probe(self) -> bool {
+        matches!(self, Self::ProbeHandle | Self::ProbeEnvironment)
+    }
+}
+
+/// The bounded answer line for one closed N102 isolation probe, or `None` when it cannot be
+/// answered honestly on this host or from this parameter.
+///
+/// Windows only: the probes read this child's own real kernel handle table and real environment
+/// block. No handle value, variable value or environment block is ever printed.
+#[cfg(windows)]
+fn n102_probe_answer_v1(mode: ImageWorkerModeV1, parameter: Option<&str>) -> Option<String> {
+    let parameter = parameter?;
+    if parameter.len() > MAX_N102_PROBE_PARAMETER_BYTES_V1 || !parameter.is_ascii() {
+        return None;
+    }
+    let pid = std::process::id();
+    match mode {
+        ImageWorkerModeV1::ProbeHandle => {
+            let (value, control) = parameter.split_once(':')?;
+            let value: u32 = value.parse().ok()?;
+            let control: u32 = control.parse().ok()?;
+            let (live, control_live) = crate::n102_probe_handle_v1(value, control);
+            Some(format!(
+                "{} live={} control_live={} pid={pid}\n",
+                N102_HANDLE_PROBE_PREFIX_V1,
+                u8::from(live),
+                u8::from(control_live)
+            ))
+        }
+        ImageWorkerModeV1::ProbeEnvironment => {
+            let (canary, system_root) =
+                crate::n102_probe_environment_v1(std::ffi::OsStr::new(parameter));
+            Some(format!(
+                "{} canary={} system_root={} pid={pid}\n",
+                N102_ENVIRONMENT_PROBE_PREFIX_V1,
+                u8::from(canary),
+                u8::from(system_root)
+            ))
+        }
+        _ => None,
+    }
+}
+
+/// Off Windows there is no N102 native boundary, so both probes refuse rather than pretend.
+#[cfg(not(windows))]
+fn n102_probe_answer_v1(_mode: ImageWorkerModeV1, parameter: Option<&str>) -> Option<String> {
+    // The bound is validated on every host so the closed contract stays identical.
+    if parameter?.len() > MAX_N102_PROBE_PARAMETER_BYTES_V1 {
+        return None;
+    }
+    None
 }
 
 /// The pinned `image` format value named by one admitted format.
@@ -526,17 +611,17 @@ pub fn run_internal_image_worker_v1(args: &[std::ffi::OsString]) -> Option<u8> {
     else {
         return Some(IMAGE_WORKER_EXIT_REFUSED_V1);
     };
-    let mode = match args.get(4) {
-        None => ImageWorkerModeV1::Decode,
+    let (mode, parameter) = match args.get(4) {
+        None => (ImageWorkerModeV1::Decode, None),
         Some(token) => match token.to_str().and_then(ImageWorkerModeV1::from_token) {
-            Some(mode) => mode,
+            Some(pair) => pair,
             None => return Some(IMAGE_WORKER_EXIT_REFUSED_V1),
         },
     };
     if args.len() > 5 {
         return Some(IMAGE_WORKER_EXIT_REFUSED_V1);
     }
-    Some(run_image_worker_child_v1(format, claimed, mode))
+    Some(run_image_worker_child_v1(format, claimed, mode, parameter))
 }
 
 /// The child half: prove confinement, then decode exactly one owned bounded byte stream.
@@ -549,6 +634,7 @@ fn run_image_worker_child_v1(
     format: GraphicImageFormatV1,
     claimed: MediaWorkerDigestV1,
     mode: ImageWorkerModeV1,
+    parameter: Option<&str>,
 ) -> u8 {
     let Some(confinement) = crate::media_worker_host::child_image_worker_confinement_v1() else {
         return IMAGE_WORKER_EXIT_UNCONFINED_V1;
@@ -565,6 +651,18 @@ fn run_image_worker_child_v1(
             solo_application::IMAGE_WORKER_WALL_MS_V1 * 2,
         ));
         return IMAGE_WORKER_EXIT_REFUSED_V1;
+    }
+    if mode.is_n102_probe() {
+        // The probes answer one bounded line and exit; they never read source bytes or decode.
+        let Some(answer) = n102_probe_answer_v1(mode, parameter) else {
+            return IMAGE_WORKER_EXIT_REFUSED_V1;
+        };
+        let stdout = std::io::stdout();
+        let mut out = stdout.lock();
+        if out.write_all(answer.as_bytes()).is_err() || out.flush().is_err() {
+            return IMAGE_WORKER_EXIT_REFUSED_V1;
+        }
+        return 0;
     }
 
     let mut source: Vec<u8> = Vec::new();

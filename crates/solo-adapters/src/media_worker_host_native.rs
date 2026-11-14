@@ -655,6 +655,12 @@ pub(crate) use linux::{
 // nameable from the rest of the crate. There is no general-purpose native API here: no
 // caller-selected executable, limit, command line or output destination is reachable.
 #[cfg(windows)]
+#[cfg(windows)]
+pub use windows::{
+    N102ExtraInheritableV1, n102_probe_environment_v1, n102_probe_handle_v1, n102_refused_step_v1,
+    n102_select_injection_v1,
+};
+#[cfg(windows)]
 pub(crate) use windows::{SuspendedWorkerV1, in_job_v1};
 
 // ---------------------------------------------------------------------------------------------
@@ -682,7 +688,8 @@ mod windows {
     use std::path::Path;
 
     use windows_sys::Win32::Foundation::{
-        CloseHandle, HANDLE, HANDLE_FLAG_INHERIT, SetHandleInformation, WAIT_OBJECT_0,
+        CloseHandle, GetHandleInformation, HANDLE, HANDLE_FLAG_INHERIT, SetHandleInformation,
+        WAIT_OBJECT_0,
     };
     use windows_sys::Win32::Security::SECURITY_ATTRIBUTES;
     use windows_sys::Win32::System::JobObjects::{
@@ -695,7 +702,7 @@ mod windows {
     };
     use windows_sys::Win32::System::Pipes::CreatePipe;
     use windows_sys::Win32::System::Threading::{
-        CREATE_SUSPENDED, CREATE_UNICODE_ENVIRONMENT, CreateProcessW,
+        CREATE_SUSPENDED, CREATE_UNICODE_ENVIRONMENT, CreateEventW, CreateProcessW,
         DeleteProcThreadAttributeList, EXTENDED_STARTUPINFO_PRESENT, GetCurrentProcess,
         GetExitCodeProcess, InitializeProcThreadAttributeList, LPPROC_THREAD_ATTRIBUTE_LIST,
         PROC_THREAD_ATTRIBUTE_HANDLE_LIST, PROCESS_INFORMATION, ResumeThread, STARTF_USESTDHANDLES,
@@ -706,6 +713,50 @@ mod windows {
     ///
     /// The documented size for a two-handle inheritance list is a few hundred bytes; anything
     /// outside this bound is treated as a refused host rather than a number to trust.
+    // ---------------------------------------------------------------------------------
+    // `SOLO-WO-103 R01` closed N102 test seam.
+    //
+    // Two fixed, bounded facts are exposed to the integration suite and to nothing else: an
+    // injection selector that makes one production native boundary refuse, and the child-side
+    // probes for the two isolation canaries. Neither is reachable from authored content, an
+    // ordinary public argument or any product configuration: the selector is a process-local
+    // atomic set only by the closed test seam, and the probes run only in the reserved internal
+    // worker modes. No handle value, canary value or path is ever logged.
+    /// The highest injection step this build understands.
+    pub(crate) const N102_INJECT_LAST_STEP_V1: u8 = 11;
+
+    /// The production boundary the closed test seam must make refuse; `0` means none.
+    static N102_INJECT_STEP_V1: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
+    /// The boundary that actually refused, so injection evidence stays distinct from kernel proof.
+    static N102_REFUSED_STEP_V1: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
+
+    /// Selects the one production boundary that must refuse, or clears the selection.
+    pub fn n102_select_injection_v1(step: u8) {
+        N102_REFUSED_STEP_V1.store(0, std::sync::atomic::Ordering::SeqCst);
+        N102_INJECT_STEP_V1.store(
+            if step <= N102_INJECT_LAST_STEP_V1 {
+                step
+            } else {
+                0
+            },
+            std::sync::atomic::Ordering::SeqCst,
+        );
+    }
+
+    /// The boundary that refused under injection, or `0` when none did.
+    pub fn n102_refused_step_v1() -> u8 {
+        N102_REFUSED_STEP_V1.load(std::sync::atomic::Ordering::SeqCst)
+    }
+
+    /// Whether this boundary is the one the closed test seam selected.
+    fn injected_v1(step: u8) -> bool {
+        if N102_INJECT_STEP_V1.load(std::sync::atomic::Ordering::SeqCst) == step {
+            N102_REFUSED_STEP_V1.store(step, std::sync::atomic::Ordering::SeqCst);
+            return true;
+        }
+        false
+    }
+
     const ATTRIBUTE_LIST_MAX_BYTES: usize = 4_096;
 
     /// One initialised `PROC_THREAD_ATTRIBUTE_LIST` plus the aligned storage it points into.
@@ -928,6 +979,69 @@ mod windows {
     /// A job whose readback fails, or whose limits cannot be written, is closed here and reported as
     /// a failure. No caller can therefore hold a job it has not verified, and the process launch
     /// that follows is impossible without confirmed limits.
+    /// One additional explicitly inheritable parent handle that the allowlist never contains.
+    ///
+    /// The integration suite holds one of these across a real spawn, so a child that could reach it
+    /// would prove broad inheritance. It is created with `bInheritHandle` set on purpose and is
+    /// never added to the two-entry `PROC_THREAD_ATTRIBUTE_HANDLE_LIST`.
+    pub struct N102ExtraInheritableV1(OwnedHandleV1);
+
+    impl N102ExtraInheritableV1 {
+        /// Creates the extra inheritable handle, or `None` when the kernel refuses.
+        pub fn create() -> Option<Self> {
+            // SAFETY: `SECURITY_ATTRIBUTES` is a plain `repr(C)` structure valid when zeroed; only
+            // the three fields set below are read by `CreateEventW`, and a null name with manual
+            // reset asks for one fresh anonymous event owned by this process.
+            let mut attributes: SECURITY_ATTRIBUTES = unsafe { std::mem::zeroed() };
+            attributes.nLength = u32::try_from(std::mem::size_of::<SECURITY_ATTRIBUTES>()).ok()?;
+            attributes.lpSecurityDescriptor = std::ptr::null_mut();
+            attributes.bInheritHandle = 1;
+            // SAFETY: the attributes pointer names this function's own live structure, the name is a
+            // null pointer (anonymous object) and both flags are documented constants.
+            let event =
+                unsafe { CreateEventW(std::ptr::from_ref(&attributes), 1, 0, std::ptr::null()) };
+            if event.is_null() {
+                return None;
+            }
+            Some(Self(OwnedHandleV1::new(event)?))
+        }
+
+        /// The kernel's own numeric value for this handle, as a child would see it if inherited.
+        pub fn value(&self) -> u32 {
+            self.0.raw() as usize as u32
+        }
+    }
+
+    /// Whether one numeric handle value is live in this process, plus whether a value the parent
+    /// guarantees can never be a handle is also reported live.
+    ///
+    /// Used only in the reserved internal probe mode. A value that is not a handle is the expected
+    /// answer for a correctly excluded handle; a probe whose guaranteed-invalid control also reports
+    /// live means the child's handle table cannot be trusted for this question, so the caller refuses
+    /// the run instead of reading it as either inheritance or exclusion.
+    pub fn n102_probe_handle_v1(value: u32, control: u32) -> (bool, bool) {
+        fn live(value: u32) -> bool {
+            let mut flags: u32 = 0;
+            // SAFETY: `GetHandleInformation` only reads this process's own handle table for the
+            // supplied value and writes the out-parameter owned here; an absent handle makes it fail,
+            // which is exactly the fact being measured.
+            (unsafe { GetHandleInformation(value as usize as HANDLE, &mut flags) }) != 0
+        }
+        let ambiguous = live(control);
+        (live(value), ambiguous)
+    }
+
+    /// Whether the named variable is visible to this process, and whether `SystemRoot` is present.
+    ///
+    /// `std::env` reads the real process environment block, so this observes what the production
+    /// minimal-environment `CreateProcessW` actually installed rather than any local model of it.
+    pub fn n102_probe_environment_v1(name: &std::ffi::OsStr) -> (bool, bool) {
+        (
+            std::env::var_os(name).is_some(),
+            std::env::var_os("SystemRoot").is_some(),
+        )
+    }
+
     fn create_limited_job_v1() -> Option<OwnedHandleV1> {
         // SAFETY: `CreateJobObjectW` takes a null security descriptor and a null name, so it creates
         // an anonymous job whose only handle this process owns. It returns a handle or null.
@@ -1104,6 +1218,9 @@ mod windows {
         /// limited and read back before assignment, and `resume` is a separate call the caller makes
         /// only after those facts are known.
         pub(crate) fn spawn(executable: &Path, arguments: &[&str]) -> Option<Self> {
+            if injected_v1(1) {
+                return None;
+            }
             let job = create_limited_job_v1()?;
 
             // SAFETY: `SECURITY_ATTRIBUTES` is a plain `repr(C)` structure valid when zeroed; the
@@ -1113,6 +1230,9 @@ mod windows {
             attributes.lpSecurityDescriptor = std::ptr::null_mut();
             attributes.bInheritHandle = 1;
 
+            if injected_v1(2) {
+                return None;
+            }
             let mut stdout_read: HANDLE = std::ptr::null_mut();
             let mut stdout_write: HANDLE = std::ptr::null_mut();
             // SAFETY: both out-pointers name this function's own stack handles, and the attributes
@@ -1133,6 +1253,9 @@ mod windows {
             let stdout_read = OwnedHandleV1::new(stdout_read)?;
             let stdout_write = OwnedHandleV1::new(stdout_write)?;
 
+            if injected_v1(3) {
+                return None;
+            }
             let mut stdin_read: HANDLE = std::ptr::null_mut();
             let mut stdin_write: HANDLE = std::ptr::null_mut();
             // SAFETY: identical shape to the pipe above.
@@ -1152,6 +1275,9 @@ mod windows {
 
             // The parent-side ends must never be inherited by any other process.
             // SAFETY: both handles are live parent ends owned by the guards above.
+            if injected_v1(4) {
+                return None;
+            }
             let cleared = unsafe {
                 SetHandleInformation(stdout_read.raw(), HANDLE_FLAG_INHERIT, 0) != 0
                     && SetHandleInformation(stdin_write.raw(), HANDLE_FLAG_INHERIT, 0) != 0
@@ -1165,6 +1291,9 @@ mod windows {
             // no provider handle — is admitted, and `bInheritHandles=TRUE` is only ever passed
             // together with this validated list.
             let child_handles: [HANDLE; 2] = [stdin_read.raw(), stdout_write.raw()];
+            if injected_v1(5) {
+                return None;
+            }
             let allowlist = AttributeListV1::new(&child_handles)?;
 
             // SAFETY: `STARTUPINFOEXW` is a plain `repr(C)` structure valid when zeroed; the fields
@@ -1188,7 +1317,13 @@ mod windows {
 
             // The child gets a freshly built minimal block, never the ambient one, and a working
             // directory bound to this one trusted executable's own parent directory.
+            if injected_v1(6) {
+                return None;
+            }
             let environment = minimal_environment_v1()?;
+            if injected_v1(7) {
+                return None;
+            }
             let working_directory = wide(
                 &executable
                     .parent()
@@ -1207,6 +1342,9 @@ mod windows {
             // is what makes the attribute list authoritative and `CREATE_UNICODE_ENVIRONMENT`
             // declares the block's encoding; the startup pointer is the base structure as the API
             // requires; and `info` is this function's own out-structure.
+            if injected_v1(8) {
+                return None;
+            }
             let created = unsafe {
                 CreateProcessW(
                     application.as_ptr(),
@@ -1235,6 +1373,9 @@ mod windows {
             // Assign the still-suspended worker and confirm real membership.
             // SAFETY: all three handles came from the calls above and are live; assigning a
             // suspended process changes no memory and cannot start it.
+            if injected_v1(9) {
+                return None;
+            }
             let assigned = unsafe { AssignProcessToJobObject(job.raw(), process.raw()) };
             let member = assigned != 0 && job_has_a_process_v1(job.raw());
             if !member {
@@ -1290,6 +1431,9 @@ mod windows {
         ///
         /// It must only be called after the job was created, limited, read back and assigned.
         pub(crate) fn resume(&mut self) -> bool {
+            if injected_v1(10) {
+                return false;
+            }
             if self.resumed || self.exited {
                 return false;
             }
@@ -1313,6 +1457,9 @@ mod windows {
 
         /// Waits up to `milliseconds` for the worker and returns its exit code when it has exited.
         pub(crate) fn wait_ms(&mut self, milliseconds: u32) -> Option<u32> {
+            if injected_v1(11) {
+                return None;
+            }
             // SAFETY: `self.process` is a live process handle owned exclusively here. Waiting on a
             // handle changes no memory of this process and cannot fault.
             let signalled = unsafe { WaitForSingleObject(self.process, milliseconds) };

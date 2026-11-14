@@ -652,6 +652,35 @@ jobs:
         run: cargo test -p solo-cli --test media_worker_host_smoke --locked n097 -- --nocapture --test-threads=1
 
 
+      # Mandatory `SOLO-WO-104 R01` Windows canaries. These three cases drive the real production
+      # `CreateProcessW` / attribute-list / Job Object / minimal-environment path, so a Windows job is
+      # the only place such facts exist. The gate fails when a required case is absent, filtered,
+      # ignored or failing: the exact names and the exact passing count are both asserted, and a
+      # green workflow with no N102 execution is a failure rather than a pass.
+      - name: Windows N102 isolation canaries (Windows only)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $required = @(
+            'n102_01_extra_inheritable_handle_is_excluded',
+            'n102_02_parent_environment_is_excluded',
+            'n102_03_native_failures_refuse_and_cleanup',
+          )
+          $log = Join-Path $env:RUNNER_TEMP 'n102-canaries.txt'
+          cargo test -p solo-cli --test media_worker_host_smoke --locked n102_ -- --nocapture --test-threads=1 *>&1 | Tee-Object -FilePath $log
+          if ($LASTEXITCODE -ne 0) { throw "the N102 canaries failed (exit $LASTEXITCODE)" }
+          $text = Get-Content -LiteralPath $log -Raw
+          foreach ($name in $required) {
+            if ($text -notmatch [regex]::Escape("test $name ... ok")) {
+              throw "required N102 case did not pass on this host: $name"
+            }
+          }
+          if ($text -notmatch 'test result: ok\. 3 passed; 0 failed; 0 ignored') {
+            throw 'the N102 run did not execute exactly three passing, non-ignored cases'
+          }
+          Write-Output 'N102 gate: three required canaries executed and passed.'
+
+
       # ---------------------------------------------------------------------------
       # Accepted fail-closed architecture checker, run as its own process so the
       # policy exit status — not a test harness — decides. No weaken switch exists.

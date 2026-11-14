@@ -135,6 +135,12 @@ fn main() -> ExitCode {
     // The second reserved internal mode: the `R03.C3` confined image worker. It writes its own
     // framed observation and decoded plane to stdout, so this root only translates its exit status.
     // It is dispatched before the public adapter and is reachable through no public flag.
+    // The third reserved internal mode: the isolated N102 helper parent. It launches the real
+    // confined worker with the production minimal environment and reports only bounded booleans,
+    // so an integration case can prove the parent environment does not reach the child.
+    if let Some(status) = solo_adapters::run_internal_n102_environment_parent_v1(&arguments) {
+        return ExitCode::from(status);
+    }
     if let Some(status) = solo_adapters::run_internal_image_worker_v1(&arguments) {
         return ExitCode::from(status);
     }
