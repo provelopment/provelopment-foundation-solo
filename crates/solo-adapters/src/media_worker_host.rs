@@ -4302,7 +4302,7 @@ fn run_confined_image_worker_platform_v1(
         Err(_) => false,
     };
 
-    let stdout_cap = crate::graphic_image_inspection::MAX_IMAGE_WORKER_STDOUT_BYTES_V1;
+    let stdout_cap = worker_stdout_cap_v1(format_token);
     let out_reader = child
         .stdout
         .take()
@@ -4444,7 +4444,7 @@ fn run_confined_image_worker_platform_v1(
         return Err(ImageWorkerRunRefusalV1::SpawnFailed);
     };
 
-    let stdout_cap = crate::graphic_image_inspection::MAX_IMAGE_WORKER_STDOUT_BYTES_V1;
+    let stdout_cap = worker_stdout_cap_v1(format_token);
     let out_reader = std::thread::spawn(move || read_worker_stream_v1(stdout, stdout_cap));
     let writer = {
         let payload = source.to_vec();
@@ -4587,6 +4587,20 @@ pub fn run_confined_image_worker_v1(
         source,
         &mut N102FaultRunV1::production(),
     )
+}
+
+/// The fixed per-format stdout cap.
+///
+/// Exactly the closed `gif` token gets the smaller GIF bound, applied by the reader while it
+/// reads, so an oversize GIF response is capped (and therefore refused) during read rather than
+/// after a larger still-image allowance was already collected. Every other token keeps the
+/// unchanged still-image cap.
+fn worker_stdout_cap_v1(format_token: &str) -> u64 {
+    if format_token == crate::graphic_image_inspection::GIF_WORKER_TOKEN_V1 {
+        crate::graphic_image_inspection::MAX_GIF_WORKER_STDOUT_BYTES_V1
+    } else {
+        crate::graphic_image_inspection::MAX_IMAGE_WORKER_STDOUT_BYTES_V1
+    }
 }
 
 #[cfg(test)]
