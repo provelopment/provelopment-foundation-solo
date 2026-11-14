@@ -1,115 +1,98 @@
 # Execution Report
 
-**Work order:** `SOLO-WO-115 R01` — complete AVIF + safe true-vector SVG inspection, real host proof and controlled `main` integration.
-**Date:** 2026-11-14. **Approved outcome sought:** `R03C-SIX-FORMAT-AVIF-AND-TRUE-VECTOR-SVG-PRODUCTION-VERIFIED-ON-MAIN`.
-**status=STOPPED — no codec source, manifest, lockfile, workflow or notice byte was written; `main` carries only the Owner authority and this report.**
+**Work order:** `SOLO-WO-115 R02` — complete production AVIF + safe true-vector SVG, with pinned fixtures and Foundation-sourced library authority.
+**Date:** 2026-11-14. **Target:** `R03C-SIX-FORMAT-AVIF-SVG-ON-MAIN-VERIFIED`.
+**status=STOPPED — B0 proven on the technical branch; B1/B2/B3/D/I not delivered; nothing integrated into `main`.**
 
-Execution stopped at the order's own dependency-and-fixture gate, before checkpoint **B1**. The three blockers in §2 are each independently sufficient, are reproducible from the exact repository state, and each maps to an explicit STOP clause in the installed order (the native-`libdav1d` gate in §3 and the deterministic-text clause in §4). Nothing was simulated, no partial work was integrated, and no test, expectation, `#[ignore]` or workflow gate was weakened. §3 records capability facts established during the investigation so a resumed order can be written against verified rather than assumed behaviour.
+Checkpoint **A** (Owner authority) and checkpoint **B0** (pinned donor fixtures, provenance, native-prerequisite pinning) are complete and independently verifiable. The remaining package could not be implemented *and proved* within this run, and the order forbids integrating partial work, so `main` carries only the authority and this report. No codec, sanitizer, application, adapter, worker, workflow or notice byte was written; the technical branch holds the verified B0 checkpoint only.
 
-## 1. Authority, preflight and checkpoint A
+## 1. Authority and checkpoints
 
-Owner installed the exact R01 text at `.documents/WIP/workorder-active.md` (87 lines, raw `git hash-object` and Git-filtered blob both `b895fe3dc65274ea7b50e4efc0abb3b15d6f32c0`) and issued the matching activation handoff.
-
-Preflight verified: one Windows/WSL Solo checkout; one `origin` = `https://github.com/provelopment/provelopment-foundation-solo.git`; local and remote `main` both `98917578af9ce0201416461896bc0cd1a66da109`, tree `599586ec2857e53cffb9a790b837e432c98a3752`, parent `06217642`; canonical report blob `2cd116c3aa6f4a9d0ccfe068191de29a9b5ed631`; 26 remote branch refs; one worktree; empty stash; exactly four WIP files; clean tree apart from the Owner-installed ACTIVE. Frozen governance verified 11/11 at their pinned blobs — `AGENTS.md` `6eae1da8`, `ARCHITECTURE.md` `f66096ec`, Architect SOP `1483c9be`, Implementation SOP `51bb3792`, architecture source checker `crates/solo-cli/tests/architecture_checks/source.rs` `1c99d348`, unsafe checker `crates/solo-cli/tests/unsafe_boundary.rs` `57d75796`, root `Cargo.toml` `14505be4`, `rust-toolchain.toml` `9ec55b3b`, ROADMAP/NEXT/OUTLOOK `9d7a8622`/`92fa562b`/`cb9c7a61`.
+Preflight at the order's exact baseline: local and remote `main` both `52773d25416b09a8f3e65b9d5f73130bc921bf5c`, tree `837129ed2f44b38e1033f9a30385b24a0caddfeb`, parent `b71832c7ff2e79311d644c6cfcf84a51d14712c5`; report blob `0c9d3182`; R01 ACTIVE `b895fe3d`; 26 refs; one checkout; one `origin`; empty stash; four WIP files; clean tree apart from the Owner-installed R02 ACTIVE (80 lines, raw and filtered blob `5defdd486f03d951f7a7653d52c518a7c96dc07c`). Frozen governance verified **11/11** (`AGENTS.md` `6eae1da8`, `ARCHITECTURE.md` `f66096ec`, Architect SOP `1483c9be`, Implementation SOP `51bb3792`, `architecture_checks/source.rs` `1c99d348`, `unsafe_boundary.rs` `57d75796`, root `Cargo.toml` `14505be4`, `rust-toolchain.toml` `9ec55b3b`, ROADMAP/NEXT/OUTLOOK `9d7a8622`/`92fa562b`/`cb9c7a61`).
 
 | Step | Commit | Tree | Parent | Contents |
 |---|---|---|---|---|
-| initial `main` | `98917578af9ce0201416461896bc0cd1a66da109` | `599586ec` | `06217642` | accepted WO-114 integration |
-| **A** authority | `b71832c7ff2e79311d644c6cfcf84a51d14712c5` | `f590f31d44f1216bd5cad835c5777eb8be59a586` | `98917578` | ACTIVE only, `b895fe3d`, raw == filtered == GitHub |
-| **R** report | reported in chat after publication | — | `b71832c7` | report only |
+| baseline `main` | `52773d25416b09a8f3e65b9d5f73130bc921bf5c` | `837129ed` | `b71832c7` | accepted R01 STOP report |
+| **A** authority | `f936a4539df8cd0f10896616d6ba9885636ab737` | `d2adb6e130b14e731edd7ac73f5417327853c942` | `52773d25` | ACTIVE alone, `5defdd48` |
+| **B0** fixtures | `8c7b6573a9a97e1208a66aae62c18627e6d8ac0a` | `357c646857d4578ad945d5ff6d01c89d2d7df347` | `f936a453` | 7 AVIF + 2 SVG fixtures + provenance |
+| **R** report | reported in chat after publication | — | `f936a453` | report alone on `main` |
 
-`git diff-tree --name-only A` lists exactly `.documents/WIP/workorder-active.md`. **B1 (AVIF), B2 (SVG), B3 (V3 matrix), D (technical CI) and I (integration) were not started.** The technical branch `solo-wo-115-avif-svg-v3-r01` was **not created**, so the remote ref count remains **26**; `solo-wo-113-gif-v2-r01` `ad7b74df`, `solo-wo-112-gif8-host-r01` `40b03c73` and every other branch tip are untouched. No product, test, workflow, manifest, lockfile or notice file differs from the accepted WO-114 state.
+`git diff-tree --name-only A` lists exactly `.documents/WIP/workorder-active.md`. Technical branch `solo-wo-115-avif-svg-v3-r02` was created once from exact A and is preserved at B0 (`8c7b6573…`); remote refs are now **27**, with `solo-wo-113-gif-v2-r01` `ad7b74df` and `solo-wo-112-gif8-host-r01` `40b03c73` untouched. **B1, B2, B3, D and I were not started.**
 
-## 2. The three blockers, with reproducible evidence
+## 2. Proven evidence — B0 (`8c7b6573…`)
 
-### Blocker 1 — the required AVIF positive fixtures cannot be produced lawfully inside this ledger
+All seven AVIF specimens and both SVG specimens were fetched from the exact pinned commits and verified three ways: upstream Git blob, raw SHA-256 of the stored bytes, and — after `git add` — the **index** blob. All **9/9** index blobs equal the pinned upstream blobs, so the repository stores them byte-for-byte despite the Windows worktree.
 
-§5 of the order makes real 8-bit, 10-bit and 12-bit still AVIF decoding — with and without alpha and with orientation/rotation — **required cross-host positives**, and forbids completion without them. The only authorized fixture routes are "deterministic *source-code-defined* examples in the authorized test file, or … exact approved existing public-fixture bytes with source licence/hashes documented in the one report", while "no new fixture file", "no external `ffmpeg`/ImageMagick/SVG converters" and no `ravif` encoder apply.
+| Stored path | Upstream donor @ commit | Git blob (index == upstream) | Raw SHA-256 | Bytes |
+|---|---|---|---|---|
+| `avif/white_1x1.avif` | libavif @ `37a5461` | `9d5c466444de5680b539673b26f5c770e98dacc0` | `ea4e43d1f07e4c00de16c13afa32376111bb306e51f08212cf4c1b6064df3667` | 305 |
+| `avif/abc_color_irot_alpha_irot.avif` | libavif @ `37a5461` | `e5f8141cfa06ac705f3bcbec89d0e6470788bb6b` | `b371cc88244a873131e4d10ff9363d71ce4f41cf333bd4a491b38d970d9abd3b` | 10597 |
+| `avif/abc_color_irot_alpha_NOirot.avif` | libavif @ `37a5461` | `e9dbdb49a30240ca7841af4d4577fa95942936ea` | `f2c8cd6ded641c68d13b3363417a62288a5eb335870de8d0b9da5093865ffb9a` | 10596 |
+| `avif/clap_irot_imir_non_essential.avif` | libavif @ `37a5461` | `bcbe87dd30d567a7e74473ac91f5849f24a7f14c` | `33f869fcf2a879913eb394982b8fc03e9a60c25831aa37622ddefa656fd39fc1` | 653 |
+| `avif/fox-profile0.8bpc.yuv420.avif` | av1-avif/Link-U | `cf23e6ea9fd5965ba665282581d1898996e9b7e1` | `a0ae1ad1aea81291730f42259593b297a8444699f4553de8dc25da2db56a40d9` | 63479 |
+| `avif/fox-profile0.10bpc.yuv420.avif` | av1-avif/Link-U | `025c185783831a08193557d764f280b79a55e27b` | `1564a6cd6fd3350d6b02604c74894bb51f8133ff40fddcb86e521c88130c69f1` | 64420 |
+| `avif/fox-profile2.12bpc.yuv420.avif` | av1-avif/Link-U | `4299cf745f7d6fd57a033d5fbb00f94b32cf1aa8` | `ce734812bb76659dbaf7c8a96321e12a4281fb7829180cadb685c14b9310fe45` | 65007 |
+| `svg/icon-home.svg` | foundation @ `fa59997` | `3d738af7ff081cd372e408600ce025e464a37aac` | `cb742a3b1aa0007ec0c3f26f898e5833c6e67476e136b8eae3c52e2f2c751b5c` | 482 |
+| `svg/TABLER-ICONS-MIT.txt` | foundation @ `fa59997` | `3e82379dab3fe93d9ee22251949604ed63ddea39` | `b740a1d46122672da62833e97f7e7c8a13fa85cbc7445b584b297cc00dde93db` | 1073 |
 
-* No `.avif` bytes exist anywhere in the resolved dependency sources: `find ~/.cargo/registry/src -iname '*.avif' | wc -l` → **0**.
-* `image-0.25.10` ships **no** test assets at all — its published contents are `CHANGES.md Cargo.toml Cargo.lock LICENSE-APACHE LICENSE-MIT README.md benches src` (no `tests/` directory, zero bundled `.png/.jpg/.gif`).
-* The order names **no** approved fixture byte sequence or SHA-256, so "exact approved existing public-fixture bytes" has no authorized referent; selecting third-party samples myself is precisely the "silently copy third-party artwork or a remote file" the order forbids.
-* Producing valid AVIF requires an AV1 intra encoder. Every available encoder is excluded by the order (`ravif` is reachable only through the forbidden `avif` feature; `ffmpeg`, ImageMagick and external codec binaries are expressly banned). Hand-authoring a conformant AV1 keyframe — OBU framing, sequence header, tile group, entropy-coded coefficients — inside Rust source cannot be done correctly, and an incorrect fixture would prove nothing.
-* A refusal-only AVIF path is not a substitute: the order states that unsupported required features must be a **STOP**, "not silently downgraded to a smaller canary acceptance".
+`crates/solo-cli/tests/fixtures/avif/LICENSE-AND-PROVENANCE.md` records per-file purpose, upstream path, blob, SHA-256, byte count and licence, and states explicitly that these are **test inputs only**, never platform assets or published media.
 
-**Consequence:** real AVIF decode cannot be proven on either host, because no lawful input bytes can be created or named. This alone blocks B1, D and I, and the §7 acceptance criteria.
+**Licence findings that correct an assumption carried from R01.**
 
-### Blocker 2 — deterministic SVG text has no lawful glyph source (the order's own STOP clause)
+* libavif's `LICENSE` (blob `350eb9d15ce1553438b09b8cd14c803e86da316b`) is **BSD-2-Clause**, `Copyright 2019 Joe Drago`, *not* Apache-2.0. The four libavif fixtures are "same as libavif" per the pinned `tests/data/README.md` (blob `655bc2244728f288d6b77d60bfafbe294e0ed126`).
+* The three `fox` files are **CC-BY-SA 4.0**, author/origin Link-U, via `AOMediaCodec/av1-avif` `testFiles/Link-U` @ `77bd20d5…` (attribution README blob `243fa900216f4a060c95d1a79ff002ef6516f9b0`, which states "All images are licensed under CC-BY-SA 4.0"). They are **not** relicensed under Solo's Apache-2.0; ShareAlike attaches to those bytes.
+* The Foundation icon is Tabler-derived **MIT** (`Copyright (c) 2020-2026 Paweł Kuna`), with the donor's own `icon-provenance.json` (blob `a74d234417d5bb63ff05e2b64f93d757864f3d46`) cited but not copied.
 
-§4 requires the positive construct set to include "**deterministic safe text representation**" converted to "deterministic SVG **vector glyph outlines** from a *fixed, internally specified and provenance-verified* glyph repertoire", with "no system-font dependency", no ambient/remote fonts and no host-dependent glyph selection — and then states: "If that representation cannot be given a fixed lawful glyph source/algorithm within the authorized code and notices, STOP for an Owner decision rather than claiming text is complete."
+**Native prerequisite pinned exactly.** The dav1d source archive at the order's pinned commit was fetched and hashed:
 
-The installed ledger provides no path for a glyph source. A real outline repertoire is a font program — a third-party asset with its own licence and notice obligations — and the only authorized new documentation path is `.documents/About/MEDIA-CODEC-NOTICES.md`, "new **only if required by actual verified third-party licence/notice obligations**". No font file, glyph table, repertoire definition or outline algorithm is named or authorized anywhere in the order, and a new fixture or asset file is expressly forbidden.
+* URL: `https://code.videolan.org/videolan/dav1d/-/archive/32cf02af50f32af108a3b281c452788dccdac648/dav1d-32cf02af50f32af108a3b281c452788dccdac648.tar.gz`
+* **archive SHA-256 `82ef9029404dcc4992a774bbb3fd7ea7769745246969656bcd36155bd766d152`**, 1,708,752 bytes, HTTP 200.
+* `COPYING` blob **`875b138ecf6f2b2b8e402c51ea541d7740246504`** — exactly the blob the order requires — BSD-2-Clause, `Copyright © 2018-2019, VideoLAN and dav1d authors`.
+* `meson.build` confirms `version: '1.5.0'` and `meson_version: '>= 0.49.0'`.
 
-**Consequence:** text cannot be represented as provenance-verified vector outlines, and silently dropping or refusing all text would contradict the mandated positive construct set. This is exactly the condition under which the order directs a STOP.
+**Branch baseline is green at B0** (fixtures add no compiled code): `cargo fmt --all -- --check` clean; `cargo check --workspace --all-targets --locked` finished; `cargo clippy … -D warnings` **0 findings**; `check-architecture` → `architecture=legal packages=4 targets=33 files=63 edges=70`; `unsafe_boundary` **22/22**.
 
-### Blocker 3 — native `libdav1d` is a substantive gate that cannot be satisfied or verified here
+## 3. What is not delivered, and why
 
-The authorized AVIF route is `image =0.25.10` with its opt-in `avif-native` feature, which resolves `mp4parse 0.17.0` and `dav1d 0.11.1` → `dav1d-sys 0.8.3`. `dav1d-sys` declares `[package.metadata.system-deps.dav1d] version = "1.3.0"` and probes a **system** library through `system-deps`/`pkg-config`. A scratch probe of exactly that feature set reproduced the gate:
+**Not delivered:** B1 (AVIF child decode + observations), B2 (SVG sanitizer), B3 (V3 six-format whole-owner matrix, red→green probes), D (technical two-host CI), I (integration). `main` therefore still contains **only** PNG/JPEG/WebP/GIF V1/V2; AVIF and SVG remain **unimplemented**, exactly as at the R01 STOP.
 
-```
-thread 'main' panicked at dav1d-sys-0.8.3/build.rs:82:10:
-called `Result::unwrap()` on an `Err` value: PkgConfig(
-  pkg-config exited with status code 1
-  > pkg-config --libs --cflags dav1d 'dav1d >= 1.3.0'
-  Package 'dav1d' was not found in the pkg-config search path.
-  The file `dav1d.pc` needs to be installed and the PKG_CONFIG_PATH environment variable
-  must contain its parent directory.
-```
+The blocker is scope-versus-proof, not a missing authorization. R02 resolved every R01 product question (D1 pinned fixtures, D2 code-defined glyphs, D3 pinned native dav1d, D4 mirror refusal), and the B0 work proves the inputs are lawful and fixed. What remains is a substantial engineering program that must be built *and* verified to this repository's standard before any of it may be integrated:
 
-Local host facts: `/usr/lib/x86_64-linux-gnu/libdav1d.so.7` (runtime) is present, but `libdav1d-dev` is **not installed** (`apt-cache policy libdav1d-dev` → `Installed: (none)`, candidate `1.5.3-1`) and **sudo is unavailable** (`sudo -n true` → unavailable). The `avif-native` feature therefore cannot be compiled, let alone executed, in this checkout — so no local-first evidence for B1 is possible, and none was fabricated.
+1. `graphic_avif_inspection.rs` — container/plane decode in the confined child, `irot` applied through the safe `mp4parse::image_rotation()` accessor, `imir` refused via the non-dereferencing `is_null()` presence check, inconsistent associated-alpha refusal, 20 MiB / 8192-side / 32 M-pixel / checked-budget limits, canonical RGBA8 output and digest.
+2. A reproducible **native dav1d build on both hosted OSes** (Ubuntu 24.04 and native Windows 2025 with MSVC, Meson, Ninja, NASM), each pinned by exact tool identity and hash, with Cargo forced offline for the production build and the `dav1d-sys` network fallback provably never taken.
+3. `graphic_svg_inspection.rs` — strict `quick-xml`/`svgtypes` parse, reject-by-default allowlist, the full mandated construct set (all path commands, shapes, groups/transforms, gradients, clipping, masks, bounded static filters, deterministic text), the original 5×7 glyph repertoire, all fourteen budgets, cycle detection, `currentColor` resolution, non-executable `class` validation, and a byte-identical canonical serializer.
+4. V3 application port/types, adapter composition, closed child dispatch in `media_worker_host.rs`/`main.rs`, the N115 real six-format suite with red→green oracles, architecture counts, `MEDIA-CODEC-NOTICES.md`, then green D → I → R on both hosts.
 
-For the hosted Windows job there is no pkg-config-metadata-bearing dav1d distribution; meeting §3 would require, per job, a pinned `meson`/`ninja`/`nasm`/Python toolchain, a pinned dav1d source build and a hand-authored `.pc` — permitted only as a fully captured provenance exercise with "exact version, upstream publisher, download URL, SHA-256, build/install tools, transitive native dependencies, LGPL/other licence and NOTICE/compliance … fully captured and actually verified in both hosted jobs, with no arbitrary package-manager latest/fallback download". That is a substantive gate, not an incidental step, and it cannot be attempted honestly from a host that cannot build the feature at all.
+Each can only be *proved* through repeated hosted Ubuntu/Windows runs; the AVIF and native half cannot be compiled at all on this Owner-local WSL (no `libdav1d-dev`, no `sudo`), which R02 explicitly permits, but which makes every AVIF iteration a remote round-trip. Implementing all of it and then proving it — including cross-host byte-identical SVG digests and a genuinely native dav1d build on Windows MSVC — is not achievable within this run's remaining execution window. Writing security-critical parsing and FFI-adjacent code that could not be compiled, tested and proven here would violate §2's "never integrate partial work" and the prohibition on simulated green gates, so none was written.
 
-§3 states the required outcome plainly: "If these conditions cannot be met using only this ledger and the candidates above, report `STOPPED` with the concrete smallest Owner decision; do not simulate a green native AVIF gate or claim proof using the research harness."
+**Smallest Owner decision to unblock delivery:** split R02 into two sequentially issued orders that are each independently deliverable and provable — (i) `R03C-SVG-TRUE-VECTOR-VERIFIED`: B2 + the V3 SVG arm + local and two-host proof, fully verifiable on this host; then (ii) `R03C-AVIF-NATIVE-VERIFIED`: B1 + the native two-host dav1d build + the V3 AVIF arm + N115, inherently hosted-only. Alternatively, extend this order's execution window so both halves can be completed and iterated to green in one continuous run.
 
-## 3. Verified capability findings (to de-risk the resumed order)
+## 4. Cross-host determinism hazards already identified (for the next run)
 
-These were established by source inspection of the exact resolved crates and by a disposable scratch probe kept entirely outside the repository. They are recorded so the next order can be drafted against proven behaviour.
+These were found while preparing B0 and would otherwise cost a failed CI cycle:
 
-**Exact resolved graph of the authorized candidate set** — `cargo metadata` on `image =0.25.10` (`avif-native`) + `quick-xml =0.42.0` + `svgtypes =0.16.1` resolves **76 packages**, including `image 0.25.10`, `dav1d 0.11.1`, `dav1d-sys 0.8.3`, `mp4parse 0.17.0`, `quick-xml 0.42.0`, `svgtypes 0.16.1`, `av-data 0.4.4`, `system-deps 7.0.8`, `pkg-config 0.3.34`, `byteorder 1.5.0`, `bytes 1.12.1`, `fallible_collections 0.4.9`, `toml 1.2.1`, `cfg-expr 0.20.11`, `target-lexicon 0.13.5`. Nothing was added to the repository; `Cargo.lock` on `main` is unchanged.
+1. **CRLF hazard on text fixtures.** The repository `.gitattributes` is `* text=auto`, and its binary list names `png/jpg/jpeg/gif/webp/ico/pdf/woff/woff2/zip` but **not** `.svg`. The index blob for `icon-home.svg` is correctly LF (`3d738af7…`), but a Windows checkout materializes CRLF in the worktree, so a test hashing raw worktree bytes would compute a different SHA-256 on Windows than on Ubuntu. Tests must normalize CRLF→LF for the two text fixtures before hashing, and the canonical serializer must always emit LF. `.gitattributes` is outside this order's ledger, so this must be handled in code rather than by adding an attribute.
+2. **Canonical number formatting.** To keep sanitized SVG digests byte-identical across hosts, formatting must depend only on the parsed value (integer when exact, else fixed decimal precision with trailing zeros trimmed and `-0` normalized) and must never re-derive geometry through floating-point arithmetic; the only computed coordinates should be integer glyph cells.
+3. **`image`'s AVIF decoder ignores `irot`/`imir`** (verified in the pinned `image-0.25.10` source: no transform reading anywhere in `src/codecs/avif/decoder.rs`), while it does decode alpha, 8/10/12-bit and YUV/YCgCo→RGBA. Rotation must be applied by our own checked code from `mp4parse`; any mirror must refuse atomically.
+4. **`dav1d-sys 0.8.3` requires a system `dav1d >= 1.3.0` via `pkg-config`**, and its `build.rs` contains a `git clone` fallback to `code.videolan.org` that must be provably unreachable; the pinned archive hash in §2 is the input to the reproducible build.
 
-**`image` 0.25.10 AVIF decoder (`src/codecs/avif/decoder.rs`) genuinely covers the pixel work:**
-* alpha is decoded as a second `dav1d` picture (`alpha_picture: Option<dav1d::Picture>`, `ctx.alpha_item_coded_data()`), with a hard 4:0:0 layout requirement;
-* bit depth is asserted to be 8, 10 or 12 (`assert!(bit_depth == 8 || bit_depth == 10 || bit_depth == 12)`), with `yuv.rs`/`ycgco.rs` providing 4:2:0/4:2:2/4:4:4 YUV and YCgCo → RGBA conversion at 8, 10 and 12 bits;
-* decoding is driven by `mp4parse::read_avif(ParseStrictness::Normal)` plus `dav1d::Decoder`, i.e. a real container plus real AV1 decode, not a heuristic.
+## 5. Preservation, cleanliness and status
 
-**Two decoder limitations that matter for the order's requirements:**
-* the module contains **no** `irot`/`imir`/transform handling at all (no reference anywhere in `decoder.rs`), so container-declared rotation and mirroring are silently *not applied*. The order forbids exactly that kind of silent reinterpretation, so a resumed order must either apply the transform explicitly or refuse such files atomically.
-* `mp4parse 0.17.0` does expose the data needed: `AvifContext::image_rotation() -> Result<ImageRotation>` is a **safe** enum accessor (so `irot` can be applied without new `unsafe`), while `AvifContext::image_mirror_ptr() -> Result<*const ImageMirror>` returns a **raw pointer**, so applying `imir` would require dereferencing it and therefore new `unsafe`, which the order forbids. Detecting and refusing mirroring via `is_null()` is possible without dereferencing.
+**Preserved:** the accepted PNG/JPEG/WebP/GIF V1/V2 implementation, all 15 WO-114 integration blobs, `Cargo.lock`, every `Cargo.toml`, `.github/workflows/rust-verify.yml`, `deny.toml`, frozen governance (11/11), all three `plan-*` files, both checkers and the architecture counts are byte-identical to `main` at `52773d25`. No `MEDIA-CODEC-NOTICES.md` was created because no notice duty was triggered by delivered code. `main` advanced only by A and this report; refs moved 26 → **27** solely because the authorized technical branch now exists; `ad7b74df` and `40b03c73` untouched; one checkout, one `origin`, empty stash, four WIP files, no second worktree, no merge/rebase/reset/cherry-pick/force-push/`git clean`, no tag, release, deployment, PR or provider write.
 
-**Native dependency behaviour** — `dav1d-sys 0.8.3` requires a system `dav1d >= 1.3.0` through `pkg-config`; its `build.rs` also contains an `add_build_internal` closure that would `git clone --depth 1 -b 1.5.0 https://code.videolan.org/videolan/dav1d.git` — a build-time network source acquisition that any resumed order must ensure can never trigger (a missing `.pc` must fail closed). In the probe the pkg-config error surfaced as a hard failure rather than a silent clone, which is the behaviour the product build should be required to guarantee explicitly.
+**Scratch:** all work was done in task-owned `.temp/wo115r02/` (fetch, licence, dav1d and verification scripts, downloaded specimens and the dav1d archive) and deleted at the end of the run; Owner `.temp/` directories were left untouched.
 
-## 4. Smallest Owner decisions required to resume
-
-* **D1 — AVIF fixtures.** Name the exact approved AVIF byte sequences for the required 8/10/12-bit, alpha, `irot` and `imir` positives (URL + SHA-256 + licence/provenance, permitted as inline `const` bytes in the authorized test file), **or** authorize one named encoder (e.g. `ravif` at a pinned version, or a pinned `libavif`/`avifenc` release) strictly for one-off fixture generation with the resulting bytes committed inline under a documented licence.
-* **D2 — SVG text glyphs.** Authorize a lawful, fixed glyph source for deterministic text→vector outlines: either a named OFL/Apache-licensed font file with an authorized permanent path and a `MEDIA-CODEC-NOTICES.md` entry, or an explicit statement that only an internally defined algorithmic glyph repertoire is required, with all other text refused atomically.
-* **D3 — native dav1d acquisition.** Confirm the per-host model (Ubuntu: pinned `libdav1d-dev` `.deb` with SHA-256; Windows: pinned dav1d source tarball + pinned `meson`/`ninja`/`nasm`/Python versions and SHAs producing a `.pc`), and require the build to fail closed rather than fall back to the `dav1d-sys` network clone.
-* **D4 — mirroring policy.** Confirm that `imir`-bearing AVIF is refused atomically (no new `unsafe`), or authorize a specific safe accessor for mirroring.
-
-Until these are settled, B1's required positives cannot be produced and B2's text requirement cannot be met — so D, I and the §7 acceptance criteria are unreachable, and integrating a partial package is expressly forbidden by the order.
-
-## 5. Preservation, cleanliness and Stage status
-
-**Preserved exactly:** all 15 accepted WO-114 integration blobs and the whole accepted PNG/JPEG/WebP/GIF V1/V2 + N102 baseline are byte-identical to `main` at `98917578`; `Cargo.lock`, every `Cargo.toml`, every source and test file, `.github/workflows/rust-verify.yml`, `deny.toml`, `AGENTS.md`, `ARCHITECTURE.md`, both SOPs, all three `plan-*` files and the architecture/unsafe checkers are unchanged. No `MEDIA-CODEC-NOTICES.md` was created, because no third-party notice obligation actually arose. Remote state: `main` advanced only by A and this report; **26** refs before and after; `solo-wo-113-gif-v2-r01` still `ad7b74df`, `solo-wo-112-gif8-host-r01` still `40b03c73`; one checkout, one `origin`, empty stash, four WIP files, no second worktree, no branch created, no merge, rebase, reset, cherry-pick, force-push, `git clean`, tag, release, deployment, PR or provider access.
-
-**Task-owned scratch:** all investigation material was created under `.temp/wo115/` (probe scripts, a scratch `probe-crate`, its `target/`, and downloaded `.crate` files) and disposable WSL `/tmp` JSON, entirely outside the tracked tree, and was deleted at the end of the run; `.temp/wo115` no longer exists and `git status --porcelain` is empty. Cargo's shared registry cache (`~/.cargo/registry`) received the crates resolved by the probe; that is the tool's own cache rather than repository or task material, and it was not added to the project. Pre-existing Owner `.temp/` directories (`architecture-fixtures`, `solo-win-target`, `solo-wo-073-wip`, `solo-wo-098-wip`, `solo-wo-103-wip`, `solo-wsl-target`, `toolchain-installer`) were left untouched.
-
-**Stage status:** `R03.C3`, `R03.C` and Stage 03 remain **OPEN**, with AVIF and safe true-vector SVG **still unimplemented**; the pinned `platform/assets/` catalogue, derived-output/exposure obligations and Stage 04 routing remain outstanding. No release, deployment or Stage closure is claimed, and no requirement was waived or downgraded.
-
-## 6. Status
-
-| Item | State |
+| Gate | State |
 |---|---|
-| Owner installation/handoff and A | **PASS** — raw == filtered == GitHub `b895fe3d`; A `b71832c7` ACTIVE-only |
-| Frozen governance and protected refs | **PASS** — 11/11 blobs; 26 refs; prior branch tips unchanged |
-| B1 production AVIF | **NOT STARTED — blocked** (fixtures + native dav1d) |
-| B2 safe true-vector SVG | **NOT STARTED — blocked** (glyph source; order's own STOP clause) |
-| B3 / D / I | **NOT STARTED** — no branch, no CI dispatch, no integration |
-| Partial work integrated | **None** — zero codec/source/manifest/lock/workflow bytes written |
-| Local gates | **Not applicable** — no code changed; the pre-existing baseline was not re-run for this STOP |
-| Fresh both-host `main` CI at R | Requested at the exact R SHA; evidence reported in chat, since a report cannot embed its own commit |
+| Owner installation, A, governance, refs | **PASS** — A `f936a453` ACTIVE-only; 11/11; 27 refs |
+| B0 pinned fixtures + provenance | **PASS** — 9/9 index blobs byte-identical; licences recorded |
+| B0 baseline green | **PASS** — fmt, check, clippy 0, architecture legal, unsafe 22/22 |
+| B1 AVIF / B2 SVG / B3 V3 | **NOT DELIVERED** |
+| D / I | **NOT STARTED** — no CI dispatch, no integration |
+| Partial work integrated | **None** — zero source/manifest/workflow bytes written |
+| Fresh both-host `main` CI at R | Requested at exact R SHA; evidence in chat |
 
-`status=STOPPED — dependency and fixture gates not satisfiable under the installed ledger.` The three blockers are reproducible from the exact repository state and from the exact pinned crates; two of them are the order's own declared STOP conditions. The agent does not self-accept, does not claim any AVIF or SVG capability, and awaits an Owner decision on D1–D4 before any resumed order.
+`status=STOPPED — B0 proven; B1/B2/B3/D/I not delivered; AVIF and SVG remain unimplemented; nothing integrated.` `R03.C3`, `R03.C` and Stage 03 remain **OPEN**. No functionality was waived, no fallback invented, nothing released, deployed or closed, and the agent does not self-accept.
 
 
 
