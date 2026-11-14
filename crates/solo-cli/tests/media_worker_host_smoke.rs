@@ -4344,14 +4344,11 @@ mod n116 {
     /// The same pixels as a 2×2 WebP still container, the accepted `n097` fixture.
     const FIXTURE_WEBP: &str = "UklGRg4CAABXRUJQVlA4WAoAAAAgAAAAAQAAAQAASUNDUMgBAAAAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADZWUDhMHwAAAC8BQAAAHyAQSN4fOo35FxAU/B/d/EdkD+AGDBH9DwEA";
 
-    /// A complete two-frame GIF87a with an explicit transparent index and disposal 2.
-    const FIXTURE_GIF: &[u8] = &[
-        0x47, 0x49, 0x46, 0x38, 0x37, 0x61, 0x02, 0x00, 0x02, 0x00, 0x80, 0x00, 0x00, 0xff, 0x00,
-        0x00, 0x00, 0xff, 0x00, 0x21, 0xf9, 0x04, 0x01, 0x0a, 0x00, 0x01, 0x00, 0x2c, 0x00, 0x00,
-        0x00, 0x00, 0x02, 0x00, 0x02, 0x00, 0x00, 0x02, 0x03, 0x44, 0x04, 0x05, 0x00, 0x21, 0xf9,
-        0x04, 0x01, 0x0a, 0x00, 0x01, 0x00, 0x2c, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x02, 0x00,
-        0x00, 0x02, 0x03, 0x4c, 0x05, 0x06, 0x00, 0x3b,
-    ];
+    /// The accepted deterministic three-frame GIF89a fixture, with an infinite NETSCAPE loop and
+    /// three Graphic Control extensions, shared with the N113 cases.
+    fn gif_fixture() -> Vec<u8> {
+        super::n113_fixtures::gif89a_three_frames()
+    }
 
     fn decode_base64(text: &str) -> Vec<u8> {
         let mut out: Vec<u8> = Vec::with_capacity(text.len() / 4 * 3);
@@ -4591,29 +4588,19 @@ mod n116 {
                 ("icon.png", &png()),
                 ("logo.jpg", &jpeg()),
                 ("banner.webp", &webp()),
-                ("scene.gif", FIXTURE_GIF),
+                ("scene.gif", &gif_fixture()),
                 ("mark.svg", &svg_bytes),
             ],
         );
         let inventory = inventory_of(&[
-            (TestOwnerV1::Entity, "favicon", "assets/icon.png", "public"),
-            (TestOwnerV1::Facet, "logo", "assets/logo.jpg", "public"),
-            (
-                TestOwnerV1::Site,
-                "banner",
-                "assets/banner.webp",
-                "internal",
-            ),
-            (
-                TestOwnerV1::Page,
-                "background",
-                "assets/scene.gif",
-                "public",
-            ),
+            (TestOwnerV1::Entity, "favicon", "icon.png", "public"),
+            (TestOwnerV1::Facet, "logo", "logo.jpg", "public"),
+            (TestOwnerV1::Site, "banner", "banner.webp", "internal"),
+            (TestOwnerV1::Page, "background", "scene.gif", "public"),
             (
                 TestOwnerV1::Representation,
                 "social-preview",
-                "assets/mark.svg",
+                "mark.svg",
                 "public",
             ),
         ]);
@@ -4659,9 +4646,9 @@ mod n116 {
             .iter()
             .find_map(|item| item.animation())
             .expect("the GIF obligation yields a timeline");
-        assert_eq!(animation.frames.len(), 2, "two authored frames");
-        assert_eq!(animation.width, 2);
-        assert_eq!(animation.height, 2);
+        assert_eq!(animation.frames.len(), 3, "three authored frames");
+        assert_eq!(animation.width, 1);
+        assert_eq!(animation.height, 1);
 
         let vector = set
             .inspections()
@@ -4693,8 +4680,7 @@ mod n116 {
                 b"\x00\x00\x00\x20ftypavif\x00\x00\x00\x00avifmif1miafMA1B".as_slice(),
             )],
         );
-        let avif_inventory =
-            inventory_of(&[(TestOwnerV1::Entity, "logo", "assets/mark.avif", "public")]);
+        let avif_inventory = inventory_of(&[(TestOwnerV1::Entity, "logo", "mark.avif", "public")]);
         assert_eq!(
             refusal_kind(inspect_entity_graphic_images_v3(
                 &avif_root.capability(),
@@ -4829,8 +4815,7 @@ mod n116 {
         ] {
             let bad = hostile(name);
             let root = Root::new(name, &[("mark.svg", &bad)]);
-            let inventory =
-                inventory_of(&[(TestOwnerV1::Entity, "logo", "assets/mark.svg", "public")]);
+            let inventory = inventory_of(&[(TestOwnerV1::Entity, "logo", "mark.svg", "public")]);
             let kind = refusal_kind(inspect_entity_graphic_images_v3(
                 &root.capability(),
                 &inventory,
@@ -4852,24 +4837,19 @@ mod n116 {
                 ("icon.png", &png()),
                 ("logo.jpg", &jpeg()),
                 ("banner.webp", &webp()),
-                ("scene.gif", FIXTURE_GIF),
+                ("scene.gif", &gif_fixture()),
                 ("z-mark.svg", &hostile("script")),
             ],
         );
         let late_inventory = inventory_of(&[
-            (TestOwnerV1::Entity, "favicon", "assets/icon.png", "public"),
-            (TestOwnerV1::Facet, "logo", "assets/logo.jpg", "public"),
-            (TestOwnerV1::Site, "banner", "assets/banner.webp", "public"),
-            (
-                TestOwnerV1::Page,
-                "background",
-                "assets/scene.gif",
-                "public",
-            ),
+            (TestOwnerV1::Entity, "favicon", "icon.png", "public"),
+            (TestOwnerV1::Facet, "logo", "logo.jpg", "public"),
+            (TestOwnerV1::Site, "banner", "banner.webp", "public"),
+            (TestOwnerV1::Page, "background", "scene.gif", "public"),
             (
                 TestOwnerV1::Representation,
                 "social-preview",
-                "assets/z-mark.svg",
+                "z-mark.svg",
                 "public",
             ),
         ]);
@@ -4891,11 +4871,11 @@ mod n116 {
             &[("mark.svg", &hostile("dtd")), ("logo.jpg", &jpeg())],
         );
         let hidden_inventory = suppressed_inventory_of(&[
-            (TestOwnerV1::Entity, "logo", "assets/logo.jpg", "public"),
+            (TestOwnerV1::Entity, "logo", "logo.jpg", "public"),
             (
                 TestOwnerV1::Representation,
                 "social-preview",
-                "assets/mark.svg",
+                "mark.svg",
                 "internal",
             ),
         ]);
@@ -4915,17 +4895,17 @@ mod n116 {
         assert_eq!(
             refusal_kind(inspect_entity_graphic_images_v3(
                 &role_root.capability(),
-                &inventory_of(&[(TestOwnerV1::Entity, "favicon", "assets/icon.svg", "public")]),
+                &inventory_of(&[(TestOwnerV1::Entity, "favicon", "icon.svg", "public")]),
                 std::path::Path::new(BIN)
             )),
             GraphicImageInspectRefusalKindV3::FaviconNotPng,
             "the favicon role is PNG-only"
         );
-        let gif_role_root = Root::new("gifrole", &[("icon.gif", FIXTURE_GIF)]);
+        let gif_role_root = Root::new("gifrole", &[("icon.gif", &gif_fixture())]);
         assert_eq!(
             refusal_kind(inspect_entity_graphic_images_v3(
                 &gif_role_root.capability(),
-                &inventory_of(&[(TestOwnerV1::Entity, "favicon", "assets/icon.gif", "public")]),
+                &inventory_of(&[(TestOwnerV1::Entity, "favicon", "icon.gif", "public")]),
                 std::path::Path::new(BIN)
             )),
             GraphicImageInspectRefusalKindV3::FaviconNotPng
@@ -4936,8 +4916,8 @@ mod n116 {
         let missing = inspect_entity_graphic_images_v3(
             &missing_root.capability(),
             &inventory_of(&[
-                (TestOwnerV1::Entity, "logo", "assets/logo.jpg", "public"),
-                (TestOwnerV1::Facet, "banner", "assets/absent.png", "public"),
+                (TestOwnerV1::Entity, "logo", "logo.jpg", "public"),
+                (TestOwnerV1::Facet, "banner", "absent.png", "public"),
             ]),
             std::path::Path::new(BIN),
         );
