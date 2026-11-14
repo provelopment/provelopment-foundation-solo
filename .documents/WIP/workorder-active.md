@@ -1,105 +1,272 @@
-# SOLO-WO-109 R01 — PROVE PRESERVED GIF WORKER ON REAL HOSTS; CLOSE STRICT TRANSCRIPT VALIDATION; DO NOT INTEGRATE
+# SOLO-WO-110 R01 — FIRST REAL GIF HOST PROOFS: N108_01 + N108_02
 
-**Authority:** Chief Master Architect-prepared **PROPOSED OWNER-ISSUABLE** order. This artifact is not self-activating. It becomes `OWNER-ISSUED — SOLO-WO-109 R01` **only after** the Owner reviews and installs these exact complete bytes as the sole `C:\Users\Sean\Documents\Provelopment\00.foundation-solo\.documents\WIP\workorder-active.md` and sends the matching WO-109 activation to the Implementation Agent. The Owner alone issues and closes orders. The Implementation Agent alone makes authorized workstation/repository changes; the Chief Master Architect uses GitHub **READ-ONLY** for independent ACCEPT / REVISE / STOP. No agent self-acceptance.
+**Status:** PROPOSED FOR OWNER ISSUANCE; NOT SELF-ACTIVATING. The Owner alone issues this order by reviewing and installing its **complete exact bytes** as the sole `C:\Users\Sean\Documents\Provelopment\00.foundation-solo\.documents\WIP\workorder-active.md`, followed by a matching explicit `SOLO-WO-110 R01` activation. The Implementation Agent alone performs permitted local edits and Git pushes. The Chief Master Architect independently audits GitHub **READ-ONLY** and rules **ACCEPT / REVISE / STOP**. No self-acceptance, release, deployment or publication.
 
-**Required bounded outcome:** `R03C-CONFINED-GIF-WORKER-N108-REAL-HOST-PROOF-AND-STRICT-TRANSCRIPT-VERIFIED`. Produce one **published, exact-SHA, green Ubuntu 24.04 + Windows 2025 technical-branch checkpoint** with eight actually executed `n108_*` GIF-worker tests, mandatory no-absence/no-skipping CI gates, strict parent validation of a complete ordered animation transcript, correct per-format GIF output cap during read, and existing N097/N102/security/reproducibility nonregression. Preserve the known working GIF semantics and real worker from WO-108. **Do not integrate GIF into `main` yet.** The follow-on separately Owner-issued order will implement mixed-owner V2, deliberate-red sensitivity, exact verified-blobs integration, and final GIF acceptance. The Owner-approved, binding true-vector sanitized SVG requirement remains mandatory after full GIF integration, not abandoned or diluted.
+**Required bounded outcome:** `R03C-GIF-N108-FIRST-TWO-REAL-HOST-CANARIES-VERIFIED` — preserve the WO-109 strict GIF parser and confined worker; add **two actual executable tests**, `n108_01_gif87a_still_confined_and_parent_verified` and `n108_02_gif89a_animation_keeps_frames_delays_and_loop`, driving the real compiled `solo-cli` under the real Linux/Windows confined supervisor; a dedicated **mandatory both-host two-case CI gate** must execute and pass them at one exact technical SHA, together with unchanged N097/N102/security/architecture/reproducibility gates. Preserve a green technical branch and publish one truthful report on green main. **Do NOT integrate GIF code into main yet**. This is a deliberately small *partial proof milestone*, not full GIF acceptance. The remaining `n108_03`–`n108_08`, deliberate-red proof, V2 atomic mixed inventory, GIF integration, and secure full-vector SVG are **still required**.
 
-**Repository:** `provelopment/provelopment-foundation-solo`; only approved checkout `C:\Users\Sean\Documents\Provelopment\00.foundation-solo` (WSL operates in this same mounted checkout). Permitted refs: `main` and new `solo-wo-109-gif-proof-r01`. Existing `solo-wo-108-gif-worker-r01` at `bb3ef4ab083643b1b1d6c332c5c038f12ded68f9` and `solo-wo-107-gif-r01` at `efc384e17f496522484dff09e0559b4724876829` are strictly **read-only source checkpoints**. No new negative branch under this order. No second worktree/clone, PR, merge, cherry-pick, rebase, force-push, reset/clean of Owner material, release, tag, deploy, public asset delivery or provider/network/media fetch.
+**Why this order is different:** WO-107 implemented a decoder, WO-108 implemented the confined worker, and WO-109 strengthened the parser, but no real hosted GIF-worker test was written. This order starts by writing a functioning host test **before** designing another full matrix. A working test and CI proof are the immediate product of the run. Use the concrete, source-specific Rust and workflow examples below; adapt only as required by actual compiled types and observed failures. Do not stop for normal fixable in-ledger defects. If full outcome becomes blocked, preserve and publish the earliest genuine coded/tested technical checkpoint and report exactly which test executed.
 
-## 1. Independent disposition and precise unfinished objective
+## 1. Immutable preflight and preservation
 
-WO-108 R01 is **STOPPED / NOT ACCEPTED overall**: its required `n108_*` actual hosted tests and CI execution-count gate do not exist, and therefore the branch cannot be called a verified GIF worker despite compiling. The B0/B/C technical branch is independently confirmed at `bb3ef4ab083643b1b1d6c332c5c038f12ded68f9` (tree `22b42679c4d25aeb8f47f020ea3c43cee89ecf12`, sole parent `1282852ad2052a4c302a4439fd474b5122556c73`) with green run `43580280590`, Ubuntu job `132403323848`, Windows job `132403324023`. Fourteen real GIF decoder unit tests execute and pass; existing N097 PNG/JPEG/WebP and N102 Windows canaries pass. The GIF codec is not on main, not accepted, not a public product capability and not a publication grant. Preserve its complete commit history and blobs.
+1. Repository `provelopment/provelopment-foundation-solo`; one Owner checkout at `C:\Users\Sean\Documents\Provelopment\00.foundation-solo` (WSL uses same `/mnt/c` checkout); one approved `origin`, one worktree, empty stash. Verify `HEAD == main == origin/main == git ls-remote origin main == ea63f2808b5c94e4c0eb3194cb37a1a03b95b898`, tree `3569c2c381aab26bb7785cc01a9364d7a5515e0a`, sole parent `c97765062b3e0f16f596cb5249fcfa75710cd684`. The only permitted initial tracked dirt is the Owner-installed **exact** WO-110 ACTIVE file; preserve byte-for-byte, no hard-break or newline normalization. STOP on unexplained dirt or missing pins without reset/clean/stash.
+2. Prior GitHub blobs on main: `.documents/Reports/execution-report.md` `b54a29f6fca63d047b26243e84cc2a6f6f7e033f`; `.documents/WIP/workorder-active.md` `43dc6a56203ca1983a8db358b9947d970f76baaf`; NEXT `92fa562b1af0c54391851aa5c79deb1631127069`; ROADMAP `9d7a86226878f490fd5e26c6813a81e5f73f3f37`; OUTLOOK `cb9c7a610cf3c537557e060ca9656e44a053e69d`. Exactly **four canonical WIP** files, one overwrite-only report, no archive.
+3. Frozen governance: Architecture `f66096ec375a497ac6de9a65cfbeae4c5dc85844`, architect SOP `1483c9bec1dc9cc7bb7a51590b72eb90c1506af1`, implementation SOP `51bb37922cf7fc56952e4ad6155c9a59d3c09036`, `AGENTS.md` `6eae1da8c721e13cea0c6689a1665e98fa5a9abb`, AST checker `crates/solo-cli/tests/architecture_checks/source.rs` `1c99d3482dd2a9bd7b027f5f193e17603976e361`, unsafe guard `crates/solo-cli/tests/unsafe_boundary.rs` `57d7579616fc0bab96dcb1e371584f20cfd5d8f9`. Frozen native host file `crates/solo-adapters/src/media_worker_host_native.rs` `d411eaf429b6fe1e090654d26f75833bffa597d4`. No edits, waivers or skips.
+4. Frozen main technical pins: root manifest `Cargo.toml` `14505be49a281ba0495eabea5ca386548cc36347`, toolchain `rust-toolchain.toml` `9ec55b3b621dbc75fc68817cd51b96e407d3c94c`, `Cargo.lock` `5a18352becaee99b459a93ec75a9d46ce3ff6c8a`, adapter manifest `9c7d526d217bf175bbe9c3956684d28bf8e2a5b6`, workflow `995bd28e7d3d7e236da37da391a5648bfb0317ce`, adapter lib `c009e4282a56fc541d8aef4598ddb533161ba67a`, image worker `90d67201a5959f93758c2a9311e940ee3c8005e5`, safe supervisor `c6d7813943c3979be44208665ec1365830c6d81c`, graph `da7d7ee78ffe7f7c8b32b2e10c776350ab2345a2`, CLI smoke `88b4c6ab7346677196e5bac4ff576fefa7c998ef`, application inspection `bdba09c116a9b0667c4e179668b15168f53e481f`. Preserve all other paths.
+5. There are **22** remote refs preflight: main + 21 frozen non-main. Source checkpoint `solo-wo-109-gif-proof-r01` must be `1be3750bed19f3145d1e39cc475603343e97dff7` (tree `7ae474603bb8269d3b18b10ff0f47690767e8d99`); `solo-wo-108-gif-worker-r01=bb3ef4ab083643b1b1d6c332c5c038f12ded68f9`; `solo-wo-107-gif-r01=efc384e17f496522484dff09e0559b4724876829`; 18 older refs unchanged. New authorized branch only `solo-wo-110-gif-host2-r01`; do not repurpose or move older branches. Preserve ignored Owner `.temp/` files, retained patches, WSL cache and old local branches.
+6. GitHub independent historical evidence: WO-109 issuance run `43583223625` green on both hosts, source branch `43583511938` green, report `43583884449` green. Earlier WO-108 Windows issuance `43579699908` **red** in `n102_01`; record this historical irregularity, do not misstate as green or suppress the unchanged canary if it recurs.
 
-**New independent source-audit findings that MUST be corrected, not merely tested around:** In `graphic_image_inspection.rs` at this C head, `validate_gif_worker_frame_v1` hashes received transcript bytes but does **not** yet validate their entire grammar: `text.lines()` and `break` at `end=...` can admit trailing lines/bytes; `signature`, `mime` and `loop_count` have branches that return `true` without checking the values; `transcript_line_value_v1` searches for frame keys anywhere, admitting reordered/duplicate/unknown keys; header/transcript summary may be inconsistent without all arithmetic being re-derived. Hash equality with a worker claim does not cure these grammar defects. Author a deterministic strict, complete, bounded parser for the **same received bytes**, rejecting every missing, additional, duplicate, reordered, noncanonical or inconsistent field. The **trusted parent must not call the GIF decoder or do image compositing**; it can check fixed source signature and logical screen dimensions using bounded header bytes it already owns.
+## 2. Exact permissible writes and operations
 
-**Issuance CI irregularity:** WO-108 A push run `43579699908` at `ae65053d4ef0d197292a195e8c12638a530c1f44` was **red on Windows**, job `132401577479`, specifically `n102::n102_01_extra_inheritable_handle_is_excluded`, where the non-inheritable numeric-control value unexpectedly resolved in the child and the protective test refused ambiguity. This is a real failed gate, not green issuance. Subsequent branch `43580280590` and final main report run `43580588933` passed N102 on Windows. Do not suppress, skip or rename this canary. Record the occurrence in the next report; if it recurs in fresh baseline or branch CI, investigate the actual root cause and STOP if correction needs a path outside this order. Do not assume that a single later pass disproves an intermittent regression.
+Permanent closed ledger:
+- `.documents/WIP/workorder-active.md`: only exact Owner bytes, commit **A**, then immutable.
+- `.documents/Reports/execution-report.md`: one final overwrite-only report, committed separately on main; no additional WIP/report file.
+- `.github/workflows/rust-verify.yml`: restore inherited exact checkpoint, then add two-host N108-first-two gate; do **not** edit existing N097/N102/architecture/cargo-deny/reproducibility/release gates.
+- `Cargo.lock`, `crates/solo-adapters/Cargo.toml`, `crates/solo-adapters/src/graphic_gif_inspection.rs`, `crates/solo-cli/tests/architecture_checks/graph.rs`: **exact scope-imported checkpoint blobs only**, no further changes, no dependency addition.
+- `crates/solo-adapters/src/graphic_image_inspection.rs`: restore checkpoint, then only fix a real discovered GIF worker/parent-validation defect exposed by N108_01/N108_02; preserve V1 still-image code.
+- `crates/solo-adapters/src/media_worker_host.rs`: restore checkpoint, then only fix a proven GIF-specific bounded supervision defect; protect N097/N102 and native host.
+- `crates/solo-adapters/src/lib.rs`: restore checkpoint and **only** re-export the already-existing trusted observer seam `inspect_gif_bytes_with_executable_v1` and typed `GifFrameEvidenceV2` if not already exported. Raw `inspect_gif_animation_v1` stays crate-private and non-exported.
+- `crates/solo-cli/tests/media_worker_host_smoke.rs`: add exact `mod n108` with **two** real-host tests, deterministic bounded fixture helpers and bounded proof log lines; no files or external fixtures required.
 
-**Current main report:** [WO-108 STOP report](https://github.com/provelopment/provelopment-foundation-solo/blob/644570b01061924bc2f770f76c28539eca71500a/.documents/Reports/execution-report.md). Final completed step is a green main-only report, not GIF integration. Preserve original PNG/JPEG/WebP V1 policy, all previous source-read and N097/N102 evidence, and the SVG/GIF requirement in Architecture §6.2I.
+No other permanent paths. The single checkout may create ordinary forward commits, fast-forward push authorized branches, run exact-head `workflow_dispatch`, and import exact named source paths with scoped Git restore. No merge, PR, rebase, cherry-pick, second checkout/worktree/clone, force-push, reset-hard, destructive clean, tag, release, deploy, new dependency or outbound fetch. Scratch only in owned Solo `.temp/` and clean only owned scratch; never touch Owner material. No release or publication authority.
 
-## 2. Frozen starting identities and hard preservation preflight
+## 3. Execution: get a REAL worker case running immediately
 
-Before writing, verify **all** of the following against the one local checkout, remote `origin` and GitHub. STOP on real mismatch; do not overwrite, normalize or reset unexpected dirt.
+### Phase A — Owner authority
 
-- `HEAD == main == origin/main == git ls-remote origin main == 644570b01061924bc2f770f76c28539eca71500a`, tree `5c2dd007a59c5ebee87428bb2b9fe82cfccc03f1`, sole parent `ae65053d4ef0d197292a195e8c12638a530c1f44`; accepted prior report `.documents/Reports/execution-report.md` blob `8df01ee392f0a52cef7a43e602f6e62ed145d71d`; tracked WO-108 ACTIVE `.documents/WIP/workorder-active.md` blob `cd7a1618901f34ed8600d9e83f55ea0cb4f2037b`. Only permitted initial tracked dirt is the Owner's *exact* replacement WO-109 ACTIVE, to be staged as-is; no CRLF or hard-break normalization.
-- Exactly four WIP files: `plan-next.md` blob `92fa562b1af0c54391851aa5c79deb1631127069`, `plan-roadmap.md` `9d7a86226878f490fd5e26c6813a81e5f73f3f37`, `plan-outlook.md` `cb9c7a610cf3c537557e060ca9656e44a053e69d` and the one ACTIVE. One overwrite-only `.documents/Reports/execution-report.md`; no archive or additional WIP.
-- Frozen governance: Architecture `.documents/Architecture/ARCHITECTURE.md` `f66096ec375a497ac6de9a65cfbeae4c5dc85844`; Architect SOP `1483c9bec1dc9cc7bb7a51590b72eb90c1506af1`; Implementation SOP `51bb37922cf7fc56952e4ad6155c9a59d3c09036`; `AGENTS.md` `6eae1da8c721e13cea0c6689a1665e98fa5a9abb`; `crates/solo-cli/tests/architecture_checks/source.rs` `1c99d3482dd2a9bd7b027f5f193e17603976e361`; `crates/solo-cli/tests/unsafe_boundary.rs` `57d7579616fc0bab96dcb1e371584f20cfd5d8f9`. All immutable.
-- Current `main` technical blobs: root `Cargo.toml` `14505be49a281ba0495eabea5ca386548cc36347`; `Cargo.lock` `5a18352becaee99b459a93ec75a9d46ce3ff6c8a`; toolchain `9ec55b3b621dbc75fc68817cd51b96e407d3c94c` (Rust 1.99.1); adapters manifest `9c7d526d217bf175bbe9c3956684d28bf8e2a5b6`; adapter lib `c009e4282a56fc541d8aef4598ddb533161ba67a`; worker source `crates/solo-adapters/src/graphic_image_inspection.rs` `90d67201a5959f93758c2a9311e940ee3c8005e5`; safe host `crates/solo-adapters/src/media_worker_host.rs` `c6d7813943c3979be44208665ec1365830c6d81c`; **frozen process-native** `crates/solo-adapters/src/media_worker_host_native.rs` `d411eaf429b6fe1e090654d26f75833bffa597d4`; application V1 `crates/solo-application/src/graphic_image_inspection.rs` `bdba09c116a9b0667c4e179668b15168f53e481f`; CLI `crates/solo-cli/src/main.rs` `ae1395b3ec43dbecf470b694642a4d7aea0d7695`; smoke `crates/solo-cli/tests/media_worker_host_smoke.rs` `88b4c6ab7346677196e5bac4ff576fefa7c998ef`; graph `crates/solo-cli/tests/architecture_checks/graph.rs` `da7d7ee78ffe7f7c8b32b2e10c776350ab2345a2`; workflow `.github/workflows/rust-verify.yml` `995bd28e7d3d7e236da37da391a5648bfb0317ce`.
-- Exactly **21 remote refs** at preflight: `main` plus 20 prior nonmain, all unchanged. `solo-wo-107-gif-r01 = efc384e17f496522484dff09e0559b4724876829`; `solo-wo-108-gif-worker-r01 = bb3ef4ab083643b1b1d6c332c5c038f12ded68f9`; protected `solo-wo-105-canary-r01 = ba1767dd959606cf3623e3703ca0b796b609fa36`, `solo-wo-105-negative-r01 = d345022d8d221f55bc7fc3a1a4797913db1ed0b5`. No `solo-wo-109-*` remote ref must exist before issuance. One actual worktree, one approved origin, empty stash. Preserve unowned/ignored files, old branches and patches, `.temp/solo-wo-073-wip/` and `.temp/solo-wsl-target/`, never delete or stash them.
-- Independently verify source branch `bb3ef4ab` **seven exact technical blobs** before scoped import: `.github/workflows/rust-verify.yml` `866c9e51d2bbb2532bc5a8630c608a075220d500`; `Cargo.lock` `cf1051675576ab0e00ce7acbd5dbe139882c31b4`; `crates/solo-adapters/Cargo.toml` `3610f06ff58cdea6ce1b3993544f0c2e286087ea`; `crates/solo-adapters/src/graphic_gif_inspection.rs` `785d08d0e5a9009be1cbb015eb1b88362f6ab311`; `crates/solo-adapters/src/lib.rs` `3f7ab0b397af77d7116c018c1c159fc679ddf4bc`; `crates/solo-adapters/src/graphic_image_inspection.rs` `61c5e1421ff5c69455a4baae240cfad52f0f9ea1`; `crates/solo-cli/tests/architecture_checks/graph.rs` `dc6d2770038a14199d2f366faab64db4e3d6e98b`. All imported blobs must initially match exactly, including protected 14 GIF unit tests.
+From pinned main, stage only the exact Owner-installed ACTIVE and commit A. Push to main. Verify exact `head_sha` both-host issuance CI and record conclusion. If a genuine red preexisting test occurs (including N102) investigate and preserve failure facts; do not waive or call green. Do not silently abandon the assigned technical work for a transient service delay; request the exact failing job evidence and follow existing STOP boundaries if unresolvable.
 
-## 3. Only authorized permanent write ledger
+### Phase B0 — preserve WO-109 checkpoint (no reinvention)
 
-1. `.documents/WIP/workorder-active.md` — exact Owner bytes **issuance A only**, thereafter frozen.
-2. `.documents/Reports/execution-report.md` — **one** canonical overwrite-only final report on `main`, separately committed; no archive, no additional WIP.
-3. `.github/workflows/rust-verify.yml` — import C blob, then add **mandatory both-host** eight-case N108 real worker gate; existing N097, four N102 Windows canaries, security, negative policy, reproducibility and release smoke all stay intact.
-4. `Cargo.lock` — exact import `cf105167...` only, no extra dependency.
-5. `crates/solo-adapters/Cargo.toml` — exact import `3610f06f...` only, `gif =0.14.2` with `std`, `image =0.25.10` png/jpeg/webp unchanged, no new dependencies/features.
-6. `crates/solo-adapters/src/graphic_gif_inspection.rs` — exact import corrected GIF blob `785d08d0...`; only add minor bounded unit tests/fixture support when actually needed. Do not weaken corrected GIF89a background, previous disposal, interlace, palette, or strict GIF87a behavior.
-7. `crates/solo-adapters/src/lib.rs` — exact import `3f7ab0b3...`; only narrow typed supervised/fixture interface registration if strictly needed; raw `inspect_gif_animation_v1` MUST remain crate-private, never publicly re-exported.
-8. `crates/solo-adapters/src/graphic_image_inspection.rs` — exact import `61c5e142...`, then correct **full strict transcript grammar** and genuinely load-bearing parent validation; allow closed trusted executable seam for tests and fixed malformed-response injection as necessary, no arbitrary input or public bypass.
-9. `crates/solo-adapters/src/media_worker_host.rs` — optional small **safe Rust** change: for closed `format_token == "gif"`, enforce GIF stdout cap **while reading** on both Linux and Windows, rather than first collecting the larger still-image allowance and then rejecting. Preserve all OS limits, cleanup and N097/N102 native control paths. No change to `media_worker_host_native.rs`.
-10. `crates/solo-cli/tests/media_worker_host_smoke.rs` — add the **exact eight `n108_*` real worker cases**, deterministic in-memory GIF fixtures and strictly bounded evidence logging. No fixture assets outside this file or in project content.
-11. `crates/solo-cli/tests/architecture_checks/graph.rs` — import exact `dc6d277...` only. Graph remains four packages, 33 targets, 63 files, 70 edges absent a precisely proven non-dependency-count difference; no wildcard bypass.
+Create `solo-wo-110-gif-host2-r01` from A after authorized issuance. Scope-import **exactly these eight** source-branch files from `1be3750bed19f3145d1e39cc475603343e97dff7`; verify every imported `git hash-object` before edits, then commit B0:
 
-**All other permanent paths READ-ONLY**: especially Architecture and the SVG/GIF product contract, both SOPs, AGENTS, NEXT/ROADMAP/OUTLOOK, root manifest/toolchain, `deny.toml`, source checker, unsafe guard, `crates/solo-application` V1 and all domain/source-read/inventory files, `crates/solo-cli/src/main.rs`, native process seam, other test files, providers, public assets and publication pipeline. If necessary correction requires out-of-ledger code, STOP with source-level reason and preserve completed branch work. Permitted git actions: ordinary forward-only commits/fast-forward pushes, scoped blob import, workflow dispatch on exact branch SHA, CI/log/API reads. No destructive actions or secret exposure. Scratch only in owned ignored `.temp/wo109/`, clean up owned files only after evidence retained.
+| Source path | Exact Git blob at source head |
+|---|---|
+| `.github/workflows/rust-verify.yml` | `866c9e51d2bbb2532bc5a8630c608a075220d500` |
+| `Cargo.lock` | `cf1051675576ab0e00ce7acbd5dbe139882c31b4` |
+| `crates/solo-adapters/Cargo.toml` | `3610f06ff58cdea6ce1b3993544f0c2e286087ea` |
+| `crates/solo-adapters/src/graphic_gif_inspection.rs` | `785d08d0e5a9009be1cbb015eb1b88362f6ab311` |
+| `crates/solo-adapters/src/graphic_image_inspection.rs` | `a3096585f3ec357ae3a65833f519a000b4eba311` |
+| `crates/solo-adapters/src/lib.rs` | `3f7ab0b397af77d7116c018c1c159fc679ddf4bc` |
+| `crates/solo-adapters/src/media_worker_host.rs` | `3f6eebd32e8f25458aabe3c72d162490a8592f35` |
+| `crates/solo-cli/tests/architecture_checks/graph.rs` | `dc6d2770038a14199d2f366faab64db4e3d6e98b` |
 
-## 4. Mandatory execution sequence — real technical checkpoint first
+The baseline GIF codec has fourteen passing unit tests, and the worker's strict parser, typed frame evidence and smaller supervisor output cap already exist. **Do not spend this run rewriting those systems**. The missing link is tests calling the actual executable.
 
-### A. Authority and baseline gate
+### Phase C1 — N108_01 still GIF: write, compile, execute, commit first
 
-1. Verify §2 exactly. Stage only the Owner-issued `.documents/WIP/workorder-active.md`. Commit A as one path-only commit parented by `644570b0...`; push `main`; record A SHA/tree/parent/blob. Run fresh two-host push CI and inspect **both** named job conclusions, not just the combined workflow status.
-2. **No green issuance claim unless both hosts are actually green.** If the Windows `n102_01` collision recurs, capture the exact error and evidence without disabling canaries; a retry on the same unmodified SHA may establish repeatability but is not permission to relabel a red run green. Persistent or unexplained security-test failures are a real gate: preserve current work and STOP if resolving it needs an unauthorized file or guard change. If first attempt red and a later exact-head repeat green, disclose both runs and give the Architect the underlying facts; do not conceal a flaky accepted test.
+The exact composition-root binary is **already defined** in `crates/solo-cli/tests/media_worker_host_smoke.rs:19`:
 
-### B. Preserve the C checkpoint as a new forward branch
+```rust
+const BIN: &str = env!("CARGO_BIN_EXE_solo-cli");
+```
 
-1. From the new green A `main`, create `solo-wo-109-gif-proof-r01` only. With all seven pinned source blobs verified, scope-import those exact seven paths from `bb3ef4ab` with supported single-checkout Git path restore; **no merge, cherry-pick, rebase or broad checkout**. Record each imported Git blob before modifications. Commit `B0 — restored GIF worker checkpoint` forward; leave original WO-108 branch untouched.
-2. Run fast WSL `cargo fmt --all -- --check`, `cargo check --workspace --all-targets --locked`, strict Clippy with `-D warnings`, `cargo test -p solo-adapters --lib --locked graphic_gif`, `cargo test -p solo-cli --test unsafe_boundary --locked`, and real-tree Architecture. Existing 14 GIF unit tests, 22 unsafe-boundary tests and 29 AST self-checks must remain valid. Windows type-check (`--target x86_64-pc-windows-msvc`) is helpful but **not** native Windows runtime proof. Use `.temp/solo-wsl-target`/the already approved one-checkout cache, do not create a second checkout.
+This is an existing trusted Cargo binding, not PATH or authored user input. The worker seam is already implemented in source-branch `graphic_image_inspection.rs:1685`:
 
-### C. Make the parent parser genuinely strict and ensure real test invocation
+```rust
+pub fn inspect_gif_bytes_with_executable_v1(
+    executable: &std::path::Path,
+    source: &[u8],
+) -> Result<GifWorkerObservationV1, GifWorkerRefusalV1>;
+```
 
-1. Preserve `SOLO-GIF-WORKER-V1` and `SOLO-GIF-ANIMATION-V1` protocol versions. The received transcript must parse as **one complete grammar**: initial marker; exactly one `signature` (matching bytes' `GIF87a`/`GIF89a` header), `mime=image/gif`, positive `width`/`height`, positive `frames`, exact `loop`/`loop_count` relation (zero finite count refused), `one_cycle_delay_ms`, `total_composited_pixels`, `source_sha256`, exactly `frames` sequential `frame=<zero-based>` lines each with **exact ordered keys** `delay_cs`, `rect`, `disposal`, `transparent`, `interlaced`, `local_palette`, `composite_sha256`; then exactly one terminal `end=SOLO-GIF-ANIMATION-V1` line ending in LF and **no following bytes**, CR, hidden control bytes, extra lines, blank lines, reordered keys, duplicates, unknown data or junk. Decode no GIF pixels in the parent. Parse and validate rect components, bounds, positive sizes, transparency token index, booleans, palette/disposal tokens, finite/nonnegative delays, composite SHA256 lowercase hex. Check complete arithmetic: `frames × width × height == total_composited_pixels` within the 128M cap, and `sum(delay_cs×10) == one_cycle_delay_ms` <=3,600,000. Parent-held source digest and bounded GIF header dimensions must match transcript/header claims; signed/enumerated values require canonical decimal spellings. Preserve maximum 1024 frames and 1MiB transcript. After strict acceptance expose **bounded, immutable, validated transcript bytes and/or typed ordered per-frame evidence** on the supervised `GifWorkerObservationV1` so actual host tests can verify frame geometry, authored timing, disposal, palette/interlace and composite digests; a solitary transcript hash is not enough to test those fields. Never expose raw GIF decoder access or accept unvalidated worker text. Reject a transcript with an internally consistent forged digest but an inconsistent **semantic structure**. No permissive `.find_map()` or early `break` can bypass full-consumption checks.
-2. The header's exact 14 keys remain ordered and unique; ensure header line length bounded independently, require exactly one LF separator, no CR, and no extra stdout after the claimed body. Prove PID matches actual supervisor PID, `limits_verified`, reaped child and exit code 0; the worker's own `confinement=verified` string alone has no authority. Correct a trusted test-executable invocation issue: existing `inspect_gif_bytes_v1` selects `std::env::current_exe()`, which under an integration test is the Rust **test harness**, not the built `solo-cli` image. Expose only a narrow adapter-level **trusted composition-root/test seam** accepting the known executable path (`env!("CARGO_BIN_EXE_solo-cli")` in `media_worker_host_smoke.rs`), and make it share exactly the same parent validation as `inspect_gif_bytes_v1`. Neither the pathname nor arbitrary arguments may derive from authored content; don't add a public CLI command, environment variable, or arbitrary executable provider.
-3. `run_confined_image_worker_v1` already accepts a **closed worker format token**. On both Linux and Windows, select the fixed GIF stdout read limit `MAX_GIF_TRACE_BYTES_V1 + 4096` for only `"gif"`; leave the original still-image cap unchanged for png/jpeg/webp and N102 probe modes. Reap/terminate on oversize, never treat truncated output as success; keep all cleanup and native isolation semantics unmodified. A parent's post-read cap alone does not demonstrate that the host reader applied the smaller GIF bound.
-4. Add deterministic **parser-focused unit tests** inside the authorized adapter worker module if needed, using the *same production parser*. Test: trailing line after `end`, duplicate/reordered metadata, skipped frame, duplicate or unknown frame key, wrong MIME/signature, forged but syntactically valid digest, frame rect outside canvas, mismatch between frame-delay sum and header, mismatched loop count and noncanonical numbers. These are extra tests, **not substitutes for eight real-worker N108 cases**.
+**First actual edit:** Add its `pub use` in adapter `lib.rs`, alongside `GifFrameEvidenceV2` (both already defined). Do not export the raw decoder. Add a `#[cfg(any(target_os = "linux", windows))] mod n108` to `media_worker_host_smoke.rs`. Use the exact reference pattern below; this is a code-level implementation guide, not a substitute for compilation or host evidence:
 
-### D. Eight real GIF worker cases and exact CI gate
+```rust
+#[cfg(any(target_os = "linux", windows))]
+mod n108 {
+    use std::path::Path;
+    use solo_adapters::{
+        GifLoopV1, inspect_gif_bytes_with_executable_v1,
+    };
+    use solo_application::sha256_media_worker_bytes_v1;
 
-All eight cases **must call the actual product `solo-cli` image using the production confined supervisor and reserved child flag**, not a direct call to crate-private raw GIF decoder, a fake test binary, a mock worker, or a type-check. Name them exactly under one `#[cfg(any(target_os="linux", windows))] mod n108` in `crates/solo-cli/tests/media_worker_host_smoke.rs`:
+    // Valid extension-free GIF87a: 1x1 canvas, global palette red/blue,
+    // one image descriptor, LZW codes clear / palette-index-0 / end.
+    // Code width is three bits: codes (4, 0, 5) => 0x0144, little-endian bits.
+    fn gif87a_red_pixel() -> Vec<u8> {
+        let mut bytes = b"GIF87a".to_vec();
+        bytes.extend_from_slice(&[1, 0, 1, 0, 0x80, 0, 0]);
+        bytes.extend_from_slice(&[255, 0, 0, 0, 0, 255]);
+        bytes.extend_from_slice(&[0x2c, 0, 0, 0, 0, 1, 0, 1, 0, 0]);
+        bytes.extend_from_slice(&[2, 2, 0x44, 0x01, 0, 0x3b]);
+        bytes
+    }
 
-1. `n108_01_gif87a_still_confined_and_parent_verified` — real extension-free GIF87a; positive nonzero child PID, limits/readback, verified reap, exact source/transcript SHA-256, dimensions 1×1, one frame, loop absent, animation false.
-2. `n108_02_gif89a_animation_keeps_frames_delays_and_loop` — real 3+ frame GIF89a; authored 10/20/5 centiseconds, 350ms total, exact frame count, loop infinite and ordered per-frame composite hashes from **known deterministic fixture**; no first-frame substitution.
-3. `n108_03_gif89a_previous_background_palette_interlace_offset` — real workers for deterministic RestorePrevious, nonzero logical-screen background colour, local palette, interlace and offset fixtures; evidence matches independently pinned expected transcript fields and composite SHA256, both hosts.
-4. `n108_04_gif_extension_signature_trailer_and_mislabeled_input_refuse` — bad signature, 87a+89a extension, truncated, trailing-byte/polyglot, unexpected extension, invalid palette/background, magic/label mismatch; every case a typed whole-asset refusal with no accepted observation. A `.png`-declared GIF must remain refused by V1; the `gif` worker must reject PNG/JPEG/WebP bytes rather than relabel them.
-5. `n108_05_source_and_transcript_digest_claims_are_independently_checked` — exercise the existing **closed modes** `gif-wrong-source` and `gif-wrong-transcript` through the true child, not a mock; verify precise parent refusal. Retain correct-mode positive control. Do not weaken or mutate digest comparison under this order.
-6. `n108_06_complete_protocol_and_structured_transcript_are_fail_closed` — prove malformed/missing/duplicate/reordered fields, bad line terminator, trailing data, mismatched frame count/timing/geometry/loop and a self-consistently rehashed **malformed** transcript all refuse by the exact production parser; pair parser fixture proof with a real worker positive and closed malformed-child modes if necessary. No public arbitrary-output injection switch.
-7. `n108_07_gif_size_frame_canvas_duration_and_output_budgets_refuse` — test upper and over-upper bounds, canvas/frame/composited-pixel/duration/trace budgets, and bounded stdout/refusal/cleanup, using compact deterministic constructed fixtures rather than huge allocations or external assets. Confirm actual host proofs as appropriate; cover exact fail-closed outcomes without relying on running out of RAM.
-8. `n108_08_cross_host_deterministic_worker_transcript_and_nonregression` — emit bounded `n108_gif=...` evidence with known fixture SHA-256 and actual full transcript SHA-256, frame count, loop/timing, real child PID, limits/reap facts, compare pinned constant digest values between Ubuntu and Windows; explicitly recheck unchanged N097 positive PNG/JPEG/WebP and Windows N102 canaries within the **same** branch run (existing steps must also remain mandatory).
+    #[test]
+    fn n108_01_gif87a_still_confined_and_parent_verified() {
+        let bytes = gif87a_red_pixel();
+        let obs = inspect_gif_bytes_with_executable_v1(Path::new(super::BIN), &bytes)
+            .expect("real confined GIF87a worker must succeed");
+        assert_eq!(obs.signature(), "GIF87a");
+        assert_eq!((obs.width(), obs.height()), (1, 1));
+        assert_eq!(obs.frame_count(), 1);
+        assert!(!obs.is_animated());
+        assert_eq!(obs.loop_semantics(), GifLoopV1::Absent);
+        assert_eq!(obs.source_digest(), &sha256_media_worker_bytes_v1(&bytes));
+        assert_eq!(obs.frames()[0].composite_digest(),
+                   &sha256_media_worker_bytes_v1(&[255, 0, 0, 255]));
+        assert!(obs.transcript_len() > 0);
+        assert_ne!(obs.worker_pid(), 0);
+        assert!(obs.limits_verified() && obs.cleanup_verified());
+        println!("n108_gif=still frames=1 pid={} src={} transcript={}",
+            obs.worker_pid(), obs.source_digest().to_hex(),
+            obs.transcript_digest().to_hex());
+    }
+}
+```
 
-Each case prints only bounded nonsecret metadata. Tests must not log full source GIFs, raw paths, environment, handles or enormous transcripts. Helper fixture encoder is deterministic, limited to test code; do not add a dependency. If the test matrix exposes real decoder/compositor/worker defects, correct them **forward-only within the authorized technical files** and rerun. Do not stop for ordinary in-ledger correctable failures.
+**Run immediately**, in the same checkout under WSL (these tests use owned memory bytes and do **not** require a reflink root):
 
-Add a dedicated **Ubuntu + Windows** workflow step (do not rely on workspace test enumeration alone):
+```bash
+cargo fmt --all -- --check
+cargo test -p solo-cli --test media_worker_host_smoke --locked \
+  n108_01_ -- --nocapture --test-threads=1
+```
 
-`cargo test -p solo-cli --test media_worker_host_smoke --locked n108_ -- --nocapture --test-threads=1`
+If `n108_01` fails, read the exact refusal/stack and fix only the authorized seam/worker; do not create a second decoding path, change the guard, drop the test or claim the failure is caused by the unrelated reflink-only tests. **Commit the working first real-worker test as C1** on the preserved technical branch even before writing the second test. This checkpoint is mandatory for progress and remains retained if later gates fail.
 
-On Linux use `bash` with `set -euo pipefail`, capture output and fail nonzero. On Windows use `pwsh` and check `$LASTEXITCODE`. In both, assert each **qualified** Rust harness case begins with the exact fixed name `^test n108::n108_0[1-8]_<full_name> \.\.\.`; assert the required eight distinct exact names listed above, **exactly `test result: ok. 8 passed; 0 failed; 0 ignored`**, no extra case, and zero missing, skipped, filtered-as-passing or `... FAILED` lines. Because `--nocapture` can place per-test logging between the `...` prefix and the eventual `ok` (sometimes on a separate line), **do not** require one physical line ending `... ok` when output is interleaved. Instead combine the exact-name execution prefixes with the actual test harness result totals and reject every explicit failure. Do not accept absent tests. Require the existing N097 two-host step, four N102 Windows canaries, strict Clippy, architecture counts, cargo-deny/advisory tripwire, release smoke and two clean-build reproducibility checks to remain intact. No `continue-on-error`, ignored/skipped/fake tests or broad allowlist.
+### Phase C2 — N108_02 animated GIF: same production worker
 
-### E. Fast local loop and live two-host branch CI
+Use a deterministic **three-frame 1x1 GIF89a** generated inline using the same GIF image descriptor and LZW pixel payload. It requires a NETSCAPE2.0 application extension and three Graphic Control Extensions, not three separately decoded images. An example fixture builder to adapt is:
 
-- WSL fast loops first: `cargo fmt --all -- --check`, `cargo check --workspace --all-targets --locked`, strict `cargo clippy --workspace --all-targets --locked -- -D warnings` (respect CI flags and environment), `cargo test -p solo-adapters --lib --locked graphic_gif`, `cargo test -p solo-cli --test unsafe_boundary --locked`, real-tree Architecture, `cargo test -p solo-cli --test media_worker_host_smoke --locked n108_ -- --nocapture --test-threads=1` on Linux. No unauthorized reflink fixture cleanup or skip; disclose local-only filesystem limitations honestly.
-- Create ordinary forward technical commits for parser, host cap, tests and workflow, preserving each checkpoint SHA. Push `solo-wo-109-gif-proof-r01` fast-forward and trigger actual existing GitHub `workflow_dispatch` with exact branch and approved workflow. Verify the completed run `head_sha` **matches the technical commit**; both matrix jobs `verify (ubuntu-24.04)` and `verify (windows-2025)` must be **success** with the full eight-case N108 gate and N097/N102/security/reproducibility gates. A scheduled/reused run for a different SHA is not evidence. If any job red for a fixable in-ledger defect, repair by a new forward commit and rerun both hosts. Do not promote a red SHA or assert Windows from WSL type-check.
-- Verify both logs show `n108_01...08`, `8 passed, 0 failed, 0 ignored`, real `n108_gif` values and identical **known-fixture source and transcript digests** (PIDs and times necessarily differ). Verify hard corpus refusal, forgery detection, host limits, observed cleanup; record exact source/output digests, not secret payload bytes.
-- **STOP** if security test remains failing without authorized correction, tests cannot prove exact frame/worker outcomes, a new dependency is required, or a correction needs an out-of-ledger file. Preserve all technical commits/branch/CI and publish a truthful STOP report rather than deleting useful code.
+```rust
+fn gif89a_three_frames() -> Vec<u8> {
+    let mut bytes = b"GIF89a".to_vec();
+    bytes.extend_from_slice(&[1, 0, 1, 0, 0x80, 0, 0]);
+    bytes.extend_from_slice(&[255, 0, 0, 0, 0, 255]);
+    bytes.extend_from_slice(&[0x21, 0xff, 11]);
+    bytes.extend_from_slice(b"NETSCAPE2.0");
+    bytes.extend_from_slice(&[3, 1, 0, 0, 0]); // infinite loop
+    for (delay, disposal, transparent) in [(10u8, 1u8, false),
+                                           (20, 2, true), (5, 1, true)] {
+        let gce = (disposal << 2) | u8::from(transparent);
+        bytes.extend_from_slice(&[0x21, 0xf9, 4, gce, delay, 0, 0, 0]);
+        bytes.extend_from_slice(&[0x2c, 0, 0, 0, 0, 1, 0, 1, 0, 0]);
+        bytes.extend_from_slice(&[2, 2, 0x44, 0x01, 0]);
+    }
+    bytes.push(0x3b);
+    bytes
+}
+```
 
-### F. No integration, truthful final report, final CI
+Write **exactly** `n108_02_gif89a_animation_keeps_frames_delays_and_loop`. Invoke `inspect_gif_bytes_with_executable_v1(Path::new(super::BIN), &bytes)` as for C1. Assert: `signature == "GIF89a"`, `frame_count == 3`, `is_animated`, `loop_semantics == GifLoopV1::Infinite`, delays `[10,20,5]` centiseconds, one-cycle `350` milliseconds, ordered indexes `0,1,2`, and disposal (`Keep`, `Background`, `Keep`). The current accepted codec's defined transparent-background rule should yield composited RGBA digests red, red, transparent ([0,0,0,0]) for this fixture. Also assert source SHA, valid child PID, limits/readback, verified reap, nonzero transcript length. **A second actual test body** (place inside the same `mod n108` and add `GifDisposalV1` to the adapter imports) is:
 
-**Do not import or integrate any GIF technical file into `main` under WO-109.** It is intentional for green main after this order to still have PNG/JPEG/WebP only. On `main` (after authority A), overwrite only `.documents/Reports/execution-report.md`, report status **`COMPLETE — pending independent Architect review`** **only if** every gate in this order was actually met; otherwise `STOPPED` with exact unfinished items. Commit report **alone**, push, require fresh **green both-host main CI at the exact report head**. If a report-only main push is red, disclose and address within authority or STOP. ACTIVE remains WO-109 exact Owner bytes. All four WIP and frozen planning/governance files remain as issued.
+```rust
+#[test]
+fn n108_02_gif89a_animation_keeps_frames_delays_and_loop() {
+    let bytes = gif89a_three_frames();
+    let obs = inspect_gif_bytes_with_executable_v1(Path::new(super::BIN), &bytes)
+        .expect("real confined animated GIF89a worker must succeed");
+    assert_eq!(obs.signature(), "GIF89a");
+    assert_eq!((obs.width(), obs.height()), (1, 1));
+    assert_eq!(obs.frame_count(), 3);
+    assert!(obs.is_animated());
+    assert_eq!(obs.loop_semantics(), GifLoopV1::Infinite);
+    assert_eq!(obs.one_cycle_delay_ms(), 350);
+    let frames = obs.frames();
+    assert_eq!(frames.iter().map(|f| f.index()).collect::<Vec<_>>(),
+               [0, 1, 2]);
+    assert_eq!(frames.iter().map(|f| f.delay_centiseconds()).collect::<Vec<_>>(),
+               [10, 20, 5]);
+    assert_eq!(frames.iter().map(|f| f.disposal()).collect::<Vec<_>>(),
+               [GifDisposalV1::Keep, GifDisposalV1::Background, GifDisposalV1::Keep]);
+    let red = sha256_media_worker_bytes_v1(&[255, 0, 0, 255]);
+    let clear = sha256_media_worker_bytes_v1(&[0, 0, 0, 0]);
+    assert_eq!(frames[0].composite_digest(), &red);
+    assert_eq!(frames[1].composite_digest(), &red);
+    assert_eq!(frames[2].composite_digest(), &clear);
+    assert_eq!(obs.source_digest(), &sha256_media_worker_bytes_v1(&bytes));
+    assert!(obs.transcript_len() > 0 && obs.worker_pid() != 0);
+    assert!(obs.limits_verified() && obs.cleanup_verified());
+    println!("n108_gif=animation frames=3 duration_ms=350 pid={} src={} transcript={}",
+        obs.worker_pid(), obs.source_digest().to_hex(),
+        obs.transcript_digest().to_hex());
+}
+```
 
-The report must include: §2 every exact verified SHA/blob and remote ref ledger; A issuance and any Windows N102 `n102_01` failures/retries; B0 imported seven blobs; each subsequent technical commit/tree/parent; final technical branch SHA; all `n108_*` case evidence on both OSes; strict parser/negative fixture results; actual host stdout cap and cleanup; source/transcript digests and cross-host equality; cargo-deny/security/architecture diagnostics and one pre-existing nonblocking license warning if present; final main report SHA/job conclusions; preserved 21 original refs + exactly one new authorized branch; scratch/WSL/reflink limitations; no publication, delivery, release, deployment, SVG implementation or product GIF acceptance.
+Log only bounded metadata, without logging source bytes, paths or secrets. If a host reveals an actually incorrect fixture or correct product semantics differing from the stated expectation, diagnose with the parser/compositor code and preserve the correct semantics; never force the decoder to agree with an invalid fixture just to make the test green.
 
-## 5. Acceptance / STOP matrix and next phase
+```bash
+cargo test -p solo-cli --test media_worker_host_smoke --locked \
+  n108_ -- --nocapture --test-threads=1
+cargo test -p solo-adapters --lib --locked graphic_gif
+cargo test -p solo-cli --test unsafe_boundary --locked
+cargo check --workspace --all-targets --locked
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo fmt --all -- --check
+```
 
-**PASS only if all:** (1) authority correctly installed and reported with genuine two-host gate disposition; (2) seven existing GIF blobs imported exactly and original branches frozen; (3) strict **complete** transcript parser and closed test-executable seam with no unconfined GIF path; (4) smaller GIF supervisor cap enforced during read on both hosts; (5) eight actual N108 real-host tests + known SHA digest equality on both hosts; (6) mandatory N108 gate with exact names and 8/0/0 zero-skipped; (7) all N097/N102/security/architecture/toolchain/denial/reproducibility gates remain active and green on the exact technical head; (8) branch preserved, NO GIF integration, truthful report-only main commit and fresh two-host CI; (9) no unapproved path, dependency, branch, destructive or release/deploy action.
+**Commit C2** when both tests actually run and pass on WSL. Do not wait to write unrelated N108_03–08 cases; those are explicitly a subsequent order.
 
-**Hard STOP** on contradictory pin/owner state, no valid host isolation/reap, missing or skipped security case, unverified source/output, unauthorised ledger expansion, unresolvable native failure, or genuine CI evidence deficit. Ordinary compile/test defects inside the ledger are iterative corrections, not an excuse to claim a complete checkpoint without tests.
+### Phase D — strict 2-test CI gate, not an empty-workflow success
 
-After Architect ACCEPT of this narrowly scoped worker proof, a separately Owner-issued **WO-110** shall add the inward atomic PNG/JPEG/WebP/GIF V2 whole-owner result, a preserved complete GIF original-byte artifact, an **independent deliberate-red digest-guard sensitivity branch**, exact-blob integration and fresh two-host main CI. **Then** the mandatory sanitized, real scalable vector SVG implementation follows as a distinct code package. Neither SVG nor animated GIF is cancelled, flattened or deemed publicly deployed by this order.
+Add **dedicated** workflow steps on both `ubuntu-24.04` and `windows-2025`, immediately after existing N097, without deleting the existing N102, architecture, cargo-deny, release or reproducibility gates. Exact invocation on both:
+
+```bash
+cargo test -p solo-cli --test media_worker_host_smoke --locked \
+  n108_ -- --nocapture --test-threads=1
+```
+
+Ubuntu `shell: bash` reference pattern (run separately as a normal job step, not a permissive conditional):
+
+```bash
+set -euo pipefail
+log="$RUNNER_TEMP/n108-first-two.txt"
+if ! cargo test -p solo-cli --test media_worker_host_smoke --locked n108_ -- --nocapture --test-threads=1 >"$log" 2>&1; then
+  cat "$log"; exit 1
+fi
+cat "$log"
+for name in \
+  n108_01_gif87a_still_confined_and_parent_verified \
+  n108_02_gif89a_animation_keeps_frames_delays_and_loop; do
+  grep -Eq "^test n108::${name} \\.\\.\\." "$log" || exit 1
+done
+[ "$(grep -Ec '^test n108::n108_0[12]_[A-Za-z0-9_]+ \.\.\.' "$log")" -eq 2 ]
+grep -Eq '^test result: ok\. 2 passed; 0 failed; 0 ignored;' "$log"
+! grep -Eq '^test n108::.* \.\.\. FAILED|^test result: FAILED' "$log"
+```
+
+Windows `shell: pwsh` reference pattern:
+
+```powershell
+$required = @('n108_01_gif87a_still_confined_and_parent_verified',
+              'n108_02_gif89a_animation_keeps_frames_delays_and_loop')
+$log = Join-Path $env:RUNNER_TEMP 'n108-first-two.txt'
+cargo test -p solo-cli --test media_worker_host_smoke --locked n108_ -- --nocapture --test-threads=1 *>&1 | Tee-Object -FilePath $log
+if ($LASTEXITCODE -ne 0) { throw "N108 real worker test failed: $LASTEXITCODE" }
+$text = Get-Content -LiteralPath $log -Raw
+foreach ($name in $required) {
+  $pattern = '(?m)^test n108::' + [regex]::Escape($name) + ' \.\.\.'
+  if ($text -notmatch $pattern) { throw "N108 case absent: $name" }
+}
+$actual = [regex]::Matches($text,'(?m)^test n108::n108_0[12]_[A-Za-z0-9_]+ \.\.\.').Count
+if ($actual -ne 2) { throw "N108 exactly-two requirement failed: $actual" }
+if ($text -notmatch 'test result: ok\. 2 passed; 0 failed; 0 ignored;') { throw 'N108 passing count wrong' }
+if ($text -match '(?m)^test n108::.* \.\.\. FAILED|test result: FAILED') { throw 'N108 failed' }
+```
+
+**Important:** because the command uses a Rust test-name filter, the harness may legitimately report other cases as `filtered out`; do **not** require `0 filtered out`. The gate must nonetheless require the exact two named tests, `2 passed; 0 failed; 0 ignored`, no extra `n108_` case and no skipped/failed case. With `--nocapture`, a test can print after the `...` prefix, so do not require a same-line `... ok` suffix; require the execution prefix plus the harness total, as above.
+
+Commit D, push technical branch fast-forward and dispatch the existing workflow. The actual GitHub run's `head_sha` must equal the commit and **both** `verify (ubuntu-24.04)` and `verify (windows-2025)` must succeed. Inspect logs showing both test names and actual real child PID, limits, cleanup, expected 1/3 frame counts, 350ms animation and source/transcript digests. Compare source/transcript digest hex across host logs; PIDs and wall times differ. Rerun after a forward-only correction if a fixable test failure appears. Keep the green technical branch, do **not** integrate to main.
+
+### Phase E — truthful final report and main CI
+
+After the actual branch gate: return to green main A, overwrite only `.documents/Reports/execution-report.md`, commit **report-only R**, push and obtain fresh both-host green CI for R. Do not touch ACTIVE, NEXT/ROADMAP/OUTLOOK or any other main technical file. Report full SHAs/trees/parents, exact imported blobs, A and D/R CI run/job/host SHA identity, N108_01/02 observed results and digests, any errors/corrections, preservation/refusals, and the **six still-pending tests N108_03–08**.
+
+Status may say `COMPLETE — bounded first-two host-proof milestone pending Architect review` **only** if both named real tests are genuinely green on both hosts, strict two-case CI is in the exact green branch tree, and the source remains safely confined/nonpublishing. Otherwise STOP truthfully **but retain every real test/technical checkpoint on the authorized branch**. Do not call GIF a product capability, an accepted full N108 proof or a published asset. `R03.C3`, `R03.C`, Stage 03 remain OPEN. The binding safe scalable SVG and full animated GIF obligations remain OPEN.
+
+## 4. Explicit acceptance, next concrete milestones and references
+
+**Architect ACCEPT of this bounded order requires:** verified authority; exact source import; real `n108_01` and `n108_02` using **the production executable and supervisor**, not a direct raw decoder; nonzero native child PID and true OS bounds/reap; correct still and animation timeline; exact parent-trusted source/transcript facts; mandatory actual two-host CI gate with named execution + 2/0/0; N097/N102 and strict security/architecture/dependency/repro gates unchanged and green; preserved technical branch; report-only main final green; no release/integration. Anything less receives REVISE or STOP with preserved progress.
+
+**Next order:** implement N108_03–N108_08, including negatives, malformed transcript, budget adversaries and cross-host pinned digests, and increase the gate to **eight**; then an Owner-issued V2 atomic mixed GIF/raster policy + deliberate-red digest proof + exact-blob integration order; then mandatory actual safe-vector SVG code. No format is silently dropped or flattened. This smaller outcome intentionally supersedes WO-109's unrealized all-eight test milestone; it does **not** lower the eventual all-eight obligation.
+
+**Source-level implementation references** (these are pointers for the agent to read, not authority to broaden the ledger):
+- Existing `CARGO_BIN_EXE_solo-cli` test binary binding and N097 test style: `https://github.com/provelopment/provelopment-foundation-solo/blob/1be3750bed19f3145d1e39cc475603343e97dff7/crates/solo-cli/tests/media_worker_host_smoke.rs#L13-L22` and `#L1803-L1930`.
+- Trusted GIF worker seam and typed frame accessors: `https://github.com/provelopment/provelopment-foundation-solo/blob/1be3750bed19f3145d1e39cc475603343e97dff7/crates/solo-adapters/src/graphic_image_inspection.rs#L1450-L1600` and `#L1644-L1720`.
+- Existing strict GIF transcript validation: `https://github.com/provelopment/provelopment-foundation-solo/blob/1be3750bed19f3145d1e39cc475603343e97dff7/crates/solo-adapters/src/graphic_image_inspection.rs#L1885-L2084`.
+- Existing Windows N102 strict named-test CI step pattern: `https://github.com/provelopment/provelopment-foundation-solo/blob/1be3750bed19f3145d1e39cc475603343e97dff7/.github/workflows/rust-verify.yml#L650-L684`.
+- Cargo integration-test `CARGO_BIN_EXE_<name>` contract: `https://doc.rust-lang.org/cargo/reference/cargo-targets.html#integration-tests`.
+- Pinned GIF decoder API documentation: `https://docs.rs/gif/0.14.2/gif/struct.DecodeOptions.html` and `https://docs.rs/gif/0.14.2/gif/enum.MemoryLimit.html`.
+
+**Prohibitions remain:** no source checker/unsafe-guard changes, no second clone, no extra WIP/report archive, no force/reset/rebase/merge, no weakened tests, no arbitrary file or network access in the worker, no unapproved native operations, no release/deploy/publication, and no self-acceptance.
