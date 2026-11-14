@@ -1,1 +1,1589 @@
-//! Linux-only native resource-limit **readback** for `R03.C3`.1028//!1028//! This is the boundary that `SOLO-WO-074 R01` reserved and `SOLO-WO-076 R01` filled: a private1028//! seam that observes the calling process's **existing** address-space and CPU ceilings through1028//! the real kernel. `SOLO-WO-085 R01` added the fixed child's own process-group readback and1028//! `SOLO-WO-087 R01` adds one read-only group **and** session identity query, so a trusted child can1028//! attest its own identity and the owning parent can independently observe the same identities of1028//! its live, directly owned child.1028//!1028//! It is deliberately not a supervisor. There is no descendant, no limit mutation, no signal, no1028//! process-tree sweep, no handle cache and no output protocol here — only `getrlimit`, `getpgid`1028//! and `getsid` observations with compile-time-fixed selectors and a caller-validated target.1028//!1028//! Everything, including `use libc`, sits inside a positively `#[cfg(target_os = "linux")]`-gated1028//! module, and every `unsafe` block carries an adjacent `// SAFETY:` rationale, so both the AST1028//! checker and the independent source scanner can prove the target of each call from real text.1028//! The crate root declares this file only for `target_os = "linux"`, which is why a Windows build1028//! compiles no Linux-native module and makes no Linux readback claim.1028//!1028//! Reading a ceiling proves no enforcement: it says nothing about a future child's limits, a1028//! watchdog, a process group, descendants or any Windows Job Object.10281028#[cfg(target_os = "linux")]1028mod linux {1028    // The seam is established by this order and consumed by a later, separately issued one; until1028    // then nothing outside this module's own unit tests names it, so the unused-code lint would1028    // otherwise refuse a deliberately unexercised private API.1028    #![allow(dead_code)]10281028    use std::io::Read;1028    use std::mem::MaybeUninit;1028    use std::os::unix::process::CommandExt;1028    use std::process::{Child, Command};10281028    use crate::media_worker_host::{PROFILE_V1_AS_BYTES, PROFILE_V1_CPU_SECONDS};10281028    /// The most bytes of one `/proc/<pid>/stat` record this seam will read.1028    ///1028    /// A real record is a few hundred bytes; the cap means a hostile or unusual kernel surface can1028    /// never make this observation allocate without bound.1028    const PROC_STAT_READ_CAP: u64 = 4096;10281028    /// The field index, after the closing `)`, of the kernel's process start time.1028    ///1028    /// `/proc/<pid>/stat` numbers `state` as field 3 and `starttime` as field 22, so after the1028    /// command name ends at the final `)` the start time sits at zero-based offset 19.1028    const PROC_STAT_START_TIME_OFFSET: usize = 19;10281028    /// The kernel's "no limit" sentinel for an unsigned resource value.1028    #[cfg(test)]1028    const LIMIT_UNLIMITED: u64 = u64::MAX;10281028    /// Which compile-time-fixed ceiling an observation targets.1028    ///1028    /// An enum rather than a parameter, so no caller can name an arbitrary resource: only these1028    /// two exist, and both are resolved to kernel constants inside this module.1028    #[derive(Clone, Copy)]1028    enum Ceiling {1028        /// `RLIMIT_AS` — the process's virtual address-space ceiling in bytes.1028        AddressSpace,1028        /// `RLIMIT_CPU` — the process's consumed CPU-time ceiling in seconds.1028        Cpu,1028    }10281028    /// One observed ceiling, soft and hard reported separately.1028    ///1028    /// `rlim_t` is unsigned and `RLIM_INFINITY` is its maximum value, so the pair is carried as1028    /// `u64` without narrowing, clamping or a "finite" reinterpretation.1028    #[derive(Clone, Copy, Debug, PartialEq, Eq)]1028    pub(crate) struct LimitCeilingV1 {1028        /// The soft ceiling the kernel currently enforces.1028        pub(crate) soft: u64,1028        /// The hard ceiling a soft value may not exceed.1028        pub(crate) hard: u64,1028    }10281028    /// Both ceilings of the calling process, observed by two real kernel readbacks.1028    #[derive(Clone, Copy, Debug, PartialEq, Eq)]1028    pub(crate) struct NativeLimitReadbackV1 {1028        /// The `RLIMIT_AS` observation.1028        pub(crate) address_space: LimitCeilingV1,1028        /// The `RLIMIT_CPU` observation.1028        pub(crate) cpu: LimitCeilingV1,1028    }10281028    /// Why a readback produced no observation, and which selector failed.1028    ///1028    /// Closed and typed: it carries no OS error text, no path and no raw worker input, so a1028    /// caller cannot leak host detail through it.1028    #[derive(Clone, Copy, Debug, PartialEq, Eq)]1028    pub(crate) enum NativeReadbackRefusalV1 {1028        /// The `RLIMIT_AS` query did not return success.1028        AddressSpaceCeilingRejected,1028        /// The `RLIMIT_CPU` query did not return success.1028        CpuCeilingRejected,1028    }10281028    /// Whether a kernel return status means the structure was written.1028    ///1028    /// Separated from the call so the success/refusal decision is provable by a pure unit test1028    /// without injecting a syscall failure or acquiring privilege.1028    const fn ceiling_status_ok(status: i32) -> bool {1028        status == 01028    }10281028    /// Builds the typed ceiling from the two raw values the kernel reported.1028    ///1028    /// Pure, so full-width preservation of `RLIM_INFINITY` and of a distinct soft/hard pair is1028    /// unit-testable with no FFI and no process-limit change.1028    const fn ceiling_from_raw(soft: u64, hard: u64) -> LimitCeilingV1 {1028        LimitCeilingV1 { soft, hard }1028    }10281028    /// The closed result of one readback attempt.1028    type ReadbackV1 = Result<NativeLimitReadbackV1, NativeReadbackRefusalV1>;10281028    /// Reads the calling process's existing ceilings through two real `getrlimit` calls.1028    pub(crate) fn read_limit_ceilings_v1() -> ReadbackV1 {1028        Ok(NativeLimitReadbackV1 {1028            address_space: read_ceiling(Ceiling::AddressSpace)?,1028            cpu: read_ceiling(Ceiling::Cpu)?,1028        })1028    }10281028    fn read_ceiling(which: Ceiling) -> Result<LimitCeilingV1, NativeReadbackRefusalV1> {1028        let selector = match which {1028            Ceiling::AddressSpace => libc::RLIMIT_AS,1028            Ceiling::Cpu => libc::RLIMIT_CPU,1028        };1028        let refusal = match which {1028            Ceiling::AddressSpace => NativeReadbackRefusalV1::AddressSpaceCeilingRejected,1028            Ceiling::Cpu => NativeReadbackRefusalV1::CpuCeilingRejected,1028        };10281028        let mut raw = MaybeUninit::<libc::rlimit>::uninit();10281028        // SAFETY: `getrlimit` writes exactly one fully initialised `libc::rlimit` through the1028        // pointer it is given and reads nothing else. `raw` is a live, properly aligned stack slot1028        // exclusively borrowed for this call, `as_mut_ptr` yields a valid `*mut libc::rlimit` for1028        // it, the selector is one of the two fixed kernel constants, and the call mutates no1028        // process limit — it only reports one.1028        let status = unsafe { libc::getrlimit(selector, raw.as_mut_ptr()) };10281028        if !ceiling_status_ok(status) {1028            // The slot is deliberately left unread. A rejected call does not promise to have1028            // written anything, so reading it, or turning it into a success, would be exactly the1028            // partly initialised observation this type exists to make impossible.1028            return Err(refusal);1028        }10281028        // SAFETY: the status just checked was zero, which is `getrlimit`'s contract for having1028        // written the complete structure into the slot. The slot is therefore initialised, it is1028        // not read again afterwards, and `rlim_t` is `u64` on Linux, so both fields pass through1028        // with no narrowing, clamping or reinterpretation of the ceiling value.1028        let raw = unsafe { raw.assume_init() };10281028        Ok(ceiling_from_raw(raw.rlim_cur, raw.rlim_max))1028    }10281028    /// Why the calling process's group identity could not be observed.1028    ///1028    /// Closed and typed, like the ceiling refusals: it carries no OS error text and no path.1028    #[derive(Clone, Copy, Debug, PartialEq, Eq)]1028    pub(crate) enum NativeGroupRefusalV1 {1028        /// The `getpgid` query did not return a valid group identity.1028        ProcessGroupUnreadable,1028    }10281028    /// Registers the fixed Linux pre-exec boundary on `command`.1028    ///1028    /// The closure runs in the forked child **after** `fork` and **before** `exec`, so it may use1028    /// only async-signal-safe operations: it calls `setsid`, then installs both hard and soft1028    /// ceilings with two `setrlimit` calls, and returns a plain `errno`-derived error on failure.1028    /// It allocates nothing, locks nothing, formats nothing, performs no Rust I/O, resolves no1028    /// path, reads no limit, spawns no thread and cannot panic, because every value it needs was1028    /// computed here, before the fork. A failure means the image is never executed.1028    pub(crate) fn install_linux_child_limits_v1(command: &mut Command) {1028        let address_space = libc::rlimit {1028            rlim_cur: PROFILE_V1_AS_BYTES,1028            rlim_max: PROFILE_V1_AS_BYTES,1028        };1028        let cpu = libc::rlimit {1028            rlim_cur: PROFILE_V1_CPU_SECONDS,1028            rlim_max: PROFILE_V1_CPU_SECONDS,1028        };10281028        // SAFETY: `pre_exec` is `unsafe` because the registered closure runs in a restricted1028        // post-fork child, where only async-signal-safe work is permitted. The closure captures1028        // exactly two `Copy` `libc::rlimit` values built above and performs only `setsid` and two1028        // `setrlimit` calls, all three of which POSIX lists as async-signal-safe; it allocates,1028        // locks, formats, logs, opens, scans, resolves, observes and spawns nothing, and it cannot1028        // panic. Each failure path reports the child's own `errno` through1028        // `std::io::Error::last_os_error`, which only reads the thread-local errno and allocates1028        // nothing, and the parent never echoes that text. Both ceilings are installed with equal1028        // soft and hard values, so the child cannot raise them after `exec`.1028        unsafe {1028            command.pre_exec(move || {1028                if libc::setsid() == -1 {1028                    return Err(std::io::Error::last_os_error());1028                }1028                if libc::setrlimit(libc::RLIMIT_AS, &address_space) != 0 {1028                    return Err(std::io::Error::last_os_error());1028                }1028                if libc::setrlimit(libc::RLIMIT_CPU, &cpu) != 0 {1028                    return Err(std::io::Error::last_os_error());1028                }1028                Ok(())1028            });1028        }1028    }10281028    /// Reads the calling process's own process-group id.1028    ///1028    /// Used only by the fixed child, to prove that `setsid` inside the pre-exec boundary really1028    /// made this process a session leader in its own group.1028    pub(crate) fn own_process_group_v1() -> Result<u32, NativeGroupRefusalV1> {1028        // SAFETY: `getpgid(0)` asks the kernel for the process-group id of the calling process1028        // itself. It takes a plain `pid_t`, writes through no pointer, allocates nothing, mutates1028        // no state and cannot fault; a negative return is the kernel's error report and is turned1028        // into the closed refusal below rather than being cast or ignored.1028        let group = unsafe { libc::getpgid(0) };1028        if group < 0 {1028            return Err(NativeGroupRefusalV1::ProcessGroupUnreadable);1028        }1028        Ok(group as u32)1028    }10281028    /// Why a process-group or session identity could not be observed.1028    ///1028    /// Closed and typed, like the refusals above: it carries no `errno`, no path, no process1028    /// metadata and no OS error text, so nothing host-specific can reach an operator through it.1028    #[derive(Clone, Copy, Debug, PartialEq, Eq)]1028    pub(crate) enum NativeIdentityRefusalV1 {1028        /// The caller's target was zero, negative or not representable as a kernel `pid_t`.1028        ProcessIdNotRepresentable,1028        /// The `getpgid` query did not report a valid, positive group identity.1028        ProcessGroupUnreadable,1028        /// The `getsid` query did not report a valid, positive session identity.1028        SessionUnreadable,1028    }10281028    /// One read-only identity observation: the group and session the kernel reports for a target.1028    ///1028    /// Both fields are positive kernel identifiers that were validated **before** conversion, so a1028    /// caller never sees a zero or a wrapped negative value presented as an identity.1028    #[derive(Clone, Copy, Debug, PartialEq, Eq)]1028    pub(crate) struct ProcessIdentityV1 {1028        /// The process-group id the kernel reported for the target.1028        pub(crate) group: u32,1028        /// The session id the kernel reported for the target.1028        pub(crate) session: u32,1028    }10281028    /// Converts a caller's target into the `pid_t` the kernel queries accept.1028    ///1028    /// `None` is the kernel's own "the calling process" selector (`0`), which is the only form the1028    /// fixed trusted child may use. `Some(pid)` must be a positive value a `pid_t` can represent:1028    /// a zero, or a value wider than `pid_t`, is refused **before** any call, so a wrapped negative1028    /// pid can never be handed to the kernel and no caller can name an arbitrary unrepresentable1028    /// process.1028    fn pid_target(target: Option<u32>) -> Result<libc::pid_t, NativeIdentityRefusalV1> {1028        match target {1028            None => Ok(0),1028            Some(pid) => match libc::pid_t::try_from(pid) {1028                Ok(converted) if converted > 0 => Ok(converted),1028                _ => Err(NativeIdentityRefusalV1::ProcessIdNotRepresentable),1028            },1028        }1028    }10281028    /// Observes the process-group and session identity of `target`, read-only.1028    ///1028    /// `None` asks the kernel about the calling process itself and is used only by the fixed,1028    /// trusted child. `Some(pid)` names one exact positive pid that only this parent's own1028    /// `Child::id()` can supply, and is used only by the fixed parent while that child is alive.1028    ///1028    /// Nothing here mutates state: `getpgid` and `getsid` are pure observations. No signal, no1028    /// `waitpid`, no `pidfd`, no `fork` and no process-group or session control is reachable from1028    /// this module, and each kernel status is checked before any result is converted.1028    pub(crate) fn observe_process_identity_v1(1028        target: Option<u32>,1028    ) -> Result<ProcessIdentityV1, NativeIdentityRefusalV1> {1028        let pid = pid_target(target)?;10281028        // SAFETY: `getpgid` is a read-only query. It takes one `pid_t` that was just validated as1028        // either the kernel's own `0` selector or a positive, representable pid; it writes through1028        // no pointer, allocates nothing, mutates no process state and cannot fault. A negative1028        // return is the kernel's error report and becomes the closed refusal below rather than1028        // being cast, so no fabricated group identity can leave this function.1028        let group = unsafe { libc::getpgid(pid) };1028        if group <= 0 {1028            return Err(NativeIdentityRefusalV1::ProcessGroupUnreadable);1028        }10281028        // SAFETY: `getsid` is the same shape of read-only query for the session identity: one1028        // already validated `pid_t`, no pointer, no allocation, no state mutation and no fault. Its1028        // negative return is likewise the kernel's error report, checked before conversion, so a1028        // rejected call can never become a session identity.1028        let session = unsafe { libc::getsid(pid) };1028        if session <= 0 {1028            return Err(NativeIdentityRefusalV1::SessionUnreadable);1028        }10281028        let group =1028            u32::try_from(group).map_err(|_| NativeIdentityRefusalV1::ProcessGroupUnreadable)?;1028        let session =1028            u32::try_from(session).map_err(|_| NativeIdentityRefusalV1::SessionUnreadable)?;1028        Ok(ProcessIdentityV1 { group, session })1028    }10281028    /// Why one owned-group termination was not issued.1028    ///1028    /// Closed and typed, like every refusal above: it carries no `errno`, no path and no process1028    /// metadata, so nothing host-specific reaches an operator through it.1028    #[derive(Clone, Copy, Debug, PartialEq, Eq)]1028    pub(crate) enum GroupSignalRefusalV1 {1028        /// A pid was zero, one, not representable as a kernel `pid_t`, or self-contradictory.1028        BadIdentity,1028        /// The directly owned leader was not proved still running immediately around the call.1028        LeaderNotLive,1028        /// The kernel's own group/session answers did not match the identities this call requires.1028        IdentityMismatch,1028        /// The kernel rejected the one signal, so no termination may be claimed.1028        SignalRejected,1028    }10281028    /// What one owned-group termination actually established.1028    ///1028    /// It records the **request** and the identities it was checked against. It is deliberately not a1028    /// termination, a reap or a descendant exit: the caller must establish those separately.1028    #[derive(Clone, Copy, Debug, PartialEq, Eq)]1028    pub(crate) struct GroupSignalOutcomeV1 {1028        /// The leader pid, derived inside this seam from the owned handle.1028        pub(crate) leader_pid: u32,1028        /// The descendant pid supplied only for identity validation.1028        pub(crate) descendant_pid: u32,1028        /// The verified group identity, which the kernel reported as the leader pid.1028        pub(crate) group: u32,1028        /// The verified session identity, which the kernel reported as the leader pid.1028        pub(crate) session: u32,1028    }10281028    /// Sends exactly one `SIGKILL` to the **owned** group of `owned_child`, after re-proving it.1028    ///1028    /// The leader pid is derived here from the caller's own `Child` handle, never from a parameter;1028    /// `descendant_pid` is used only to prove that the descendant really sits in that group. The1028    /// group number is therefore never caller-selected, and no generic signaller exists: this1028    /// function cannot be asked to signal an arbitrary group, PID `0`, or `-1`.1028    ///1028    /// The pre-call `try_wait` bracket narrows, but does **not** eliminate, the window in which the1028    /// leader could exit and its pid be reused. It is not a race-free lifetime pin, and no caller may1028    /// present it as hostile-descendant containment.1028    pub(crate) fn terminate_owned_group_v1(1028        owned_child: &mut Child,1028        descendant_pid: u32,1028    ) -> Result<GroupSignalOutcomeV1, GroupSignalRefusalV1> {1028        let handle_pid = owned_child.id();1028        let leader_pid =1028            i32::try_from(handle_pid).map_err(|_| GroupSignalRefusalV1::BadIdentity)?;1028        if leader_pid <= 1 || descendant_pid == handle_pid || descendant_pid <= 1 {1028            return Err(GroupSignalRefusalV1::BadIdentity);1028        }1028        if !matches!(owned_child.try_wait(), Ok(None)) {1028            return Err(GroupSignalRefusalV1::LeaderNotLive);1028        }10281028        let leader = observe_process_identity_v1(Some(handle_pid))1028            .map_err(|_| GroupSignalRefusalV1::IdentityMismatch)?;1028        if leader.group != handle_pid || leader.session != handle_pid {1028            return Err(GroupSignalRefusalV1::IdentityMismatch);1028        }1028        let descendant = observe_process_identity_v1(Some(descendant_pid))1028            .map_err(|_| GroupSignalRefusalV1::IdentityMismatch)?;1028        if descendant.group != handle_pid || descendant.session != handle_pid {1028            return Err(GroupSignalRefusalV1::IdentityMismatch);1028        }10281028        // The verified group must not be this process's own group: a group signal that could reach1028        // the supervising parent is refused before the call rather than discovered afterwards.1028        let own_group =1028            own_process_group_v1().map_err(|_| GroupSignalRefusalV1::IdentityMismatch)?;1028        if own_group == leader.group {1028            return Err(GroupSignalRefusalV1::IdentityMismatch);1028        }10281028        // Recheck the same handle immediately before signalling, so a leader that exited during the1028        // observations above cannot be signalled by a stale identity this call just derived.1028        if !matches!(owned_child.try_wait(), Ok(None)) {1028            return Err(GroupSignalRefusalV1::LeaderNotLive);1028        }10281028        let target = leader_pid1028            .checked_neg()1028            .ok_or(GroupSignalRefusalV1::BadIdentity)?;10281028        // SAFETY: `kill` takes a `pid_t` and a signal number and performs no memory access, so no1028        // pointer, allocation or Rust state is involved. `target` is the negation of a positive pid1028        // this function just derived from the caller's own `Child` handle, which is the kernel's1028        // documented "this process group" selector; it can never be `0` or `-1`, because1028        // `leader_pid > 1` was enforced above and `checked_neg` refused any overflow. The group was1028        // verified as the leader's own and proved different from this process's group, so the signal1028        // cannot reach the supervising parent, a foreign group or a caller-selected group. The1028        // signal is the fixed `SIGKILL` constant, never a caller-supplied number.1028        let rc = unsafe { libc::kill(target, libc::SIGKILL) };10281028        if rc != 0 {1028            return Err(GroupSignalRefusalV1::SignalRejected);1028        }1028        Ok(GroupSignalOutcomeV1 {1028            leader_pid: handle_pid,1028            descendant_pid,1028            group: leader.group,1028            session: leader.session,1028        })1028    }10281028    /// The bounded, kernel-backed run state of one observed pid.1028    ///1028    /// `Running` and `Zombie` both carry the kernel's **start-time** identity, so a caller can prove1028    /// that the state it read belongs to the same process it observed earlier and not to a recycled1028    /// pid. A zombie is non-running but is **not** parent-reaped by this process.1028    #[derive(Clone, Copy, Debug, PartialEq, Eq)]1028    pub(crate) enum ProcessStateV1 {1028        /// The kernel reports the process as alive and not terminated.1028        Running {1028            /// The kernel's `starttime` identity for this process.1028            start_time: u64,1028        },1028        /// The kernel reports the process as a zombie: terminated, awaiting its own parent's reap.1028        Zombie {1028            /// The kernel's `starttime` identity for this process.1028            start_time: u64,1028        },1028        /// No `/proc` entry exists for the pid any more.1028        Gone,1028    }10281028    /// Why one `/proc` observation was refused rather than reported.1028    #[derive(Clone, Copy, Debug, PartialEq, Eq)]1028    pub(crate) enum ProcessStateRefusalV1 {1028        /// The record existed but could not be read.1028        Unreadable,1028        /// The record existed but was truncated, non-UTF-8, or off-schema.1028        Malformed,1028    }10281028    /// Observes one pid's run state and start-time identity from `/proc`, bounded and read-only.1028    ///1028    /// Nothing here mutates state, sends a signal, waits on a child or scans a process table: it1028    /// opens exactly one fixed `/proc/<pid>/stat` path for one already-validated positive pid. An1028    /// absent entry is reported as [`ProcessStateV1::Gone`]; anything unreadable or off-schema is a1028    /// typed refusal, so an inconclusive read can never be presented as a termination.1028    pub(crate) fn observe_process_state_v1(1028        pid: u32,1028    ) -> Result<ProcessStateV1, ProcessStateRefusalV1> {1028        if pid <= 1 {1028            return Err(ProcessStateRefusalV1::Malformed);1028        }1028        let path = format!("/proc/{pid}/stat");1028        let file = match std::fs::File::open(&path) {1028            Ok(file) => file,1028            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {1028                return Ok(ProcessStateV1::Gone);1028            }1028            Err(_) => return Err(ProcessStateRefusalV1::Unreadable),1028        };10281028        let mut buffer = Vec::new();1028        let read = file1028            .take(PROC_STAT_READ_CAP)1028            .read_to_end(&mut buffer)1028            .map_err(|_| ProcessStateRefusalV1::Unreadable)?;1028        if u64::try_from(read).unwrap_or(u64::MAX) >= PROC_STAT_READ_CAP {1028            return Err(ProcessStateRefusalV1::Malformed);1028        }1028        let text = std::str::from_utf8(&buffer).map_err(|_| ProcessStateRefusalV1::Malformed)?;1028        parse_proc_stat_v1(text)1028    }10281028    /// Parses one `/proc/<pid>/stat` record into a typed state and start-time identity.1028    ///1028    /// The command name is delimited by the **last** `)`, so a name that itself contains a space or a1028    /// bracket cannot shift the field offsets. Only the fixed state character and the fixed1028    /// start-time field are read; every other field is ignored rather than interpreted.1028    fn parse_proc_stat_v1(text: &str) -> Result<ProcessStateV1, ProcessStateRefusalV1> {1028        let open = text.find('(').ok_or(ProcessStateRefusalV1::Malformed)?;1028        let close = text.rfind(')').ok_or(ProcessStateRefusalV1::Malformed)?;1028        if close <= open {1028            return Err(ProcessStateRefusalV1::Malformed);1028        }1028        let rest = text1028            .get(close + 1..)1028            .ok_or(ProcessStateRefusalV1::Malformed)?;1028        let fields: Vec<&str> = rest.split_whitespace().collect();1028        if fields.len() <= PROC_STAT_START_TIME_OFFSET {1028            return Err(ProcessStateRefusalV1::Malformed);1028        }10281028        let state = fields[0];1028        if state.len() != 1 {1028            return Err(ProcessStateRefusalV1::Malformed);1028        }1028        let start_time = fields[PROC_STAT_START_TIME_OFFSET]1028            .parse::<u64>()1028            .map_err(|_| ProcessStateRefusalV1::Malformed)?;10281028        match state {1028            "R" | "S" | "D" | "I" | "T" | "t" | "W" | "P" => {1028                Ok(ProcessStateV1::Running { start_time })1028            }1028            "Z" | "X" | "x" => Ok(ProcessStateV1::Zombie { start_time }),1028            _ => Err(ProcessStateRefusalV1::Malformed),1028        }1028    }10281028    /// Sends exactly one `SIGKILL` to the verified **own** group of `owned_child`.1028    ///1028    /// The accepted `N093` helper requires a descendant to prove group membership. This image1028    /// worker is designed to create **zero** descendants, so this separate entry point derives the1028    /// group from the leader alone: the kernel must report `group == session == leader pid`, and that1028    /// group must differ from this parent's own group, all inside a `try_wait` bracket. The group1028    /// number is never caller-selected and no generic signaller exists.1028    ///1028    /// This narrows but does not eliminate the pid-reuse window, so no caller may present it as1028    /// race-free process-tree containment.1028    pub(crate) fn terminate_own_group_v1(1028        owned_child: &mut Child,1028    ) -> Result<u32, GroupSignalRefusalV1> {1028        let handle_pid = owned_child.id();1028        let leader_pid =1028            i32::try_from(handle_pid).map_err(|_| GroupSignalRefusalV1::BadIdentity)?;1028        if leader_pid <= 1 {1028            return Err(GroupSignalRefusalV1::BadIdentity);1028        }1028        if !matches!(owned_child.try_wait(), Ok(None)) {1028            return Err(GroupSignalRefusalV1::LeaderNotLive);1028        }10281028        let leader = observe_process_identity_v1(Some(handle_pid))1028            .map_err(|_| GroupSignalRefusalV1::IdentityMismatch)?;1028        if leader.group != handle_pid || leader.session != handle_pid {1028            return Err(GroupSignalRefusalV1::IdentityMismatch);1028        }1028        let own_group =1028            own_process_group_v1().map_err(|_| GroupSignalRefusalV1::IdentityMismatch)?;1028        if own_group == leader.group {1028            return Err(GroupSignalRefusalV1::IdentityMismatch);1028        }10281028        // Recheck the same handle immediately before signalling.1028        if !matches!(owned_child.try_wait(), Ok(None)) {1028            return Err(GroupSignalRefusalV1::LeaderNotLive);1028        }10281028        let target = leader_pid1028            .checked_neg()1028            .ok_or(GroupSignalRefusalV1::BadIdentity)?;10281028        // SAFETY: `kill` takes a `pid_t` and a signal number and touches no memory, so no pointer,1028        // allocation or Rust state is involved. `target` is the negation of a positive pid this1028        // function just derived from the caller's own `Child` handle — the kernel's documented1028        // "this process group" selector — and it can never be `0` or `-1` because `leader_pid > 1`1028        // was enforced and `checked_neg` refused overflow. The group was verified as the leader's1028        // own and proved different from this process's group, so the signal cannot reach the1028        // supervising parent. A non-zero return is the kernel's error report and becomes the closed1028        // `SignalRejected` refusal rather than a claimed termination.1028        let status = unsafe { libc::kill(target, libc::SIGKILL) };1028        if status != 0 {1028            return Err(GroupSignalRefusalV1::SignalRejected);1028        }1028        Ok(leader.group)1028    }10281028    #[cfg(test)]1028    mod tests {1028        use super::*;10281028        /// `N076-01`: both real kernel readbacks succeed and are reported separately.1028        #[test]1028        fn n076_01_getrlimit_rlimit_as_and_rlimit_cpu_observe_the_real_kernel() {1028            let address_space =1028                read_ceiling(Ceiling::AddressSpace).expect("RLIMIT_AS readback must succeed");1028            let cpu = read_ceiling(Ceiling::Cpu).expect("RLIMIT_CPU readback must succeed");10281028            // The kernel never reports a soft ceiling above its own hard ceiling.1028            assert!(address_space.soft <= address_space.hard);1028            assert!(cpu.soft <= cpu.hard);10281028            let both = read_limit_ceilings_v1().expect("both readbacks must succeed");1028            assert_eq!(both.address_space, address_space);1028            assert_eq!(both.cpu, cpu);1028        }10281028        /// `N076-02`: soft and hard stay separate, the whole `rlim_t` range is preserved, and a1028        /// repeated read is consistent. No fixed host value is asserted.1028        #[test]1028        fn n076_02_ceilings_keep_their_full_range_and_repeat_consistently() {1028            let first = read_limit_ceilings_v1().expect("readback");1028            let second = read_limit_ceilings_v1().expect("readback");1028            assert_eq!(1028                first, second,1028                "repeating the observation must be consistent"1028            );10281028            let unlimited = ceiling_from_raw(LIMIT_UNLIMITED, LIMIT_UNLIMITED);1028            assert_eq!(unlimited.soft, u64::MAX, "RLIM_INFINITY must not truncate");1028            assert_eq!(unlimited.hard, u64::MAX, "RLIM_INFINITY must not truncate");10281028            let split = ceiling_from_raw(1_048_576, 536_870_912);1028            assert_ne!(1028                split.soft, split.hard,1028                "soft and hard are reported separately"1028            );1028            assert_eq!(split.hard, 536_870_912);1028        }10281028        /// `N076-03`: a **source-path** proof, not an injected syscall failure. No privilege is1028        /// used and no limit is changed; the decision that turns a status into a typed refusal is1028        /// proved purely.1028        #[test]1028        fn n076_03_a_rejected_status_is_a_typed_refusal_not_a_partial_observation() {1028            assert!(!ceiling_status_ok(-1), "a failed status is never success");1028            assert!(!ceiling_status_ok(1), "only zero is success");1028            assert!(ceiling_status_ok(0), "zero is the kernel's success status");10281028            assert_ne!(1028                NativeReadbackRefusalV1::AddressSpaceCeilingRejected,1028                NativeReadbackRefusalV1::CpuCeilingRejected,1028                "each selector keeps its own closed refusal"1028            );1028        }1028    }1028}10281028// The fixed entry points the safe façade consumes.1028//1028// The implementation lives inside the positively Linux-gated `linux` module above, which keeps1028// every `unsafe` occurrence inside a provable gate; these re-exports only make the same fixed1028// items nameable from the rest of the crate. There is no general-purpose native API, no1028// caller-selected limit, no executable parameter and no Windows counterpart here: the two group1028// items are the owned-group termination request and the bounded `/proc` state observation that1028// `SOLO-WO-093 R01` added, and `SOLO-WO-094 R01` re-exports them so the façade's own imports1028// resolve on Linux.1028#[cfg(target_os = "linux")]1028pub(crate) use linux::{1028    GroupSignalRefusalV1, ProcessStateV1, install_linux_child_limits_v1,1028    observe_process_identity_v1, observe_process_state_v1, own_process_group_v1,1028    read_limit_ceilings_v1, terminate_own_group_v1, terminate_owned_group_v1,1028};10281028// The fixed Windows entry points the safe façade consumes.1028//1028// The implementation lives inside the positively `#[cfg(windows)]`-gated `windows` module above;1028// these re-exports only make the one suspended-worker type and the one job-membership query1028// nameable from the rest of the crate. There is no general-purpose native API here: no1028// caller-selected executable, limit, command line or output destination is reachable.1028#[cfg(windows)]1028#[cfg(windows)]1028pub use windows::{1028    N102ExtraInheritableV1, N102FaultContextV1, n102_probe_environment_v1, n102_probe_handle_v1,1028};1028#[cfg(windows)]1028pub(crate) use windows::{SuspendedWorkerV1, in_job_v1};10281028// ---------------------------------------------------------------------------------------------1028// `R03.C3` — the Windows suspended-worker job boundary1028// ---------------------------------------------------------------------------------------------1028//1028// This is the second approved use of the reserved process-native file and the first Windows one in1028// it. Every operation below sits inside a positively `#[cfg(windows)]`-gated module, and every1028// `unsafe` block carries an adjacent `// SAFETY:` rationale naming the exact invariant that makes1028// the call sound.1028//1028// What it provides, and nothing more: create the one trusted worker **suspended**, create and limit1028// a job object before that worker may execute, assign the still-suspended worker, read the limits1028// and membership back from the kernel, only then resume its captured primary thread, wait with a1028// timeout, and terminate or confirm the reap of exactly this parent's own job and process. It opens1028// no file, reads no authored path, writes no output file and starts no other executable.1028//1028// What it does **not** provide: a filesystem, registry or network sandbox; protection against a1028// hostile worker that tries to break out of its job; race-free identity pinning against handle1028// duplication; or any claim that a Job Object bounds committed memory the way a container would.10281028#[cfg(windows)]1028mod windows {1028    use std::ffi::c_void;1028    use std::path::Path;10281028    use windows_sys::Win32::Foundation::{1028        CloseHandle, GetHandleInformation, HANDLE, HANDLE_FLAG_INHERIT, SetHandleInformation,1028        WAIT_OBJECT_0,1028    };1028    use windows_sys::Win32::Security::SECURITY_ATTRIBUTES;1028    use windows_sys::Win32::System::JobObjects::{1028        AssignProcessToJobObject, CreateJobObjectW, IsProcessInJob, JOB_OBJECT_LIMIT_JOB_MEMORY,1028        JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE, JOB_OBJECT_LIMIT_PROCESS_MEMORY,1028        JOB_OBJECT_LIMIT_PROCESS_TIME, JOBOBJECT_BASIC_ACCOUNTING_INFORMATION,1028        JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JobObjectBasicAccountingInformation,1028        JobObjectExtendedLimitInformation, QueryInformationJobObject, SetInformationJobObject,1028        TerminateJobObject,1028    };1028    use windows_sys::Win32::System::Pipes::CreatePipe;1028    use windows_sys::Win32::System::Threading::{1028        CREATE_SUSPENDED, CREATE_UNICODE_ENVIRONMENT, CreateEventW, CreateProcessW,1028        DeleteProcThreadAttributeList, EXTENDED_STARTUPINFO_PRESENT, GetCurrentProcess,1028        GetExitCodeProcess, InitializeProcThreadAttributeList, LPPROC_THREAD_ATTRIBUTE_LIST,1028        PROC_THREAD_ATTRIBUTE_HANDLE_LIST, PROCESS_INFORMATION, ResumeThread, STARTF_USESTDHANDLES,1028        STARTUPINFOEXW, TerminateProcess, UpdateProcThreadAttribute, WaitForSingleObject,1028    };10281028    /// The largest attribute-list size this code will allocate for a one-entry list.1028    ///1028    /// The documented size for a two-handle inheritance list is a few hundred bytes; anything1028    /// outside this bound is treated as a refused host rather than a number to trust.1028    // ---------------------------------------------------------------------------------1028    // `SOLO-WO-103 R01` closed N102 test seam.1028    //1028    // Two fixed, bounded facts are exposed to the integration suite and to nothing else: an1028    // injection selector that makes one production native boundary refuse, and the child-side1028    // probes for the two isolation canaries. Neither is reachable from authored content, an1028    // ordinary public argument or any product configuration: the requested step is an immutable1028    // per-run value owned by one invocation, so it cannot leak between runs. The probes run only in1028    // the reserved internal worker modes, and no handle value, canary value or path is ever logged.1028    /// One closed per-run N102 fault context: the boundary this invocation must make refuse, the1028    /// boundary it actually reached, and whether the cleanup that followed a fault was observed.1028    ///1028    /// The value is constructed per invocation and passed by reference, so no global or thread-local1028    /// state exists: a concurrent host test can never observe another test's fault, and no normal1028    /// production run can be injected because it constructs [`Self::production`].1028    #[derive(Debug, Clone, Copy, PartialEq, Eq)]1028    pub struct N102FaultContextV1 {1028        requested: Option<u8>,1028        reached: Option<u8>,1028        cleanup_verified: bool,1028    }10281028    impl N102FaultContextV1 {1028        /// A non-injected context: every normal production image run constructs this.1028        pub const fn production() -> Self {1028            Self {1028                requested: None,1028                reached: None,1028                cleanup_verified: false,1028            }1028        }10281028        /// A context that must make exactly `step` refuse, for the closed integration seam only.1028        pub const fn requesting(step: u8) -> Self {1028            Self {1028                requested: Some(step),1028                reached: None,1028                cleanup_verified: false,1028            }1028        }10281028        /// Whether this boundary is the one this run requested, recording that it was reached.1028        pub fn inject_here(&mut self, boundary: u8) -> bool {1028            if self.reached.is_none() && self.requested == Some(boundary) {1028                self.reached = Some(boundary);1028                true1028            } else {1028                false1028            }1028        }10281028        /// The boundary this run actually reached, recorded at the native boundary itself.1028        pub fn reached(&self) -> Option<u8> {1028            self.reached1028        }10281028        /// Whether the cleanup that followed a fault was observed to complete.1028        pub fn cleanup_verified(&self) -> bool {1028            self.cleanup_verified1028        }10281028        /// Records that the owned child was terminated and its exit actually observed.1028        pub fn mark_cleanup_verified(&mut self) {1028            self.cleanup_verified = true;1028        }1028    }10281028    const ATTRIBUTE_LIST_MAX_BYTES: usize = 4_096;10281028    /// One initialised `PROC_THREAD_ATTRIBUTE_LIST` plus the aligned storage it points into.1028    ///1028    /// The owner keeps `storage` alive and never reallocates it while Windows holds `list`, and1028    /// `DeleteProcThreadAttributeList` runs exactly once, only after a successful initialisation.1028    struct AttributeListV1 {1028        storage: Vec<usize>,1028        list: LPPROC_THREAD_ATTRIBUTE_LIST,1028        initialised: bool,1028    }10281028    impl AttributeListV1 {1028        /// Probes the required size, allocates, initialises, and installs the two-handle allowlist.1028        ///1028        /// Every step is fail-closed: a probe that unexpectedly succeeds, a size of zero or one1028        /// beyond the bound, an initialisation failure and a rejected update all return `None`1028        /// without ever having installed a partial or unrestricted inheritance arrangement.1028        fn new(handles: &[HANDLE; 2]) -> Option<Self> {1028            if handles[0].is_null()1028                || handles[1].is_null()1028                || handles[0] == handles[1]1028                || handles[0] == windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE1028                || handles[1] == windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE1028            {1028                return None;1028            }10281028            let mut bytes_needed: usize = 0;1028            // SAFETY: this is the documented size-probe form — a null list, one entry and this1028            // function's own `usize` for the size — and it is expected to fail without writing1028            // anywhere except that `usize`.1028            let probe = unsafe {1028                InitializeProcThreadAttributeList(std::ptr::null_mut(), 1, 0, &mut bytes_needed)1028            };1028            if probe != 0 || bytes_needed == 0 || bytes_needed > ATTRIBUTE_LIST_MAX_BYTES {1028                return None;1028            }10281028            let word = std::mem::size_of::<usize>();1028            let words = bytes_needed.checked_add(word - 1)? / word;1028            // `Vec<usize>` provides `usize` alignment, which satisfies the list's alignment1028            // requirement, and the buffer is created at its final size so it never moves.1028            let mut storage: Vec<usize> = vec![0; words];1028            let list: LPPROC_THREAD_ATTRIBUTE_LIST = storage.as_mut_ptr().cast();1028            // SAFETY: `list` names `words * size_of::<usize>() >= bytes_needed` writable, aligned1028            // bytes owned by `storage`, the entry count matches the single attribute installed1028            // below, and the size pointer is this function's own.1028            let initialised =1028                unsafe { InitializeProcThreadAttributeList(list, 1, 0, &mut bytes_needed) };1028            if initialised == 0 {1028                // The list was never initialised, so it must not be deleted.1028                return None;1028            }1028            let owner = Self {1028                storage,1028                list,1028                initialised: true,1028            };1028            // SAFETY: `list` is initialised with capacity for one attribute; the value pointer names1028            // the caller's live two-handle array and the size is exactly that array's size, which is1028            // the documented shape of an inheritance allowlist.1028            let updated = unsafe {1028                UpdateProcThreadAttribute(1028                    list,1028                    0,1028                    PROC_THREAD_ATTRIBUTE_HANDLE_LIST as usize,1028                    handles.as_ptr().cast(),1028                    std::mem::size_of_val(handles),1028                    std::ptr::null_mut(),1028                    std::ptr::null(),1028                )1028            };1028            if updated == 0 {1028                return None;1028            }1028            Some(owner)1028        }10281028        fn list_ptr(&self) -> LPPROC_THREAD_ATTRIBUTE_LIST {1028            self.list1028        }1028    }10281028    impl Drop for AttributeListV1 {1028        fn drop(&mut self) {1028            if self.initialised {1028                // SAFETY: the list was initialised exactly once by `new` and is deleted exactly once1028                // here, while `storage` — the memory it points into — is still alive.1028                unsafe { DeleteProcThreadAttributeList(self.list) };1028                self.initialised = false;1028            }1028            let _ = self.storage.capacity();1028        }1028    }10281028    /// The fixed CPU ceiling for one worker, in 100-nanosecond units (10 seconds).1028    const PROCESS_TIME_100NS: i64 = 10 * 10_000_000;10281028    /// The fixed committed-memory ceiling for one worker process, in bytes (512 MiB).1028    const PROCESS_MEMORY_BYTES: usize = 536_870_912;10281028    /// The fixed committed-memory ceiling for the whole job, in bytes (512 MiB).1028    const JOB_MEMORY_BYTES: usize = 536_870_912;10281028    /// Whether the calling process really belongs to a job object.1028    ///1028    /// The fixed child calls this before it parses a single byte, so a worker started outside the1028    /// approved boundary refuses instead of decoding unconfined.1028    pub(crate) fn in_job_v1() -> bool {1028        let mut inside: windows_sys::core::BOOL = 0;1028        // SAFETY: `IsProcessInJob` takes this process's own pseudo-handle, a null job handle (which1028        // asks about *any* job) and one out-pointer to a stack `BOOL`. It writes exactly that1028        // `BOOL`, allocates nothing, opens no handle and cannot fault on these arguments.1028        let status =1028            unsafe { IsProcessInJob(GetCurrentProcess(), std::ptr::null_mut(), &mut inside) };1028        status != 0 && inside != 01028    }10281028    /// A UTF-16, NUL-terminated rendering of one Rust string.1028    fn wide(text: &str) -> Vec<u16> {1028        text.encode_utf16().chain(std::iter::once(0)).collect()1028    }10281028    /// Quotes one command-line argument with the Windows `CommandLineToArgvW` rules.1028    ///1028    /// The worker's arguments (a closed flag, a closed format token and one lowercase digest) never1028    /// need quoting, but the executable path may contain spaces, so quoting is applied to every1028    /// element uniformly rather than to a hand-picked subset.1028    fn quote_argument(text: &str) -> String {1028        let needs_quotes = text.is_empty() || text.contains([' ', '\t', '"']);1028        if !needs_quotes {1028            return text.to_owned();1028        }1028        let mut out = String::with_capacity(text.len() + 2);1028        out.push('"');1028        let mut backslashes = 0usize;1028        for character in text.chars() {1028            match character {1028                '\\' => {1028                    backslashes += 1;1028                    out.push('\\');1028                }1028                '"' => {1028                    for _ in 0..backslashes {1028                        out.push('\\');1028                    }1028                    backslashes = 0;1028                    out.push('\\');1028                    out.push('"');1028                }1028                _ => {1028                    backslashes = 0;1028                    out.push(character);1028                }1028            }1028        }1028        out.push('"');1028        out1028    }10281028    /// Wraps one raw handle as an owned standard-library file, refusing an obviously invalid handle.1028    ///1028    /// # Safety1028    ///1028    /// The caller must pass a handle it exclusively owns and has not transferred elsewhere; the1028    /// returned `File` closes it exactly once.1028    unsafe fn file_from_owned_handle(handle: HANDLE) -> Option<std::fs::File> {1028        use std::os::windows::io::FromRawHandle;10281028        if handle.is_null() || handle == windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE {1028            return None;1028        }1028        // SAFETY: the caller guarantees exclusive ownership of a live handle, and `File` takes it1028        // over with exactly one matching `CloseHandle`, so no double close or leak follows.1028        Some(unsafe { std::fs::File::from_raw_handle(handle as std::os::windows::io::RawHandle) })1028    }10281028    /// Creates one job object and installs the four mandatory limits.1028    ///1028    /// The limits are written once and then **queried back**, so a silently rejected setting can1028    /// never be reported as installed.1028    /// One native handle this module owns, closed exactly once however the path leaves.1028    ///1028    /// Guards exist because `spawn` has many fallible steps between acquiring a handle and handing1028    /// it to the constructed worker: with explicit closes only, one added `?` is one new leak.1028    struct OwnedHandleV1(HANDLE);10281028    impl OwnedHandleV1 {1028        fn new(handle: HANDLE) -> Option<Self> {1028            if handle.is_null() || handle == windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE {1028                None1028            } else {1028                Some(Self(handle))1028            }1028        }10281028        fn raw(&self) -> HANDLE {1028            self.01028        }10281028        /// Transfers ownership to the struct that will close it.1028        fn into_raw(self) -> HANDLE {1028            let handle = self.0;1028            std::mem::forget(self);1028            handle1028        }1028    }10281028    impl Drop for OwnedHandleV1 {1028        fn drop(&mut self) {1028            // SAFETY: this guard is the sole owner of the handle and closes it exactly once, after1028            // which no copy of it is used anywhere.1028            unsafe { close_owned(self.0) }1028        }1028    }10281028    /// Creates a job, installs the four limits and **requires** a successful readback.1028    ///1028    /// A job whose readback fails, or whose limits cannot be written, is closed here and reported as1028    /// a failure. No caller can therefore hold a job it has not verified, and the process launch1028    /// that follows is impossible without confirmed limits.1028    /// One additional explicitly inheritable parent handle that the allowlist never contains.1028    ///1028    /// The integration suite holds one of these across a real spawn, so a child that could reach it1028    /// would prove broad inheritance. It is created with `bInheritHandle` set on purpose and is1028    /// never added to the two-entry `PROC_THREAD_ATTRIBUTE_HANDLE_LIST`.1028    pub struct N102ExtraInheritableV1(OwnedHandleV1);10281028    impl N102ExtraInheritableV1 {1028        /// Creates the extra inheritable handle, or `None` when the kernel refuses.1028        pub fn create() -> Option<Self> {1028            Self::create_with_inherit_v1(1)1028        }10281028        /// Creates one comparable **non**-inheritable handle: a numeric value the child can never1028        /// receive by inheritance, used as the ambiguity control for one handle probe.1028        pub fn create_control() -> Option<Self> {1028            Self::create_with_inherit_v1(0)1028        }10281028        fn create_with_inherit_v1(inherit: i32) -> Option<Self> {1028            // SAFETY: `SECURITY_ATTRIBUTES` is a plain `repr(C)` structure valid when zeroed; only1028            // the three fields set below are read by `CreateEventW`, and a null name with manual1028            // reset asks for one fresh anonymous event owned by this process.1028            let mut attributes: SECURITY_ATTRIBUTES = unsafe { std::mem::zeroed() };1028            attributes.nLength = u32::try_from(std::mem::size_of::<SECURITY_ATTRIBUTES>()).ok()?;1028            attributes.lpSecurityDescriptor = std::ptr::null_mut();1028            attributes.bInheritHandle = inherit;1028            // SAFETY: the attributes pointer names this function's own live structure, the name1028            // is a null pointer (anonymous object) and both flags are documented constants.1028            let event =1028                unsafe { CreateEventW(std::ptr::from_ref(&attributes), 1, 0, std::ptr::null()) };1028            if event.is_null() {1028                return None;1028            }1028            Some(Self(OwnedHandleV1::new(event)?))1028        }1028        }10281028        /// The kernel's own numeric value for this handle, as a child would see it if inherited.1028        pub fn value(&self) -> u32 {1028            self.0.raw() as usize as u321028        }1028    }10281028    /// Whether one numeric handle value is live in this process, plus whether a value the parent1028    /// guarantees can never be a handle is also reported live.1028    ///1028    /// Used only in the reserved internal probe mode. A value that is not a handle is the expected1028    /// answer for a correctly excluded handle; a probe whose guaranteed-invalid control also reports1028    /// live means the child's handle table cannot be trusted for this question, so the caller refuses1028    /// the run instead of reading it as either inheritance or exclusion.1028    pub fn n102_probe_handle_v1(value: u32, control: u32) -> (bool, bool) {1028        fn live(value: u32) -> bool {1028            let mut flags: u32 = 0;1028            // SAFETY: `GetHandleInformation` only reads this process's own handle table for the1028            // supplied value and writes the out-parameter owned here; an absent handle makes it fail,1028            // which is exactly the fact being measured.1028            (unsafe { GetHandleInformation(value as usize as HANDLE, &mut flags) }) != 01028        }1028        let ambiguous = live(control);1028        (live(value), ambiguous)1028    }10281028    /// Whether the named variable is visible to this process, and whether `SystemRoot` is present.1028    ///1028    /// `std::env` reads the real process environment block, so this observes what the production1028    /// minimal-environment `CreateProcessW` actually installed rather than any local model of it.1028    pub fn n102_probe_environment_v1(name: &std::ffi::OsStr) -> (bool, bool) {1028        (1028            std::env::var_os(name).is_some(),1028            std::env::var_os("SystemRoot").is_some(),1028        )1028    }10281028    fn create_limited_job_v1() -> Option<OwnedHandleV1> {1028        // SAFETY: `CreateJobObjectW` takes a null security descriptor and a null name, so it creates1028        // an anonymous job whose only handle this process owns. It returns a handle or null.1028        let job =1028            OwnedHandleV1::new(unsafe { CreateJobObjectW(std::ptr::null(), std::ptr::null()) })?;10281028        // SAFETY: every field of these `repr(C)` window structures is valid when zeroed, which is1028        // the documented "no limits" baseline this code then fills in explicitly.1028        let mut limits: JOBOBJECT_EXTENDED_LIMIT_INFORMATION = unsafe { std::mem::zeroed() };1028        limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_PROCESS_TIME1028            | JOB_OBJECT_LIMIT_PROCESS_MEMORY1028            | JOB_OBJECT_LIMIT_JOB_MEMORY1028            | JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;1028        limits.BasicLimitInformation.PerProcessUserTimeLimit = PROCESS_TIME_100NS;1028        limits.ProcessMemoryLimit = PROCESS_MEMORY_BYTES;1028        limits.JobMemoryLimit = JOB_MEMORY_BYTES;10281028        let length =1028            u32::try_from(std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>()).ok()?;10281028        // SAFETY: the job handle came from `CreateJobObjectW` just above and is owned by the guard,1028        // the information class matches the structure type, and the length is exactly that1028        // structure's size, which is `SetInformationJobObject`'s contract for this class.1028        let set = unsafe {1028            SetInformationJobObject(1028                job.raw(),1028                JobObjectExtendedLimitInformation,1028                std::ptr::from_ref(&limits).cast::<c_void>(),1028                length,1028            )1028        };1028        if set == 0 {1028            return None;1028        }10281028        // The readback is the contract: a job that cannot prove its four limits is closed by the1028        // guard and never reaches a process launch.1028        if !read_job_limits_v1(job.raw()) {1028            return None;1028        }1028        Some(job)1028    }10281028    /// Reads the job's effective limits back from the kernel and compares all four.1028    fn read_job_limits_v1(job: HANDLE) -> bool {1028        // SAFETY: zeroed `repr(C)` structure, filled by the query below.1028        let mut observed: JOBOBJECT_EXTENDED_LIMIT_INFORMATION = unsafe { std::mem::zeroed() };1028        let mut returned: u32 = 0;1028        let Some(length) =1028            u32::try_from(std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>()).ok()1028        else {1028            return false;1028        };1028        // SAFETY: the job handle is live, the class matches the structure, the pointer and length1028        // name this function's own stack structure, and the size is its exact size.1028        let queried = unsafe {1028            QueryInformationJobObject(1028                job,1028                JobObjectExtendedLimitInformation,1028                std::ptr::from_mut(&mut observed).cast::<c_void>(),1028                length,1028                &mut returned,1028            )1028        };1028        if queried == 0 {1028            return false;1028        }1028        let required = JOB_OBJECT_LIMIT_PROCESS_TIME1028            | JOB_OBJECT_LIMIT_PROCESS_MEMORY1028            | JOB_OBJECT_LIMIT_JOB_MEMORY1028            | JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;1028        observed.BasicLimitInformation.LimitFlags & required == required1028            && observed.BasicLimitInformation.PerProcessUserTimeLimit == PROCESS_TIME_100NS1028            && observed.ProcessMemoryLimit == PROCESS_MEMORY_BYTES1028            && observed.JobMemoryLimit == JOB_MEMORY_BYTES1028    }10281028    /// Whether the job currently holds at least one live process.1028    fn job_has_a_process_v1(job: HANDLE) -> bool {1028        // SAFETY: zeroed `repr(C)` accounting structure, filled by the query below.1028        let mut accounting: JOBOBJECT_BASIC_ACCOUNTING_INFORMATION = unsafe { std::mem::zeroed() };1028        let mut returned: u32 = 0;1028        let Some(length) =1028            u32::try_from(std::mem::size_of::<JOBOBJECT_BASIC_ACCOUNTING_INFORMATION>()).ok()1028        else {1028            return false;1028        };1028        // SAFETY: live job handle, matching class, this function's own stack structure and its exact1028        // size.1028        let queried = unsafe {1028            QueryInformationJobObject(1028                job,1028                JobObjectBasicAccountingInformation,1028                std::ptr::from_mut(&mut accounting).cast::<c_void>(),1028                length,1028                &mut returned,1028            )1028        };1028        queried != 0 && accounting.ActiveProcesses >= 11028    }10281028    /// One worker that was created suspended, limited by its job, and only then resumed.1028    ///1028    /// It owns the job, the process handle, the primary thread handle and the two parent-side pipe1028    /// ends. Dropping it terminates a still-running job and closes every handle exactly once, so no1028    /// native handle can leak even on an early refusal.1028    pub(crate) struct SuspendedWorkerV1 {1028        job: HANDLE,1028        process: HANDLE,1028        thread: HANDLE,1028        pid: u32,1028        limits_verified: bool,1028        resumed: bool,1028        exited: bool,1028        stdin: Option<std::fs::File>,1028        stdout: Option<std::fs::File>,1028    }10281028    /// Closes one handle if it is live.1028    ///1028    /// # Safety1028    ///1028    /// The caller must own `handle` exclusively and must not use it afterwards.1028    unsafe fn close_owned(handle: HANDLE) {1028        if !handle.is_null() && handle != windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE {1028            // SAFETY: the caller guarantees exclusive ownership and no later use.1028            unsafe { CloseHandle(handle) };1028        }1028    }10281028    /// The fixed, minimal environment the worker is given.1028    ///1028    /// Only `SystemRoot` and — when it differs — `WINDIR` are admitted, each read from its single1028    /// named OS variable, re-validated as a non-empty absolute ASCII Windows path with no interior1028    /// NUL and a bounded length, and emitted as an explicitly sorted, double-NUL-terminated UTF-161028    /// block. Nothing else is forwarded: no `PATH`, profile, temp, token, cloud, repository or1028    /// arbitrary inherited value, and never the ambient block itself.1028    fn minimal_environment_v1() -> Option<Vec<u16>> {1028        let mut admitted: Vec<(String, String)> = Vec::new();1028        for name in ["SystemRoot", "WINDIR"] {1028            let value = std::env::var(name).ok()?;1028            if value.is_empty()1028                || value.len() > 2601028                || value.contains('\0')1028                || !value.is_ascii()1028                || !std::path::Path::new(&value).is_absolute()1028            {1028                return None;1028            }1028            if admitted1028                .iter()1028                .any(|(_, existing)| existing.eq_ignore_ascii_case(&value))1028            {1028                continue;1028            }1028            admitted.push((name.to_owned(), value));1028        }1028        // Windows expects the block's names in case-insensitive sorted order.1028        admitted.sort_by_key(|(name, _)| name.to_uppercase());10281028        let mut block: Vec<u16> = Vec::new();1028        for (name, value) in &admitted {1028            block.extend(format!("{name}={value}").encode_utf16());1028            block.push(0);1028        }1028        // The block itself must be terminated by one further NUL.1028        block.push(0);1028        Some(block)1028    }1028    impl SuspendedWorkerV1 {1028        /// Creates the worker suspended, assigns it to a freshly limited job and verifies both.1028        ///1028        /// Nothing here lets the child execute: `CREATE_SUSPENDED` holds it at creation, the job is1028        /// limited and read back before assignment, and `resume` is a separate call the caller makes1028        /// only after those facts are known.1028        pub(crate) fn spawn(1028            executable: &Path,1028            arguments: &[&str],1028            fault: &mut N102FaultContextV1,1028        ) -> Option<Self> {1028            if fault.inject_here(1) {1028                return None;1028            }1028            let job = create_limited_job_v1()?;10281028            // SAFETY: `SECURITY_ATTRIBUTES` is a plain `repr(C)` structure valid when zeroed; the1028            // three fields set below are the only ones `CreatePipe` reads.1028            let mut attributes: SECURITY_ATTRIBUTES = unsafe { std::mem::zeroed() };1028            attributes.nLength = u32::try_from(std::mem::size_of::<SECURITY_ATTRIBUTES>()).ok()?;1028            attributes.lpSecurityDescriptor = std::ptr::null_mut();1028            attributes.bInheritHandle = 1;10281028            if fault.inject_here(2) {1028                return None;1028            }1028            let mut stdout_read: HANDLE = std::ptr::null_mut();1028            let mut stdout_write: HANDLE = std::ptr::null_mut();1028            // SAFETY: both out-pointers name this function's own stack handles, and the attributes1028            // ask for an inheritable child end.1028            let out_pipe = unsafe {1028                CreatePipe(1028                    &mut stdout_read,1028                    &mut stdout_write,1028                    std::ptr::from_ref(&attributes),1028                    0,1028                )1028            };1028            if out_pipe == 0 {1028                return None;1028            }1028            // Every acquired handle is owned by a guard from here on, so each early return below1028            // closes it exactly once without a hand-written close list.1028            let stdout_read = OwnedHandleV1::new(stdout_read)?;1028            let stdout_write = OwnedHandleV1::new(stdout_write)?;10281028            if fault.inject_here(3) {1028                return None;1028            }1028            let mut stdin_read: HANDLE = std::ptr::null_mut();1028            let mut stdin_write: HANDLE = std::ptr::null_mut();1028            // SAFETY: identical shape to the pipe above.1028            let in_pipe = unsafe {1028                CreatePipe(1028                    &mut stdin_read,1028                    &mut stdin_write,1028                    std::ptr::from_ref(&attributes),1028                    0,1028                )1028            };1028            if in_pipe == 0 {1028                return None;1028            }1028            let stdin_read = OwnedHandleV1::new(stdin_read)?;1028            let stdin_write = OwnedHandleV1::new(stdin_write)?;10281028            // The parent-side ends must never be inherited by any other process.1028            // SAFETY: both handles are live parent ends owned by the guards above.1028            if fault.inject_here(4) {1028                return None;1028            }1028            let cleared = unsafe {1028                SetHandleInformation(stdout_read.raw(), HANDLE_FLAG_INHERIT, 0) != 01028                    && SetHandleInformation(stdin_write.raw(), HANDLE_FLAG_INHERIT, 0) != 01028            };1028            if !cleared {1028                return None;1028            }10281028            // The child may inherit exactly two handles: its stdin read end and its stdout write1028            // end. Nothing else — no parent end, no job or process handle, no ambient std handle and1028            // no provider handle — is admitted, and `bInheritHandles=TRUE` is only ever passed1028            // together with this validated list.1028            let child_handles: [HANDLE; 2] = [stdin_read.raw(), stdout_write.raw()];1028            if fault.inject_here(5) {1028                return None;1028            }1028            let allowlist = AttributeListV1::new(&child_handles)?;10281028            // SAFETY: `STARTUPINFOEXW` is a plain `repr(C)` structure valid when zeroed; the fields1028            // set here are exactly those `STARTF_USESTDHANDLES` and the attribute list document.1028            let mut startup: STARTUPINFOEXW = unsafe { std::mem::zeroed() };1028            startup.StartupInfo.cb = u32::try_from(std::mem::size_of::<STARTUPINFOEXW>()).ok()?;1028            startup.StartupInfo.dwFlags = STARTF_USESTDHANDLES;1028            startup.StartupInfo.hStdInput = child_handles[0];1028            startup.StartupInfo.hStdOutput = child_handles[1];1028            startup.StartupInfo.hStdError = child_handles[1];1028            startup.lpAttributeList = allowlist.list_ptr();10281028            let image = executable.to_string_lossy();1028            let mut parts: Vec<String> = Vec::with_capacity(arguments.len() + 1);1028            parts.push(quote_argument(&image));1028            for argument in arguments {1028                parts.push(quote_argument(argument));1028            }1028            let application = wide(&image);1028            let mut command_line = wide(&parts.join(" "));10281028            // The child gets a freshly built minimal block, never the ambient one, and a working1028            // directory bound to this one trusted executable's own parent directory.1028            if fault.inject_here(6) {1028                return None;1028            }1028            let environment = minimal_environment_v1()?;1028            if fault.inject_here(7) {1028                return None;1028            }1028            let working_directory = wide(1028                &executable1028                    .parent()1028                    .filter(|parent| parent.is_dir())?1028                    .to_string_lossy(),1028            );10281028            // SAFETY: `PROCESS_INFORMATION` is a plain `repr(C)` structure valid when zeroed.1028            let mut info: PROCESS_INFORMATION = unsafe { std::mem::zeroed() };10281028            // SAFETY: the application name and mutable command line are NUL-terminated UTF-161028            // buffers that outlive this call; the environment block and working directory are1028            // NUL-terminated buffers owned by this function; `bInheritHandles` is `TRUE` only with1028            // the initialised handle allowlist above, so exactly the two child ends are inherited;1028            // `CREATE_SUSPENDED` holds the child before it can execute, `EXTENDED_STARTUPINFO_PRESENT`1028            // is what makes the attribute list authoritative and `CREATE_UNICODE_ENVIRONMENT`1028            // declares the block's encoding; the startup pointer is the base structure as the API1028            // requires; and `info` is this function's own out-structure.1028            if fault.inject_here(8) {1028                return None;1028            }1028            let created = unsafe {1028                CreateProcessW(1028                    application.as_ptr(),1028                    command_line.as_mut_ptr(),1028                    std::ptr::null(),1028                    std::ptr::null(),1028                    1,1028                    CREATE_SUSPENDED | EXTENDED_STARTUPINFO_PRESENT | CREATE_UNICODE_ENVIRONMENT,1028                    environment.as_ptr().cast(),1028                    working_directory.as_ptr(),1028                    &startup.StartupInfo,1028                    &mut info,1028                )1028            };10281028            // The child's own ends are closed in the parent whatever happened.1028            // SAFETY: both are live and owned by their guards, which close each exactly once now.1028            drop(stdout_write);1028            drop(stdin_read);1028            if created == 0 {1028                return None;1028            }1028            let process = OwnedHandleV1::new(info.hProcess)?;1028            let thread = OwnedHandleV1::new(info.hThread)?;10281028            // Assign the still-suspended worker and confirm real membership.1028            // SAFETY: all three handles came from the calls above and are live; assigning a1028            // suspended process changes no memory and cannot start it.1028            if fault.inject_here(9) {1028                // The suspended child exists but has never joined the job, so closing or terminating1028                // the job cannot end it. The owned process itself is terminated and its exit is1028                // observed; only that observation may be recorded as verified cleanup.1028                // SAFETY: `process` is this function's own live process handle returned by the1028                // `CreateProcessW` above; terminating it touches no Rust memory, and the bounded wait1028                // observes the owned process itself.1028                let ended = unsafe {1028                    TerminateProcess(process.raw(), 1) != 01028                        && WaitForSingleObject(process.raw(), 5_000) == WAIT_OBJECT_01028                };1028                if ended {1028                    fault.mark_cleanup_verified();1028                }1028                return None;1028            }1028            let assigned = unsafe { AssignProcessToJobObject(job.raw(), process.raw()) };1028            let member = assigned != 0 && job_has_a_process_v1(job.raw());1028            if !member {1028                // A process that never joined this job cannot be ended by terminating the job, so the1028                // owned process handle is terminated directly and its exit observed; the job is also1028                // terminated for any process that did join. Only an observed process exit is recorded1028                // as verified cleanup, and every handle is then closed exactly once by its guard.1028                // SAFETY: `job` and `process` are this function's own live handles from the calls1028                // above; neither call touches Rust memory and both are bounded.1028                let ended = unsafe {1028                    TerminateJobObject(job.raw(), 1);1028                    TerminateProcess(process.raw(), 1) != 01028                        && WaitForSingleObject(process.raw(), 5_000) == WAIT_OBJECT_01028                };1028                if ended {1028                    fault.mark_cleanup_verified();1028                }1028                return None;1028            }10281028            // SAFETY: both parent ends are live, exclusively owned and transferred to a `File` that1028            // closes each exactly once; no other copy of either handle exists in this process.1028            let stdin = unsafe { file_from_owned_handle(stdin_write.into_raw()) };1028            // SAFETY: identical guarantee for the stdout read end.1028            let stdout = unsafe { file_from_owned_handle(stdout_read.into_raw()) };10281028            Some(Self {1028                job: job.into_raw(),1028                process: process.into_raw(),1028                thread: thread.into_raw(),1028                pid: info.dwProcessId,1028                limits_verified: true,1028                resumed: false,1028                exited: false,1028                stdin,1028                stdout,1028            })1028        }10281028        /// The worker's own process identifier, as the create call reported it.1028        pub(crate) fn pid(&self) -> u32 {1028            self.pid1028        }10281028        /// Whether the job's four limits were read back as installed before the worker ran.1028        pub(crate) fn limits_verified(&self) -> bool {1028            self.limits_verified1028        }10281028        /// Takes the parent's write end of the child's stdin.1028        pub(crate) fn take_stdin(&mut self) -> Option<std::fs::File> {1028            self.stdin.take()1028        }10281028        /// Takes the parent's read end of the child's stdout.1028        pub(crate) fn take_stdout(&mut self) -> Option<std::fs::File> {1028            self.stdout.take()1028        }10281028        /// Resumes the captured primary thread, which is the moment the worker may execute.1028        ///1028        /// It must only be called after the job was created, limited, read back and assigned.1028        /// Terminates this worker's job and observes the owned child's actual exit, bounded.1028        ///1028        /// Returns `true` only when the termination call succeeded **and** the owned process handle1028        /// signalled, so a caller may record verified cleanup only from an observed exit.1028        pub(crate) fn terminate_and_observe_v1(&mut self) -> bool {1028            // SAFETY: `self.job` is this worker's own live job handle, and terminating a job1028            // touches no Rust memory.1028            let job_ended = unsafe { TerminateJobObject(self.job, 1) != 0 };1028            // SAFETY: `self.process` is this worker's own live process handle; the bounded wait1028            // observes the owned process and cannot fault.1028            let exited = unsafe { WaitForSingleObject(self.process, 5_000) == WAIT_OBJECT_0 };1028            if exited {1028                self.exited = true;1028            }1028            job_ended && exited1028        }10281028        pub(crate) fn resume(&mut self, fault: &mut N102FaultContextV1) -> bool {1028            if fault.inject_here(10) {1028                return false;1028            }1028            if self.resumed || self.exited {1028                return false;1028            }1028            // A worker whose four job limits were not read back as installed, or whose assignment1028            // and membership were not confirmed, must never execute: the refusal is enforced here as1028            // well as at construction, so a future caller cannot regress it by constructing a worker1028            // some other way.1028            if !self.limits_verified {1028                return false;1028            }1028            // SAFETY: `self.thread` is the live primary-thread handle from `CreateProcessW`, still1028            // suspended and owned exclusively here. `ResumeThread` decrements the suspend count and1028            // returns the previous count, or `u32::MAX` on failure; it touches no Rust memory.1028            let previous = unsafe { ResumeThread(self.thread) };1028            if previous == u32::MAX {1028                return false;1028            }1028            self.resumed = true;1028            true1028        }10281028        /// Waits up to `milliseconds` for the worker and returns its exit code when it has exited.1028        pub(crate) fn wait_ms(1028            &mut self,1028            milliseconds: u32,1028            fault: &mut N102FaultContextV1,1028        ) -> Option<u32> {1028            if fault.inject_here(11) {1028                // The injected wait failure must not suppress cleanup: the job is terminated and the1028                // owned child's exit observed before the refusal is returned.1028                if self.terminate_and_observe_v1() {1028                    fault.mark_cleanup_verified();1028                }1028                return None;1028            }1028            // SAFETY: `self.process` is a live process handle owned exclusively here. Waiting on a1028            // handle changes no memory of this process and cannot fault.1028            let signalled = unsafe { WaitForSingleObject(self.process, milliseconds) };1028            if signalled != WAIT_OBJECT_0 {1028                return None;1028            }1028            let mut code: u32 = 0;1028            // SAFETY: the same live handle, and one out-pointer to this stack `u32`.1028            let read = unsafe { GetExitCodeProcess(self.process, &mut code) };1028            if read == 0 {1028                return None;1028            }1028            self.exited = true;1028            Some(code)1028        }10281028        /// Terminates every process in this parent's own job.1028        pub(crate) fn terminate_job(&mut self) -> bool {1028            // SAFETY: `self.job` is the live job handle this struct owns, and the exit status is a1028            // plain integer. Terminating a job cannot fault and touches no Rust memory.1028            unsafe { TerminateJobObject(self.job, 1) != 0 }1028        }1028    }10281028    impl Drop for SuspendedWorkerV1 {1028        /// Terminates a still-running job and closes every handle exactly once.1028        fn drop(&mut self) {1028            if !self.exited {1028                // SAFETY: the job and process handles are live and owned by this struct; the bounded1028                // wait below requires the termination to be observed, not merely requested.1028                unsafe {1028                    TerminateJobObject(self.job, 1);1028                    WaitForSingleObject(self.process, 5_000);1028                }1028            }1028            // SAFETY: each handle is live, owned here, closed exactly once and never used again.1028            unsafe {1028                close_owned(self.thread);1028                close_owned(self.process);1028                close_owned(self.job);1028            }1028        }1028    }1028}
+//! Linux-only native resource-limit **readback** for `R03.C3`.
+//!
+//! This is the boundary that `SOLO-WO-074 R01` reserved and `SOLO-WO-076 R01` filled: a private
+//! seam that observes the calling process's **existing** address-space and CPU ceilings through
+//! the real kernel. `SOLO-WO-085 R01` added the fixed child's own process-group readback and
+//! `SOLO-WO-087 R01` adds one read-only group **and** session identity query, so a trusted child can
+//! attest its own identity and the owning parent can independently observe the same identities of
+//! its live, directly owned child.
+//!
+//! It is deliberately not a supervisor. There is no descendant, no limit mutation, no signal, no
+//! process-tree sweep, no handle cache and no output protocol here — only `getrlimit`, `getpgid`
+//! and `getsid` observations with compile-time-fixed selectors and a caller-validated target.
+//!
+//! Everything, including `use libc`, sits inside a positively `#[cfg(target_os = "linux")]`-gated
+//! module, and every `unsafe` block carries an adjacent `// SAFETY:` rationale, so both the AST
+//! checker and the independent source scanner can prove the target of each call from real text.
+//! The crate root declares this file only for `target_os = "linux"`, which is why a Windows build
+//! compiles no Linux-native module and makes no Linux readback claim.
+//!
+//! Reading a ceiling proves no enforcement: it says nothing about a future child's limits, a
+//! watchdog, a process group, descendants or any Windows Job Object.
+
+#[cfg(target_os = "linux")]
+mod linux {
+    // The seam is established by this order and consumed by a later, separately issued one; until
+    // then nothing outside this module's own unit tests names it, so the unused-code lint would
+    // otherwise refuse a deliberately unexercised private API.
+    #![allow(dead_code)]
+
+    use std::io::Read;
+    use std::mem::MaybeUninit;
+    use std::os::unix::process::CommandExt;
+    use std::process::{Child, Command};
+
+    use crate::media_worker_host::{PROFILE_V1_AS_BYTES, PROFILE_V1_CPU_SECONDS};
+
+    /// The most bytes of one `/proc/<pid>/stat` record this seam will read.
+    ///
+    /// A real record is a few hundred bytes; the cap means a hostile or unusual kernel surface can
+    /// never make this observation allocate without bound.
+    const PROC_STAT_READ_CAP: u64 = 4096;
+
+    /// The field index, after the closing `)`, of the kernel's process start time.
+    ///
+    /// `/proc/<pid>/stat` numbers `state` as field 3 and `starttime` as field 22, so after the
+    /// command name ends at the final `)` the start time sits at zero-based offset 19.
+    const PROC_STAT_START_TIME_OFFSET: usize = 19;
+
+    /// The kernel's "no limit" sentinel for an unsigned resource value.
+    #[cfg(test)]
+    const LIMIT_UNLIMITED: u64 = u64::MAX;
+
+    /// Which compile-time-fixed ceiling an observation targets.
+    ///
+    /// An enum rather than a parameter, so no caller can name an arbitrary resource: only these
+    /// two exist, and both are resolved to kernel constants inside this module.
+    #[derive(Clone, Copy)]
+    enum Ceiling {
+        /// `RLIMIT_AS` — the process's virtual address-space ceiling in bytes.
+        AddressSpace,
+        /// `RLIMIT_CPU` — the process's consumed CPU-time ceiling in seconds.
+        Cpu,
+    }
+
+    /// One observed ceiling, soft and hard reported separately.
+    ///
+    /// `rlim_t` is unsigned and `RLIM_INFINITY` is its maximum value, so the pair is carried as
+    /// `u64` without narrowing, clamping or a "finite" reinterpretation.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub(crate) struct LimitCeilingV1 {
+        /// The soft ceiling the kernel currently enforces.
+        pub(crate) soft: u64,
+        /// The hard ceiling a soft value may not exceed.
+        pub(crate) hard: u64,
+    }
+
+    /// Both ceilings of the calling process, observed by two real kernel readbacks.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub(crate) struct NativeLimitReadbackV1 {
+        /// The `RLIMIT_AS` observation.
+        pub(crate) address_space: LimitCeilingV1,
+        /// The `RLIMIT_CPU` observation.
+        pub(crate) cpu: LimitCeilingV1,
+    }
+
+    /// Why a readback produced no observation, and which selector failed.
+    ///
+    /// Closed and typed: it carries no OS error text, no path and no raw worker input, so a
+    /// caller cannot leak host detail through it.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub(crate) enum NativeReadbackRefusalV1 {
+        /// The `RLIMIT_AS` query did not return success.
+        AddressSpaceCeilingRejected,
+        /// The `RLIMIT_CPU` query did not return success.
+        CpuCeilingRejected,
+    }
+
+    /// Whether a kernel return status means the structure was written.
+    ///
+    /// Separated from the call so the success/refusal decision is provable by a pure unit test
+    /// without injecting a syscall failure or acquiring privilege.
+    const fn ceiling_status_ok(status: i32) -> bool {
+        status == 0
+    }
+
+    /// Builds the typed ceiling from the two raw values the kernel reported.
+    ///
+    /// Pure, so full-width preservation of `RLIM_INFINITY` and of a distinct soft/hard pair is
+    /// unit-testable with no FFI and no process-limit change.
+    const fn ceiling_from_raw(soft: u64, hard: u64) -> LimitCeilingV1 {
+        LimitCeilingV1 { soft, hard }
+    }
+
+    /// The closed result of one readback attempt.
+    type ReadbackV1 = Result<NativeLimitReadbackV1, NativeReadbackRefusalV1>;
+
+    /// Reads the calling process's existing ceilings through two real `getrlimit` calls.
+    pub(crate) fn read_limit_ceilings_v1() -> ReadbackV1 {
+        Ok(NativeLimitReadbackV1 {
+            address_space: read_ceiling(Ceiling::AddressSpace)?,
+            cpu: read_ceiling(Ceiling::Cpu)?,
+        })
+    }
+
+    fn read_ceiling(which: Ceiling) -> Result<LimitCeilingV1, NativeReadbackRefusalV1> {
+        let selector = match which {
+            Ceiling::AddressSpace => libc::RLIMIT_AS,
+            Ceiling::Cpu => libc::RLIMIT_CPU,
+        };
+        let refusal = match which {
+            Ceiling::AddressSpace => NativeReadbackRefusalV1::AddressSpaceCeilingRejected,
+            Ceiling::Cpu => NativeReadbackRefusalV1::CpuCeilingRejected,
+        };
+
+        let mut raw = MaybeUninit::<libc::rlimit>::uninit();
+
+        // SAFETY: `getrlimit` writes exactly one fully initialised `libc::rlimit` through the
+        // pointer it is given and reads nothing else. `raw` is a live, properly aligned stack slot
+        // exclusively borrowed for this call, `as_mut_ptr` yields a valid `*mut libc::rlimit` for
+        // it, the selector is one of the two fixed kernel constants, and the call mutates no
+        // process limit — it only reports one.
+        let status = unsafe { libc::getrlimit(selector, raw.as_mut_ptr()) };
+
+        if !ceiling_status_ok(status) {
+            // The slot is deliberately left unread. A rejected call does not promise to have
+            // written anything, so reading it, or turning it into a success, would be exactly the
+            // partly initialised observation this type exists to make impossible.
+            return Err(refusal);
+        }
+
+        // SAFETY: the status just checked was zero, which is `getrlimit`'s contract for having
+        // written the complete structure into the slot. The slot is therefore initialised, it is
+        // not read again afterwards, and `rlim_t` is `u64` on Linux, so both fields pass through
+        // with no narrowing, clamping or reinterpretation of the ceiling value.
+        let raw = unsafe { raw.assume_init() };
+
+        Ok(ceiling_from_raw(raw.rlim_cur, raw.rlim_max))
+    }
+
+    /// Why the calling process's group identity could not be observed.
+    ///
+    /// Closed and typed, like the ceiling refusals: it carries no OS error text and no path.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub(crate) enum NativeGroupRefusalV1 {
+        /// The `getpgid` query did not return a valid group identity.
+        ProcessGroupUnreadable,
+    }
+
+    /// Registers the fixed Linux pre-exec boundary on `command`.
+    ///
+    /// The closure runs in the forked child **after** `fork` and **before** `exec`, so it may use
+    /// only async-signal-safe operations: it calls `setsid`, then installs both hard and soft
+    /// ceilings with two `setrlimit` calls, and returns a plain `errno`-derived error on failure.
+    /// It allocates nothing, locks nothing, formats nothing, performs no Rust I/O, resolves no
+    /// path, reads no limit, spawns no thread and cannot panic, because every value it needs was
+    /// computed here, before the fork. A failure means the image is never executed.
+    pub(crate) fn install_linux_child_limits_v1(command: &mut Command) {
+        let address_space = libc::rlimit {
+            rlim_cur: PROFILE_V1_AS_BYTES,
+            rlim_max: PROFILE_V1_AS_BYTES,
+        };
+        let cpu = libc::rlimit {
+            rlim_cur: PROFILE_V1_CPU_SECONDS,
+            rlim_max: PROFILE_V1_CPU_SECONDS,
+        };
+
+        // SAFETY: `pre_exec` is `unsafe` because the registered closure runs in a restricted
+        // post-fork child, where only async-signal-safe work is permitted. The closure captures
+        // exactly two `Copy` `libc::rlimit` values built above and performs only `setsid` and two
+        // `setrlimit` calls, all three of which POSIX lists as async-signal-safe; it allocates,
+        // locks, formats, logs, opens, scans, resolves, observes and spawns nothing, and it cannot
+        // panic. Each failure path reports the child's own `errno` through
+        // `std::io::Error::last_os_error`, which only reads the thread-local errno and allocates
+        // nothing, and the parent never echoes that text. Both ceilings are installed with equal
+        // soft and hard values, so the child cannot raise them after `exec`.
+        unsafe {
+            command.pre_exec(move || {
+                if libc::setsid() == -1 {
+                    return Err(std::io::Error::last_os_error());
+                }
+                if libc::setrlimit(libc::RLIMIT_AS, &address_space) != 0 {
+                    return Err(std::io::Error::last_os_error());
+                }
+                if libc::setrlimit(libc::RLIMIT_CPU, &cpu) != 0 {
+                    return Err(std::io::Error::last_os_error());
+                }
+                Ok(())
+            });
+        }
+    }
+
+    /// Reads the calling process's own process-group id.
+    ///
+    /// Used only by the fixed child, to prove that `setsid` inside the pre-exec boundary really
+    /// made this process a session leader in its own group.
+    pub(crate) fn own_process_group_v1() -> Result<u32, NativeGroupRefusalV1> {
+        // SAFETY: `getpgid(0)` asks the kernel for the process-group id of the calling process
+        // itself. It takes a plain `pid_t`, writes through no pointer, allocates nothing, mutates
+        // no state and cannot fault; a negative return is the kernel's error report and is turned
+        // into the closed refusal below rather than being cast or ignored.
+        let group = unsafe { libc::getpgid(0) };
+        if group < 0 {
+            return Err(NativeGroupRefusalV1::ProcessGroupUnreadable);
+        }
+        Ok(group as u32)
+    }
+
+    /// Why a process-group or session identity could not be observed.
+    ///
+    /// Closed and typed, like the refusals above: it carries no `errno`, no path, no process
+    /// metadata and no OS error text, so nothing host-specific can reach an operator through it.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub(crate) enum NativeIdentityRefusalV1 {
+        /// The caller's target was zero, negative or not representable as a kernel `pid_t`.
+        ProcessIdNotRepresentable,
+        /// The `getpgid` query did not report a valid, positive group identity.
+        ProcessGroupUnreadable,
+        /// The `getsid` query did not report a valid, positive session identity.
+        SessionUnreadable,
+    }
+
+    /// One read-only identity observation: the group and session the kernel reports for a target.
+    ///
+    /// Both fields are positive kernel identifiers that were validated **before** conversion, so a
+    /// caller never sees a zero or a wrapped negative value presented as an identity.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub(crate) struct ProcessIdentityV1 {
+        /// The process-group id the kernel reported for the target.
+        pub(crate) group: u32,
+        /// The session id the kernel reported for the target.
+        pub(crate) session: u32,
+    }
+
+    /// Converts a caller's target into the `pid_t` the kernel queries accept.
+    ///
+    /// `None` is the kernel's own "the calling process" selector (`0`), which is the only form the
+    /// fixed trusted child may use. `Some(pid)` must be a positive value a `pid_t` can represent:
+    /// a zero, or a value wider than `pid_t`, is refused **before** any call, so a wrapped negative
+    /// pid can never be handed to the kernel and no caller can name an arbitrary unrepresentable
+    /// process.
+    fn pid_target(target: Option<u32>) -> Result<libc::pid_t, NativeIdentityRefusalV1> {
+        match target {
+            None => Ok(0),
+            Some(pid) => match libc::pid_t::try_from(pid) {
+                Ok(converted) if converted > 0 => Ok(converted),
+                _ => Err(NativeIdentityRefusalV1::ProcessIdNotRepresentable),
+            },
+        }
+    }
+
+    /// Observes the process-group and session identity of `target`, read-only.
+    ///
+    /// `None` asks the kernel about the calling process itself and is used only by the fixed,
+    /// trusted child. `Some(pid)` names one exact positive pid that only this parent's own
+    /// `Child::id()` can supply, and is used only by the fixed parent while that child is alive.
+    ///
+    /// Nothing here mutates state: `getpgid` and `getsid` are pure observations. No signal, no
+    /// `waitpid`, no `pidfd`, no `fork` and no process-group or session control is reachable from
+    /// this module, and each kernel status is checked before any result is converted.
+    pub(crate) fn observe_process_identity_v1(
+        target: Option<u32>,
+    ) -> Result<ProcessIdentityV1, NativeIdentityRefusalV1> {
+        let pid = pid_target(target)?;
+
+        // SAFETY: `getpgid` is a read-only query. It takes one `pid_t` that was just validated as
+        // either the kernel's own `0` selector or a positive, representable pid; it writes through
+        // no pointer, allocates nothing, mutates no process state and cannot fault. A negative
+        // return is the kernel's error report and becomes the closed refusal below rather than
+        // being cast, so no fabricated group identity can leave this function.
+        let group = unsafe { libc::getpgid(pid) };
+        if group <= 0 {
+            return Err(NativeIdentityRefusalV1::ProcessGroupUnreadable);
+        }
+
+        // SAFETY: `getsid` is the same shape of read-only query for the session identity: one
+        // already validated `pid_t`, no pointer, no allocation, no state mutation and no fault. Its
+        // negative return is likewise the kernel's error report, checked before conversion, so a
+        // rejected call can never become a session identity.
+        let session = unsafe { libc::getsid(pid) };
+        if session <= 0 {
+            return Err(NativeIdentityRefusalV1::SessionUnreadable);
+        }
+
+        let group =
+            u32::try_from(group).map_err(|_| NativeIdentityRefusalV1::ProcessGroupUnreadable)?;
+        let session =
+            u32::try_from(session).map_err(|_| NativeIdentityRefusalV1::SessionUnreadable)?;
+        Ok(ProcessIdentityV1 { group, session })
+    }
+
+    /// Why one owned-group termination was not issued.
+    ///
+    /// Closed and typed, like every refusal above: it carries no `errno`, no path and no process
+    /// metadata, so nothing host-specific reaches an operator through it.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub(crate) enum GroupSignalRefusalV1 {
+        /// A pid was zero, one, not representable as a kernel `pid_t`, or self-contradictory.
+        BadIdentity,
+        /// The directly owned leader was not proved still running immediately around the call.
+        LeaderNotLive,
+        /// The kernel's own group/session answers did not match the identities this call requires.
+        IdentityMismatch,
+        /// The kernel rejected the one signal, so no termination may be claimed.
+        SignalRejected,
+    }
+
+    /// What one owned-group termination actually established.
+    ///
+    /// It records the **request** and the identities it was checked against. It is deliberately not a
+    /// termination, a reap or a descendant exit: the caller must establish those separately.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub(crate) struct GroupSignalOutcomeV1 {
+        /// The leader pid, derived inside this seam from the owned handle.
+        pub(crate) leader_pid: u32,
+        /// The descendant pid supplied only for identity validation.
+        pub(crate) descendant_pid: u32,
+        /// The verified group identity, which the kernel reported as the leader pid.
+        pub(crate) group: u32,
+        /// The verified session identity, which the kernel reported as the leader pid.
+        pub(crate) session: u32,
+    }
+
+    /// Sends exactly one `SIGKILL` to the **owned** group of `owned_child`, after re-proving it.
+    ///
+    /// The leader pid is derived here from the caller's own `Child` handle, never from a parameter;
+    /// `descendant_pid` is used only to prove that the descendant really sits in that group. The
+    /// group number is therefore never caller-selected, and no generic signaller exists: this
+    /// function cannot be asked to signal an arbitrary group, PID `0`, or `-1`.
+    ///
+    /// The pre-call `try_wait` bracket narrows, but does **not** eliminate, the window in which the
+    /// leader could exit and its pid be reused. It is not a race-free lifetime pin, and no caller may
+    /// present it as hostile-descendant containment.
+    pub(crate) fn terminate_owned_group_v1(
+        owned_child: &mut Child,
+        descendant_pid: u32,
+    ) -> Result<GroupSignalOutcomeV1, GroupSignalRefusalV1> {
+        let handle_pid = owned_child.id();
+        let leader_pid =
+            i32::try_from(handle_pid).map_err(|_| GroupSignalRefusalV1::BadIdentity)?;
+        if leader_pid <= 1 || descendant_pid == handle_pid || descendant_pid <= 1 {
+            return Err(GroupSignalRefusalV1::BadIdentity);
+        }
+        if !matches!(owned_child.try_wait(), Ok(None)) {
+            return Err(GroupSignalRefusalV1::LeaderNotLive);
+        }
+
+        let leader = observe_process_identity_v1(Some(handle_pid))
+            .map_err(|_| GroupSignalRefusalV1::IdentityMismatch)?;
+        if leader.group != handle_pid || leader.session != handle_pid {
+            return Err(GroupSignalRefusalV1::IdentityMismatch);
+        }
+        let descendant = observe_process_identity_v1(Some(descendant_pid))
+            .map_err(|_| GroupSignalRefusalV1::IdentityMismatch)?;
+        if descendant.group != handle_pid || descendant.session != handle_pid {
+            return Err(GroupSignalRefusalV1::IdentityMismatch);
+        }
+
+        // The verified group must not be this process's own group: a group signal that could reach
+        // the supervising parent is refused before the call rather than discovered afterwards.
+        let own_group =
+            own_process_group_v1().map_err(|_| GroupSignalRefusalV1::IdentityMismatch)?;
+        if own_group == leader.group {
+            return Err(GroupSignalRefusalV1::IdentityMismatch);
+        }
+
+        // Recheck the same handle immediately before signalling, so a leader that exited during the
+        // observations above cannot be signalled by a stale identity this call just derived.
+        if !matches!(owned_child.try_wait(), Ok(None)) {
+            return Err(GroupSignalRefusalV1::LeaderNotLive);
+        }
+
+        let target = leader_pid
+            .checked_neg()
+            .ok_or(GroupSignalRefusalV1::BadIdentity)?;
+
+        // SAFETY: `kill` takes a `pid_t` and a signal number and performs no memory access, so no
+        // pointer, allocation or Rust state is involved. `target` is the negation of a positive pid
+        // this function just derived from the caller's own `Child` handle, which is the kernel's
+        // documented "this process group" selector; it can never be `0` or `-1`, because
+        // `leader_pid > 1` was enforced above and `checked_neg` refused any overflow. The group was
+        // verified as the leader's own and proved different from this process's group, so the signal
+        // cannot reach the supervising parent, a foreign group or a caller-selected group. The
+        // signal is the fixed `SIGKILL` constant, never a caller-supplied number.
+        let rc = unsafe { libc::kill(target, libc::SIGKILL) };
+
+        if rc != 0 {
+            return Err(GroupSignalRefusalV1::SignalRejected);
+        }
+        Ok(GroupSignalOutcomeV1 {
+            leader_pid: handle_pid,
+            descendant_pid,
+            group: leader.group,
+            session: leader.session,
+        })
+    }
+
+    /// The bounded, kernel-backed run state of one observed pid.
+    ///
+    /// `Running` and `Zombie` both carry the kernel's **start-time** identity, so a caller can prove
+    /// that the state it read belongs to the same process it observed earlier and not to a recycled
+    /// pid. A zombie is non-running but is **not** parent-reaped by this process.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub(crate) enum ProcessStateV1 {
+        /// The kernel reports the process as alive and not terminated.
+        Running {
+            /// The kernel's `starttime` identity for this process.
+            start_time: u64,
+        },
+        /// The kernel reports the process as a zombie: terminated, awaiting its own parent's reap.
+        Zombie {
+            /// The kernel's `starttime` identity for this process.
+            start_time: u64,
+        },
+        /// No `/proc` entry exists for the pid any more.
+        Gone,
+    }
+
+    /// Why one `/proc` observation was refused rather than reported.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub(crate) enum ProcessStateRefusalV1 {
+        /// The record existed but could not be read.
+        Unreadable,
+        /// The record existed but was truncated, non-UTF-8, or off-schema.
+        Malformed,
+    }
+
+    /// Observes one pid's run state and start-time identity from `/proc`, bounded and read-only.
+    ///
+    /// Nothing here mutates state, sends a signal, waits on a child or scans a process table: it
+    /// opens exactly one fixed `/proc/<pid>/stat` path for one already-validated positive pid. An
+    /// absent entry is reported as [`ProcessStateV1::Gone`]; anything unreadable or off-schema is a
+    /// typed refusal, so an inconclusive read can never be presented as a termination.
+    pub(crate) fn observe_process_state_v1(
+        pid: u32,
+    ) -> Result<ProcessStateV1, ProcessStateRefusalV1> {
+        if pid <= 1 {
+            return Err(ProcessStateRefusalV1::Malformed);
+        }
+        let path = format!("/proc/{pid}/stat");
+        let file = match std::fs::File::open(&path) {
+            Ok(file) => file,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                return Ok(ProcessStateV1::Gone);
+            }
+            Err(_) => return Err(ProcessStateRefusalV1::Unreadable),
+        };
+
+        let mut buffer = Vec::new();
+        let read = file
+            .take(PROC_STAT_READ_CAP)
+            .read_to_end(&mut buffer)
+            .map_err(|_| ProcessStateRefusalV1::Unreadable)?;
+        if u64::try_from(read).unwrap_or(u64::MAX) >= PROC_STAT_READ_CAP {
+            return Err(ProcessStateRefusalV1::Malformed);
+        }
+        let text = std::str::from_utf8(&buffer).map_err(|_| ProcessStateRefusalV1::Malformed)?;
+        parse_proc_stat_v1(text)
+    }
+
+    /// Parses one `/proc/<pid>/stat` record into a typed state and start-time identity.
+    ///
+    /// The command name is delimited by the **last** `)`, so a name that itself contains a space or a
+    /// bracket cannot shift the field offsets. Only the fixed state character and the fixed
+    /// start-time field are read; every other field is ignored rather than interpreted.
+    fn parse_proc_stat_v1(text: &str) -> Result<ProcessStateV1, ProcessStateRefusalV1> {
+        let open = text.find('(').ok_or(ProcessStateRefusalV1::Malformed)?;
+        let close = text.rfind(')').ok_or(ProcessStateRefusalV1::Malformed)?;
+        if close <= open {
+            return Err(ProcessStateRefusalV1::Malformed);
+        }
+        let rest = text
+            .get(close + 1..)
+            .ok_or(ProcessStateRefusalV1::Malformed)?;
+        let fields: Vec<&str> = rest.split_whitespace().collect();
+        if fields.len() <= PROC_STAT_START_TIME_OFFSET {
+            return Err(ProcessStateRefusalV1::Malformed);
+        }
+
+        let state = fields[0];
+        if state.len() != 1 {
+            return Err(ProcessStateRefusalV1::Malformed);
+        }
+        let start_time = fields[PROC_STAT_START_TIME_OFFSET]
+            .parse::<u64>()
+            .map_err(|_| ProcessStateRefusalV1::Malformed)?;
+
+        match state {
+            "R" | "S" | "D" | "I" | "T" | "t" | "W" | "P" => {
+                Ok(ProcessStateV1::Running { start_time })
+            }
+            "Z" | "X" | "x" => Ok(ProcessStateV1::Zombie { start_time }),
+            _ => Err(ProcessStateRefusalV1::Malformed),
+        }
+    }
+
+    /// Sends exactly one `SIGKILL` to the verified **own** group of `owned_child`.
+    ///
+    /// The accepted `N093` helper requires a descendant to prove group membership. This image
+    /// worker is designed to create **zero** descendants, so this separate entry point derives the
+    /// group from the leader alone: the kernel must report `group == session == leader pid`, and that
+    /// group must differ from this parent's own group, all inside a `try_wait` bracket. The group
+    /// number is never caller-selected and no generic signaller exists.
+    ///
+    /// This narrows but does not eliminate the pid-reuse window, so no caller may present it as
+    /// race-free process-tree containment.
+    pub(crate) fn terminate_own_group_v1(
+        owned_child: &mut Child,
+    ) -> Result<u32, GroupSignalRefusalV1> {
+        let handle_pid = owned_child.id();
+        let leader_pid =
+            i32::try_from(handle_pid).map_err(|_| GroupSignalRefusalV1::BadIdentity)?;
+        if leader_pid <= 1 {
+            return Err(GroupSignalRefusalV1::BadIdentity);
+        }
+        if !matches!(owned_child.try_wait(), Ok(None)) {
+            return Err(GroupSignalRefusalV1::LeaderNotLive);
+        }
+
+        let leader = observe_process_identity_v1(Some(handle_pid))
+            .map_err(|_| GroupSignalRefusalV1::IdentityMismatch)?;
+        if leader.group != handle_pid || leader.session != handle_pid {
+            return Err(GroupSignalRefusalV1::IdentityMismatch);
+        }
+        let own_group =
+            own_process_group_v1().map_err(|_| GroupSignalRefusalV1::IdentityMismatch)?;
+        if own_group == leader.group {
+            return Err(GroupSignalRefusalV1::IdentityMismatch);
+        }
+
+        // Recheck the same handle immediately before signalling.
+        if !matches!(owned_child.try_wait(), Ok(None)) {
+            return Err(GroupSignalRefusalV1::LeaderNotLive);
+        }
+
+        let target = leader_pid
+            .checked_neg()
+            .ok_or(GroupSignalRefusalV1::BadIdentity)?;
+
+        // SAFETY: `kill` takes a `pid_t` and a signal number and touches no memory, so no pointer,
+        // allocation or Rust state is involved. `target` is the negation of a positive pid this
+        // function just derived from the caller's own `Child` handle — the kernel's documented
+        // "this process group" selector — and it can never be `0` or `-1` because `leader_pid > 1`
+        // was enforced and `checked_neg` refused overflow. The group was verified as the leader's
+        // own and proved different from this process's group, so the signal cannot reach the
+        // supervising parent. A non-zero return is the kernel's error report and becomes the closed
+        // `SignalRejected` refusal rather than a claimed termination.
+        let status = unsafe { libc::kill(target, libc::SIGKILL) };
+        if status != 0 {
+            return Err(GroupSignalRefusalV1::SignalRejected);
+        }
+        Ok(leader.group)
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        /// `N076-01`: both real kernel readbacks succeed and are reported separately.
+        #[test]
+        fn n076_01_getrlimit_rlimit_as_and_rlimit_cpu_observe_the_real_kernel() {
+            let address_space =
+                read_ceiling(Ceiling::AddressSpace).expect("RLIMIT_AS readback must succeed");
+            let cpu = read_ceiling(Ceiling::Cpu).expect("RLIMIT_CPU readback must succeed");
+
+            // The kernel never reports a soft ceiling above its own hard ceiling.
+            assert!(address_space.soft <= address_space.hard);
+            assert!(cpu.soft <= cpu.hard);
+
+            let both = read_limit_ceilings_v1().expect("both readbacks must succeed");
+            assert_eq!(both.address_space, address_space);
+            assert_eq!(both.cpu, cpu);
+        }
+
+        /// `N076-02`: soft and hard stay separate, the whole `rlim_t` range is preserved, and a
+        /// repeated read is consistent. No fixed host value is asserted.
+        #[test]
+        fn n076_02_ceilings_keep_their_full_range_and_repeat_consistently() {
+            let first = read_limit_ceilings_v1().expect("readback");
+            let second = read_limit_ceilings_v1().expect("readback");
+            assert_eq!(
+                first, second,
+                "repeating the observation must be consistent"
+            );
+
+            let unlimited = ceiling_from_raw(LIMIT_UNLIMITED, LIMIT_UNLIMITED);
+            assert_eq!(unlimited.soft, u64::MAX, "RLIM_INFINITY must not truncate");
+            assert_eq!(unlimited.hard, u64::MAX, "RLIM_INFINITY must not truncate");
+
+            let split = ceiling_from_raw(1_048_576, 536_870_912);
+            assert_ne!(
+                split.soft, split.hard,
+                "soft and hard are reported separately"
+            );
+            assert_eq!(split.hard, 536_870_912);
+        }
+
+        /// `N076-03`: a **source-path** proof, not an injected syscall failure. No privilege is
+        /// used and no limit is changed; the decision that turns a status into a typed refusal is
+        /// proved purely.
+        #[test]
+        fn n076_03_a_rejected_status_is_a_typed_refusal_not_a_partial_observation() {
+            assert!(!ceiling_status_ok(-1), "a failed status is never success");
+            assert!(!ceiling_status_ok(1), "only zero is success");
+            assert!(ceiling_status_ok(0), "zero is the kernel's success status");
+
+            assert_ne!(
+                NativeReadbackRefusalV1::AddressSpaceCeilingRejected,
+                NativeReadbackRefusalV1::CpuCeilingRejected,
+                "each selector keeps its own closed refusal"
+            );
+        }
+    }
+}
+
+// The fixed entry points the safe façade consumes.
+//
+// The implementation lives inside the positively Linux-gated `linux` module above, which keeps
+// every `unsafe` occurrence inside a provable gate; these re-exports only make the same fixed
+// items nameable from the rest of the crate. There is no general-purpose native API, no
+// caller-selected limit, no executable parameter and no Windows counterpart here: the two group
+// items are the owned-group termination request and the bounded `/proc` state observation that
+// `SOLO-WO-093 R01` added, and `SOLO-WO-094 R01` re-exports them so the façade's own imports
+// resolve on Linux.
+#[cfg(target_os = "linux")]
+pub(crate) use linux::{
+    GroupSignalRefusalV1, ProcessStateV1, install_linux_child_limits_v1,
+    observe_process_identity_v1, observe_process_state_v1, own_process_group_v1,
+    read_limit_ceilings_v1, terminate_own_group_v1, terminate_owned_group_v1,
+};
+
+// The fixed Windows entry points the safe façade consumes.
+//
+// The implementation lives inside the positively `#[cfg(windows)]`-gated `windows` module above;
+// these re-exports only make the one suspended-worker type and the one job-membership query
+// nameable from the rest of the crate. There is no general-purpose native API here: no
+// caller-selected executable, limit, command line or output destination is reachable.
+#[cfg(windows)]
+#[cfg(windows)]
+pub use windows::{
+    N102ExtraInheritableV1, N102FaultContextV1, n102_probe_environment_v1, n102_probe_handle_v1,
+};
+#[cfg(windows)]
+pub(crate) use windows::{SuspendedWorkerV1, in_job_v1};
+
+// ---------------------------------------------------------------------------------------------
+// `R03.C3` — the Windows suspended-worker job boundary
+// ---------------------------------------------------------------------------------------------
+//
+// This is the second approved use of the reserved process-native file and the first Windows one in
+// it. Every operation below sits inside a positively `#[cfg(windows)]`-gated module, and every
+// `unsafe` block carries an adjacent `// SAFETY:` rationale naming the exact invariant that makes
+// the call sound.
+//
+// What it provides, and nothing more: create the one trusted worker **suspended**, create and limit
+// a job object before that worker may execute, assign the still-suspended worker, read the limits
+// and membership back from the kernel, only then resume its captured primary thread, wait with a
+// timeout, and terminate or confirm the reap of exactly this parent's own job and process. It opens
+// no file, reads no authored path, writes no output file and starts no other executable.
+//
+// What it does **not** provide: a filesystem, registry or network sandbox; protection against a
+// hostile worker that tries to break out of its job; race-free identity pinning against handle
+// duplication; or any claim that a Job Object bounds committed memory the way a container would.
+
+#[cfg(windows)]
+mod windows {
+    use std::ffi::c_void;
+    use std::path::Path;
+
+    use windows_sys::Win32::Foundation::{
+        CloseHandle, GetHandleInformation, HANDLE, HANDLE_FLAG_INHERIT, SetHandleInformation,
+        WAIT_OBJECT_0,
+    };
+    use windows_sys::Win32::Security::SECURITY_ATTRIBUTES;
+    use windows_sys::Win32::System::JobObjects::{
+        AssignProcessToJobObject, CreateJobObjectW, IsProcessInJob, JOB_OBJECT_LIMIT_JOB_MEMORY,
+        JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE, JOB_OBJECT_LIMIT_PROCESS_MEMORY,
+        JOB_OBJECT_LIMIT_PROCESS_TIME, JOBOBJECT_BASIC_ACCOUNTING_INFORMATION,
+        JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JobObjectBasicAccountingInformation,
+        JobObjectExtendedLimitInformation, QueryInformationJobObject, SetInformationJobObject,
+        TerminateJobObject,
+    };
+    use windows_sys::Win32::System::Pipes::CreatePipe;
+    use windows_sys::Win32::System::Threading::{
+        CREATE_SUSPENDED, CREATE_UNICODE_ENVIRONMENT, CreateEventW, CreateProcessW,
+        DeleteProcThreadAttributeList, EXTENDED_STARTUPINFO_PRESENT, GetCurrentProcess,
+        GetExitCodeProcess, InitializeProcThreadAttributeList, LPPROC_THREAD_ATTRIBUTE_LIST,
+        PROC_THREAD_ATTRIBUTE_HANDLE_LIST, PROCESS_INFORMATION, ResumeThread, STARTF_USESTDHANDLES,
+        STARTUPINFOEXW, TerminateProcess, UpdateProcThreadAttribute, WaitForSingleObject,
+    };
+
+    /// The largest attribute-list size this code will allocate for a one-entry list.
+    ///
+    /// The documented size for a two-handle inheritance list is a few hundred bytes; anything
+    /// outside this bound is treated as a refused host rather than a number to trust.
+    // ---------------------------------------------------------------------------------
+    // `SOLO-WO-103 R01` closed N102 test seam.
+    //
+    // Two fixed, bounded facts are exposed to the integration suite and to nothing else: an
+    // injection selector that makes one production native boundary refuse, and the child-side
+    // probes for the two isolation canaries. Neither is reachable from authored content, an
+    // ordinary public argument or any product configuration: the requested step is an immutable
+    // per-run value owned by one invocation, so it cannot leak between runs. The probes run only in
+    // the reserved internal worker modes, and no handle value, canary value or path is ever logged.
+    /// One closed per-run N102 fault context: the boundary this invocation must make refuse, the
+    /// boundary it actually reached, and whether the cleanup that followed a fault was observed.
+    ///
+    /// The value is constructed per invocation and passed by reference, so no global or thread-local
+    /// state exists: a concurrent host test can never observe another test's fault, and no normal
+    /// production run can be injected because it constructs [`Self::production`].
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub struct N102FaultContextV1 {
+        requested: Option<u8>,
+        reached: Option<u8>,
+        cleanup_verified: bool,
+    }
+
+    impl N102FaultContextV1 {
+        /// A non-injected context: every normal production image run constructs this.
+        pub const fn production() -> Self {
+            Self {
+                requested: None,
+                reached: None,
+                cleanup_verified: false,
+            }
+        }
+
+        /// A context that must make exactly `step` refuse, for the closed integration seam only.
+        pub const fn requesting(step: u8) -> Self {
+            Self {
+                requested: Some(step),
+                reached: None,
+                cleanup_verified: false,
+            }
+        }
+
+        /// Whether this boundary is the one this run requested, recording that it was reached.
+        pub fn inject_here(&mut self, boundary: u8) -> bool {
+            if self.reached.is_none() && self.requested == Some(boundary) {
+                self.reached = Some(boundary);
+                true
+            } else {
+                false
+            }
+        }
+
+        /// The boundary this run actually reached, recorded at the native boundary itself.
+        pub fn reached(&self) -> Option<u8> {
+            self.reached
+        }
+
+        /// Whether the cleanup that followed a fault was observed to complete.
+        pub fn cleanup_verified(&self) -> bool {
+            self.cleanup_verified
+        }
+
+        /// Records that the owned child was terminated and its exit actually observed.
+        pub fn mark_cleanup_verified(&mut self) {
+            self.cleanup_verified = true;
+        }
+    }
+
+    const ATTRIBUTE_LIST_MAX_BYTES: usize = 4_096;
+
+    /// One initialised `PROC_THREAD_ATTRIBUTE_LIST` plus the aligned storage it points into.
+    ///
+    /// The owner keeps `storage` alive and never reallocates it while Windows holds `list`, and
+    /// `DeleteProcThreadAttributeList` runs exactly once, only after a successful initialisation.
+    struct AttributeListV1 {
+        storage: Vec<usize>,
+        list: LPPROC_THREAD_ATTRIBUTE_LIST,
+        initialised: bool,
+    }
+
+    impl AttributeListV1 {
+        /// Probes the required size, allocates, initialises, and installs the two-handle allowlist.
+        ///
+        /// Every step is fail-closed: a probe that unexpectedly succeeds, a size of zero or one
+        /// beyond the bound, an initialisation failure and a rejected update all return `None`
+        /// without ever having installed a partial or unrestricted inheritance arrangement.
+        fn new(handles: &[HANDLE; 2]) -> Option<Self> {
+            if handles[0].is_null()
+                || handles[1].is_null()
+                || handles[0] == handles[1]
+                || handles[0] == windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE
+                || handles[1] == windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE
+            {
+                return None;
+            }
+
+            let mut bytes_needed: usize = 0;
+            // SAFETY: this is the documented size-probe form — a null list, one entry and this
+            // function's own `usize` for the size — and it is expected to fail without writing
+            // anywhere except that `usize`.
+            let probe = unsafe {
+                InitializeProcThreadAttributeList(std::ptr::null_mut(), 1, 0, &mut bytes_needed)
+            };
+            if probe != 0 || bytes_needed == 0 || bytes_needed > ATTRIBUTE_LIST_MAX_BYTES {
+                return None;
+            }
+
+            let word = std::mem::size_of::<usize>();
+            let words = bytes_needed.checked_add(word - 1)? / word;
+            // `Vec<usize>` provides `usize` alignment, which satisfies the list's alignment
+            // requirement, and the buffer is created at its final size so it never moves.
+            let mut storage: Vec<usize> = vec![0; words];
+            let list: LPPROC_THREAD_ATTRIBUTE_LIST = storage.as_mut_ptr().cast();
+            // SAFETY: `list` names `words * size_of::<usize>() >= bytes_needed` writable, aligned
+            // bytes owned by `storage`, the entry count matches the single attribute installed
+            // below, and the size pointer is this function's own.
+            let initialised =
+                unsafe { InitializeProcThreadAttributeList(list, 1, 0, &mut bytes_needed) };
+            if initialised == 0 {
+                // The list was never initialised, so it must not be deleted.
+                return None;
+            }
+            let owner = Self {
+                storage,
+                list,
+                initialised: true,
+            };
+            // SAFETY: `list` is initialised with capacity for one attribute; the value pointer names
+            // the caller's live two-handle array and the size is exactly that array's size, which is
+            // the documented shape of an inheritance allowlist.
+            let updated = unsafe {
+                UpdateProcThreadAttribute(
+                    list,
+                    0,
+                    PROC_THREAD_ATTRIBUTE_HANDLE_LIST as usize,
+                    handles.as_ptr().cast(),
+                    std::mem::size_of_val(handles),
+                    std::ptr::null_mut(),
+                    std::ptr::null(),
+                )
+            };
+            if updated == 0 {
+                return None;
+            }
+            Some(owner)
+        }
+
+        fn list_ptr(&self) -> LPPROC_THREAD_ATTRIBUTE_LIST {
+            self.list
+        }
+    }
+
+    impl Drop for AttributeListV1 {
+        fn drop(&mut self) {
+            if self.initialised {
+                // SAFETY: the list was initialised exactly once by `new` and is deleted exactly once
+                // here, while `storage` — the memory it points into — is still alive.
+                unsafe { DeleteProcThreadAttributeList(self.list) };
+                self.initialised = false;
+            }
+            let _ = self.storage.capacity();
+        }
+    }
+
+    /// The fixed CPU ceiling for one worker, in 100-nanosecond units (10 seconds).
+    const PROCESS_TIME_100NS: i64 = 10 * 10_000_000;
+
+    /// The fixed committed-memory ceiling for one worker process, in bytes (512 MiB).
+    const PROCESS_MEMORY_BYTES: usize = 536_870_912;
+
+    /// The fixed committed-memory ceiling for the whole job, in bytes (512 MiB).
+    const JOB_MEMORY_BYTES: usize = 536_870_912;
+
+    /// Whether the calling process really belongs to a job object.
+    ///
+    /// The fixed child calls this before it parses a single byte, so a worker started outside the
+    /// approved boundary refuses instead of decoding unconfined.
+    pub(crate) fn in_job_v1() -> bool {
+        let mut inside: windows_sys::core::BOOL = 0;
+        // SAFETY: `IsProcessInJob` takes this process's own pseudo-handle, a null job handle (which
+        // asks about *any* job) and one out-pointer to a stack `BOOL`. It writes exactly that
+        // `BOOL`, allocates nothing, opens no handle and cannot fault on these arguments.
+        let status =
+            unsafe { IsProcessInJob(GetCurrentProcess(), std::ptr::null_mut(), &mut inside) };
+        status != 0 && inside != 0
+    }
+
+    /// A UTF-16, NUL-terminated rendering of one Rust string.
+    fn wide(text: &str) -> Vec<u16> {
+        text.encode_utf16().chain(std::iter::once(0)).collect()
+    }
+
+    /// Quotes one command-line argument with the Windows `CommandLineToArgvW` rules.
+    ///
+    /// The worker's arguments (a closed flag, a closed format token and one lowercase digest) never
+    /// need quoting, but the executable path may contain spaces, so quoting is applied to every
+    /// element uniformly rather than to a hand-picked subset.
+    fn quote_argument(text: &str) -> String {
+        let needs_quotes = text.is_empty() || text.contains([' ', '\t', '"']);
+        if !needs_quotes {
+            return text.to_owned();
+        }
+        let mut out = String::with_capacity(text.len() + 2);
+        out.push('"');
+        let mut backslashes = 0usize;
+        for character in text.chars() {
+            match character {
+                '\\' => {
+                    backslashes += 1;
+                    out.push('\\');
+                }
+                '"' => {
+                    for _ in 0..backslashes {
+                        out.push('\\');
+                    }
+                    backslashes = 0;
+                    out.push('\\');
+                    out.push('"');
+                }
+                _ => {
+                    backslashes = 0;
+                    out.push(character);
+                }
+            }
+        }
+        out.push('"');
+        out
+    }
+
+    /// Wraps one raw handle as an owned standard-library file, refusing an obviously invalid handle.
+    ///
+    /// # Safety
+    ///
+    /// The caller must pass a handle it exclusively owns and has not transferred elsewhere; the
+    /// returned `File` closes it exactly once.
+    unsafe fn file_from_owned_handle(handle: HANDLE) -> Option<std::fs::File> {
+        use std::os::windows::io::FromRawHandle;
+
+        if handle.is_null() || handle == windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE {
+            return None;
+        }
+        // SAFETY: the caller guarantees exclusive ownership of a live handle, and `File` takes it
+        // over with exactly one matching `CloseHandle`, so no double close or leak follows.
+        Some(unsafe { std::fs::File::from_raw_handle(handle as std::os::windows::io::RawHandle) })
+    }
+
+    /// Creates one job object and installs the four mandatory limits.
+    ///
+    /// The limits are written once and then **queried back**, so a silently rejected setting can
+    /// never be reported as installed.
+    /// One native handle this module owns, closed exactly once however the path leaves.
+    ///
+    /// Guards exist because `spawn` has many fallible steps between acquiring a handle and handing
+    /// it to the constructed worker: with explicit closes only, one added `?` is one new leak.
+    struct OwnedHandleV1(HANDLE);
+
+    impl OwnedHandleV1 {
+        fn new(handle: HANDLE) -> Option<Self> {
+            if handle.is_null() || handle == windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE {
+                None
+            } else {
+                Some(Self(handle))
+            }
+        }
+
+        fn raw(&self) -> HANDLE {
+            self.0
+        }
+
+        /// Transfers ownership to the struct that will close it.
+        fn into_raw(self) -> HANDLE {
+            let handle = self.0;
+            std::mem::forget(self);
+            handle
+        }
+    }
+
+    impl Drop for OwnedHandleV1 {
+        fn drop(&mut self) {
+            // SAFETY: this guard is the sole owner of the handle and closes it exactly once, after
+            // which no copy of it is used anywhere.
+            unsafe { close_owned(self.0) }
+        }
+    }
+
+    /// Creates a job, installs the four limits and **requires** a successful readback.
+    ///
+    /// A job whose readback fails, or whose limits cannot be written, is closed here and reported as
+    /// a failure. No caller can therefore hold a job it has not verified, and the process launch
+    /// that follows is impossible without confirmed limits.
+    /// One additional explicitly inheritable parent handle that the allowlist never contains.
+    ///
+    /// The integration suite holds one of these across a real spawn, so a child that could reach it
+    /// would prove broad inheritance. It is created with `bInheritHandle` set on purpose and is
+    /// never added to the two-entry `PROC_THREAD_ATTRIBUTE_HANDLE_LIST`.
+    pub struct N102ExtraInheritableV1(OwnedHandleV1);
+
+    impl N102ExtraInheritableV1 {
+        /// Creates the extra inheritable handle, or `None` when the kernel refuses.
+        pub fn create() -> Option<Self> {
+            Self::create_with_inherit_v1(1)
+        }
+
+        /// Creates one comparable **non**-inheritable handle: a numeric value the child can never
+        /// receive by inheritance, used as the ambiguity control for one handle probe.
+        pub fn create_control() -> Option<Self> {
+            Self::create_with_inherit_v1(0)
+        }
+
+        fn create_with_inherit_v1(inherit: i32) -> Option<Self> {
+            // SAFETY: `SECURITY_ATTRIBUTES` is a plain `repr(C)` structure valid when zeroed; only
+            // the three fields set below are read by `CreateEventW`, and a null name with manual
+            // reset asks for one fresh anonymous event owned by this process.
+            let mut attributes: SECURITY_ATTRIBUTES = unsafe { std::mem::zeroed() };
+            attributes.nLength = u32::try_from(std::mem::size_of::<SECURITY_ATTRIBUTES>()).ok()?;
+            attributes.lpSecurityDescriptor = std::ptr::null_mut();
+            attributes.bInheritHandle = inherit;
+            // SAFETY: the attributes pointer names this function's own live structure, the name is a
+            // null pointer (anonymous object) and both flags are documented constants.
+            let event =
+                unsafe { CreateEventW(std::ptr::from_ref(&attributes), 1, 0, std::ptr::null()) };
+            if event.is_null() {
+                return None;
+            }
+            Some(Self(OwnedHandleV1::new(event)?))
+        }
+
+        /// The kernel's own numeric value for this handle, as a child would see it if inherited.
+        pub fn value(&self) -> u32 {
+            self.0.raw() as usize as u32
+        }
+    }
+
+    /// Whether one numeric handle value is live in this process, plus whether a value the parent
+    /// guarantees can never be a handle is also reported live.
+    ///
+    /// Used only in the reserved internal probe mode. A value that is not a handle is the expected
+    /// answer for a correctly excluded handle; a probe whose guaranteed-invalid control also reports
+    /// live means the child's handle table cannot be trusted for this question, so the caller refuses
+    /// the run instead of reading it as either inheritance or exclusion.
+    pub fn n102_probe_handle_v1(value: u32, control: u32) -> (bool, bool) {
+        fn live(value: u32) -> bool {
+            let mut flags: u32 = 0;
+            // SAFETY: `GetHandleInformation` only reads this process's own handle table for the
+            // supplied value and writes the out-parameter owned here; an absent handle makes it fail,
+            // which is exactly the fact being measured.
+            (unsafe { GetHandleInformation(value as usize as HANDLE, &mut flags) }) != 0
+        }
+        let ambiguous = live(control);
+        (live(value), ambiguous)
+    }
+
+    /// Whether the named variable is visible to this process, and whether `SystemRoot` is present.
+    ///
+    /// `std::env` reads the real process environment block, so this observes what the production
+    /// minimal-environment `CreateProcessW` actually installed rather than any local model of it.
+    pub fn n102_probe_environment_v1(name: &std::ffi::OsStr) -> (bool, bool) {
+        (
+            std::env::var_os(name).is_some(),
+            std::env::var_os("SystemRoot").is_some(),
+        )
+    }
+
+    fn create_limited_job_v1() -> Option<OwnedHandleV1> {
+        // SAFETY: `CreateJobObjectW` takes a null security descriptor and a null name, so it creates
+        // an anonymous job whose only handle this process owns. It returns a handle or null.
+        let job =
+            OwnedHandleV1::new(unsafe { CreateJobObjectW(std::ptr::null(), std::ptr::null()) })?;
+
+        // SAFETY: every field of these `repr(C)` window structures is valid when zeroed, which is
+        // the documented "no limits" baseline this code then fills in explicitly.
+        let mut limits: JOBOBJECT_EXTENDED_LIMIT_INFORMATION = unsafe { std::mem::zeroed() };
+        limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_PROCESS_TIME
+            | JOB_OBJECT_LIMIT_PROCESS_MEMORY
+            | JOB_OBJECT_LIMIT_JOB_MEMORY
+            | JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        limits.BasicLimitInformation.PerProcessUserTimeLimit = PROCESS_TIME_100NS;
+        limits.ProcessMemoryLimit = PROCESS_MEMORY_BYTES;
+        limits.JobMemoryLimit = JOB_MEMORY_BYTES;
+
+        let length =
+            u32::try_from(std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>()).ok()?;
+
+        // SAFETY: the job handle came from `CreateJobObjectW` just above and is owned by the guard,
+        // the information class matches the structure type, and the length is exactly that
+        // structure's size, which is `SetInformationJobObject`'s contract for this class.
+        let set = unsafe {
+            SetInformationJobObject(
+                job.raw(),
+                JobObjectExtendedLimitInformation,
+                std::ptr::from_ref(&limits).cast::<c_void>(),
+                length,
+            )
+        };
+        if set == 0 {
+            return None;
+        }
+
+        // The readback is the contract: a job that cannot prove its four limits is closed by the
+        // guard and never reaches a process launch.
+        if !read_job_limits_v1(job.raw()) {
+            return None;
+        }
+        Some(job)
+    }
+
+    /// Reads the job's effective limits back from the kernel and compares all four.
+    fn read_job_limits_v1(job: HANDLE) -> bool {
+        // SAFETY: zeroed `repr(C)` structure, filled by the query below.
+        let mut observed: JOBOBJECT_EXTENDED_LIMIT_INFORMATION = unsafe { std::mem::zeroed() };
+        let mut returned: u32 = 0;
+        let Some(length) =
+            u32::try_from(std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>()).ok()
+        else {
+            return false;
+        };
+        // SAFETY: the job handle is live, the class matches the structure, the pointer and length
+        // name this function's own stack structure, and the size is its exact size.
+        let queried = unsafe {
+            QueryInformationJobObject(
+                job,
+                JobObjectExtendedLimitInformation,
+                std::ptr::from_mut(&mut observed).cast::<c_void>(),
+                length,
+                &mut returned,
+            )
+        };
+        if queried == 0 {
+            return false;
+        }
+        let required = JOB_OBJECT_LIMIT_PROCESS_TIME
+            | JOB_OBJECT_LIMIT_PROCESS_MEMORY
+            | JOB_OBJECT_LIMIT_JOB_MEMORY
+            | JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        observed.BasicLimitInformation.LimitFlags & required == required
+            && observed.BasicLimitInformation.PerProcessUserTimeLimit == PROCESS_TIME_100NS
+            && observed.ProcessMemoryLimit == PROCESS_MEMORY_BYTES
+            && observed.JobMemoryLimit == JOB_MEMORY_BYTES
+    }
+
+    /// Whether the job currently holds at least one live process.
+    fn job_has_a_process_v1(job: HANDLE) -> bool {
+        // SAFETY: zeroed `repr(C)` accounting structure, filled by the query below.
+        let mut accounting: JOBOBJECT_BASIC_ACCOUNTING_INFORMATION = unsafe { std::mem::zeroed() };
+        let mut returned: u32 = 0;
+        let Some(length) =
+            u32::try_from(std::mem::size_of::<JOBOBJECT_BASIC_ACCOUNTING_INFORMATION>()).ok()
+        else {
+            return false;
+        };
+        // SAFETY: live job handle, matching class, this function's own stack structure and its exact
+        // size.
+        let queried = unsafe {
+            QueryInformationJobObject(
+                job,
+                JobObjectBasicAccountingInformation,
+                std::ptr::from_mut(&mut accounting).cast::<c_void>(),
+                length,
+                &mut returned,
+            )
+        };
+        queried != 0 && accounting.ActiveProcesses >= 1
+    }
+
+    /// One worker that was created suspended, limited by its job, and only then resumed.
+    ///
+    /// It owns the job, the process handle, the primary thread handle and the two parent-side pipe
+    /// ends. Dropping it terminates a still-running job and closes every handle exactly once, so no
+    /// native handle can leak even on an early refusal.
+    pub(crate) struct SuspendedWorkerV1 {
+        job: HANDLE,
+        process: HANDLE,
+        thread: HANDLE,
+        pid: u32,
+        limits_verified: bool,
+        resumed: bool,
+        exited: bool,
+        stdin: Option<std::fs::File>,
+        stdout: Option<std::fs::File>,
+    }
+
+    /// Closes one handle if it is live.
+    ///
+    /// # Safety
+    ///
+    /// The caller must own `handle` exclusively and must not use it afterwards.
+    unsafe fn close_owned(handle: HANDLE) {
+        if !handle.is_null() && handle != windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE {
+            // SAFETY: the caller guarantees exclusive ownership and no later use.
+            unsafe { CloseHandle(handle) };
+        }
+    }
+
+    /// The fixed, minimal environment the worker is given.
+    ///
+    /// Only `SystemRoot` and — when it differs — `WINDIR` are admitted, each read from its single
+    /// named OS variable, re-validated as a non-empty absolute ASCII Windows path with no interior
+    /// NUL and a bounded length, and emitted as an explicitly sorted, double-NUL-terminated UTF-16
+    /// block. Nothing else is forwarded: no `PATH`, profile, temp, token, cloud, repository or
+    /// arbitrary inherited value, and never the ambient block itself.
+    fn minimal_environment_v1() -> Option<Vec<u16>> {
+        let mut admitted: Vec<(String, String)> = Vec::new();
+        for name in ["SystemRoot", "WINDIR"] {
+            let value = std::env::var(name).ok()?;
+            if value.is_empty()
+                || value.len() > 260
+                || value.contains('\0')
+                || !value.is_ascii()
+                || !std::path::Path::new(&value).is_absolute()
+            {
+                return None;
+            }
+            if admitted
+                .iter()
+                .any(|(_, existing)| existing.eq_ignore_ascii_case(&value))
+            {
+                continue;
+            }
+            admitted.push((name.to_owned(), value));
+        }
+        // Windows expects the block's names in case-insensitive sorted order.
+        admitted.sort_by_key(|(name, _)| name.to_uppercase());
+
+        let mut block: Vec<u16> = Vec::new();
+        for (name, value) in &admitted {
+            block.extend(format!("{name}={value}").encode_utf16());
+            block.push(0);
+        }
+        // The block itself must be terminated by one further NUL.
+        block.push(0);
+        Some(block)
+    }
+    impl SuspendedWorkerV1 {
+        /// Creates the worker suspended, assigns it to a freshly limited job and verifies both.
+        ///
+        /// Nothing here lets the child execute: `CREATE_SUSPENDED` holds it at creation, the job is
+        /// limited and read back before assignment, and `resume` is a separate call the caller makes
+        /// only after those facts are known.
+        pub(crate) fn spawn(
+            executable: &Path,
+            arguments: &[&str],
+            fault: &mut N102FaultContextV1,
+        ) -> Option<Self> {
+            if fault.inject_here(1) {
+                return None;
+            }
+            let job = create_limited_job_v1()?;
+
+            // SAFETY: `SECURITY_ATTRIBUTES` is a plain `repr(C)` structure valid when zeroed; the
+            // three fields set below are the only ones `CreatePipe` reads.
+            let mut attributes: SECURITY_ATTRIBUTES = unsafe { std::mem::zeroed() };
+            attributes.nLength = u32::try_from(std::mem::size_of::<SECURITY_ATTRIBUTES>()).ok()?;
+            attributes.lpSecurityDescriptor = std::ptr::null_mut();
+            attributes.bInheritHandle = 1;
+
+            if fault.inject_here(2) {
+                return None;
+            }
+            let mut stdout_read: HANDLE = std::ptr::null_mut();
+            let mut stdout_write: HANDLE = std::ptr::null_mut();
+            // SAFETY: both out-pointers name this function's own stack handles, and the attributes
+            // ask for an inheritable child end.
+            let out_pipe = unsafe {
+                CreatePipe(
+                    &mut stdout_read,
+                    &mut stdout_write,
+                    std::ptr::from_ref(&attributes),
+                    0,
+                )
+            };
+            if out_pipe == 0 {
+                return None;
+            }
+            // Every acquired handle is owned by a guard from here on, so each early return below
+            // closes it exactly once without a hand-written close list.
+            let stdout_read = OwnedHandleV1::new(stdout_read)?;
+            let stdout_write = OwnedHandleV1::new(stdout_write)?;
+
+            if fault.inject_here(3) {
+                return None;
+            }
+            let mut stdin_read: HANDLE = std::ptr::null_mut();
+            let mut stdin_write: HANDLE = std::ptr::null_mut();
+            // SAFETY: identical shape to the pipe above.
+            let in_pipe = unsafe {
+                CreatePipe(
+                    &mut stdin_read,
+                    &mut stdin_write,
+                    std::ptr::from_ref(&attributes),
+                    0,
+                )
+            };
+            if in_pipe == 0 {
+                return None;
+            }
+            let stdin_read = OwnedHandleV1::new(stdin_read)?;
+            let stdin_write = OwnedHandleV1::new(stdin_write)?;
+
+            // The parent-side ends must never be inherited by any other process.
+            // SAFETY: both handles are live parent ends owned by the guards above.
+            if fault.inject_here(4) {
+                return None;
+            }
+            let cleared = unsafe {
+                SetHandleInformation(stdout_read.raw(), HANDLE_FLAG_INHERIT, 0) != 0
+                    && SetHandleInformation(stdin_write.raw(), HANDLE_FLAG_INHERIT, 0) != 0
+            };
+            if !cleared {
+                return None;
+            }
+
+            // The child may inherit exactly two handles: its stdin read end and its stdout write
+            // end. Nothing else — no parent end, no job or process handle, no ambient std handle and
+            // no provider handle — is admitted, and `bInheritHandles=TRUE` is only ever passed
+            // together with this validated list.
+            let child_handles: [HANDLE; 2] = [stdin_read.raw(), stdout_write.raw()];
+            if fault.inject_here(5) {
+                return None;
+            }
+            let allowlist = AttributeListV1::new(&child_handles)?;
+
+            // SAFETY: `STARTUPINFOEXW` is a plain `repr(C)` structure valid when zeroed; the fields
+            // set here are exactly those `STARTF_USESTDHANDLES` and the attribute list document.
+            let mut startup: STARTUPINFOEXW = unsafe { std::mem::zeroed() };
+            startup.StartupInfo.cb = u32::try_from(std::mem::size_of::<STARTUPINFOEXW>()).ok()?;
+            startup.StartupInfo.dwFlags = STARTF_USESTDHANDLES;
+            startup.StartupInfo.hStdInput = child_handles[0];
+            startup.StartupInfo.hStdOutput = child_handles[1];
+            startup.StartupInfo.hStdError = child_handles[1];
+            startup.lpAttributeList = allowlist.list_ptr();
+
+            let image = executable.to_string_lossy();
+            let mut parts: Vec<String> = Vec::with_capacity(arguments.len() + 1);
+            parts.push(quote_argument(&image));
+            for argument in arguments {
+                parts.push(quote_argument(argument));
+            }
+            let application = wide(&image);
+            let mut command_line = wide(&parts.join(" "));
+
+            // The child gets a freshly built minimal block, never the ambient one, and a working
+            // directory bound to this one trusted executable's own parent directory.
+            if fault.inject_here(6) {
+                return None;
+            }
+            let environment = minimal_environment_v1()?;
+            if fault.inject_here(7) {
+                return None;
+            }
+            let working_directory = wide(
+                &executable
+                    .parent()
+                    .filter(|parent| parent.is_dir())?
+                    .to_string_lossy(),
+            );
+
+            // SAFETY: `PROCESS_INFORMATION` is a plain `repr(C)` structure valid when zeroed.
+            let mut info: PROCESS_INFORMATION = unsafe { std::mem::zeroed() };
+
+            // SAFETY: the application name and mutable command line are NUL-terminated UTF-16
+            // buffers that outlive this call; the environment block and working directory are
+            // NUL-terminated buffers owned by this function; `bInheritHandles` is `TRUE` only with
+            // the initialised handle allowlist above, so exactly the two child ends are inherited;
+            // `CREATE_SUSPENDED` holds the child before it can execute, `EXTENDED_STARTUPINFO_PRESENT`
+            // is what makes the attribute list authoritative and `CREATE_UNICODE_ENVIRONMENT`
+            // declares the block's encoding; the startup pointer is the base structure as the API
+            // requires; and `info` is this function's own out-structure.
+            if fault.inject_here(8) {
+                return None;
+            }
+            let created = unsafe {
+                CreateProcessW(
+                    application.as_ptr(),
+                    command_line.as_mut_ptr(),
+                    std::ptr::null(),
+                    std::ptr::null(),
+                    1,
+                    CREATE_SUSPENDED | EXTENDED_STARTUPINFO_PRESENT | CREATE_UNICODE_ENVIRONMENT,
+                    environment.as_ptr().cast(),
+                    working_directory.as_ptr(),
+                    &startup.StartupInfo,
+                    &mut info,
+                )
+            };
+
+            // The child's own ends are closed in the parent whatever happened.
+            // SAFETY: both are live and owned by their guards, which close each exactly once now.
+            drop(stdout_write);
+            drop(stdin_read);
+            if created == 0 {
+                return None;
+            }
+            let process = OwnedHandleV1::new(info.hProcess)?;
+            let thread = OwnedHandleV1::new(info.hThread)?;
+
+            // Assign the still-suspended worker and confirm real membership.
+            // SAFETY: all three handles came from the calls above and are live; assigning a
+            // suspended process changes no memory and cannot start it.
+            if fault.inject_here(9) {
+                // The suspended child exists but has never joined the job, so closing or terminating
+                // the job cannot end it. The owned process itself is terminated and its exit is
+                // observed; only that observation may be recorded as verified cleanup.
+                // SAFETY: `process` is this function's own live process handle returned by the
+                // `CreateProcessW` above; terminating it touches no Rust memory, and the bounded wait
+                // observes the owned process itself.
+                let ended = unsafe {
+                    TerminateProcess(process.raw(), 1) != 0
+                        && WaitForSingleObject(process.raw(), 5_000) == WAIT_OBJECT_0
+                };
+                if ended {
+                    fault.mark_cleanup_verified();
+                }
+                return None;
+            }
+            let assigned = unsafe { AssignProcessToJobObject(job.raw(), process.raw()) };
+            let member = assigned != 0 && job_has_a_process_v1(job.raw());
+            if !member {
+                // A process that never joined this job cannot be ended by terminating the job, so the
+                // owned process handle is terminated directly and its exit observed; the job is also
+                // terminated for any process that did join. Only an observed process exit is recorded
+                // as verified cleanup, and every handle is then closed exactly once by its guard.
+                // SAFETY: `job` and `process` are this function's own live handles from the calls
+                // above; neither call touches Rust memory and both are bounded.
+                let ended = unsafe {
+                    TerminateJobObject(job.raw(), 1);
+                    TerminateProcess(process.raw(), 1) != 0
+                        && WaitForSingleObject(process.raw(), 5_000) == WAIT_OBJECT_0
+                };
+                if ended {
+                    fault.mark_cleanup_verified();
+                }
+                return None;
+            }
+
+            // SAFETY: both parent ends are live, exclusively owned and transferred to a `File` that
+            // closes each exactly once; no other copy of either handle exists in this process.
+            let stdin = unsafe { file_from_owned_handle(stdin_write.into_raw()) };
+            // SAFETY: identical guarantee for the stdout read end.
+            let stdout = unsafe { file_from_owned_handle(stdout_read.into_raw()) };
+
+            Some(Self {
+                job: job.into_raw(),
+                process: process.into_raw(),
+                thread: thread.into_raw(),
+                pid: info.dwProcessId,
+                limits_verified: true,
+                resumed: false,
+                exited: false,
+                stdin,
+                stdout,
+            })
+        }
+
+        /// The worker's own process identifier, as the create call reported it.
+        pub(crate) fn pid(&self) -> u32 {
+            self.pid
+        }
+
+        /// Whether the job's four limits were read back as installed before the worker ran.
+        pub(crate) fn limits_verified(&self) -> bool {
+            self.limits_verified
+        }
+
+        /// Takes the parent's write end of the child's stdin.
+        pub(crate) fn take_stdin(&mut self) -> Option<std::fs::File> {
+            self.stdin.take()
+        }
+
+        /// Takes the parent's read end of the child's stdout.
+        pub(crate) fn take_stdout(&mut self) -> Option<std::fs::File> {
+            self.stdout.take()
+        }
+
+        /// Resumes the captured primary thread, which is the moment the worker may execute.
+        ///
+        /// It must only be called after the job was created, limited, read back and assigned.
+        /// Terminates this worker's job and observes the owned child's actual exit, bounded.
+        ///
+        /// Returns `true` only when the termination call succeeded **and** the owned process handle
+        /// signalled, so a caller may record verified cleanup only from an observed exit.
+        pub(crate) fn terminate_and_observe_v1(&mut self) -> bool {
+            // SAFETY: `self.job` is this worker's own live job handle, and terminating a job
+            // touches no Rust memory.
+            let job_ended = unsafe { TerminateJobObject(self.job, 1) != 0 };
+            // SAFETY: `self.process` is this worker's own live process handle; the bounded wait
+            // observes the owned process and cannot fault.
+            let exited = unsafe { WaitForSingleObject(self.process, 5_000) == WAIT_OBJECT_0 };
+            if exited {
+                self.exited = true;
+            }
+            job_ended && exited
+        }
+
+        pub(crate) fn resume(&mut self, fault: &mut N102FaultContextV1) -> bool {
+            if fault.inject_here(10) {
+                return false;
+            }
+            if self.resumed || self.exited {
+                return false;
+            }
+            // A worker whose four job limits were not read back as installed, or whose assignment
+            // and membership were not confirmed, must never execute: the refusal is enforced here as
+            // well as at construction, so a future caller cannot regress it by constructing a worker
+            // some other way.
+            if !self.limits_verified {
+                return false;
+            }
+            // SAFETY: `self.thread` is the live primary-thread handle from `CreateProcessW`, still
+            // suspended and owned exclusively here. `ResumeThread` decrements the suspend count and
+            // returns the previous count, or `u32::MAX` on failure; it touches no Rust memory.
+            let previous = unsafe { ResumeThread(self.thread) };
+            if previous == u32::MAX {
+                return false;
+            }
+            self.resumed = true;
+            true
+        }
+
+        /// Waits up to `milliseconds` for the worker and returns its exit code when it has exited.
+        pub(crate) fn wait_ms(
+            &mut self,
+            milliseconds: u32,
+            fault: &mut N102FaultContextV1,
+        ) -> Option<u32> {
+            if fault.inject_here(11) {
+                // The injected wait failure must not suppress cleanup: the job is terminated and the
+                // owned child's exit observed before the refusal is returned.
+                if self.terminate_and_observe_v1() {
+                    fault.mark_cleanup_verified();
+                }
+                return None;
+            }
+            // SAFETY: `self.process` is a live process handle owned exclusively here. Waiting on a
+            // handle changes no memory of this process and cannot fault.
+            let signalled = unsafe { WaitForSingleObject(self.process, milliseconds) };
+            if signalled != WAIT_OBJECT_0 {
+                return None;
+            }
+            let mut code: u32 = 0;
+            // SAFETY: the same live handle, and one out-pointer to this stack `u32`.
+            let read = unsafe { GetExitCodeProcess(self.process, &mut code) };
+            if read == 0 {
+                return None;
+            }
+            self.exited = true;
+            Some(code)
+        }
+
+        /// Terminates every process in this parent's own job.
+        pub(crate) fn terminate_job(&mut self) -> bool {
+            // SAFETY: `self.job` is the live job handle this struct owns, and the exit status is a
+            // plain integer. Terminating a job cannot fault and touches no Rust memory.
+            unsafe { TerminateJobObject(self.job, 1) != 0 }
+        }
+    }
+
+    impl Drop for SuspendedWorkerV1 {
+        /// Terminates a still-running job and closes every handle exactly once.
+        fn drop(&mut self) {
+            if !self.exited {
+                // SAFETY: the job and process handles are live and owned by this struct; the bounded
+                // wait below requires the termination to be observed, not merely requested.
+                unsafe {
+                    TerminateJobObject(self.job, 1);
+                    WaitForSingleObject(self.process, 5_000);
+                }
+            }
+            // SAFETY: each handle is live, owned here, closed exactly once and never used again.
+            unsafe {
+                close_owned(self.thread);
+                close_owned(self.process);
+                close_owned(self.job);
+            }
+        }
+    }
+}
