@@ -620,7 +620,13 @@ impl AssetNamespace {
 }
 
 /// The image extensions the initial profile admits (§6.2I.3).
-pub const ACCEPTED_IMAGE_EXTENSIONS: [&str; 5] = ["png", "jpg", "jpeg", "webp", "avif"];
+///
+/// `SOLO-WO-113 R02` added exactly one token, `gif`, so a real authored four-format candidate can
+/// exist. This is an **authored reference grammar** only: it grants no decoding, inspection,
+/// publication or routing authority, and the accepted four-format V2 inspector still decides
+/// separately whether a given format is supported. `svg` is deliberately absent until the secure
+/// true-vector codec exists, and uppercase spellings are never admitted.
+pub const ACCEPTED_IMAGE_EXTENSIONS: [&str; 6] = ["png", "jpg", "jpeg", "webp", "avif", "gif"];
 
 /// A validated typed asset **reference**.
 ///
@@ -1718,5 +1724,116 @@ impl DeclaredOwnerPropertiesV1 {
             .iter()
             .find(|(declared, _)| *declared == key)
             .map(|(_, declaration)| declaration)
+    }
+}
+
+/// `SOLO-WO-113 R02` — direct proof of the one-token admission and the unchanged security rules.
+///
+/// These tests live in the authorized registry file on purpose: they assert the **real** parser and
+/// the **real** property-validation stage (`DeclaredOwnerPropertiesV1::new`), never a stand-in.
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn reference(text: &str) -> Result<AssetReferenceV1, PropertyDeclarationRefusalV1> {
+        AssetReferenceV1::parse(AssetNamespace::Entity, text)
+    }
+
+    fn declaration(reference: AssetReferenceV1) -> PropertyDeclarationV1 {
+        let authored =
+            AuthoredPropertyValueV1::new(PropertyValueV1::graphic(reference), Exposure::Public)
+                .expect("a public graphic value is valid");
+        PropertyDeclarationV1::new(
+            Inheritance::Inherit,
+            CurrentContextV1::Values(vec![authored]),
+        )
+    }
+
+    fn entity_owner() -> QualifiedOwnerV1 {
+        QualifiedOwnerV1::entity(EntityIdV1::parse("example").expect("canonical Entity"))
+    }
+
+    fn page_owner() -> QualifiedOwnerV1 {
+        QualifiedOwnerV1::page(
+            EntityIdV1::parse("example").expect("canonical Entity"),
+            FacetIdV1::parse("main").expect("canonical Facet"),
+            SiteIdV1::parse("bali").expect("canonical Site"),
+            PageIdV1::parse("home").expect("canonical Page"),
+        )
+    }
+
+    #[test]
+    fn n113_00_a_lowercase_gif_reference_is_admitted_and_keeps_its_grammar() {
+        assert_eq!(ACCEPTED_IMAGE_EXTENSIONS.len(), 6);
+        assert!(ACCEPTED_IMAGE_EXTENSIONS.contains(&"gif"));
+        for text in ["scene.gif", "deep/scene.gif"] {
+            let parsed = reference(text).expect("a lowercase gif reference is admitted");
+            assert_eq!(parsed.reference(), text);
+            assert_eq!(parsed.namespace(), AssetNamespace::Entity);
+            assert!(!parsed.is_png());
+        }
+        // AVIF stays syntactically admitted, exactly as the accepted Architecture requires.
+        assert!(reference("hero.avif").is_ok());
+        // The four still formats are untouched.
+        for text in ["a.png", "a.jpg", "a.jpeg", "a.webp"] {
+            assert!(reference(text).is_ok(), "{text} must stay admitted");
+        }
+    }
+
+    #[test]
+    fn n113_00_a_gif_reaches_the_registered_graphic_roles_but_never_the_favicon() {
+        let gif = declaration(reference("scene.gif").expect("admitted reference"));
+        let declared = DeclaredOwnerPropertiesV1::new(
+            page_owner(),
+            vec![(PropertyKey::GraphicBackground, gif.clone())],
+        )
+        .expect("a GIF background is a valid authored declaration");
+        assert_eq!(declared.owner(), &page_owner());
+
+        // The favicon role is PNG-only at the real property-validation stage.
+        let refusal = DeclaredOwnerPropertiesV1::new(
+            entity_owner(),
+            vec![(PropertyKey::GraphicFavicon, gif)],
+        )
+        .expect_err("a GIF favicon must be refused");
+        assert_eq!(refusal.kind(), PropertyRefusalKind::FaviconNotPng);
+        assert_eq!(refusal.key(), Some(PropertyKey::GraphicFavicon));
+
+        let png = declaration(reference("favicon.png").expect("admitted reference"));
+        DeclaredOwnerPropertiesV1::new(entity_owner(), vec![(PropertyKey::GraphicFavicon, png)])
+            .expect("a PNG favicon stays valid");
+    }
+
+    #[test]
+    fn n113_00_uppercase_svg_and_unsafe_references_stay_refused() {
+        for text in ["bad.GIF", "vector.svg", "a.Gif", "a.SVG", "a.bmp"] {
+            let refusal = reference(text).expect_err("extension must be refused");
+            assert_eq!(
+                refusal.kind(),
+                PropertyRefusalKind::UnsupportedAssetExtension
+            );
+        }
+        for text in [
+            "../scene.gif",
+            "assets/../scene.gif",
+            "scene",
+            "/scene.gif",
+            "scene.gif/",
+            "a\\b.gif",
+            "a%20.gif",
+            "https://example.test/a.gif",
+            "a.gif?x=1",
+        ] {
+            let refusal = reference(text).expect_err("unsafe reference must be refused");
+            assert!(
+                matches!(
+                    refusal.kind(),
+                    PropertyRefusalKind::InvalidAssetReference
+                        | PropertyRefusalKind::UnsupportedAssetExtension
+                ),
+                "{text} refused as {:?}",
+                refusal.kind()
+            );
+        }
     }
 }
