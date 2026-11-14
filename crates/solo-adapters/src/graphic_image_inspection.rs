@@ -543,7 +543,8 @@ fn n102_probe_answer_v1(mode: ImageWorkerModeV1, parameter: Option<&str>) -> Opt
             let (value, control) = parameter.split_once(':')?;
             let value: u32 = value.parse().ok()?;
             let control: u32 = control.parse().ok()?;
-            let (live, control_live) = crate::n102_probe_handle_v1(value, control);
+            let (live, control_live) =
+                crate::media_worker_host::n102_probe_handle_v1(value, control);
             Some(format!(
                 "{} live={} control_live={} pid={pid}\n",
                 N102_HANDLE_PROBE_PREFIX_V1,
@@ -552,8 +553,9 @@ fn n102_probe_answer_v1(mode: ImageWorkerModeV1, parameter: Option<&str>) -> Opt
             ))
         }
         ImageWorkerModeV1::ProbeEnvironment => {
-            let (canary, system_root) =
-                crate::n102_probe_environment_v1(std::ffi::OsStr::new(parameter));
+            let (canary, system_root) = crate::media_worker_host::n102_probe_environment_v1(
+                std::ffi::OsStr::new(parameter),
+            );
             Some(format!(
                 "{} canary={} system_root={} pid={pid}\n",
                 N102_ENVIRONMENT_PROBE_PREFIX_V1,

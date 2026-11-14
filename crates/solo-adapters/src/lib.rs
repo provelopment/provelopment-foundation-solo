@@ -129,7 +129,7 @@ pub use source_set_staging::{
 /// across a real spawn, and the two child-side isolation probes. None of them exposes a process,
 /// command, limit or handle operation, and none adds an `unsafe` allowance.
 #[cfg(windows)]
-pub use media_worker_host_native::{
+pub use media_worker_host::{
     N102ExtraInheritableV1, n102_probe_environment_v1, n102_probe_handle_v1, n102_refused_step_v1,
     n102_select_injection_v1,
 };

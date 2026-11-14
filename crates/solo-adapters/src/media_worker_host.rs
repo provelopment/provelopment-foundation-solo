@@ -6650,6 +6650,11 @@ mod tests {
     }
 }
 
+#[cfg(windows)]
+pub use crate::media_worker_host_native::{
+    N102ExtraInheritableV1, n102_probe_environment_v1, n102_probe_handle_v1, n102_refused_step_v1,
+    n102_select_injection_v1,
+};
 // `SOLO-WO-104 R01` — the closed N102 probe seam.
 //
 // These helpers let the integration suite observe two real facts through the production confined
