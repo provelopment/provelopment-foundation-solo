@@ -1,120 +1,125 @@
 # Execution Report
 
-**Work order:** `SOLO-WO-113 R03` — reconcile two out-of-ledger regression-test edits and verify the accepted four-format GIF V2 tree.
-**Date:** 2026-11-14. **Bounded outcome:** `R03C-GIF-MIXED-V2-OWNER-RECONCILED-AND-REVERIFIED`.
+**Work order:** `SOLO-WO-114 R01` — controlled exact-blob integration of the accepted four-format GIF V2 and N102 work into `main`.
+**Date:** 2026-11-14. **Approved bounded outcome:** `R03C-FOUR-FORMAT-GIF-V2-AND-N102-MAIN-INTEGRATED-VERIFIED`.
 **status=COMPLETE — pending independent Chief Master Architect review.**
 
-The reviewed technical tree is unchanged and re-verified: the only difference between the formerly reviewed head `b0f204a2` and the current technical head `ad7b74df` is `.documents/WIP/workorder-active.md`. Both hosts passed on the **first attempt** of run [`43605231196`](https://github.com/provelopment/provelopment-foundation-solo/actions/runs/43605231196) at that exact SHA: Ubuntu job `132478354577`, Windows job `132478354755`, every step success. Nothing is merged, released, deployed or closed.
+The Owner-issued order was installed as exact bytes and executed as three named checkpoints: **A** authority, **I** integration, **R** report. All 15 ledger paths now sit on `main` byte-for-byte as accepted on `solo-wo-113-gif-v2-r01`; the integration run at exact **I** `062176427faa9f38091149434e5135ea3ab593ee` was green on Ubuntu 24.04 **and** Windows 2025 on **attempt 1**, including N113 4/4, N108 8/8 and Windows N102 4/4 + 12/12. No accepted source byte was altered, no history was merged, and `R03.C3`, `R03.C` and Stage 03 remain **OPEN**.
 
-## 1. Owner handoff, authority commits and the exact prior deviation
+## 1. Owner authority, preflight and checkpoint commits
 
-This run began only after the Owner installed the exact `SOLO-WO-113 R03` bytes at `.documents/WIP/workorder-active.md` (working-tree blob `03fe013a7253d9bf007e9891eee90cf189a71989`) and issued a matching R03 handoff. Preflight confirmed `main == origin/main == 283932b553e5306051a389e17b1665c0e7f3f254` (tree `69aa8548`, parent `c595d27b`, R02 report blob `24817428`), the existing technical branch `solo-wo-113-gif-v2-r01` at `b0f204a2b2de470f1b0cfe8ef3631fcd51fac72d` (tree `eca5f96c`, parent `430c37ee`) locally **and** remotely, 26 remote branches, one checkout, one `origin`, empty stash, exactly four WIP files, and a clean tree apart from the Owner-installed ACTIVE.
+The Owner installed the exact R01 text at `.documents/WIP/workorder-active.md` (raw `git hash-object` and Git-filtered blob both `5041c71c181c6767a8af3ea382d339fb18afeee0`, 67 lines) and issued the matching activation handoff.
 
 | Step | Commit | Tree | Parent | Contents |
 |---|---|---|---|---|
-| R02 head (reviewed) | `b0f204a2b2de470f1b0cfe8ef3631fcd51fac72d` | `eca5f96c` | `430c37ee` | unchanged product/test tree |
-| **A3** authority (`main`) | `07aef0330fe2db8fbdb27b5bf2d8222bdaeea415` | `3a7da62a` | `283932b5` | ACTIVE only, blob `03fe013a`; GitHub blob verified |
-| **T1** authority (branch) | `ad7b74df8638ff56c7137f33d9242da54583f17b` | `ca675fa4` | `b0f204a2` | ACTIVE only, blob `03fe013a`; pushed, remote verified |
+| initial `main` | `b42003f62f2efd2c828be0b7310f0c8bae4caa39` | `a5315673` | `07aef033` | R03 report, no integrated source |
+| **A** authority | `14cc2ad83bbf87bced79fe95472ba3c8c2f557aa` | `a1d59f659ddd9838fc3626dbf5af2285ab8bfeee` | `b42003f6` | ACTIVE only |
+| **I** integration | `062176427faa9f38091149434e5135ea3ab593ee` | `7b9bc45b06194317b579ad0d24ddd906ea593597` | `14cc2ad8` | exactly the 15 ledger paths |
+| **R** report | reported in chat after publication | — | `06217642` | report only |
 
-**The deviation being reconciled, stated without softening.** Under R02 this agent changed two regression-test files that the frozen R02 ledger did not list. R03 does **not** retroactively authorize those edits, and this report makes no compliance claim about them:
+Preflight confirmed: one Windows/WSL Solo checkout, one `origin` to `provelopment/provelopment-foundation-solo`, local `main` **and** remote `main` at `b42003f6`, accepted branch local **and** remote at `ad7b74df` (tree `ca675fa4`, parent `b0f204a2`), 26 remote branch refs, one worktree, empty stash, exactly four WIP files, and a tree clean apart from the Owner-installed ACTIVE. `main` had advanced from `e698ad80` only through `.documents/WIP/workorder-active.md` and `.documents/Reports/execution-report.md` — **no GIF/V2 or N102 source existed on `main` beforehand**, and all 15 ledger paths differed from `main` (the GIF adapter file was absent entirely). Governance blobs were verified at their pinned SHAs: `AGENTS.md` `6eae1da8`, `ARCHITECTURE.md` `f66096ec`, Architect SOP `1483c9be`, Implementation SOP `51bb3792`, architecture source checker `crates/solo-cli/tests/architecture_checks/source.rs` `1c99d348`, unsafe checker `crates/solo-cli/tests/unsafe_boundary.rs` `57d75796`, root `Cargo.toml` `14505be4`, `rust-toolchain.toml` `9ec55b3b`, and `plan-roadmap`/`plan-next`/`plan-outlook` `9d7a8622`/`92fa562b`/`cb9c7a61` — 11/11 identical on `main` and on the accepted branch. A was committed with only the ACTIVE path staged and the GitHub blob was read back as `5041c71c` matching the installed bytes.
 
-1. `crates/solo-domain/tests/property_resolution.rs` — blob **`1b69ae6d9cd0d01414174911a6f2868c60979570`**, changed in C0 `3b5a2498`.
-2. `crates/solo-adapters/tests/property_resolution.rs` — blob **`18bafe2f4059845e026fd77554957fb388b9661e`**, changed in C3 `b0f204a2`.
+## 2. The 15-path integration ledger — source, staged, committed
 
-Both were disclosed in the R02 report (§3) at the time; the Architect's REVISE was correct. R03 converts them into **prospectively Owner-adopted contents of the reviewed tree**: the Owner's installation of R03 is approval to *retain these exact bytes going forward*, not a finding that editing them under R02 had been permitted.
+Integration used path-limited `git restore --source=ad7b74df… -- <15 explicit paths>`, never an overwrite of unrelated data, never a cherry-pick, rebase or branch merge. Each path was checked three times before commit (source `ad7b74df:<path>`, filtered worktree `git hash-object`, and index) and a fourth time after commit (`I:<path>`), with **15/15 matches on all four checks**.
 
-## 2. Independent verification of the two retained blobs and the whole change set
+| # | Path | Blob (source = worktree = index = committed) |
+|---|---|---|
+| 1 | `.github/workflows/rust-verify.yml` | `db2bc14b2ef53dbb1971483327e4ccd9a7cd6394` |
+| 2 | `Cargo.lock` | `cf1051675576ab0e00ce7acbd5dbe139882c31b4` |
+| 3 | `crates/solo-adapters/Cargo.toml` | `3610f06ff58cdea6ce1b3993544f0c2e286087ea` |
+| 4 | `crates/solo-adapters/src/graphic_gif_inspection.rs` | `785d08d0e5a9009be1cbb015eb1b88362f6ab311` |
+| 5 | `crates/solo-adapters/src/graphic_image_inspection.rs` | `14af5029d1ecd8cda85d3470eedbf685b5fc8463` |
+| 6 | `crates/solo-adapters/src/lib.rs` | `10817e4b73db5773c563958ab1def2cdc03610a1` |
+| 7 | `crates/solo-adapters/src/media_worker_host.rs` | `894bc6220d90161ce98bb9c0c848ff208388f666` |
+| 8 | `crates/solo-adapters/src/media_worker_host_native.rs` | `9a26e195b295974b54f7e2da7ce7ae8fbc510c4a` |
+| 9 | `crates/solo-adapters/tests/property_resolution.rs` | `18bafe2f4059845e026fd77554957fb388b9661e` |
+| 10 | `crates/solo-application/src/graphic_image_inspection.rs` | `658cb36320e7307b92f7437d76f5e06911e9367a` |
+| 11 | `crates/solo-application/src/lib.rs` | `2d1f71b4dcb21396aeb9543a6ad63d04e5e99313` |
+| 12 | `crates/solo-cli/tests/architecture_checks/graph.rs` | `dc6d2770038a14199d2f366faab64db4e3d6e98b` |
+| 13 | `crates/solo-cli/tests/media_worker_host_smoke.rs` | `1aa18b3d6c944f0a0da7850ada7c00154c9a193d` |
+| 14 | `crates/solo-domain/src/property_registry.rs` | `889d0fa75af62574944e422811b9fe7a6ae93c26` |
+| 15 | `crates/solo-domain/tests/property_resolution.rs` | `1b69ae6d9cd0d01414174911a6f2868c60979570` |
 
-`git rev-parse b0f204a2:<path>` and `git rev-parse T1:<path>` were both compared against the exact 40-character SHAs quoted by the order: **all ten checked blobs match on both revisions**, including the two retained test files, so T1 retains them byte-for-byte and neither file was touched during R03.
+`git diff --cached --name-status` showed exactly 15 entries (14 `M`, 1 `A` for the new GIF adapter) and no 16th path; the worktree had no untracked file and nothing dirty outside the stage. After commit, `git diff-tree --name-only I` lists exactly those 15, and `git diff --name-only e698ad80 I` contains exactly 17 paths — the 15 plus the Owner ACTIVE and the previous canonical report — so **no change exists outside the three permitted ledger categories**. The two previously reconciled regression-test files were imported at their exact accepted blobs without repeating the R02 omission.
 
-The complete `79c4dccf..b0f204a2` change set contains **exactly nine paths**:
+## 3. Local-first confidence on the exact imported bytes (before commit and push)
 
-| Path | R02 ledger status |
+Executed on the checked-in staged bytes in the single verified WSL Ubuntu checkout:
+
+| Check | Result |
 |---|---|
-| `.documents/WIP/workorder-active.md` | authorized (T0) |
-| `.github/workflows/rust-verify.yml` | authorized (D) |
-| `crates/solo-adapters/src/graphic_image_inspection.rs` | authorized (C1/C2) |
-| `crates/solo-adapters/src/lib.rs` | authorized (`crates/solo-adapters/src/lib.rs` is in the R02 ledger) |
-| `crates/solo-application/src/graphic_image_inspection.rs` | authorized (C1) |
-| `crates/solo-cli/tests/media_worker_host_smoke.rs` | authorized (C1/C2) |
-| `crates/solo-domain/src/property_registry.rs` | authorized (C0) |
-| `crates/solo-adapters/tests/property_resolution.rs` | **the disclosed out-of-ledger file** |
-| `crates/solo-domain/tests/property_resolution.rs` | **the disclosed out-of-ledger file** |
+| `cargo fmt --all -- --check` | clean |
+| `cargo check --workspace --all-targets --locked` | clean |
+| `cargo clippy --workspace --all-targets --locked -- -D warnings` | **0** findings |
+| `cargo check --workspace --all-targets --locked --target x86_64-pc-windows-msvc` | clean (type-check only; no MSVC linker here) |
+| `solo-domain --test property_resolution` | 27 passed |
+| `solo-adapters --test property_resolution` | 20 passed |
+| `solo-application --lib` | 15 passed |
+| `solo-adapters --lib graphic_gif` | 14 passed |
+| `solo-adapters --lib n102_event` | 3 passed |
+| `media_worker_host_smoke n108_` | 8 passed |
+| `unsafe_boundary` | 22 passed |
+| `check-architecture` | exit 0, `architecture=legal packages=4 targets=33 files=63 edges=70` |
+| `check_architecture_fixtures` | 35 passed |
 
-No third unauthorized path exists; `graph.rs` was never changed; there is no suppressed, deleted or ignored test.
+Full workspace suite `cargo test --workspace --all-targets --locked --no-fail-fast`: **26 targets passed, 517 tests passed**. Six targets cannot run here and fail only for environment reasons — `source_read_native::snapshot_proofs` (5 cases), `d2_product` (4), and the real-filesystem `n097` suite (`n097_01`–`n097_08`, `n113_01`–`n113_04`). All 73 failure messages are the same refusal, e.g. `SOLO_TEST_SOURCE_FS_ROOT must name the R03 snapshot fixture filesystem; refusing to run the real-filesystem suite on a filesystem that was never verified to support an immutable clone`, plus two `SOLO_TEST_UNSUPPORTED_FS_ROOT` refusals. **Zero semantic failures.** This host has no `mkfs.btrfs`, no passwordless sudo, no `SOLO_TEST_SOURCE_FS_ROOT` and no native Windows Rust toolchain, so those cases are honestly unproven locally and are proven instead by the hosted run in §4. No test, workflow or configuration byte was altered to make any gate pass, and no `#[ignore]` was added.
 
-The patches were inspected directly, not inferred from commit messages:
-* C0 `3b5a2498` replaces only the stale `assets/logo.gif` refusal in `r03a_06_duplicate_and_malformed_entries_refuse_without_repair` with lowercase-GIF admission plus an uppercase `.GIF` refusal; the neighbouring `../escape.png`, `.svg`, remote-URL, drive-path, missing-extension and `.PNG` refusals are untouched.
-* C3 `b0f204a2` keeps the `media/logo.svg` unsupported-extension refusal, replaces the obsolete GIF refusal with a real manifest validation → real inventory → `grants_publication_authority() == false` admission case, and adds `graphic.favicon` + `.gif` → `FaviconNotPng`; the surrounding PNG-only favicon and nonpublication assertions are untouched.
+## 4. Hosted integration evidence at exact I — attempt 1, both hosts
 
-## 3. Frozen product and verification tree — unchanged from `b0f204a2`
-
-Verified identical at T1 (and therefore at `b0f204a2`): registry `crates/solo-domain/src/property_registry.rs` `889d0fa75af62574944e422811b9fe7a6ae93c26`; inward V2 `crates/solo-application/src/graphic_image_inspection.rs` `658cb36320e7307b92f7437d76f5e06911e9367a`; adapter V2 `crates/solo-adapters/src/graphic_image_inspection.rs` `14af5029d1ecd8cda85d3470eedbf685b5fc8463`; real host tests `crates/solo-cli/tests/media_worker_host_smoke.rs` `1aa18b3d6c944f0a0da7850ada7c00154c9a193d`; workflow `.github/workflows/rust-verify.yml` `db2bc14b2ef53dbb1971483327e4ccd9a7cd6394`; plus `solo-application/src/lib.rs`, `solo-adapters/src/lib.rs` and `Cargo.lock` `cf1051675576ab0e00ce7acbd5dbe139882c31b4` — 10/10 identical, zero drift. Only the ACTIVE blob differs, so the tree SHA necessarily differs (`ca675fa4` vs `eca5f96c`).
-
-`git diff --name-only b0f204a2 T1` returns exactly `.documents/WIP/workorder-active.md`. No product, test, dependency, manifest, lockfile, toolchain, architecture, safety-guard, workflow or other documentation byte moved in this run, and the closed parser/fav-icon/security/real-worker behaviour is therefore exactly the previously verified behaviour.
-
-## 4. Local-first evidence at T1, re-run rather than assumed
-
-In the single verified WSL Ubuntu 26.04 checkout: `cargo fmt --all -- --check` clean; `cargo check --workspace --all-targets --locked` clean; `cargo clippy --workspace --all-targets --locked -- -D warnings` zero findings; `cargo check --workspace --all-targets --locked --target x86_64-pc-windows-msvc` clean; `solo-domain --test property_resolution` 27 passed; `solo-adapters --test property_resolution` 20 passed; `solo-application --lib` 15 passed; `solo-adapters --lib graphic_gif` 14 passed; `media_worker_host_smoke n108_` 8 passed; `unsafe_boundary` 22 passed; `check-architecture` `architecture=legal packages=4 targets=33 files=63 edges=70`; `check_architecture_fixtures` 35 passed.
-
-The deliberate-red switch was re-executed against the unchanged frozen test in a disposable capture: `SOLO_N113_RED_ORACLE=wrong` → exit `101` at the independent pixel oracle (`left` `34aaa746…3423`, `right` `b7d1b3a1…7c23`), and the default run passed the oracle and both forged-mode phases before stopping at the same host-fixture limitation. No test source was edited, no case was ignored and no switch was committed.
-
-**Local limitations, disclosed not waived:** this host still has no `mkfs.btrfs`, no passwordless sudo, no `SOLO_TEST_SOURCE_FS_ROOT` and no native Windows Rust toolchain, so the five `snapshot_proofs`, the twelve real-filesystem `n097`/`n113` cases and the other fixture-bound suites cannot execute here; they refuse loudly with `SOLO_TEST_SOURCE_FS_ROOT must name the R03 snapshot fixture filesystem`. A plain directory substitute is refused `Unsupported` by the reader. Their real proof is the hosted runs in §5.
-
-## 5. Hosted evidence at T1 — attempt 1, both hosts
-
-Run `43605231196`, head `ad7b74df8638ff56c7137f33d9242da54583f17b`, run attempt **1**, conclusion `success`.
+Automatic exact-SHA run [`43607380648`](https://github.com/provelopment/provelopment-foundation-solo/actions/runs/43607380648), head `062176427faa9f38091149434e5135ea3ab593ee`, **run attempt 1**, conclusion `success`, **40 of 40 steps success on each host, zero non-success steps**.
 
 | Host | Job | Result |
 |---|---|---|
-| `ubuntu-24.04` | `132478354577` | success, 0 non-success steps |
-| `windows-2025` | `132478354755` | success, 0 non-success steps |
+| `ubuntu-24.04` | `132484847682` | success, 40/40 steps, 0 non-success |
+| `windows-2025` | `132484847470` | success, 40/40 steps, 0 non-success |
 
-* `n097::n113_01`–`n113_04` — exactly **4/4** on each host, inside both the workspace test step and the dedicated `n113_` gate. Ubuntu printed `n113_mixed formats=4 owners=4 order=png,jpeg,webp,gif pids=[5599, 5603, 5607, 5611]`, Windows `pids=[8224, 9868, 8904, 3860]` — four distinct declaring owners and four real child processes per host. `gif_frames=3`, `gif_loop=infinite`, `gif_cycle_ms=350`.
-* Cross-host deterministic digests identical, PIDs never compared: GIF source `dc425aeadeee8daa6324c0c6093710c69f6ad6bcf6d58c12571e88df1632b84f`, transcript `8c02ba6fe2d4fea8edabba2378db8a696bd166b5fba72315a93924341019ac33`, RED `34aaa746c25a0f105c4316bbb1f009aa359f49582656ee97d73c58132d563423`, BLUE `b7d1b3a1104cc86b1cea310793cf777002db0517281d135a02de079b0ea87c23`, clear `df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119`.
-* Refusal and sensitivity evidence on both hosts: `n113_hidden refused_whole=true discarded=2 partial=false`, `n113_declared all_cases_refused=true`, `n113_red … oracle=red source_distinct=true transcript_distinct=true`, `n113_forged adapter_wrong_source=refused adapter_wrong_transcript=refused partial=false`.
-* `N108_01`–`N108_08` — exactly **8/8** on both hosts (`n108_08_gif_source_transcript_and_pixel_change_evidence ... ok`); retained N097 PNG/JPEG/WebP cases green; Windows `n102` **4/4** with `extra_event_signaled=false control_event_signaled=false local_witness=true parent_positive_control=true`, and `N102 repeat 12/12 passed` / `N102 event-identity repeatability: 12/12 consecutive native Windows runs passed.`
-* Real source snapshot proofs, confinement, strict Clippy/fmt, workspace tests, architecture checker with its refusal self-test, unsafe boundary, test-failure tripwire, two-host cargo-deny 0.20.2 with fresh advisory DB and the refusing `RUSTSEC-2026-0009` negative probe (`time 0.3.46`, exit 1, workspace still passing all four checks), and the byte-for-byte reproducible release builds all succeeded unchanged. `architecture=legal packages=4 targets=33 files=63 edges=70`.
+**Four-format V2 (`n097::n113_01`–`n113_04`) — exactly 4/4 on each host**, in both the shared workspace test step and the dedicated per-host `V2 four-format image inspection gate`:
+* Ubuntu `n113_mixed formats=4 owners=4 order=png,jpeg,webp,gif pids=[5614, 5618, 5622, 5626]`; Windows `pids=[9404, 10160, 9872, 5888]` — four distinct declaring owners and four real child processes per host, PIDs different by construction and never compared.
+* `gif_frames=3 gif_loop=infinite gif_cycle_ms=350` — full three-frame GIF89a animation preserved.
+* Deterministic digests identical across both hosts: GIF source `dc425aeadeee8daa6324c0c6093710c69f6ad6bcf6d58c12571e88df1632b84f`, transcript `8c02ba6fe2d4fea8edabba2378db8a696bd166b5fba72315a93924341019ac33`, RED `34aaa746c25a0f105c4316bbb1f009aa359f49582656ee97d73c58132d563423`, BLUE `b7d1b3a1104cc86b1cea310793cf777002db0517281d135a02de079b0ea87c23`, clear `df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119` — matching the accepted WO-113 R03 technical run.
+* Negative and sensitivity gates on both hosts: `n113_hidden refused_whole=true discarded=2 partial=false` (whole-candidate fail-closed, no partial result), `n113_declared all_cases_refused=true` (declared-format and PNG-only favicon refusals), `n113_red … oracle=red source_distinct=true transcript_distinct=true` (deliberate-red oracle load-bearing), `n113_forged adapter_wrong_source=refused adapter_wrong_transcript=refused partial=false`.
 
-## 6. Every red and green attempt, stated truthfully
+**N108 real GIF worker canaries — exactly 8/8 on each host**, with parent-authenticated evidence, e.g. `n108_08_gif_source_transcript_and_pixel_change_evidence … case=A1 src=aef0685e1c2625c61fac6647d9d7dd908b5ecc7eb3ebcf46e857f55788484915 transcript=370a685d7526ccf614ab4e456958f8845a607076010af7e18bc824ae25db61a1 pixel=34aaa746…3423`; retained N097 PNG/JPEG/WebP, snapshot/confinement, strict identity and cleanup assertions all green.
 
-| Run | SHA | Attempt | Outcome |
-|---|---|---|---|
-| `43602488897` (R02, D) | `430c37ee` | 1 | **FAILED, both hosts** — shared workspace test step; `r03c1_09_reference_grammar_is_unchanged_and_no_media_is_attested` still expected `media/logo.gif` to refuse |
-| `43602999853` (R02, corrective) | `b0f204a2` | 1 | **success**, Ubuntu `132471572016`, Windows `132471571758` |
-| `43603620598` (R02 report, `main`) | `283932b5` | 1 | **success**, Ubuntu `132473430385`, Windows `132473430194` |
-| `43605231196` (R03, T1) | `ad7b74df` | 1 | **success**, Ubuntu `132478354577`, Windows `132478354755` |
+**Windows N102 correction — 4/4 plus 12/12 native repeats**: `n102_01 extra_event_signaled=false control_event_signaled=false local_witness=true parent_positive_control=true` observed with distinct real child PIDs (`9684`, `7804`, …), then `N102 repeat 12/12 passed` and `N102 event-identity repeatability: 12/12 consecutive native Windows runs passed.`
 
-The R02 failure is **not** relabelled: D `430c37ee` was not green, its first attempt failed on both hosts, and the green result belongs to corrective commit `b0f204a2` and to T1 `ad7b74df`. No main-only N102 numeric flake occurred in either main run.
+Also green on both hosts, unchanged: snapshot-test filesystems provisioned and cleaned, format check, strict lint, workspace all-target tests, architecture checker on the real checkout (`architecture=legal packages=4 targets=33 files=63 edges=70`), architecture refusal self-test, unsafe guard, test-failure tripwire, workspace package-set gate, release build, release CLI smoke, forbidden-import/bypass refusal with guaranteed restore, and the two byte-for-byte compared clean release builds.
 
-## 7. Warnings, security assessment and current A1 position
+## 5. Security, dependency and warning assessment
 
-The only warning is the known `warning[license-not-encountered]: license was not encountered` for the unused `Unicode-3.0` allowlist entry. It is a cargo-deny licence-list hygiene warning about an allowlist entry matching no shipped crate, not evidence of an affected shipped licence; it was not suppressed, `deny.toml` was not modified, and it is the same warning the Architect already reviewed. No new actionable security, version, deprecation or runner warning appeared on either host; `Cargo.lock` still holds exactly 43 packages at blob `cf105167`; the pinned toolchain `1.99.1`, pinned runner labels, pinned action SHAs and `cargo-deny 0.20.2` are unchanged.
+The accepted locked graph was imported exactly: `Cargo.lock` is blob `cf105167` (no new package, feature, version, toolchain, runner label or action pin). `cargo-deny 0.20.2` ran on **both** hosts from the verified archive (`DENY_SCANNER_SHA256 9f12ed4c49936e09b48bf862b595cde2fe64fcbd9d74dfacac6131ca824c8d5f`, `DENY_LOCK_SHA256 350c6acf987f7497fdae69f6e1126534f522edd1d9f1ed7f49db91e5a72ee1c3`), with a refreshed advisory database and the four checks (advisories, licences, sources, bans) passing. The negative advisory probe still **refuses** the pinned specimen: `advisory negative probe refused time 0.3.46 with RUSTSEC-2026-0009 and exit 1, while the unchanged locked workspace graph passed all four checks`.
 
-A1 position: no capability assertion is weakened by this run. The four-format V2 result still reports `grants_publication_authority() == false` and `proves_whole_publication() == false`, the favicon stays PNG-only, `.avif`/`.svg`/unknown extensions stay refused, and the unlisted/visibility and platform-catalogue obligations remain open under §8.
+A1 inventory of the integrated surface: canonical MIME/magic and complete decoded structure are enforced (PNG/JPEG/WebP retained, lowercase `gif` admitted through one allowlist token, uppercase `.GIF`, `.svg`, `.avif`-by-implementation-status and unknown extensions refused); one child process per untrusted input with bounded OS confinement, verified cleanup and no uncontrolled handle inheritance (the N102 correction proves the extra inheritable handle is excluded while the parent positive control still signals); no secrets, no unexpected network, no arbitrary executable content, no publication authority (`grants_publication_authority() == false`, `proves_whole_publication() == false`), no first-frame GIF downgrade, and caller-supplied path semantics unchanged. The GIF limits are retained — 20 MiB source, 8192-side, 32M intrinsic pixels plus the stricter total frame/composited-pixel/duration limits — and the V2 atomic whole-owner design is intact: any bad obligation discards the entire candidate with no partial result. Favicon remains PNG-only. Nothing grants a route, Page publication or a global multi-file snapshot. No new `unsafe` code or guard bypass was introduced; the unsafe checker and architecture checker, with their refusal self-tests, pass on both hosts.
 
-## 8. Non-goals, repository state and remaining binding work
+The only warning is the known `warning[license-not-encountered]: license was not encountered` for the unused `Unicode-3.0` allowlist entry on both hosts. It is allowlist hygiene — an allowlisted licence matching no shipped crate — not evidence of an affected shipped licence. It was **not** suppressed and `deny.toml` was not edited. No new actionable security, version, deprecation or runner warning appeared.
 
-`main` is A3 plus this report only; it still carries no GIF source, no V2 code and no corrected N102 code. The technical branch `solo-wo-113-gif-v2-r01` is at T1 `ad7b74df` with the full preserved history (`79c4dccf` → `9b08dc6d` → `3b5a2498` → `6152f6d8` → `36466f21` → `430c37ee` → `b0f204a2` → `ad7b74df`) and is **unmerged**. The accepted WO-112 source branch `solo-wo-112-gif8-host-r01` at `40b03c73` and all earlier refs keep their SHAs; the remote branch inventory is **26 before and 26 after** — no branch was created or deleted. One checkout, one `origin`, empty stash, four WIP files, no PR, merge, tag, release, deployment or settings change, and no parent/sibling repository write.
+## 6. Preservation, cleanliness and remaining Stage obligations
 
-**Task-owned temporary material:** `.temp/r03-diff.txt`, `.temp/r03-c0-test.patch`, `.temp/r03-c3-test.patch` and `.temp/wo113-r03/` (red and default captures) were created for this run and deleted; nothing was tracked. Pre-existing `.temp/` directories from earlier orders (`architecture-fixtures`, `solo-win-target`, `solo-wo-073-wip`, `solo-wo-098-wip`, `solo-wo-103-wip`, `solo-wsl-target`, `toolchain-installer`) were preserved untouched — an empty `git status` is not evidence of clean temp directories, and these are not this run's material.
+`main` is A + I + this report; the accepted technical branch `solo-wo-113-gif-v2-r01` remains at `ad7b74df` untouched and `solo-wo-112-gif8-host-r01` at `40b03c73`, with the remote branch inventory at **26** before and after — no branch created, deleted or force-pushed. `plan-roadmap.md`, `plan-next.md`, `plan-outlook.md`, `README`, `AGENTS.md`, Architecture, SOPs, root `Cargo.toml`, `rust-toolchain.toml`, the architecture/unsafe checkers, `deny.toml` and `.gitignore` were not imported or modified. One checkout, one `origin`, empty stash, four WIP files, no second worktree, clone, cherry-pick, rebase, reset, `git clean`, tag, release, deployment, PR, merge, provider/account operation or other-repository write. The final `git status --porcelain` is empty after this report commit.
 
-**Not done, not claimed:** no GIF/V2 or N102 integration into `main`, no PR/merge, no closure of `R03.C3`, `R03.C` or Stage 03, no release or deployment. Still binding: Owner-accepted safe static true-vector **SVG**; real cross-host confined **AVIF**; lawful `platformAssetLibraryVersion: "1.0.0"` with a complete pinned `platform/assets/` catalogue (IDs, hashes, class, dimensions, licence/provenance); verified derived-output/exposure and whole-owner rules; and final controlled integration with green main verification. The Owner's conditional administrative closure applies only once those are genuinely complete and green, which they are not today.
+**Task-owned temporary material:** this run created no files in `.temp/` — the local full-suite logs were written to the disposable WSL `/tmp` area only, and nothing was tracked. Pre-existing `.temp/` directories from earlier orders (`architecture-fixtures`, `solo-win-target`, `solo-wo-073-wip`, `solo-wo-098-wip`, `solo-wo-103-wip`, `solo-wsl-target`, `toolchain-installer`) were left untouched; an empty `git status` is not evidence of clean temp directories, and none of them is this run's material.
 
-## 9. Narrow reconciliation acceptance — self-assessment
+**Stage status unchanged and binding:** `R03.C3`, `R03.C` and Stage 03 remain **OPEN**. This integration delivers a proven four-format image inspection slice into the product branch; it does **not** finish Stage 03 graphics. **AVIF** is admitted but still unimplemented, **SVG** must be safe true-vector rather than flattened, the exact pinned licensed `platform/assets/` catalogue with IDs, hashes, class, dimensions and licence/provenance still does not exist, and whole-candidate derived-output/exposure/publication obligations are unfinished. Stage 04 routing/visibility/publication is not treated as finished. No release, deployment or Stage closure is claimed.
+
+## 7. Acceptance self-assessment
 
 | Requirement | State |
 |---|---|
-| Current exact authority A3/T1 | **PASS** — `07aef033` on `main`, `ad7b74df` on the branch, ACTIVE `03fe013a` on both, GitHub blob verified |
-| Both reviewed test blobs exactly as specified, retained by this new order | **PASS** — `1b69ae6d`, `18bafe2f`, byte-identical at `b0f204a2` and T1 |
-| No retroactive compliance claim | **PASS** — §1 states the deviation plainly and limits the Owner action to prospective retention |
-| Zero other executable file changes from `b0f204a2` | **PASS** — `git diff b0f204a2 T1` = ACTIVE only; ten frozen blobs identical |
-| Unchanged parser/fav-icon/security/real-worker behaviour | **PASS** — §3, §4, §5 |
-| Exact technical two-host green T1 run and fresh main report green | **T1 PASS** — `43605231196` attempt 1; the final main run is reported in chat with its exact SHA, since a report cannot embed its own commit |
-| Truthful prior failure disclosures | **PASS** — §6 |
-| Clean one-checkout repository, no Owner material or Git forbidden operation | **PASS** — §8 |
-| Full current A1 and warning assessment | **PASS** — §7 |
+| Exact Owner installation/handoff and A | **PASS** — raw == filtered == GitHub `5041c71c`; A `14cc2ad8` ACTIVE-only |
+| 15/15 source/worktree/index/commit/remote SHA match | **PASS** — four-way equality on all 15; remote `main` = `06217642` |
+| No change outside the three ledger categories | **PASS** — 17 paths since baseline = 15 + ACTIVE + previous report |
+| No reimplementation or unapproved version changes | **PASS** — path-limited restore; `Cargo.lock` `cf105167` |
+| Unchanged accepted source/security boundary | **PASS** — §5, both-host guards and negative probes |
+| Exact technical branch and all 26 prior refs preserved | **PASS** — `ad7b74df`, `40b03c73`, 26 refs |
+| All applicable local gates | **PASS** — §3; fixture-bound suites honestly listed as host-limited |
+| Real Ubuntu/Windows full-I gates: N113 4/4, N108 8/8, Windows N102 4/4+12/12 | **PASS** — run `43607380648` attempt 1 |
+| Current A1 security/advisory negative probe | **PASS** — §5 |
+| Precise report-only R and fresh green main R CI | **R published**; its exact SHA and the fresh both-host run at that SHA are reported in chat, since a report cannot embed its own commit |
+| No unauthorized merge/release/deploy/Stage closure | **PASS** — §6 |
+| Clean final state and honest temporary cleanup | **PASS** — §6 |
 
 `status=COMPLETE — pending independent Chief Master Architect review.` The agent does not self-accept and awaits the Architect's independent `ACCEPT`, `REVISE` or `STOP` on the final SHA.
+
 
 
