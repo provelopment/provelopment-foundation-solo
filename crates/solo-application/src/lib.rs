@@ -15,6 +15,7 @@
 mod bootstrap_preflight;
 mod graphic_asset_inventory;
 mod graphic_asset_read;
+mod graphic_image_inspection;
 mod media_worker;
 mod property_resolution;
 mod source_read;
@@ -33,6 +34,16 @@ pub use graphic_asset_read::{
     GraphicAssetReadPort, GraphicAssetReadRefusalKind, GraphicAssetReadRefusalV1,
     GraphicAssetReadSetOutcomeV1, GraphicAssetSourceEvidenceV1, GraphicAssetSourceSetV1,
     MAX_GRAPHIC_SOURCE_BYTES, read_graphic_asset_bytes_v1,
+};
+pub use graphic_image_inspection::{
+    GRAPHIC_IMAGE_INSPECTION_GRANTS_PUBLICATION_AUTHORITY,
+    GRAPHIC_IMAGE_INSPECTION_PROVES_MEDIA_CORRECTNESS, GraphicImageFormatV1,
+    GraphicImageInspectPortOutcomeV1, GraphicImageInspectPortV1, GraphicImageInspectRefusalKindV1,
+    GraphicImageInspectRefusalV1, GraphicImageInspectRequestV1, GraphicImageInspectionOutcomeV1,
+    GraphicImageInspectionSetV1, GraphicImageInspectionV1, GraphicImageWorkerObservationV1,
+    IMAGE_MIME_JPEG_V1, IMAGE_MIME_PNG_V1, IMAGE_MIME_WEBP_V1, IMAGE_WORKER_WALL_MS_V1,
+    MAX_IMAGE_DECODED_BYTES_V1, MAX_IMAGE_PIXELS_V1, MAX_IMAGE_SIDE_V1, MAX_IMAGE_SOURCE_BYTES_V1,
+    checked_rgba8_bytes_v1, inspect_graphic_image_source_set_v1, side_within_bounds_v1,
 };
 pub use media_worker::{
     MEDIA_WORKER_GRANTS_PUBLICATION_AUTHORITY_V1, MEDIA_WORKER_MAX_DECODED_BYTES_V1,

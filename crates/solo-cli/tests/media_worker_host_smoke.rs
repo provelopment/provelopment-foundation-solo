@@ -1793,3 +1793,619 @@ fn n093_06_the_public_cli_and_every_earlier_marker_are_unchanged() {
         );
     }
 }
+
+/// `R03.C3` — confined Entity image-byte inspection.
+///
+/// These cases run the **real** composition: a confined content root is adopted, the accepted
+/// `R03.C2` reader acquires the authored `assets/…` bytes, and the `R03.C3` adapter starts the real
+/// `solo-cli` worker under the platform confinement. No case trusts a worker's printed claim, and no
+/// case substitutes a fake port for a decode.
+mod n097 {
+    use std::fs;
+    use std::path::{Path, PathBuf};
+
+    use solo_adapters::{
+        ContentRootCapability, EntityImageOutcomeV1, EntityImageRefusalV1,
+        IMAGE_WORKER_MODE_REFUSE_V1, IMAGE_WORKER_MODE_SHORT_OUTPUT_V1,
+        IMAGE_WORKER_MODE_TRAILING_V1, IMAGE_WORKER_MODE_WRONG_OUTPUT_V1,
+        IMAGE_WORKER_MODE_WRONG_SOURCE_V1, RootProvenanceV1, TestOwnerV1,
+        inspect_entity_graphic_images_v1, inspect_image_bytes_with_mode_v1, test_inventory_v1,
+    };
+    use solo_application::{
+        GraphicAssetObligationInventoryV1, GraphicImageFormatV1, GraphicImageInspectPortOutcomeV1,
+        GraphicImageInspectRefusalKindV1, GraphicImageInspectionOutcomeV1,
+        MAX_IMAGE_SOURCE_BYTES_V1, inspect_graphic_image_source_set_v1,
+    };
+
+    /// The one worker binary these cases start.
+    const BIN: &str = super::BIN;
+
+    /// The trusted provenance marker the confined source reader records for an adopted root.
+    const TRUSTED: RootProvenanceV1 = RootProvenanceV1::OperatorDesignatedContentRoot;
+
+    /// A four-pixel 2×2 PNG generated for this test: red, green, blue, white in that order.
+    const FIXTURE_PNG: &str = "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFklEQVR4AWL6z8DwHwSZGEEkw38GAAAAAP//4+5legAAAAZJREFUAwBBDwb/5c5bAAAAAABJRU5ErkJggg==";
+
+    /// The same four pixels encoded as a 2×2 baseline JPEG, generated for this test.
+    const FIXTURE_JPEG: &str = "/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDAAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/2wBDAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/wAARCAACAAIDAREAAhEBAxEB/8QAFAABAAAAAAAAAAAAAAAAAAAACv/EABsQAAIDAQEBAAAAAAAAAAAAAAQFAwYHAggJ/8QAFQEBAQAAAAAAAAAAAAAAAAAABgf/xAAbEQACAwEBAQAAAAAAAAAAAAAEBgMFBwIIAf/aAAwDAQACEQMRAD8AWB84MIw+y/PHwZYrFjWUv7A/8YeXHT166zuoNXLpy1w+jHNGzZocnnNZM2Rs85h55k8xRhU0pBEsk0nffSD1D58wOq9MeiaurxDIK2trd01sCurgM0TAwQAQ39gHECCEHpYxxRBR444BxoI44YIY+IouOeOeefkfPxfHX0416esnzR0dnQslscXFsRFZjamxqY5u7hhZmZhuKoy3vmC9tzDLS5ubQwqxtLEok44mcmeWXr//2Q==";
+
+    /// The same four pixels encoded as a 2×2 WebP (VP8X still container with an ICC profile).
+    const FIXTURE_WEBP: &str = "UklGRg4CAABXRUJQVlA4WAoAAAAgAAAAAQAAAQAASUNDUMgBAAAAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADZWUDhMHwAAAC8BQAAAHyAQSN4fOo35FxAU/B/d/EdkD+AGDBH9DwEA";
+
+    /// Decodes one strict base64 literal, refusing padding in the middle or stray characters.
+    fn decode_base64(text: &str) -> Vec<u8> {
+        let mut out: Vec<u8> = Vec::with_capacity(text.len() / 4 * 3);
+        let mut accumulator: u32 = 0;
+        let mut bits = 0u32;
+        for character in text.trim().chars() {
+            let value = match character {
+                'A'..='Z' => character as u32 - 'A' as u32,
+                'a'..='z' => character as u32 - 'a' as u32 + 26,
+                '0'..='9' => character as u32 - '0' as u32 + 52,
+                '+' => 62,
+                '/' => 63,
+                '=' => continue,
+                other => panic!("unexpected base64 character {other:?}"),
+            };
+            accumulator = (accumulator << 6) | value;
+            bits += 6;
+            if bits >= 8 {
+                bits -= 8;
+                out.push(u8::try_from((accumulator >> bits) & 0xff).expect("one byte"));
+            }
+        }
+        out
+    }
+
+    fn png() -> Vec<u8> {
+        decode_base64(FIXTURE_PNG)
+    }
+
+    fn jpeg() -> Vec<u8> {
+        decode_base64(FIXTURE_JPEG)
+    }
+
+    fn webp() -> Vec<u8> {
+        decode_base64(FIXTURE_WEBP)
+    }
+
+    /// A disposable confined content root holding exactly the fixture files a case declares.
+    struct Root {
+        dir: PathBuf,
+    }
+
+    impl Root {
+        /// The parent the fixtures live in.
+        ///
+        /// On Linux the confined reader needs a filesystem that was verified to support an immutable
+        /// clone, so the workflow's fixture root is mandatory exactly as the other real-filesystem
+        /// suites require; a missing value is a loud refusal, never a quiet run on an unverified
+        /// filesystem.
+        fn parent() -> PathBuf {
+            #[cfg(target_os = "linux")]
+            {
+                match std::env::var_os("SOLO_TEST_SOURCE_FS_ROOT") {
+                    Some(root) if !root.is_empty() => PathBuf::from(root),
+                    _ => panic!(
+                        "SOLO_TEST_SOURCE_FS_ROOT must name the R03 snapshot fixture filesystem; \
+                         refusing to run the real-filesystem image suite on a filesystem that was \
+                         never verified to support an immutable clone"
+                    ),
+                }
+            }
+            #[cfg(not(target_os = "linux"))]
+            {
+                std::env::temp_dir()
+            }
+        }
+
+        fn new(tag: &str, assets: &[(&str, &[u8])]) -> Self {
+            let dir = Self::parent().join(format!("solo-n097-{}-{tag}", std::process::id()));
+            let _ = fs::remove_dir_all(&dir);
+            fs::create_dir_all(dir.join("assets")).expect("scratch assets directory");
+            for (name, bytes) in assets {
+                fs::write(dir.join("assets").join(name), bytes).expect("fixture write");
+            }
+            Self { dir }
+        }
+
+        fn capability(&self) -> ContentRootCapability {
+            ContentRootCapability::adopt_bootstrap_path(&self.dir, TRUSTED).expect("adopted root")
+        }
+    }
+
+    impl Drop for Root {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.dir);
+        }
+    }
+
+    /// The real, whole-graph validated inventory the gate consumes.
+    fn inventory_of(
+        entries: &[(TestOwnerV1, &str, &str, &str)],
+    ) -> GraphicAssetObligationInventoryV1 {
+        test_inventory_v1(entries).expect("a validated test inventory")
+    }
+
+    fn one_logo(reference: &str) -> GraphicAssetObligationInventoryV1 {
+        inventory_of(&[(TestOwnerV1::Entity, "logo", reference, "public")])
+    }
+
+    fn complete(outcome: EntityImageOutcomeV1) -> solo_application::GraphicImageInspectionSetV1 {
+        match outcome {
+            EntityImageOutcomeV1::Complete(set) => set,
+            EntityImageOutcomeV1::Refused(refusal) => {
+                panic!("expected a complete inspection, got {refusal:?}")
+            }
+        }
+    }
+
+    fn inspection_refusal(
+        outcome: EntityImageOutcomeV1,
+    ) -> solo_application::GraphicImageInspectRefusalV1 {
+        match outcome {
+            EntityImageOutcomeV1::Complete(set) => {
+                panic!("expected a refusal, got {} inspections", set.len())
+            }
+            EntityImageOutcomeV1::Refused(EntityImageRefusalV1::Inspection(refusal)) => refusal,
+            EntityImageOutcomeV1::Refused(other) => {
+                panic!("expected an inspection refusal, got {other:?}")
+            }
+        }
+    }
+
+    #[test]
+    fn n097_01_a_real_png_is_confined_decoded_and_matches_known_pixels() {
+        let fixture = png();
+        let root = Root::new("png", &[("hero.png", &fixture)]);
+        let set = complete(inspect_entity_graphic_images_v1(
+            &root.capability(),
+            &one_logo("hero.png"),
+            Path::new(BIN),
+        ));
+
+        assert_eq!(set.len(), 1, "one authored obligation, one result");
+        assert!(!set.grants_publication_authority());
+        assert!(!set.proves_whole_publication());
+        let result = &set.inspections()[0];
+        assert_eq!(result.format(), GraphicImageFormatV1::Png);
+        assert_eq!(result.mime(), "image/png");
+        assert_eq!(result.width(), 2);
+        assert_eq!(result.height(), 2);
+        assert_eq!(result.pixels(), 4);
+        assert_eq!(result.decoded_bytes(), 16, "2x2 RGBA8");
+        assert!(
+            result.worker_pid() > 0,
+            "the parent observed a real child pid"
+        );
+        assert!(!result.grants_publication_authority());
+        assert!(
+            format!("{:?}", result.obligation().declaring_owner()).contains("entity"),
+            "the result keeps the Entity that authored it"
+        );
+        assert_eq!(result.logical_path(), "assets/hero.png");
+
+        // The four pixels are red, green, blue, white in that order, so the decoded plane is known
+        // exactly and its digest is a trusted constant rather than a worker claim.
+        let known_plane: [u8; 16] = [
+            255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255,
+        ];
+        assert_eq!(
+            result.decoded_digest().to_hex(),
+            solo_application::sha256_media_worker_bytes_v1(&known_plane).to_hex(),
+            "the parent's digest of the decoded plane must match the known pixels"
+        );
+        assert_eq!(
+            result.source_digest().to_hex(),
+            solo_application::sha256_media_worker_bytes_v1(&fixture).to_hex(),
+            "the source digest is the parent's own hash of the owned bytes"
+        );
+
+        println!(
+            "n097_image=format=png mime={} width={} height={} decoded={} pid={} wall_ms={} src={} out={}",
+            result.mime(),
+            result.width(),
+            result.height(),
+            result.decoded_bytes(),
+            result.worker_pid(),
+            result.wall_ms(),
+            result.source_digest().to_hex(),
+            result.decoded_digest().to_hex(),
+        );
+    }
+
+    #[test]
+    fn n097_02_a_real_jpeg_and_a_real_webp_are_each_confined_and_decoded() {
+        for (tag, name, fixture, format) in [
+            ("jpeg", "hero.jpg", jpeg(), GraphicImageFormatV1::Jpeg),
+            ("webp", "hero.webp", webp(), GraphicImageFormatV1::WebP),
+        ] {
+            let root = Root::new(tag, &[(name, &fixture)]);
+            let reference = name.to_owned();
+            // The low-level seam is exercised first so a format-specific child refusal is reported
+            // with its own bounded fact instead of only as an unattributed port refusal.
+            let direct = solo_adapters::run_confined_image_worker_v1(
+                Path::new(BIN),
+                format.worker_token(),
+                &solo_application::sha256_media_worker_bytes_v1(&fixture).to_hex(),
+                &fixture,
+            );
+            match &direct {
+                Ok(run) => println!(
+                    "n102_worker={tag} exit={:?} pid={} wall_ms={} cleanup={} limits={} stdout_len={}",
+                    run.exit_code(),
+                    run.child_pid(),
+                    run.wall_ms(),
+                    run.cleanup_verified(),
+                    run.limits_verified(),
+                    run.stdout().len(),
+                ),
+                Err(refusal) => println!("n102_worker={tag} refused={refusal:?}"),
+            }
+            assert!(
+                direct.is_ok(),
+                "{tag} spawned a confined worker: {direct:?}"
+            );
+            let set = complete(inspect_entity_graphic_images_v1(
+                &root.capability(),
+                &one_logo(&reference),
+                Path::new(BIN),
+            ));
+            assert_eq!(set.len(), 1);
+            let result = &set.inspections()[0];
+            assert_eq!(result.format(), format);
+            assert_eq!(result.mime(), format.canonical_mime());
+            assert_eq!(result.width(), 2, "{tag} geometry comes from the container");
+            assert_eq!(result.height(), 2);
+            assert_eq!(
+                result.decoded_bytes(),
+                16,
+                "{tag} decodes to a 2x2 RGBA8 plane"
+            );
+            assert!(result.worker_pid() > 0);
+            println!(
+                "n097_image=format={} mime={} width={} height={} decoded={} pid={} wall_ms={}",
+                result.format().worker_token(),
+                result.mime(),
+                result.width(),
+                result.height(),
+                result.decoded_bytes(),
+                result.worker_pid(),
+                result.wall_ms(),
+            );
+        }
+    }
+
+    #[test]
+    fn n097_03_each_declaring_owner_keeps_its_own_independent_result() {
+        let fixture = png();
+        let root = Root::new(
+            "owners",
+            &[("entity.png", &fixture), ("site.png", &fixture)],
+        );
+        let set = complete(inspect_entity_graphic_images_v1(
+            &root.capability(),
+            &inventory_of(&[
+                (TestOwnerV1::Entity, "logo", "entity.png", "public"),
+                (TestOwnerV1::Site, "banner", "site.png", "public"),
+            ]),
+            Path::new(BIN),
+        ));
+
+        assert_eq!(
+            set.len(),
+            2,
+            "two authored declarations of one file, never merged"
+        );
+        let first = format!("{:?}", set.inspections()[0].obligation().declaring_owner());
+        let second = format!("{:?}", set.inspections()[1].obligation().declaring_owner());
+        assert_ne!(first, second, "each result keeps its own declaring owner");
+        assert_eq!(
+            set.inspections()[0].source_digest(),
+            set.inspections()[1].source_digest(),
+            "the same authored file has the same source bytes"
+        );
+        for result in set.inspections() {
+            assert_eq!(result.width(), 2);
+            assert!(result.worker_pid() > 0);
+        }
+    }
+
+    #[test]
+    fn n097_04_internal_declarations_still_participate_in_the_whole_set() {
+        let fixture = png();
+        let root = Root::new("scopes", &[("hero.png", &fixture), ("icon.png", &fixture)]);
+        let set = complete(inspect_entity_graphic_images_v1(
+            &root.capability(),
+            &inventory_of(&[
+                (TestOwnerV1::Entity, "logo", "hero.png", "public"),
+                (TestOwnerV1::Entity, "favicon", "icon.png", "internal"),
+            ]),
+            Path::new(BIN),
+        ));
+
+        assert_eq!(set.len(), 2, "an internal declaration is inspected too");
+        let exposure = format!("{:?}", set.inspections()[1].obligation().exposure());
+        assert!(
+            exposure.contains("Internal"),
+            "the second obligation keeps its authored exposure: {exposure}"
+        );
+        assert_eq!(set.inspections()[1].mime(), "image/png");
+        assert!(!set.grants_publication_authority());
+    }
+
+    #[test]
+    fn n097_05_an_avif_reference_is_refused_not_skipped() {
+        let fixture = png();
+        let root = Root::new("avif", &[("hero.avif", &fixture)]);
+        let refused = inspection_refusal(inspect_entity_graphic_images_v1(
+            &root.capability(),
+            &one_logo("hero.avif"),
+            Path::new(BIN),
+        ));
+
+        assert_eq!(
+            refused.kind(),
+            GraphicImageInspectRefusalKindV1::UnsupportedFormat
+        );
+        assert!(refused.declaring_owner().is_some());
+        assert_eq!(
+            format!("{:?}", refused.role().expect("a role")),
+            "GraphicLogo"
+        );
+    }
+
+    #[test]
+    fn n097_06_one_bad_obligation_discards_the_whole_candidate() {
+        let good = png();
+        // A syntactically valid `.webp` reference whose bytes are a PNG: the format decision is the
+        // authored extension, so the worker's structural check must refuse it.
+        let root = Root::new("mixed", &[("good.png", &good), ("bad.webp", &good)]);
+        let refused = inspection_refusal(inspect_entity_graphic_images_v1(
+            &root.capability(),
+            &inventory_of(&[
+                (TestOwnerV1::Entity, "logo", "good.png", "public"),
+                (TestOwnerV1::Entity, "banner", "bad.webp", "public"),
+            ]),
+            Path::new(BIN),
+        ));
+
+        assert_eq!(
+            refused.kind(),
+            GraphicImageInspectRefusalKindV1::PortRefused
+        );
+        assert_eq!(
+            format!("{:?}", refused.role().expect("a role")),
+            "GraphicBanner"
+        );
+    }
+
+    #[test]
+    fn n097_07_malformed_and_truncated_media_never_become_a_result() {
+        let good = png();
+        let mut truncated = good.clone();
+        truncated.truncate(good.len() / 2);
+        let mut bad_geometry = good.clone();
+        // IHDR width becomes 0 while the file stays syntactically a PNG chunk stream.
+        bad_geometry[16] = 0;
+        bad_geometry[17] = 0;
+        bad_geometry[18] = 0;
+        bad_geometry[19] = 0;
+        let mut too_wide = good.clone();
+        too_wide[16] = 0x20;
+        too_wide[17] = 0x01; // 8193
+        let mut animated = webp();
+        // Set the VP8X animation flag: a still-image contract has no frame semantics.
+        let vp8x = animated
+            .windows(4)
+            .position(|window| window == b"VP8X")
+            .expect("the fixture is a VP8X container");
+        animated[vp8x + 8] |= 0x02;
+
+        for (tag, bytes, expected) in [
+            (
+                "truncated",
+                truncated,
+                GraphicImageInspectRefusalKindV1::PortRefused,
+            ),
+            (
+                "zero-width",
+                bad_geometry,
+                GraphicImageInspectRefusalKindV1::PortRefused,
+            ),
+            (
+                "too-wide",
+                too_wide,
+                GraphicImageInspectRefusalKindV1::PortRefused,
+            ),
+            (
+                "animated",
+                animated,
+                GraphicImageInspectRefusalKindV1::PortRefused,
+            ),
+        ] {
+            let root = Root::new(tag, &[("hero.png", &bytes)]);
+            let refused = inspection_refusal(inspect_entity_graphic_images_v1(
+                &root.capability(),
+                &one_logo("hero.png"),
+                Path::new(BIN),
+            ));
+            assert_eq!(refused.kind(), expected, "{tag} must be a typed refusal");
+        }
+    }
+
+    #[test]
+    fn n097_08_empty_and_oversized_sources_are_refused_before_any_worker() {
+        let empty: &[u8] = &[];
+        let root = Root::new("empty", &[("hero.png", empty)]);
+        let refused = inspection_refusal(inspect_entity_graphic_images_v1(
+            &root.capability(),
+            &one_logo("hero.png"),
+            Path::new(BIN),
+        ));
+        assert_eq!(
+            refused.kind(),
+            GraphicImageInspectRefusalKindV1::EmptySource
+        );
+
+        // The accepted acquisition already refuses a byte above the bound, so this case asserts the
+        // composed refusal rather than a second, weaker size rule of its own.
+        let oversized = vec![0u8; usize::try_from(MAX_IMAGE_SOURCE_BYTES_V1).expect("fits") + 1];
+        let root = Root::new("oversize", &[("hero.png", &oversized)]);
+        let outcome = inspect_entity_graphic_images_v1(
+            &root.capability(),
+            &one_logo("hero.png"),
+            Path::new(BIN),
+        );
+        match outcome {
+            EntityImageOutcomeV1::Complete(set) => panic!("accepted {} oversize", set.len()),
+            EntityImageOutcomeV1::Refused(EntityImageRefusalV1::SourceRead(_)) => {}
+            EntityImageOutcomeV1::Refused(other) => panic!("unexpected refusal {other:?}"),
+        }
+    }
+
+    #[test]
+    fn n097_09_every_worker_refusal_and_forged_claim_is_refused() {
+        let fixture = png();
+        let cases = [
+            (
+                "wrong-source",
+                IMAGE_WORKER_MODE_WRONG_SOURCE_V1,
+                GraphicImageInspectRefusalKindV1::SourceDigestMismatch,
+            ),
+            (
+                "wrong-output",
+                IMAGE_WORKER_MODE_WRONG_OUTPUT_V1,
+                GraphicImageInspectRefusalKindV1::OutputDigestMismatch,
+            ),
+            (
+                "short-output",
+                IMAGE_WORKER_MODE_SHORT_OUTPUT_V1,
+                GraphicImageInspectRefusalKindV1::DecodedBytesOutOfRange,
+            ),
+            (
+                "trailing",
+                IMAGE_WORKER_MODE_TRAILING_V1,
+                GraphicImageInspectRefusalKindV1::DecodedBytesOutOfRange,
+            ),
+            (
+                "child-refused",
+                IMAGE_WORKER_MODE_REFUSE_V1,
+                GraphicImageInspectRefusalKindV1::PortRefused,
+            ),
+        ];
+
+        for (tag, mode, expected) in cases {
+            match inspect_image_bytes_with_mode_v1(
+                Path::new(BIN),
+                &fixture,
+                GraphicImageFormatV1::Png,
+                mode,
+            ) {
+                GraphicImageInspectPortOutcomeV1::Refused(kind) => {
+                    assert_eq!(kind, expected, "{tag} must refuse for its own reason")
+                }
+                GraphicImageInspectPortOutcomeV1::Inspected(_) => {
+                    panic!("{tag} produced an accepted observation")
+                }
+            }
+        }
+
+        // A declared JPEG whose bytes are a PNG is refused at the child's structural check.
+        match inspect_image_bytes_with_mode_v1(
+            Path::new(BIN),
+            &fixture,
+            GraphicImageFormatV1::Jpeg,
+            solo_adapters::IMAGE_WORKER_MODE_DECODE_V1,
+        ) {
+            GraphicImageInspectPortOutcomeV1::Refused(kind) => assert_eq!(
+                kind,
+                GraphicImageInspectRefusalKindV1::PortRefused,
+                "a non-zero child exit is never a media result"
+            ),
+            GraphicImageInspectPortOutcomeV1::Inspected(_) => {
+                panic!("a mislabeled polyglot was accepted")
+            }
+        }
+    }
+
+    #[test]
+    fn n097_10_the_wall_deadline_terminates_and_reaps_the_worker() {
+        let fixture = png();
+        let started = std::time::Instant::now();
+        match inspect_image_bytes_with_mode_v1(
+            Path::new(BIN),
+            &fixture,
+            GraphicImageFormatV1::Png,
+            solo_adapters::IMAGE_WORKER_MODE_HANG_V1,
+        ) {
+            GraphicImageInspectPortOutcomeV1::Refused(kind) => assert_eq!(
+                kind,
+                GraphicImageInspectRefusalKindV1::PortRefused,
+                "an expired deadline is a host refusal, never a media fact"
+            ),
+            GraphicImageInspectPortOutcomeV1::Inspected(_) => {
+                panic!("an overdue worker produced an observation")
+            }
+        }
+        let elapsed = started.elapsed().as_millis();
+        assert!(
+            elapsed >= 10_000,
+            "the fixed deadline must actually expire first, elapsed={elapsed}ms"
+        );
+        println!("n097_deadline=elapsed_ms={elapsed}");
+    }
+
+    #[test]
+    fn n097_11_every_geometric_and_digest_rule_is_independently_pinned() {
+        // The application policy is also exercised directly, so a change to the fixed bounds or to
+        // the RGBA8 size rule fails here rather than silently widening the gate.
+        let fixture = png();
+        let set = GraphicImageInspectionOutcomeV1::Complete(
+            solo_application::GraphicImageInspectionSetV1::default(),
+        );
+        match set {
+            GraphicImageInspectionOutcomeV1::Complete(empty) => {
+                assert!(empty.is_empty());
+                assert!(!empty.grants_publication_authority());
+            }
+            GraphicImageInspectionOutcomeV1::Refused(_) => panic!("an empty set is complete"),
+        }
+
+        let request =
+            solo_application::GraphicImageInspectRequestV1::of(fixture, GraphicImageFormatV1::Png);
+        assert_eq!(request.declared_format(), GraphicImageFormatV1::Png);
+        assert_eq!(
+            solo_application::checked_rgba8_bytes_v1(8192, 8192),
+            Some(268_435_456),
+            "an 8192x8192 RGBA8 plane is the documented ceiling size"
+        );
+        assert_eq!(
+            solo_application::checked_rgba8_bytes_v1(u32::MAX, u32::MAX),
+            None,
+            "the pixel product must never wrap"
+        );
+
+        // A fake port may demonstrate candidate-wide policy and provenance, but it is explicitly not
+        // media evidence: the real decode evidence is the three cases above.
+        let empty_set = solo_application::GraphicAssetSourceSetV1::default();
+        match inspect_graphic_image_source_set_v1(&empty_set, &NoPort) {
+            GraphicImageInspectionOutcomeV1::Complete(empty) => assert!(empty.is_empty()),
+            GraphicImageInspectionOutcomeV1::Refused(_) => {
+                panic!("a zero-obligation candidate is a valid complete set")
+            }
+        }
+    }
+
+    /// A port that must never be called for a zero-obligation candidate.
+    struct NoPort;
+
+    impl solo_application::GraphicImageInspectPortV1 for NoPort {
+        fn inspect(
+            &self,
+            _request: &solo_application::GraphicImageInspectRequestV1,
+        ) -> GraphicImageInspectPortOutcomeV1 {
+            panic!("a zero-obligation candidate must not start a worker")
+        }
+    }
+}

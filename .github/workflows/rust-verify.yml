@@ -644,6 +644,14 @@ jobs:
           exit $status
 
 
+      # Mandatory `R03.C3` evidence. The confined image-inspection cases run again with their
+      # output visible, so the real child pid, the confirmed geometry and the host-limit facts are
+      # in the job log rather than only in a captured harness buffer. A failing case fails the job;
+      # nothing here is advisory and nothing is allowed to skip on a host.
+      - name: Confined image inspection evidence (both hosts)
+        run: cargo test -p solo-cli --test media_worker_host_smoke --locked n097 -- --nocapture --test-threads=1
+
+
       # ---------------------------------------------------------------------------
       # Accepted fail-closed architecture checker, run as its own process so the
       # policy exit status — not a test harness — decides. No weaken switch exists.
@@ -657,7 +665,7 @@ jobs:
           cat "$RUNNER_TEMP/arch-real.txt"
           grep -q 'architecture=legal packages=4' "$RUNNER_TEMP/arch-real.txt" \
             || { echo "::error::unexpected package set in real-tree report"; exit 1; }
-          grep -q 'edges=41' "$RUNNER_TEMP/arch-real.txt" \
+          grep -q 'edges=68' "$RUNNER_TEMP/arch-real.txt" \
             || { echo "::error::approved edge count changed: $(grep -o 'edges=[0-9]*' "$RUNNER_TEMP/arch-real.txt" | head -n 1)"; exit 1; }
 
       - name: Architecture checker on the real checkout (Windows)
@@ -669,7 +677,7 @@ jobs:
           if ($code -ne 0) { throw "real-tree architecture check refused (exit $code)" }
           $text = Get-Content "$env:RUNNER_TEMP/arch-real.txt" -Raw
           if ($text -notmatch 'architecture=legal packages=4') { throw "unexpected package set in real-tree report" }
-          if ($text -notmatch 'edges=41') {
+          if ($text -notmatch 'edges=68') {
             $measured = [regex]::Match($text, 'edges=[0-9]+').Value
             throw "approved edge count changed: $measured"
           }
