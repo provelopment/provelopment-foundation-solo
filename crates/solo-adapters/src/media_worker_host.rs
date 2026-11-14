@@ -6718,6 +6718,9 @@ mod tests {
             "SOLO-N102-EVENT-V1 attempted=1 witness=1 witness=1 pid=4242\n",
             "SOLO-N102-EVENT-V1 attempted=1 witness=1 pid=4242 extra=1\n",
             "SOLO-N102-EVENT-V1 attempted=1 witness=1 pid=4242\nunexpected-second-line\n",
+            "SOLO-N102-EVENT-V1 attempted=1 witness=1 pid=4242\n\n",
+            "SOLO-N102-EVENT-V1 attempted=1 witness=1 pid=4242\r\n\r\n",
+            "SOLO-N102-EVENT-V1 attempted=1 witness=1 pid=4242\nEXTRA\n",
         ] {
             assert_eq!(
                 super::parse_n102_event_answer_v1(bad),
@@ -6746,6 +6749,163 @@ mod tests {
                 "accepted a non-canonical event answer: {bad:?}"
             );
         }
+    }
+
+    /// One `ImageWorkerRunV1` fixture: the parent's own recorded facts are supplied independently of
+    /// whatever the child wrote, exactly as the production supervisor reports them.
+    fn n102_event_run_fixture(
+        stdout: &str,
+        child_pid: u32,
+        exit_code: Option<i32>,
+        limits_verified: bool,
+        cleanup_verified: bool,
+    ) -> super::ImageWorkerRunV1 {
+        super::ImageWorkerRunV1 {
+            stdout: stdout.as_bytes().to_vec(),
+            stderr_len: 0,
+            exit_code,
+            wall_ms: 0,
+            child_pid,
+            limits_verified,
+            cleanup_verified,
+        }
+    }
+
+    /// `SOLO-WO-111 R01` REVISE — the run validator is the real function the production path calls,
+    /// so these fixtures prove it accepts only mutually consistent evidence and refuses each defect
+    /// independently: a child pid the parent never observed, an unproved confinement or reap, a
+    /// non-zero or missing exit, a missing attempt/witness, and any non-single-record answer.
+    #[test]
+    fn n102_event_run_validation_refuses_every_inconsistent_observation() {
+        const GOOD: &str = "SOLO-N102-EVENT-V1 attempted=1 witness=1 pid=4242\n";
+        fn invalid() -> Result<super::N102EventProbeV1, super::N102ProbeRefusalV1> {
+            Err(super::N102ProbeRefusalV1::AnswerInvalid)
+        }
+        assert_eq!(
+            super::validate_n102_event_run_v1(&n102_event_run_fixture(
+                GOOD,
+                4242,
+                Some(0),
+                true,
+                true
+            )),
+            Ok(super::N102EventProbeV1 {
+                attempted: true,
+                witness: true,
+                pid: 4242,
+            })
+        );
+        // The child claims a pid the parent's own handle never recorded.
+        assert_eq!(
+            super::validate_n102_event_run_v1(&n102_event_run_fixture(
+                GOOD,
+                4243,
+                Some(0),
+                true,
+                true
+            )),
+            invalid()
+        );
+        // The parent recorded no child pid at all.
+        assert_eq!(
+            super::validate_n102_event_run_v1(&n102_event_run_fixture(
+                GOOD,
+                0,
+                Some(0),
+                true,
+                true
+            )),
+            invalid()
+        );
+        // Confinement limits were never proved.
+        assert_eq!(
+            super::validate_n102_event_run_v1(&n102_event_run_fixture(
+                GOOD,
+                4242,
+                Some(0),
+                false,
+                true
+            )),
+            invalid()
+        );
+        // The child was never proved reaped.
+        assert_eq!(
+            super::validate_n102_event_run_v1(&n102_event_run_fixture(
+                GOOD,
+                4242,
+                Some(0),
+                true,
+                false
+            )),
+            invalid()
+        );
+        // A non-zero exit and a missing exit status are both refusals.
+        assert_eq!(
+            super::validate_n102_event_run_v1(&n102_event_run_fixture(
+                GOOD,
+                4242,
+                Some(1),
+                true,
+                true
+            )),
+            invalid()
+        );
+        assert_eq!(
+            super::validate_n102_event_run_v1(&n102_event_run_fixture(
+                GOOD, 4242, None, true, true
+            )),
+            invalid()
+        );
+        // The child reported no real attempt or no working local witness.
+        for stdout in [
+            "SOLO-N102-EVENT-V1 attempted=0 witness=1 pid=4242\n",
+            "SOLO-N102-EVENT-V1 attempted=1 witness=0 pid=4242\n",
+            "SOLO-N102-EVENT-V1 attempted=0 witness=0 pid=4242\n",
+        ] {
+            assert_eq!(
+                super::validate_n102_event_run_v1(&n102_event_run_fixture(
+                    stdout,
+                    4242,
+                    Some(0),
+                    true,
+                    true
+                )),
+                invalid(),
+                "accepted an answer with no real attempt or witness: {stdout:?}"
+            );
+        }
+        // Repeated, appended, blank-second and unterminated records are all refused.
+        for stdout in [
+            "SOLO-N102-EVENT-V1 attempted=1 witness=1 pid=4242\nSOLO-N102-EVENT-V1 attempted=1 witness=1 pid=4242\n",
+            "SOLO-N102-EVENT-V1 attempted=1 witness=1 pid=4242\nEXTRA\n",
+            "SOLO-N102-EVENT-V1 attempted=1 witness=1 pid=4242\n\n",
+            "SOLO-N102-EVENT-V1 attempted=1 witness=1 pid=4242",
+        ] {
+            assert_eq!(
+                super::validate_n102_event_run_v1(&n102_event_run_fixture(
+                    stdout,
+                    4242,
+                    Some(0),
+                    true,
+                    true
+                )),
+                invalid(),
+                "accepted a non-single-record answer: {stdout:?}"
+            );
+        }
+        // Bytes that are not UTF-8 can never be a bounded answer.
+        assert_eq!(
+            super::validate_n102_event_run_v1(&super::ImageWorkerRunV1 {
+                stdout: vec![0xFF, 0xFE, b'\n'],
+                stderr_len: 0,
+                exit_code: Some(0),
+                wall_ms: 0,
+                child_pid: 4242,
+                limits_verified: true,
+                cleanup_verified: true,
+            }),
+            invalid()
+        );
     }
 }
 
@@ -6929,7 +7089,13 @@ fn n102_canonical_pid_v1(text: &str) -> Option<u32> {
 /// repeated, reordered or unknown field, a non-canonical boolean or numeric value, or any trailing
 /// data after the pid.
 pub fn parse_n102_event_answer_v1(text: &str) -> Result<N102EventProbeV1, N102ProbeRefusalV1> {
-    let line = text.trim_end_matches(['\r', '\n']);
+    // Exactly one record: one trailing CRLF or LF is required and removed. A missing terminator,
+    // two terminators or any second record is refused rather than trimmed away, because trimming
+    // would let a duplicated or appended line look like the single bounded answer.
+    let line = text
+        .strip_suffix("\r\n")
+        .or_else(|| text.strip_suffix('\n'))
+        .ok_or(N102ProbeRefusalV1::AnswerInvalid)?;
     if line.is_empty()
         || line.len() > crate::graphic_image_inspection::MAX_IMAGE_WORKER_FRAME_BYTES_V1
         || !line.is_ascii()
@@ -6966,6 +7132,32 @@ pub fn parse_n102_event_answer_v1(text: &str) -> Result<N102EventProbeV1, N102Pr
     })
 }
 
+/// Validates one finished supervised event-probe run against the parent's own evidence.
+///
+/// The child's own line is never authoritative about identity: it is accepted only when the parent's
+/// independently recorded child pid, normal exit, proved limits and proved reap all agree with it and
+/// with each other. Every disagreement is a closed refusal, never a partial or best-effort answer.
+fn validate_n102_event_run_v1(
+    run: &ImageWorkerRunV1,
+) -> Result<N102EventProbeV1, N102ProbeRefusalV1> {
+    let text = std::str::from_utf8(run.stdout()).map_err(|_| N102ProbeRefusalV1::AnswerInvalid)?;
+
+    let answer = parse_n102_event_answer_v1(text)?;
+
+    if run.child_pid() == 0
+        || answer.pid != run.child_pid()
+        || run.exit_code() != Some(0)
+        || !run.limits_verified()
+        || !run.cleanup_verified()
+        || !answer.attempted
+        || !answer.witness
+    {
+        return Err(N102ProbeRefusalV1::AnswerInvalid);
+    }
+
+    Ok(answer)
+}
+
 /// Runs one closed object-identity event probe through the real production confined spawn.
 ///
 /// # Errors
@@ -6990,7 +7182,7 @@ pub fn run_n102_event_probe_v1(
         &mut N102FaultRunV1::production(),
     )
     .map_err(N102ProbeRefusalV1::Worker)?;
-    parse_n102_event_answer_v1(&String::from_utf8_lossy(run.stdout()))
+    validate_n102_event_run_v1(&run)
 }
 
 /// Runs one closed environment-isolation probe through the real production confined spawn.
