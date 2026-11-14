@@ -947,9 +947,16 @@ fn r03a_06_duplicate_and_malformed_entries_refuse_without_repair() {
             .kind(),
         PropertyRefusalKind::UnsupportedAssetExtension
     );
+    // `SOLO-WO-113 R02` authorized the single `gif` extension token, so this direct parser
+    // assertion is corrected from "a GIF refuses" to "a lowercase GIF reference is admitted";
+    // every other refusal in this test is unchanged, and the uppercase spelling still refuses.
+    let admitted_gif = AssetReferenceV1::parse(AssetNamespace::Entity, "assets/logo.gif")
+        .expect("a lowercase GIF reference is admitted by the R02 allowlist");
+    assert_eq!(admitted_gif.reference(), "assets/logo.gif");
+    assert_eq!(admitted_gif.namespace(), AssetNamespace::Entity);
     assert_eq!(
-        AssetReferenceV1::parse(AssetNamespace::Entity, "assets/logo.gif")
-            .expect_err("a GIF refuses")
+        AssetReferenceV1::parse(AssetNamespace::Entity, "assets/logo.GIF")
+            .expect_err("an upper-case GIF extension refuses rather than being lowered")
             .kind(),
         PropertyRefusalKind::UnsupportedAssetExtension
     );

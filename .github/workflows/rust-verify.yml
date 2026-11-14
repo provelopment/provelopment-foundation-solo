@@ -651,7 +651,132 @@ jobs:
       - name: Confined image inspection evidence (both hosts)
         run: cargo test -p solo-cli --test media_worker_host_smoke --locked n097 -- --nocapture --test-threads=1
 
+      # Mandatory `SOLO-WO-111 R01` four real GIF worker canaries. Both hosts execute the same four
+      # qualified cases against the real compiled `solo-cli` under the production confined
+      # supervisor. The gate asserts the exact names, the exact passing count of four, and the absence
+      # of any failed, filtered, ignored or missing case; an empty or partially filtered run fails.
+      # Cargo reports the unrelated integration tests as filtered out, which is not a failure.
+      - name: N108 real GIF worker canaries (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          log="$RUNNER_TEMP/n108-eight.txt"
+          cargo test -p solo-cli --test media_worker_host_smoke --locked n108_ -- --nocapture --test-threads=1 >"$log" 2>&1 || { cat "$log"; exit 1; }
+          cat "$log"
+          for name in \
+            n108_01_gif87a_still_confined_and_parent_verified \
+            n108_02_gif89a_animation_keeps_frames_delays_and_loop \
+            n108_03_gif89a_previous_background_palette_interlace_offset \
+            n108_04_gif_extension_signature_trailer_and_mislabeled_input_refuse \
+            n108_05_gif89a_absent_finite_infinite_loops_and_zero_delay \
+            n108_06_gif_resource_budget_and_frame_rectangle_refusals \
+            n108_07_gif_application_repeat_and_lzw_corruption_refusals \
+            n108_08_gif_source_transcript_and_pixel_change_evidence; do
+            grep -Eq "^test n108::${name} \.\.\." "$log" || { echo "missing $name"; exit 1; }
+          done
+          [ "$(grep -Ec '^test n108::n108_0[1-8]_[A-Za-z0-9_]+ \.\.\.' "$log")" -eq 8 ]
+          grep -q 'test result: ok\. 8 passed; 0 failed; 0 ignored' "$log"
+          ! grep -Eq '^test n108::.* \.\.\. (FAILED|ignored)|^test result: FAILED' "$log"
 
+      - name: N108 real GIF worker canaries (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $required = @(
+            'n108_01_gif87a_still_confined_and_parent_verified',
+            'n108_02_gif89a_animation_keeps_frames_delays_and_loop',
+            'n108_03_gif89a_previous_background_palette_interlace_offset',
+            'n108_04_gif_extension_signature_trailer_and_mislabeled_input_refuse',
+            'n108_05_gif89a_absent_finite_infinite_loops_and_zero_delay',
+            'n108_06_gif_resource_budget_and_frame_rectangle_refusals',
+            'n108_07_gif_application_repeat_and_lzw_corruption_refusals',
+            'n108_08_gif_source_transcript_and_pixel_change_evidence')
+          $log = Join-Path $env:RUNNER_TEMP 'n108-eight.txt'
+          cargo test -p solo-cli --test media_worker_host_smoke --locked n108_ -- --nocapture --test-threads=1 *>&1 | Tee-Object -FilePath $log
+          if ($LASTEXITCODE -ne 0) { throw 'N108 failed' }
+          $text = Get-Content -LiteralPath $log -Raw
+          foreach ($name in $required) {
+            if ($text -notmatch ('(?m)^test n108::' + [regex]::Escape($name) + ' \.\.\.')) {
+              throw "required N108 case absent: $name"
+            }
+          }
+          if (([regex]::Matches($text, '(?m)^test n108::n108_0[1-8]_[A-Za-z0-9_]+ \.\.\.')).Count -ne 8) {
+            throw 'wrong N108 execution count'
+          }
+          if ($text -notmatch 'test result: ok\. 8 passed; 0 failed; 0 ignored' -or $text -match '\.\.\. (FAILED|ignored)') {
+            throw 'N108 refusal or skipped case'
+          }
+
+      # Mandatory `SOLO-WO-113 R02` four-format V2 gate. Both hosts run the same four qualified
+      # `n097::n113_*` cases against the real compiled `solo-cli`: one real four-format four-distinct-
+      # owner candidate, the hidden/representation/suppressed refusal matrix, the declared-format and
+      # favicon refusals, and the forged plus RED-oracle sensitivity case. The gate asserts the exact
+      # names, the exact passing count of four, the absence of any failed, filtered, ignored or missing
+      # case, and the real evidence tokens those cases print. The deliberate-red wrong-oracle run is a
+      # separate controlled demonstration; it is never part of this default green gate.
+      - name: V2 four-format image inspection gate (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          log="$RUNNER_TEMP/n113-four.txt"
+          cargo test -p solo-cli --test media_worker_host_smoke --locked n113_ -- --nocapture --test-threads=1 >"$log" 2>&1 || { cat "$log"; exit 1; }
+          cat "$log"
+          for name in \
+            n113_01_mixed_four_formats_real_host \
+            n113_02_hidden_obligation_refuses_whole_candidate \
+            n113_03_declared_format_and_favicon_refusals \
+            n113_04_gif_forgery_and_red_oracle_sensitivity; do
+            grep -Eq "^test n097::${name} \\.\\.\\." "$log" || { echo "missing $name"; exit 1; }
+          done
+          [ "$(grep -Ec '^test n097::n113_0[1-4]_[A-Za-z0-9_]+ \.\.\.' "$log")" -eq 4 ]
+          grep -q 'test result: ok\. 4 passed; 0 failed; 0 ignored' "$log"
+          ! grep -Eq '^test n097::n113_.* \.\.\. (FAILED|ignored)|^test result: FAILED' "$log"
+          grep -q 'n113_mixed formats=4 owners=4 order=png,jpeg,webp,gif' "$log"
+          grep -q 'n113_hidden representation_included=true internal_included=true owners=4' "$log"
+          grep -q 'n113_hidden refused_whole=true discarded=2 partial=false' "$log"
+          grep -q 'n113_hidden suppressed_declaration_inspected=true' "$log"
+          grep -q 'n113_declared all_cases_refused=true' "$log"
+          grep -q 'n113_red red=34aaa746' "$log"
+          grep -q 'n113_forged wrong_source=refused wrong_transcript=refused' "$log"
+          grep -q 'n113_forged adapter_wrong_source=refused' "$log"
+
+      - name: V2 four-format image inspection gate (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $required = @(
+            'n113_01_mixed_four_formats_real_host',
+            'n113_02_hidden_obligation_refuses_whole_candidate',
+            'n113_03_declared_format_and_favicon_refusals',
+            'n113_04_gif_forgery_and_red_oracle_sensitivity')
+          $log = Join-Path $env:RUNNER_TEMP 'n113-four.txt'
+          cargo test -p solo-cli --test media_worker_host_smoke --locked n113_ -- --nocapture --test-threads=1 *>&1 | Tee-Object -FilePath $log
+          if ($LASTEXITCODE -ne 0) { throw 'V2 four-format gate failed' }
+          $text = Get-Content -LiteralPath $log -Raw
+          foreach ($name in $required) {
+            if ($text -notmatch ('(?m)^test n097::' + [regex]::Escape($name) + ' \.\.\.')) {
+              throw "required V2 case absent: $name"
+            }
+          }
+          if (([regex]::Matches($text, '(?m)^test n097::n113_0[1-4]_[A-Za-z0-9_]+ \.\.\.')).Count -ne 4) {
+            throw 'wrong V2 execution count'
+          }
+          if ($text -notmatch 'test result: ok\. 4 passed; 0 failed; 0 ignored' -or $text -match '\.\.\. (FAILED|ignored)') {
+            throw 'V2 refusal or skipped case'
+          }
+          foreach ($token in @(
+            'n113_mixed formats=4 owners=4 order=png,jpeg,webp,gif',
+            'n113_hidden representation_included=true internal_included=true owners=4',
+            'n113_hidden refused_whole=true discarded=2 partial=false',
+            'n113_hidden suppressed_declaration_inspected=true',
+            'n113_declared all_cases_refused=true',
+            'n113_red red=34aaa746',
+            'n113_forged wrong_source=refused wrong_transcript=refused',
+            'n113_forged adapter_wrong_source=refused')) {
+            if (-not $text.Contains($token)) { throw "missing V2 evidence token: $token" }
+          }
       # Mandatory `SOLO-WO-105 R01` Windows canaries. These four cases drive the real production
       # `CreateProcessW` / attribute-list / Job Object / minimal-environment path, so a Windows job is
       # the only place such facts exist. The gate fails when a required case is absent, filtered,
@@ -682,6 +807,26 @@ jobs:
           }
           Write-Output 'N102 gate: four required canaries executed and passed.'
 
+      # `SOLO-WO-111 R01` — the repaired object-identity canary must be stable, not lucky. The
+      # corrected `n102_01` runs twelve consecutive times on real Windows hardware, each run asserting
+      # the same bounded object-identity evidence line and an exact single-case pass count. One
+      # failure fails the job; no retry, filter or continue-on-error can convert it to green.
+      - name: Windows N102 event-identity repeatability (Windows only, 12 runs)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          for ($run = 1; $run -le 12; $run++) {
+            $log = Join-Path $env:RUNNER_TEMP "n102-repeat-$run.txt"
+            cargo test -p solo-cli --test media_worker_host_smoke --locked n102_01_extra_inheritable_handle_is_excluded -- --nocapture --test-threads=1 *>&1 | Tee-Object -FilePath $log
+            if ($LASTEXITCODE -ne 0) { throw "N102 event-identity stress failed on repetition $run" }
+            $text = Get-Content -LiteralPath $log -Raw
+            if ($text -notmatch '(?m)^test n102::n102_01_extra_inheritable_handle_is_excluded \.\.\.') { throw "N102_01 did not execute on repetition $run" }
+            if ($text -notmatch 'extra_event_signaled=false control_event_signaled=false local_witness=true') { throw "N102_01 printed no object-identity evidence on repetition $run" }
+            if ($text -notmatch 'test result: ok\. 1 passed; 0 failed; 0 ignored') { throw "N102_01 did not pass alone on repetition $run" }
+            Write-Output "N102 repeat $run/12 passed"
+          }
+          Write-Output 'N102 event-identity repeatability: 12/12 consecutive native Windows runs passed.'
+
 
       # ---------------------------------------------------------------------------
       # Accepted fail-closed architecture checker, run as its own process so the
@@ -696,7 +841,7 @@ jobs:
           cat "$RUNNER_TEMP/arch-real.txt"
           grep -q 'architecture=legal packages=4' "$RUNNER_TEMP/arch-real.txt" \
             || { echo "::error::unexpected package set in real-tree report"; exit 1; }
-          grep -q 'edges=68' "$RUNNER_TEMP/arch-real.txt" \
+          grep -q 'edges=70' "$RUNNER_TEMP/arch-real.txt" \
             || { echo "::error::approved edge count changed: $(grep -o 'edges=[0-9]*' "$RUNNER_TEMP/arch-real.txt" | head -n 1)"; exit 1; }
 
       - name: Architecture checker on the real checkout (Windows)
@@ -708,7 +853,7 @@ jobs:
           if ($code -ne 0) { throw "real-tree architecture check refused (exit $code)" }
           $text = Get-Content "$env:RUNNER_TEMP/arch-real.txt" -Raw
           if ($text -notmatch 'architecture=legal packages=4') { throw "unexpected package set in real-tree report" }
-          if ($text -notmatch 'edges=68') {
+          if ($text -notmatch 'edges=70') {
             $measured = [regex]::Match($text, 'edges=[0-9]+').Value
             throw "approved edge count changed: $measured"
           }

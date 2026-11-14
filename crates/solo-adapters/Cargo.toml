@@ -37,6 +37,10 @@ image = { version = "=0.25.10", default-features = false, features = [
 # arrives as a `std::path::Path` and `rustix` implements its path-argument trait for `&Path`
 # only with `std` enabled; without it the caller path would have to be copied into a
 # `CString`, which would be a second, weaker spelling of the same trust input.
+# The one pinned pure-Rust GIF codec approved by `SOLO-WO-107 R01` section 3: a bounded
+# streaming GIF87a/GIF89a frame decoder. Exact version, no default features, no native
+# code, no alternate version, and no second codec of any kind.
+gif = { version = "=0.14.2", default-features = false, features = ["std"] }
 [target.'cfg(target_os = "linux")'.dependencies]
 rustix = { version = "=1.1.6", default-features = false, features = ["fs", "std"] }
 
