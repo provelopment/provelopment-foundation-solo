@@ -708,6 +708,75 @@ jobs:
             throw 'N108 refusal or skipped case'
           }
 
+      # Mandatory `SOLO-WO-113 R02` four-format V2 gate. Both hosts run the same four qualified
+      # `n097::n113_*` cases against the real compiled `solo-cli`: one real four-format four-distinct-
+      # owner candidate, the hidden/representation/suppressed refusal matrix, the declared-format and
+      # favicon refusals, and the forged plus RED-oracle sensitivity case. The gate asserts the exact
+      # names, the exact passing count of four, the absence of any failed, filtered, ignored or missing
+      # case, and the real evidence tokens those cases print. The deliberate-red wrong-oracle run is a
+      # separate controlled demonstration; it is never part of this default green gate.
+      - name: V2 four-format image inspection gate (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          log="$RUNNER_TEMP/n113-four.txt"
+          cargo test -p solo-cli --test media_worker_host_smoke --locked n113_ -- --nocapture --test-threads=1 >"$log" 2>&1 || { cat "$log"; exit 1; }
+          cat "$log"
+          for name in \
+            n113_01_mixed_four_formats_real_host \
+            n113_02_hidden_obligation_refuses_whole_candidate \
+            n113_03_declared_format_and_favicon_refusals \
+            n113_04_gif_forgery_and_red_oracle_sensitivity; do
+            grep -Eq "^test n097::${name} \\.\\.\\." "$log" || { echo "missing $name"; exit 1; }
+          done
+          [ "$(grep -Ec '^test n097::n113_0[1-4]_[A-Za-z0-9_]+ \.\.\.' "$log")" -eq 4 ]
+          grep -q 'test result: ok\. 4 passed; 0 failed; 0 ignored' "$log"
+          ! grep -Eq '^test n097::n113_.* \.\.\. (FAILED|ignored)|^test result: FAILED' "$log"
+          grep -q 'n113_mixed formats=4 owners=4 order=png,jpeg,webp,gif' "$log"
+          grep -q 'n113_hidden representation_included=true internal_included=true owners=4' "$log"
+          grep -q 'n113_hidden refused_whole=true discarded=2 partial=false' "$log"
+          grep -q 'n113_hidden suppressed_declaration_inspected=true' "$log"
+          grep -q 'n113_declared all_cases_refused=true' "$log"
+          grep -q 'n113_red red=34aaa746' "$log"
+          grep -q 'n113_forged wrong_source=refused wrong_transcript=refused' "$log"
+          grep -q 'n113_forged adapter_wrong_source=refused' "$log"
+
+      - name: V2 four-format image inspection gate (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $required = @(
+            'n113_01_mixed_four_formats_real_host',
+            'n113_02_hidden_obligation_refuses_whole_candidate',
+            'n113_03_declared_format_and_favicon_refusals',
+            'n113_04_gif_forgery_and_red_oracle_sensitivity')
+          $log = Join-Path $env:RUNNER_TEMP 'n113-four.txt'
+          cargo test -p solo-cli --test media_worker_host_smoke --locked n113_ -- --nocapture --test-threads=1 *>&1 | Tee-Object -FilePath $log
+          if ($LASTEXITCODE -ne 0) { throw 'V2 four-format gate failed' }
+          $text = Get-Content -LiteralPath $log -Raw
+          foreach ($name in $required) {
+            if ($text -notmatch ('(?m)^test n097::' + [regex]::Escape($name) + ' \.\.\.')) {
+              throw "required V2 case absent: $name"
+            }
+          }
+          if (([regex]::Matches($text, '(?m)^test n097::n113_0[1-4]_[A-Za-z0-9_]+ \.\.\.')).Count -ne 4) {
+            throw 'wrong V2 execution count'
+          }
+          if ($text -notmatch 'test result: ok\. 4 passed; 0 failed; 0 ignored' -or $text -match '\.\.\. (FAILED|ignored)') {
+            throw 'V2 refusal or skipped case'
+          }
+          foreach ($token in @(
+            'n113_mixed formats=4 owners=4 order=png,jpeg,webp,gif',
+            'n113_hidden representation_included=true internal_included=true owners=4',
+            'n113_hidden refused_whole=true discarded=2 partial=false',
+            'n113_hidden suppressed_declaration_inspected=true',
+            'n113_declared all_cases_refused=true',
+            'n113_red red=34aaa746',
+            'n113_forged wrong_source=refused wrong_transcript=refused',
+            'n113_forged adapter_wrong_source=refused')) {
+            if (-not $text.Contains($token)) { throw "missing V2 evidence token: $token" }
+          }
       # Mandatory `SOLO-WO-105 R01` Windows canaries. These four cases drive the real production
       # `CreateProcessW` / attribute-list / Job Object / minimal-environment path, so a Windows job is
       # the only place such facts exist. The gate fails when a required case is absent, filtered,
