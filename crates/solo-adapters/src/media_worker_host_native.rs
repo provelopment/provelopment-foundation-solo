@@ -1357,6 +1357,10 @@ mod windows {
                 return None;
             }
             let environment = minimal_environment_v1()?;
+            // NEGATIVE PROOF (never integrate): the production block is built and then discarded,
+            // so the child inherits the ambient parent environment. That is the exact isolation
+            // defect the unchanged `n102_02` must detect at runtime.
+            drop(environment);
             if fault.inject_here(7) {
                 return None;
             }
