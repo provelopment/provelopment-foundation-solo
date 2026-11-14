@@ -2446,14 +2446,16 @@ mod n102 {
     #[test]
     fn n102_01_extra_inheritable_handle_is_excluded() {
         let extra = N102ExtraInheritableV1::create().expect("extra inheritable parent handle");
-        let value = extra.value();
-        let answer = run_n102_handle_probe_v1(Path::new(BIN), value, IMPOSSIBLE_HANDLE)
+        // A second event in the same parent table created with `bInheritHandle = 0`: its numeric
+        // value can never reach the child by inheritance, so it is the ambiguity control that tells
+        // a real allowlist exclusion apart from a coincidental reuse of the same numeric value.
+        let shadow = N102ExtraInheritableV1::create_control()
+            .expect("non-inheritable control handle in the same parent table");
+        let answer = run_n102_handle_probe_v1(Path::new(BIN), extra.value(), shadow.value())
             .expect("bounded handle probe answer from the real child");
-        // A control value that resolved would mean the child handle table cannot answer this
-        // question at all, so the case fails instead of reporting a false exclusion.
         assert!(
             !answer.control_live,
-            "the guaranteed-invalid control resolved in the child, so the answer is ambiguous"
+            "the non-inheritable control resolved in the child, so a numeric match is ambiguous reuse"
         );
         assert!(
             !answer.handle_live,
@@ -2461,8 +2463,8 @@ mod n102 {
         );
         assert_ne!(answer.pid, 0, "the child reported no process identifier");
         println!(
-            "n102_01 extra_handle_excluded=true control_live=false child_pid={}",
-            answer.pid
+            "n102_01 extra_handle_excluded={} control_live={} child_pid={}",
+            !answer.handle_live, answer.control_live, answer.pid
         );
         drop(extra);
     }
