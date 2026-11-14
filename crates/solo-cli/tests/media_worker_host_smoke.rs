@@ -2686,4 +2686,412 @@ mod n108 {
             obs.transcript_digest().to_hex()
         );
     }
+
+    // ---- Test-only deterministic GIF fixture encoder, ported from the accepted codec tests. ----
+    // It exists only to construct exact inputs for the real child; it is never a decoding path and
+    // it grants no authority. Min code size is pinned to eight bits so dictionary growth cannot mask
+    // a framing bug in these tiny images.
+    const RED: [u8; 3] = [255, 0, 0];
+    const GREEN: [u8; 3] = [0, 255, 0];
+    const BLUE: [u8; 3] = [0, 0, 255];
+    const WHITE: [u8; 3] = [255, 255, 255];
+
+    struct BitPackerV1 {
+        bytes: Vec<u8>,
+        accumulator: u32,
+        bits: u8,
+    }
+
+    impl BitPackerV1 {
+        fn new() -> Self {
+            Self {
+                bytes: Vec::new(),
+                accumulator: 0,
+                bits: 0,
+            }
+        }
+
+        fn write(&mut self, code: u16, width: u8) {
+            self.accumulator |= u32::from(code) << self.bits;
+            self.bits += width;
+            while self.bits >= 8 {
+                self.bytes.push((self.accumulator & 0xFF) as u8);
+                self.accumulator >>= 8;
+                self.bits -= 8;
+            }
+        }
+
+        fn finish(mut self) -> Vec<u8> {
+            if self.bits > 0 {
+                self.bytes.push((self.accumulator & 0xFF) as u8);
+            }
+            self.bytes
+        }
+    }
+
+    fn lzw_encode_v1(min_code_size: u8, indices: &[u8]) -> Vec<u8> {
+        let clear = 1u16 << min_code_size;
+        let end = clear + 1;
+        let mut packer = BitPackerV1::new();
+        let mut code_size = min_code_size + 1;
+        packer.write(clear, code_size);
+        let mut table: std::collections::HashMap<(u16, u8), u16> = std::collections::HashMap::new();
+        let mut next = end + 1;
+        let mut current: Option<u16> = None;
+        for &pixel in indices {
+            match current {
+                None => current = Some(u16::from(pixel)),
+                Some(prefix) => {
+                    if let Some(&known) = table.get(&(prefix, pixel)) {
+                        current = Some(known);
+                    } else {
+                        packer.write(prefix, code_size);
+                        table.insert((prefix, pixel), next);
+                        next += 1;
+                        if next == (1u16 << code_size) && code_size < 12 {
+                            code_size += 1;
+                        }
+                        current = Some(u16::from(pixel));
+                    }
+                }
+            }
+        }
+        if let Some(prefix) = current {
+            packer.write(prefix, code_size);
+        }
+        packer.write(end, code_size);
+        packer.finish()
+    }
+
+    fn table_bits_v1(entries: usize) -> (u8, usize) {
+        let mut size = 2usize;
+        while size < entries {
+            size *= 2;
+        }
+        (
+            u8::try_from(size.trailing_zeros())
+                .unwrap_or(1)
+                .saturating_sub(1),
+            size,
+        )
+    }
+
+    fn table_bytes_v1(palette: &[[u8; 3]]) -> (u8, Vec<u8>) {
+        let (bits, entries) = table_bits_v1(palette.len().max(2));
+        let mut bytes = Vec::with_capacity(entries * 3);
+        for entry in palette {
+            bytes.extend_from_slice(entry);
+        }
+        while bytes.len() < entries * 3 {
+            bytes.push(0);
+        }
+        (bits, bytes)
+    }
+
+    fn write_sub_blocks_v1(out: &mut Vec<u8>, data: &[u8]) {
+        for chunk in data.chunks(255) {
+            out.push(u8::try_from(chunk.len()).unwrap_or(255));
+            out.extend_from_slice(chunk);
+        }
+        out.push(0);
+    }
+
+    struct FrameSpecV1 {
+        left: u16,
+        top: u16,
+        width: u16,
+        height: u16,
+        delay: u16,
+        disposal: u8,
+        transparent: Option<u8>,
+        local_palette: Option<Vec<[u8; 3]>>,
+        interlaced: bool,
+        indices: Vec<u8>,
+    }
+
+    fn frame_v1(width: u16, height: u16, indices: &[u8]) -> FrameSpecV1 {
+        FrameSpecV1 {
+            left: 0,
+            top: 0,
+            width,
+            height,
+            delay: 0,
+            disposal: 1,
+            transparent: None,
+            local_palette: None,
+            interlaced: false,
+            indices: indices.to_vec(),
+        }
+    }
+
+    struct GifSpecV1 {
+        version: &'static [u8; 6],
+        width: u16,
+        height: u16,
+        background_index: u8,
+        global_palette: Option<Vec<[u8; 3]>>,
+        loop_count: Option<u16>,
+        graphic_control: bool,
+        frames: Vec<FrameSpecV1>,
+    }
+
+    impl GifSpecV1 {
+        fn to_bytes(&self) -> Vec<u8> {
+            let mut out = Vec::new();
+            out.extend_from_slice(self.version);
+            out.extend_from_slice(&self.width.to_le_bytes());
+            out.extend_from_slice(&self.height.to_le_bytes());
+            let mut packed = 0u8;
+            let mut table = Vec::new();
+            let mut global_entries = 2usize;
+            if let Some(palette) = &self.global_palette {
+                let (bits, bytes) = table_bytes_v1(palette);
+                let (_, entries) = table_bits_v1(palette.len().max(2));
+                global_entries = entries;
+                packed |= 0x80 | bits;
+                table = bytes;
+            }
+            out.push(packed);
+            out.push(self.background_index);
+            out.push(0);
+            out.extend_from_slice(&table);
+            if let Some(count) = self.loop_count {
+                out.extend_from_slice(&[0x21, 0xFF, 11]);
+                out.extend_from_slice(b"NETSCAPE2.0");
+                out.extend_from_slice(&[3, 1]);
+                out.extend_from_slice(&count.to_le_bytes());
+                out.push(0);
+            }
+            for frame in &self.frames {
+                if self.graphic_control {
+                    let gce = (frame.disposal << 2) | u8::from(frame.transparent.is_some());
+                    out.extend_from_slice(&[
+                        0x21,
+                        0xF9,
+                        4,
+                        gce,
+                        (frame.delay & 0xFF) as u8,
+                        (frame.delay >> 8) as u8,
+                        frame.transparent.unwrap_or(0),
+                        0,
+                    ]);
+                }
+                out.push(0x2C);
+                out.extend_from_slice(&frame.left.to_le_bytes());
+                out.extend_from_slice(&frame.top.to_le_bytes());
+                out.extend_from_slice(&frame.width.to_le_bytes());
+                out.extend_from_slice(&frame.height.to_le_bytes());
+                let mut descriptor = 0u8;
+                let mut local = Vec::new();
+                if let Some(palette) = &frame.local_palette {
+                    let (bits, bytes) = table_bytes_v1(palette);
+                    descriptor |= 0x80 | bits;
+                    local = bytes;
+                }
+                if frame.interlaced {
+                    descriptor |= 0x40;
+                }
+                out.push(descriptor);
+                out.extend_from_slice(&local);
+                let _ = global_entries;
+                let min_code_size = 8u8;
+                out.push(min_code_size);
+                let data = lzw_encode_v1(min_code_size, &frame.indices);
+                write_sub_blocks_v1(&mut out, &data);
+            }
+            out.push(0x3B);
+            out
+        }
+    }
+
+    fn canvas_v1(pixels: &[[u8; 4]]) -> Vec<u8> {
+        let mut out = Vec::with_capacity(pixels.len() * 4);
+        for pixel in pixels {
+            out.extend_from_slice(pixel);
+        }
+        out
+    }
+    #[test]
+    fn n108_03_gif89a_previous_background_palette_interlace_offset() {
+        let red = [255, 0, 0, 255];
+        let blue = [0, 0, 255, 255];
+        let green = [0, 255, 0, 255];
+        let white = [255, 255, 255, 255];
+        let clear = [0, 0, 0, 0];
+
+        // 1. RestorePrevious: opaque red canvas, opaque blue frame disposed Previous, transparent
+        //    reveal. The reveal must show the restored red canvas, not the blue frame.
+        let mut fill_red = frame_v1(2, 2, &[0, 0, 0, 0]);
+        fill_red.delay = 7;
+        let mut fill_blue = frame_v1(2, 2, &[1, 1, 1, 1]);
+        fill_blue.delay = 7;
+        fill_blue.disposal = 3;
+        let mut reveal = frame_v1(1, 1, &[0]);
+        reveal.delay = 7;
+        reveal.transparent = Some(0);
+        let previous = GifSpecV1 {
+            version: b"GIF89a",
+            width: 2,
+            height: 2,
+            background_index: 0,
+            global_palette: Some(vec![RED, BLUE]),
+            loop_count: None,
+            graphic_control: true,
+            frames: vec![fill_red, fill_blue, reveal],
+        }
+        .to_bytes();
+        let obs = inspect_gif_bytes_with_executable_v1(Path::new(super::BIN), &previous)
+            .expect("real confined restore-previous worker must succeed");
+        assert_eq!(obs.signature(), "GIF89a");
+        assert_eq!((obs.width(), obs.height()), (2, 2));
+        assert_eq!(obs.frame_count(), 3);
+        assert_eq!(obs.frames()[1].disposal(), GifDisposalV1::Previous);
+        assert_eq!(
+            obs.frames()[0].composite_digest(),
+            &sha256_media_worker_bytes_v1(&canvas_v1(&[red, red, red, red]))
+        );
+        assert_eq!(
+            obs.frames()[1].composite_digest(),
+            &sha256_media_worker_bytes_v1(&canvas_v1(&[blue, blue, blue, blue]))
+        );
+        assert_eq!(
+            obs.frames()[2].composite_digest(),
+            &sha256_media_worker_bytes_v1(&canvas_v1(&[red, red, red, red]))
+        );
+        assert!(obs.transcript_len() > 0 && obs.worker_pid() != 0);
+        assert!(obs.limits_verified() && obs.cleanup_verified());
+        assert_eq!(
+            obs.source_digest(),
+            &sha256_media_worker_bytes_v1(&previous)
+        );
+        println!(
+            "n108_gif=restore-previous frames=3 pid={} src={} transcript={}",
+            obs.worker_pid(),
+            obs.source_digest().to_hex(),
+            obs.transcript_digest().to_hex()
+        );
+
+        // 2. RestoreBackground with a NONZERO (blue) global background index: the disposed region
+        //    must become the real background colour, never transparent and never a stale red pixel.
+        let fill = frame_v1(2, 2, &[0, 0, 0, 0]);
+        let mut over = frame_v1(1, 1, &[0]);
+        over.left = 1;
+        over.top = 1;
+        over.disposal = 2;
+        let mut reveal_bg = frame_v1(1, 1, &[0]);
+        reveal_bg.transparent = Some(0);
+        let background = GifSpecV1 {
+            version: b"GIF89a",
+            width: 2,
+            height: 2,
+            background_index: 1,
+            global_palette: Some(vec![RED, BLUE]),
+            loop_count: None,
+            graphic_control: true,
+            frames: vec![fill, over, reveal_bg],
+        }
+        .to_bytes();
+        let obs = inspect_gif_bytes_with_executable_v1(Path::new(super::BIN), &background)
+            .expect("real confined opaque-background worker must succeed");
+        assert_eq!(obs.frames()[1].disposal(), GifDisposalV1::Background);
+        let all_red = sha256_media_worker_bytes_v1(&canvas_v1(&[red, red, red, red]));
+        assert_eq!(obs.frames()[0].composite_digest(), &all_red);
+        assert_eq!(obs.frames()[1].composite_digest(), &all_red);
+        assert_eq!(
+            obs.frames()[2].composite_digest(),
+            &sha256_media_worker_bytes_v1(&canvas_v1(&[red, red, red, blue]))
+        );
+        assert_ne!(
+            obs.frames()[2].composite_digest(),
+            &sha256_media_worker_bytes_v1(&canvas_v1(&[red, red, red, clear]))
+        );
+        assert!(obs.transcript_len() > 0 && obs.worker_pid() != 0);
+        assert!(obs.limits_verified() && obs.cleanup_verified());
+        assert_eq!(
+            obs.source_digest(),
+            &sha256_media_worker_bytes_v1(&background)
+        );
+        println!(
+            "n108_gif=background frames=3 pid={} src={} transcript={}",
+            obs.worker_pid(),
+            obs.source_digest().to_hex(),
+            obs.transcript_digest().to_hex()
+        );
+
+        // 3. Local palette: a GREEN/WHITE local table must override the RED/BLUE global table.
+        let mut local = frame_v1(2, 2, &[0, 0, 0, 0]);
+        local.local_palette = Some(vec![GREEN, WHITE]);
+        let palette = GifSpecV1 {
+            version: b"GIF89a",
+            width: 2,
+            height: 2,
+            background_index: 0,
+            global_palette: Some(vec![RED, BLUE]),
+            loop_count: None,
+            graphic_control: true,
+            frames: vec![local],
+        }
+        .to_bytes();
+        let obs = inspect_gif_bytes_with_executable_v1(Path::new(super::BIN), &palette)
+            .expect("real confined local-palette worker must succeed");
+        assert!(obs.frames()[0].local_palette());
+        assert_eq!(
+            obs.frames()[0].composite_digest(),
+            &sha256_media_worker_bytes_v1(&canvas_v1(&[green, green, green, green]))
+        );
+        assert!(obs.transcript_len() > 0 && obs.worker_pid() != 0);
+        assert!(obs.limits_verified() && obs.cleanup_verified());
+        assert_eq!(obs.source_digest(), &sha256_media_worker_bytes_v1(&palette));
+        println!(
+            "n108_gif=local-palette frames=1 pid={} src={} transcript={}",
+            obs.worker_pid(),
+            obs.source_digest().to_hex(),
+            obs.transcript_digest().to_hex()
+        );
+
+        // 4. Interlaced 1x4 frame at left=1 on a 2x4 screen; stored order [0,2,1,3] is the
+        //    interlace pass order (rows 0, 2, 1, 3), so the right column must be RED, GREEN,
+        //    BLUE, WHITE and the untouched left column must stay zero-alpha.
+        let mut interlaced = frame_v1(1, 4, &[0, 2, 1, 3]);
+        interlaced.left = 1;
+        interlaced.interlaced = true;
+        let woven = GifSpecV1 {
+            version: b"GIF89a",
+            width: 2,
+            height: 4,
+            background_index: 0,
+            global_palette: Some(vec![RED, GREEN, BLUE, WHITE]),
+            loop_count: None,
+            graphic_control: true,
+            frames: vec![interlaced],
+        }
+        .to_bytes();
+        let obs = inspect_gif_bytes_with_executable_v1(Path::new(super::BIN), &woven)
+            .expect("real confined interlaced-offset worker must succeed");
+        assert!(obs.frames()[0].interlaced());
+        assert_eq!(
+            (
+                obs.frames()[0].left(),
+                obs.frames()[0].top(),
+                obs.frames()[0].width(),
+                obs.frames()[0].height()
+            ),
+            (1, 0, 1, 4)
+        );
+        assert_eq!(
+            obs.frames()[0].composite_digest(),
+            &sha256_media_worker_bytes_v1(&canvas_v1(&[
+                clear, red, clear, green, clear, blue, clear, white
+            ]))
+        );
+        assert!(obs.transcript_len() > 0 && obs.worker_pid() != 0);
+        assert!(obs.limits_verified() && obs.cleanup_verified());
+        assert_eq!(obs.source_digest(), &sha256_media_worker_bytes_v1(&woven));
+        println!(
+            "n108_gif=interlace-offset frames=1 pid={} src={} transcript={}",
+            obs.worker_pid(),
+            obs.source_digest().to_hex(),
+            obs.transcript_digest().to_hex()
+        );
+    }
 }
