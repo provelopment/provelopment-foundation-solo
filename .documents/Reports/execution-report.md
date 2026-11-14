@@ -1,68 +1,57 @@
 # Execution Report
 
-**status=STOPPED — GIF partial engineering, NOT ACCEPTED, not publishable; SVG still pending**
+**status=STOPPED — bounded GIF semantics correction (B) and confined GIF worker implementation (C) delivered on a green technical branch; the mandatory real-worker `n108_*` suite and the execution-count workflow gate are NOT delivered, so `R03C-CONFINED-GIF-WORKER-AND-ANIMATION-EVIDENCE-VERIFIED` is NOT satisfied. No GIF product acceptance, no publication, no integration.**
 
-`SOLO-WO-107 R01` requires checkpoint set **B1+B2+B3+C+D+E** for `R03C-FULL-ANIMATED-GIF-INSPECTION-VERIFIED-AND-INTEGRATED`. **B1 is delivered, committed, pushed and green on both hosts at one exact SHA.** B2 (confined worker path and versioned evidence frame), B3 (atomic V2 mixed inventory), C (mandatory `n107_*` two-host gate), D (deliberate-red proof) and E (main integration) are **not** delivered. No GIF capability is claimed as accepted, integrated or publishable.
+## 1. Preflight — verified before any change
 
-## 1. Preflight — all 23 frozen pins exact
+`HEAD == main == origin/main == git ls-remote origin main == 26f45ad8aacd0a93a812e8637dbb7e184c030394`; tree `3c520d38860f758a04fceffddca9a91279ef8703`; sole parent `cf20f873`; prior report blob `948bab47`; prior WO-107 ACTIVE `5a120b3e`; four WIP files only; 20 remote refs with `solo-wo-107-gif-r01 = efc384e1` unchanged and no `solo-wo-108-*`; one origin, one worktree, empty stash. The only tracked dirt was the Owner-installed WO-108 ACTIVE `cd7a1618901f34ed8600d9e83f55ea0cb4f2037b`.
 
-`HEAD == main == origin/main == git ls-remote origin main == 78f4548a2b5b38de83ccc13179bf336d085c1772`, tree `240fd75c0a39c8fe3f395265fe7a050ceaf8f23b`, sole parent `c90d56b1aba2412b74690eeca08a29c5c1277343`; previous report `b6dfea76`; previously tracked ACTIVE `24caae4d`; Owner-installed WO-107 ACTIVE `5a120b3e45b1369fc0215cdbfc761760c5aa835b` installed byte-for-byte and never normalised; Architecture `f66096ec`; Architect SOP `1483c9be`; Implementation SOP `51bb3792`; `AGENTS.md` `6eae1da8`; NEXT `92fa562b`; ROADMAP `9d7a8622`; OUTLOOK `cb9c7a61`; root manifest `14505be4`; prior `Cargo.lock` `5a18352b`; toolchain `9ec55b3b`; adapter manifest `9c7d526d`; workflow `995bd28e`; adapter root `c009e428`; worker `90d67201`; confined host `c6d78139`; native seam `d411eaf4`; app inspection `bdba09c1`; app root `707f2f08`; smoke `88b4c6ab`; CLI main `ae1395b3`; graph `da7d7ee7`; AST checker `1c99d348`; unsafe guard `57d75796`. Nineteen remote refs; no `solo-wo-106-*`/`solo-wo-107-*` pre-existing; one worktree, empty stash, four WIP files; the only tracked dirt was the Owner-installed ACTIVE.
+## 2. A — authority and issuance
 
-## 2. A — authority, and issuance CI
+- **A** = `ae65053d4ef0d197292a195e8c12638a530c1f44`, tree `997a1170ec6fa289461522131594e2a03041ed15`, sole parent `26f45ad8`, changing only ACTIVE `cd7a1618`. Issuance push CI `43579699908 failure`.
+- Technical branch `solo-wo-108-gif-worker-r01` created at A. No merge, cherry-pick, rebase, reset, force or branch deletion was performed.
 
-- **A** = `cf20f8736fb7c0fc0abfd53b6728c4cd8dfbbdc7`, tree `a6f3d1c7259639d2f9a5101095cc54b1c79113f7`, sole parent `78f4548a`, changing only `.documents/WIP/workorder-active.md` (`5a120b3e`).
-- Issuance `push` run **`43577248439` GREEN on both hosts** at `cf20f873`.
+## 3. B0 — exact restoration of the six audited WO-107 B1 blobs
 
-## 3. B1 — first real-code checkpoint (delivered)
+Path-scoped restore from `efc384e1`, each verified by `git hash-object` against the order's pinned identity: workflow `866c9e51`, `Cargo.lock` `cf105167`, adapter manifest `3610f06f`, GIF module `87602f3b`, adapter root `97b8f0ed`, graph `dc6d2770`. **B0** = `059f9898e29c8bedae59cade0ec486c58f772cde`, tree `226cf8a5f7a41270c2edec5cd3d97d3914300051`, parent `ae65053d`. The seven original B1 tests still executed and passed on the restored blob, confirming the checkpoint is intact rather than re-invented.
 
-Branch `solo-wo-107-gif-r01` from green A:
+## 4. B — real corrections, with load-bearing tests
 
-- **B1** = `efc384e17f496522484dff09e0559b4724876829`, tree `37d061a3c9b3460aadaa7bc3698cb67d399df69e`, sole parent `cf20f8736fb7c0fc0abfd53b6728c4cd8dfbbdc7`. Commit message: `GIF decoder checkpoint - nonpublishing, NOT ACCEPTED`.
-- Changed blobs: `crates/solo-adapters/src/graphic_gif_inspection.rs` `87602f3b2a33bb3baf1a16bc7c5a4b18530e6b30` (new), `crates/solo-adapters/src/lib.rs` `97b8f0ed5ea1ee4b474a2904ef385356c4d9bd13`, `Cargo.lock` `cf1051675576ab0e00ce7acbd5dbe139882c31b4`, `crates/solo-adapters/Cargo.toml`, `crates/solo-cli/tests/architecture_checks/graph.rs`, `.github/workflows/rust-verify.yml`.
-- Branch `workflow_dispatch` run **`43577791335` GREEN on both hosts at `efc384e1`**: Ubuntu job `132395748559` success, Windows job `132395748911` success. That run exercised the full mandatory pipeline — N097 image tests, the four Windows N102 canaries, architecture, cargo-deny, release smoke and reproducibility — with the new codec present.
+**B** = `1282852ad2052a4c302a4439fd474b5122556c73`, GIF module blob `785d08d0e5a9009be1cbb015eb1b88362f6ab311`.
 
-What the code actually does (not a label, not a stub):
+1. **GIF89a restore-to-background is now the standard's background colour, not a zeroed buffer.** The scanner captures the logical-screen Background Color Index and the resolved global-table entry. Disposal 2 paints that opaque RGBA colour across the frame rectangle. Two documented, deterministic policy cases: a background index equal to the disposing frame's transparent index paints fully transparent (a transparent background paints nothing), and a stream that uses disposal 2 without a global colour table is refused `gif-background-undefined` because no standard colour exists. An out-of-range background index is refused `gif-background-index-out-of-range`.
+2. **GIF87a is now strict, and the old fixture defect is fixed.** An extension-free GIF87a still is the positive fixture; any extension block in a GIF87a stream is refused `gif-extension-not-permitted-in-gif87a`, because the Graphic Control and Application extensions are 89a constructs. GIF89a keeps accurate GCE and NETSCAPE2.0 repeat handling.
+3. **Interlace and palette provenance are taken from the container, not the decoder.** The pinned decoder clears `Frame::interlaced` after deinterlacing, so both the interlace flag and local-palette presence are now read from the image descriptor during the independent container walk. This was found by a failing test, not assumed.
+4. **The raw decoder is no longer a public API.** `inspect_gif_animation_v1` is `pub(crate)` and its adapter re-export is removed; it is reachable only from the confined child and unit tests.
+5. **Fourteen deterministic tests execute and pass** (`cargo test -p solo-adapters --lib --locked graphic_gif`: `14 passed; 0 failed`), including: extension-free GIF87a still with exact composite digest; GIF87a+GCE refusal; three-frame 89a timeline with authored 10/20/5 cs delays (350 ms), infinite loop and background disposal; **opaque nonzero background restore proven by digest** (frame 1 draws red into a red canvas so its own digest is unchanged, and frame 2 observes the restored opaque blue pixel — the pair is unobtainable without restoration); **RestorePrevious proven against a saved 2×2 canvas** (red → blue → red); **local palette overriding the global table** (green, not red); **interlaced four-row frame at a nonzero offset** (stored rows 0,2,1,3 compose to canvas rows red, green, blue, white with column 0 left transparent); absent and finite(2) loop semantics with authored zero delay; plus background-index, missing-table, trailing-byte, unknown-extension, truncation and oversized-screen refusals. Fixtures are generated by an in-module deterministic GIF LZW encoder, so no encoder dependency was added.
 
-1. `scan_container_v1` independently walks the **container grammar**: `GIF87a`/`GIF89a` signature, logical screen descriptor, global colour table, graphic-control/comment/application extensions, image descriptors with local colour tables, LZW data sub-block chains, and a trailer that must be the exact last byte. Unknown extension labels, non-NETSCAPE/ANIMEXTS application extensions, duplicate repeat extensions, zero-size frames, rectangles outside the logical screen, missing trailer and any trailing byte are typed refusals.
-2. `inspect_gif_animation_v1` decodes **every** frame with `gif 0.14.2` under `ColorOutput::RGBA`, an explicit per-frame `MemoryLimit::Bytes(256 MiB)`, `check_frame_consistency(true)`, `check_lzw_end_code(true)` and `allow_unknown_blocks(false)`, then composites onto one bounded RGBA canvas honouring transparency, offsets and each frame's authored disposal (`keep`, `background`, `previous`), hashing the **fully composited canvas** per frame.
-3. `GifAnimationEvidenceV1` is the closed, ordered transcript: signature, MIME, dimensions, frame count, loop semantics (`absent` / `finite(n)` / `infinite`), one-cycle duration, aggregate composited pixels, source SHA-256, and per-frame delay in **authored centiseconds**, rectangle, disposal, transparency index, interlace, palette source and composite SHA-256, plus a transcript SHA-256.
+## 5. C — confined GIF worker, implemented and compiled, not host-tested
 
-Budgets enforced with checked arithmetic: 20 MiB source, 1..=8192 per side, 32,000,000 canvas pixels, `MAX_GIF_FRAMES_V1=1024`, `MAX_GIF_TOTAL_COMPOSITED_PIXELS_V1=128_000_000`, `MAX_GIF_ONE_CYCLE_DELAY_MS_V1=3_600_000`, 1 MiB trace. Infinite repeat is preserved, never rewritten; a zero centisecond delay is preserved as authored.
+**C** = `bb3ef4ab083643b1b1d6c332c5c038f12ded68f9`, tree `22b42679c4d25aeb8f47f020ea3c43cee89ecf12`, adapter blob `61c5e1421ff5c69455a4baae240cfad52f0f9ea1`, adapter root `3f7ab0b397af77d7116c018c1c159fc679ddf4bc`.
 
-## 4. Executable evidence produced locally and in hosted CI
+- A fixed closed `gif` token inside the pre-existing reserved `--internal-image-worker-v1` handler. It is **not** a `GraphicImageFormatV1` variant; the still-image enum keeps three formats and the `SOLO-IMAGE-WORKER-V1` frame is untouched.
+- The child proves the already-installed OS profile **before reading any byte**, bounds stdin, re-checks the claimed source SHA-256, decodes the complete animation through the crate-internal compositor, and emits one versioned `SOLO-GIF-WORKER-V1` header (format, mime, confinement, child PID, width, height, frames, loop token, loop count, one-cycle delay, composited pixels, source SHA-256, transcript length, transcript SHA-256) followed by exactly the `SOLO-GIF-ANIMATION-V1` transcript bytes.
+- The trusted parent never decodes a GIF. It requires proven limits, a real PID, a verified reap and exit 0, applies the fixed smaller GIF stdout cap, parses the ordered 14-key header strictly, rejects unknown/duplicate/reordered/absent fields, verifies decimal canonicality and lower-case hex, re-checks cross-field arithmetic and budgets, **recomputes SHA-256 over the exact transcript bytes received**, and compares the source digest against the bytes it already holds. Two closed test seams (`gif-wrong-source`, `gif-wrong-transcript`) exist so those parent guards can be proved load-bearing later.
+- Public adapter surface is only the supervised, nonpublishing `inspect_gif_bytes_v1` returning `GifWorkerObservationV1`.
 
-Seven deterministic, self-generated unit tests exist in the new module and **all seven pass** (`cargo test -p solo-adapters --lib --locked graphic_gif`: `7 passed; 0 failed`):
+**Branch CI is green at `bb3ef4ab`:** `workflow_dispatch` run `43580280590`, Ubuntu job `132403323848` success, Windows job `132403324023` success — the full existing pipeline (N097, the four Windows N102 canaries, architecture, cargo-deny, release smoke, reproducibility) passed with this code present. Local gates: `cargo fmt` clean, strict Clippy `-D warnings` clean, architecture `architecture=legal packages=4 targets=33 files=63 edges=70`.
 
-| Test | What it proves |
-|---|---|
-| `gif87a_still_is_one_frame_and_not_an_animation` | GIF87a still accepted, `frame_count=1`, `is_animated=false`, loop `absent`, 0 ms cycle, composite digest equals SHA-256 of the single red RGBA pixel |
-| `gif89a_multi_frame_preserves_delays_disposal_and_composition` | 3-frame GIF89a: authored delays `10/20/5` cs sum to **350 ms**, loop `infinite`, disposal `keep`/`background`/`keep`; frame 0 digest = red, frame 1 digest = red (transparent draw carried frame 0 forward), frame 2 digest = fully cleared canvas — the only way to obtain that pair is to honour `restore to background`; transcript digest equals SHA-256 of the transcript bytes |
-| `finite_repeat_count_is_preserved_exactly` | `NETSCAPE2.0` count 3 → loop `finite(3)`, not normalised |
-| `trailing_bytes_after_the_trailer_are_refused` | one appended byte → `gif-trailing-data` |
-| `unsupported_extension_block_is_refused` | plain-text extension `0x21 0x01` → `gif-unsupported-extension` |
-| `truncated_stream_is_refused` | cut trailer → `gif-truncated-container` |
-| `oversized_logical_screen_is_refused` | 8193-pixel side → `gif-canvas-out-of-range` |
+**What that green run does not prove:** the ordered `n108_01`…`n108_08` tests do not exist, so no real hosted worker process ever exercised the GIF path, and the workflow has no mandatory named-case/count gate. The worker code is compiled and reviewed but **not host-proved**.
 
-Local gates on `efc384e1`: `cargo fmt --all -- --check` clean; `cargo clippy -p solo-adapters --all-targets --locked -- -D warnings` **0 errors**; `cargo check -p solo-adapters --all-targets --target x86_64-pc-windows-msvc --locked` clean (type-check only — not Windows runtime proof); architecture `architecture=legal packages=4 targets=33 files=63 edges=70`. The five `source_read_native::snapshot_proofs` cases fail **locally only** because this WSL filesystem offers no reflink support; they are unchanged pre-existing environment-dependent cases and pass on hosted CI, which the green run above confirms.
-
-## 5. Dependency audit
-
-`gif = { version = "=0.14.2", default-features = false, features = ["std"] }`, `solo-adapters` only. `std` is required because the crate is `#![cfg(feature = "std")]` and the audited decode API is absent without it; no other feature was added, and `image =0.25.10` keeps its three original features. Locked closure grows by exactly two nodes — `gif` and `weezl` — recorded in `APPROVED_ADAPTER_CLOSURE` (now 39) and `APPROVED_ADAPTER_EXTERNAL_NORMAL` (now 7); the observed edge count rose from 68 to 70 with no wildcard or skip. Licence, advisory, ban and source policy are enforced by the hosted `cargo-deny` gates that passed in run `43577791335`; the pre-existing non-blocking `license-not-encountered` warning is unchanged.
-
-## 6. Exact unmet gates
+## 6. Remaining obligations
 
 | Gate | State |
 |---|---|
-| **B2** confined single-use worker `gif` path, separate versioned bounded evidence frame, parent recomputation of transcript SHA-256, real `n107_*` two-host worker tests | **Not delivered** — the codec is a library module; the worker still dispatches only `png`/`jpeg`/`webp` |
-| **B3** `GraphicMedia*V2` atomic mixed PNG/JPEG/WebP/GIF whole-owner inventory (internal, unlisted, suppressed, duplicate, wrong namespace, no fallback) | **Not delivered** — `crates/solo-application/src/graphic_media_inspection.rs` does not exist |
-| **C** mandatory both-host `n107_` command plus named-case execution assertion in the workflow | **Not delivered** — workflow carries only the graph-count update |
-| **D** `solo-wo-107-negative-gif-r01` deliberate-red forged transcript/frame-digest proof | **Not delivered** — no red branch, no mutation, no log |
-| **E** exact-blob integration to `main` with fresh two-host CI | **Not performed** — nothing integrated; `main` remains at A |
+| `n108_01`…`n108_08` real two-host confined-worker tests (87a still, 89a animation, Previous/local/interlace/offset/transparency, mislabeled formats, forged digests/PID, malformed protocol, budgets, N097/N102 parity and cross-host digest equality) | **Not written** |
+| Workflow both-host `n108_` step with exact qualified names and pinned pass count, zero skipped/ignored | **Not added** |
+| Bounded outcome `R03C-CONFINED-GIF-WORKER-AND-ANIMATION-EVIDENCE-VERIFIED` | **Not satisfied** |
+| Atomic mixed PNG/JPEG/WebP/GIF `V2` whole-owner policy, deliberate-red digest mutation, exact-blob integration to `main` | Not authorized in this order; still required |
+| True-vector sanitized SVG (§6.2I) | Still binding and pending |
 
-The blocker is execution capacity in this run, not a governance contradiction: the remaining scope (worker protocol extension, V2 policy, host tests, red proof, integration and final report CI) is a further substantial increment. I stopped rather than weaken the evidence standard, and deliberately did **not** delete the working checkpoint.
+The blocker is remaining execution capacity for the mandated real-worker test suite and its CI gate, not a governance contradiction or an in-ledger impossibility. I stopped rather than fabricate worker evidence, weaken a check, or describe compiled code as verified behaviour.
 
-## 7. Preservation, cleanup, nonclaims
+## 7. Preservation and nonclaims
 
-`main` is still exactly A `cf20f873` with an empty tracked diff; the only remote advance is the new `solo-wo-107-gif-r01` ref (`efc384e1`), so there are now 20 remote refs and all 18 pre-existing non-main refs are byte-identical. Frozen and untouched: native seam, confined host, source-read and inventory boundaries, `media_worker.rs`, root manifest, Architecture, SOPs, AST checker, unsafe guard, `deny.toml`, toolchain, NEXT/ROADMAP/OUTLOOK, Owner `.temp/solo-wo-073-wip/`, retained patches and WSL cache. No scratch files were left behind outside the shared Cargo registry cache.
+`main` carries only this report commit; the GIF technical work lives solely on `solo-wo-108-gif-worker-r01` and was **not** integrated. `solo-wo-107-gif-r01` remains at `efc384e1`. Frozen and untouched: application `graphic_image_inspection.rs` and lib, domain, inventory/read/namespace logic, native seam, `media_worker.rs`, root manifest, toolchain, Architecture, SOPs, AST checker, unsafe guard, `deny.toml`, NEXT/ROADMAP/OUTLOOK, Owner `.temp` material, prior patches and WSL cache. Task scratch `.temp/wo108/` was deleted. No dependency, feature or version changed beyond the already-audited `gif 0.14.2`. Local limitation unchanged: five `source_read_native::snapshot_proofs` cases fail on this WSL filesystem for lack of reflink support and pass on hosted CI.
 
-**Nonclaims:** no GIF inspection is reachable from the worker, the CLI or any public surface; nothing accepts, validates, sanitises or delivers GIF through the product; no animation is publicly served. No SVG work of any kind was performed and the binding §6.2I true-vector SVG commitment remains entirely open and next. No AVIF, catalogue, delivery, release, deploy, tag or self-acceptance. `R03.C`, `R03.C3` and Stage 03 remain open.
+**Nonclaims:** no GIF is accepted, published, routed or delivered; no mixed-format owner policy exists; no AVIF, catalogue, browser or provider surface; no release, deploy, tag or self-acceptance. `R03.C`, `R03.C3` and Stage 03 remain open.
