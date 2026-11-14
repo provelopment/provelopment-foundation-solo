@@ -3010,3 +3010,133 @@ fn inspect_svg_bytes_in_mode_v1(
     observation.wall_ms = run.wall_ms();
     Ok(observation)
 }
+
+// ---------------------------------------------------------------------------------------------
+// `SOLO-WO-116 R02` — the V3 five-format composition.
+//
+// This adapter owns no decoding rule of its own: it selects the already-accepted confined worker
+// for each declared format and hands the untrusted response to the inward V3 validator. AVIF is
+// refused here with a typed refusal and no worker is ever started for it.
+// ---------------------------------------------------------------------------------------------
+
+/// The confined five-format inspection adapter.
+pub struct ConfinedGraphicInspectAdapterV3 {
+    executable: std::path::PathBuf,
+}
+
+impl ConfinedGraphicInspectAdapterV3 {
+    /// Binds the adapter to one already-pinned CLI executable.
+    #[must_use]
+    pub fn new(executable: &std::path::Path) -> Self {
+        Self {
+            executable: executable.to_path_buf(),
+        }
+    }
+}
+
+impl solo_application::GraphicImageInspectPortV3 for ConfinedGraphicInspectAdapterV3 {
+    fn inspect_v3(
+        &self,
+        request: &solo_application::GraphicImageInspectRequestV3,
+    ) -> solo_application::GraphicImageInspectPortOutcomeV3 {
+        use GraphicImageInspectPortOutcomeV3 as Outcome;
+        use solo_application::GraphicImageInspectRefusalKindV3 as Kind;
+        use solo_application::{
+            GraphicImageFormatV1, GraphicImageFormatV3, GraphicImageInspectPortOutcomeV3,
+            GraphicImageObservationV3, GraphicVectorEvidenceV3,
+        };
+
+        let format = request.declared_format();
+        if format.is_avif() {
+            // The AVIF arm is deliberately dead: no worker, no decode, no claim.
+            return Outcome::Refused(Kind::AvifUnsupported);
+        }
+        if format.is_svg() {
+            return match inspect_svg_bytes_with_executable_v1(&self.executable, request.bytes()) {
+                Ok(observation) => Outcome::Inspected(Box::new(GraphicImageObservationV3::Vector(
+                    GraphicVectorEvidenceV3 {
+                        width: observation.width(),
+                        height: observation.height(),
+                        elements: observation.elements(),
+                        depth: observation.depth(),
+                        references: observation.references(),
+                        path_commands: observation.path_commands(),
+                        filters: observation.filters(),
+                        canonical: observation.canonical().to_vec(),
+                        source_digest: *observation.source_digest(),
+                        output_digest: *observation.output_digest(),
+                        worker_pid: observation.worker_pid(),
+                        wall_ms: observation.wall_ms(),
+                        limits_verified: observation.limits_verified(),
+                        cleanup_verified: observation.cleanup_verified(),
+                    },
+                ))),
+                Err(_) => Outcome::Refused(Kind::PortRefused),
+            };
+        }
+        if format.is_gif() {
+            return match inspect_gif_bytes_with_executable_v1(&self.executable, request.bytes()) {
+                Ok(observation) => Outcome::Inspected(Box::new(
+                    GraphicImageObservationV3::Animation(gif_animation_evidence_v2(&observation)),
+                )),
+                Err(_) => Outcome::Refused(Kind::PortRefused),
+            };
+        }
+        let still_format = match format {
+            GraphicImageFormatV3::Png => GraphicImageFormatV1::Png,
+            GraphicImageFormatV3::Jpeg => GraphicImageFormatV1::Jpeg,
+            GraphicImageFormatV3::WebP => GraphicImageFormatV1::WebP,
+            _ => return Outcome::Refused(Kind::UnsupportedFormat),
+        };
+        match inspect_image_bytes_with_mode_v1(
+            &self.executable,
+            request.bytes(),
+            still_format,
+            IMAGE_WORKER_MODE_DECODE_V1,
+        ) {
+            GraphicImageInspectPortOutcomeV1::Inspected(observation) => {
+                Outcome::Inspected(Box::new(GraphicImageObservationV3::Still(*observation)))
+            }
+            GraphicImageInspectPortOutcomeV1::Refused(_) => Outcome::Refused(Kind::PortRefused),
+        }
+    }
+}
+
+/// One whole-owner V3 outcome: every obligation inspected, or one attributable refusal.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EntityImageOutcomeV3 {
+    /// Every declared obligation was inspected.
+    Complete(solo_application::GraphicImageInspectionSetV3),
+    /// The confined source read failed with its own typed refusal.
+    ReadRefused(solo_application::GraphicAssetReadRefusalV1),
+    /// One obligation was refused.
+    Refused(solo_application::GraphicImageInspectRefusalV3),
+}
+
+/// Reads the real confined sources for one inventory, then inspects the whole candidate.
+///
+/// The chain is the accepted one, unchanged: validated inventory, real confined source read, one
+/// freshly supervised single-use worker per source, then the inward whole-set validator.
+#[must_use]
+pub fn inspect_entity_graphic_images_v3(
+    root: &ContentRootCapability,
+    inventory: &GraphicAssetObligationInventoryV1,
+    executable: &Path,
+) -> EntityImageOutcomeV3 {
+    use solo_application::GraphicAssetReadSetOutcomeV1;
+    let source_set = match read_graphic_asset_bytes_v1(inventory, root) {
+        GraphicAssetReadSetOutcomeV1::Complete(set) => set,
+        GraphicAssetReadSetOutcomeV1::Refused(refusal) => {
+            return EntityImageOutcomeV3::ReadRefused(refusal);
+        }
+    };
+    let adapter = ConfinedGraphicInspectAdapterV3::new(executable);
+    match solo_application::inspect_graphic_image_source_set_v3(&source_set, &adapter) {
+        solo_application::GraphicImageInspectionOutcomeV3::Complete(set) => {
+            EntityImageOutcomeV3::Complete(set)
+        }
+        solo_application::GraphicImageInspectionOutcomeV3::Refused(refusal) => {
+            EntityImageOutcomeV3::Refused(refusal)
+        }
+    }
+}

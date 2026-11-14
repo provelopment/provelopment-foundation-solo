@@ -94,6 +94,9 @@ pub use graphic_image_inspection::{
     run_internal_image_worker_v1, test_inventory_suppressed_v1, test_inventory_v1,
 };
 pub use graphic_image_inspection::{
+    ConfinedGraphicInspectAdapterV3, EntityImageOutcomeV3, inspect_entity_graphic_images_v3,
+};
+pub use graphic_image_inspection::{
     MAX_SVG_WORKER_STDOUT_BYTES_V1, SVG_WORKER_FRAME_PREFIX_V1, SVG_WORKER_MODE_DECODE_V1,
     SVG_WORKER_MODE_WRONG_OUTPUT_V1, SVG_WORKER_MODE_WRONG_SOURCE_V1, SVG_WORKER_TOKEN_V1,
     SvgWorkerModeV1, SvgWorkerObservationV1, SvgWorkerRefusalV1, SvgWorkerTestModeV1,

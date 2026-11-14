@@ -941,12 +941,16 @@ fn r03a_06_duplicate_and_malformed_entries_refuse_without_repair() {
             .kind(),
         PropertyRefusalKind::InvalidAssetReference
     );
-    assert_eq!(
-        AssetReferenceV1::parse(AssetNamespace::Entity, "assets/logo.svg")
-            .expect_err("an active SVG refuses")
-            .kind(),
-        PropertyRefusalKind::UnsupportedAssetExtension
-    );
+    // `SOLO-WO-116 R02` authorized the single lowercase `svg` extension token, so this direct
+    // parser assertion is corrected from "an active SVG refuses" to "a lowercase SVG reference is
+    // admitted as *syntax only*". Syntax admission is not a media, decode or publication claim:
+    // the V3 inspector still refuses any SVG that is not a safe static vector, and `.svg` on the
+    // PNG-only favicon role still refuses. The uppercase spelling and every other refusal below
+    // are unchanged.
+    let admitted_svg = AssetReferenceV1::parse(AssetNamespace::Entity, "assets/logo.svg")
+        .expect("a lowercase svg reference is admitted");
+    assert_eq!(admitted_svg.reference(), "assets/logo.svg");
+    assert_eq!(admitted_svg.namespace(), AssetNamespace::Entity);
     // `SOLO-WO-113 R02` authorized the single `gif` extension token, so this direct parser
     // assertion is corrected from "a GIF refuses" to "a lowercase GIF reference is admitted";
     // every other refusal in this test is unchanged, and the uppercase spelling still refuses.

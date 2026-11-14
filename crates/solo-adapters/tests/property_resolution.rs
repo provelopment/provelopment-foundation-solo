@@ -401,7 +401,9 @@ fn r03a_09_closed_typed_entries_refuse() {
             PropertyRefusalKind::InvalidAssetReference,
         ),
         (
-            r#"{ "graphic.logo": { "inheritance": "inherit", "currentContext": [ { "source": { "namespace": "entity", "reference": "images/logo.svg" }, "exposure": "public" } ] } }"#,
+            // `SOLO-WO-116 R02` admitted the lowercase `svg` token as syntax only, so this closed-entry
+            // refusal sample uses the uppercase spelling, which stays refused.
+            r#"{ "graphic.logo": { "inheritance": "inherit", "currentContext": [ { "source": { "namespace": "entity", "reference": "images/logo.SVG" }, "exposure": "public" } ] } }"#,
             PropertyRefusalKind::UnsupportedAssetExtension,
         ),
         (
@@ -1877,7 +1879,7 @@ fn r03c1_09_reference_grammar_is_unchanged_and_no_media_is_attested() {
     assert_eq!(
         page_level_refusal_kind(&graphic_page_properties(
             "graphic.logo",
-            "media/logo.svg",
+            "media/logo.SVG",
             "public"
         )),
         unsupported,

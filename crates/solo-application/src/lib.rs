@@ -58,6 +58,15 @@ pub use graphic_image_inspection::{
     StillImageEvidenceV2, checked_rgba8_bytes_v1, inspect_graphic_image_source_set_v1,
     inspect_graphic_image_source_set_v2, role_admits_format_v2, side_within_bounds_v1,
 };
+pub use graphic_image_inspection::{
+    GRAPHIC_IMAGE_INSPECTION_V3_GRANTS_PUBLICATION_AUTHORITY,
+    GRAPHIC_IMAGE_INSPECTION_V3_PROVES_MEDIA_CORRECTNESS, GraphicImageFormatV3,
+    GraphicImageInspectPortOutcomeV3, GraphicImageInspectPortV3, GraphicImageInspectRefusalKindV3,
+    GraphicImageInspectRefusalV3, GraphicImageInspectRequestV3, GraphicImageInspectionOutcomeV3,
+    GraphicImageInspectionSetV3, GraphicImageInspectionV3, GraphicImageObservationV3,
+    GraphicImagePayloadV3, GraphicVectorEvidenceV3, IMAGE_MIME_GIF_V3, StillImageEvidenceV3,
+    inspect_graphic_image_source_set_v3, role_admits_format_v3,
+};
 pub use media_worker::{
     MEDIA_WORKER_GRANTS_PUBLICATION_AUTHORITY_V1, MEDIA_WORKER_MAX_DECODED_BYTES_V1,
     MEDIA_WORKER_MAX_ENVELOPE_BYTES_V1, MEDIA_WORKER_MAX_SOURCE_BYTES_V1,

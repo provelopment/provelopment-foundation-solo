@@ -624,9 +624,12 @@ impl AssetNamespace {
 /// `SOLO-WO-113 R02` added exactly one token, `gif`, so a real authored four-format candidate can
 /// exist. This is an **authored reference grammar** only: it grants no decoding, inspection,
 /// publication or routing authority, and the accepted four-format V2 inspector still decides
-/// separately whether a given format is supported. `svg` is deliberately absent until the secure
-/// true-vector codec exists, and uppercase spellings are never admitted.
-pub const ACCEPTED_IMAGE_EXTENSIONS: [&str; 6] = ["png", "jpg", "jpeg", "webp", "avif", "gif"];
+/// separately whether a given format is supported. Under `SOLO-WO-116 R02` lowercase `svg` is
+/// also admitted as syntax only, exactly like `avif`, and admission never implies a codec,
+/// an inspection result, a publication claim or a route; uppercase spellings are never
+/// admitted.
+pub const ACCEPTED_IMAGE_EXTENSIONS: [&str; 7] =
+    ["png", "jpg", "jpeg", "webp", "avif", "gif", "svg"];
 
 /// A validated typed asset **reference**.
 ///
@@ -1764,7 +1767,7 @@ mod tests {
 
     #[test]
     fn n113_00_a_lowercase_gif_reference_is_admitted_and_keeps_its_grammar() {
-        assert_eq!(ACCEPTED_IMAGE_EXTENSIONS.len(), 6);
+        assert_eq!(ACCEPTED_IMAGE_EXTENSIONS.len(), 7);
         assert!(ACCEPTED_IMAGE_EXTENSIONS.contains(&"gif"));
         for text in ["scene.gif", "deep/scene.gif"] {
             let parsed = reference(text).expect("a lowercase gif reference is admitted");
@@ -1806,7 +1809,7 @@ mod tests {
 
     #[test]
     fn n113_00_uppercase_svg_and_unsafe_references_stay_refused() {
-        for text in ["bad.GIF", "vector.svg", "a.Gif", "a.SVG", "a.bmp"] {
+        for text in ["bad.GIF", "vector.SVG", "a.Gif", "a.SVG", "a.bmp", "a.svgx"] {
             let refusal = reference(text).expect_err("extension must be refused");
             assert_eq!(
                 refusal.kind(),
