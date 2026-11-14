@@ -3631,4 +3631,86 @@ mod n108 {
             }
         }
     }
+
+    /// One 1x1 GIF89a selecting `index` from the shared RED/BLUE palette with an authored delay.
+    fn gif89a_index_delay(index: u8, delay: u16) -> Vec<u8> {
+        let mut frame = frame_v1(1, 1, &[index]);
+        frame.delay = delay;
+        GifSpecV1 {
+            version: b"GIF89a",
+            width: 1,
+            height: 1,
+            background_index: 0,
+            global_palette: Some(vec![RED, BLUE]),
+            loop_count: None,
+            graphic_control: true,
+            frames: vec![frame],
+        }
+        .to_bytes()
+    }
+
+    #[test]
+    fn n108_08_gif_source_transcript_and_pixel_change_evidence() {
+        let red = sha256_media_worker_bytes_v1(&canvas_v1(&[[255, 0, 0, 255]]));
+        let blue = sha256_media_worker_bytes_v1(&canvas_v1(&[[0, 0, 255, 255]]));
+
+        let a_bytes = gif89a_index_delay(0, 0);
+        let b_bytes = gif89a_index_delay(1, 0);
+        let c_bytes = gif89a_index_delay(0, 5);
+        assert_ne!(a_bytes, b_bytes, "B must differ from A only by pixel index");
+        assert_ne!(a_bytes, c_bytes, "C must differ from A only by delay");
+
+        let run = |bytes: &Vec<u8>, label: &str| {
+            let obs = inspect_gif_bytes_with_executable_v1(Path::new(super::BIN), bytes)
+                .expect("every valid GIF89a specimen must pass the real confined worker");
+            assert_real_child_evidence(&obs, bytes);
+            assert_eq!(obs.frame_count(), 1);
+            println!(
+                "n108_gif=evidence case={label} pid={} src={} transcript={} pixel={} cycle_ms={}",
+                obs.worker_pid(),
+                obs.source_digest().to_hex(),
+                obs.transcript_digest().to_hex(),
+                obs.frames()[0].composite_digest().to_hex(),
+                obs.one_cycle_delay_ms()
+            );
+            obs
+        };
+
+        // A is inspected twice through separate supervised children.
+        let a1 = run(&a_bytes, "A1");
+        let a2 = run(&a_bytes, "A2");
+        let b = run(&b_bytes, "B");
+        let c = run(&c_bytes, "C");
+
+        // Pixel evidence is asserted independently of the decoder's own digest arithmetic.
+        assert_eq!(a1.frames()[0].composite_digest(), &red);
+        assert_eq!(a2.frames()[0].composite_digest(), &red);
+        assert_eq!(b.frames()[0].composite_digest(), &blue);
+        assert_eq!(c.frames()[0].composite_digest(), &red);
+
+        // A different authored asset changes both the source and the transcript binding.
+        assert_ne!(a1.source_digest(), b.source_digest());
+        assert_ne!(a1.transcript_digest(), b.transcript_digest());
+        assert_ne!(a1.source_digest(), c.source_digest());
+        assert_ne!(a1.transcript_digest(), c.transcript_digest());
+
+        // C keeps A's composited pixels while changing only the timing contract.
+        assert_eq!(
+            a1.frames()[0].composite_digest(),
+            c.frames()[0].composite_digest()
+        );
+        assert_eq!(a1.one_cycle_delay_ms(), 0);
+        assert_eq!(c.one_cycle_delay_ms(), 50);
+
+        // Two separate real children agree on every piece of evidence except their own identity.
+        assert_eq!(a1.source_digest(), a2.source_digest());
+        assert_eq!(a1.transcript_digest(), a2.transcript_digest());
+        assert_eq!(a1.transcript_len(), a2.transcript_len());
+        assert_eq!(
+            a1.frames()[0].composite_digest(),
+            a2.frames()[0].composite_digest()
+        );
+        assert_eq!(a1.one_cycle_delay_ms(), a2.one_cycle_delay_ms());
+        assert_ne!(a1.worker_pid(), a2.worker_pid());
+    }
 }
