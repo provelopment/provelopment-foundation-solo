@@ -2022,6 +2022,30 @@ mod n097 {
         ] {
             let root = Root::new(tag, &[(name, &fixture)]);
             let reference = name.to_owned();
+            // The low-level seam is exercised first so a format-specific child refusal is reported
+            // with its own bounded fact instead of only as an unattributed port refusal.
+            let direct = solo_adapters::run_confined_image_worker_v1(
+                Path::new(BIN),
+                format.worker_token(),
+                &solo_application::sha256_media_worker_bytes_v1(&fixture).to_hex(),
+                &fixture,
+            );
+            match &direct {
+                Ok(run) => println!(
+                    "n102_worker={tag} exit={:?} pid={} wall_ms={} cleanup={} limits={} stdout_len={}",
+                    run.exit_code(),
+                    run.child_pid(),
+                    run.wall_ms(),
+                    run.cleanup_verified(),
+                    run.limits_verified(),
+                    run.stdout().len(),
+                ),
+                Err(refusal) => println!("n102_worker={tag} refused={refusal:?}"),
+            }
+            assert!(
+                direct.is_ok(),
+                "{tag} spawned a confined worker: {direct:?}"
+            );
             let set = complete(inspect_entity_graphic_images_v1(
                 &root.capability(),
                 &one_logo(&reference),
@@ -2063,7 +2087,7 @@ mod n097 {
             &root.capability(),
             &inventory_of(&[
                 (TestOwnerV1::Entity, "logo", "entity.png", "public"),
-                (TestOwnerV1::Site, "logo", "site.png", "public"),
+                (TestOwnerV1::Site, "banner", "site.png", "public"),
             ]),
             Path::new(BIN),
         ));

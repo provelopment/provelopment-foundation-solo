@@ -294,8 +294,11 @@ fn shape_of_jpeg_v1(bytes: &[u8]) -> Result<StillImageShapeV1, ImageShapeRefusal
 
         match marker {
             0xc0..=0xc2 => {
-                let height = u32::from(u16_be_at(bytes, body_start)?);
-                let width = u32::from(u16_be_at(bytes, body_start + 2)?);
+                // The frame header starts with one precision byte, so the sampled height
+                // and width are the next two big-endian pairs; reading from the header start
+                // would mistake precision for the high byte of the height.
+                let height = u32::from(u16_be_at(bytes, body_start + 1)?);
+                let width = u32::from(u16_be_at(bytes, body_start + 3)?);
                 let components = byte_at(bytes, body_start + 5)?;
                 if width == 0 || height == 0 {
                     return Err(ImageShapeRefusalV1::EmptyGeometry);
