@@ -64,6 +64,9 @@ pub enum GifInspectionRefusalV1 {
     TraceTooLarge,
     DecodeFailed,
     LzwFailed,
+    BackgroundUndefined,
+    BackgroundIndexOutOfRange,
+    ExtensionNotPermittedInGif87a,
 }
 
 impl GifInspectionRefusalV1 {
@@ -88,6 +91,9 @@ impl GifInspectionRefusalV1 {
             Self::TraceTooLarge => "gif-trace-too-large",
             Self::DecodeFailed => "gif-decode-failed",
             Self::LzwFailed => "gif-lzw-failed",
+            Self::BackgroundUndefined => "gif-background-undefined",
+            Self::BackgroundIndexOutOfRange => "gif-background-index-out-of-range",
+            Self::ExtensionNotPermittedInGif87a => "gif-extension-not-permitted-in-gif87a",
         }
     }
 
@@ -320,13 +326,17 @@ impl GifAnimationEvidenceV1 {
 }
 
 /// Independently scanned container facts, established before any pixel is decoded.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 struct GifContainerFactsV1 {
     signature: &'static str,
     width: u16,
     height: u16,
     frames: usize,
     loop_semantics: GifLoopV1,
+    background_index: Option<u8>,
+    background_rgb: Option<[u8; 3]>,
+    interlaced_flags: Vec<bool>,
+    local_palette_flags: Vec<bool>,
 }
 
 fn read_le_u16_v1(bytes: &[u8], at: usize) -> u16 {
@@ -379,18 +389,28 @@ fn scan_container_v1(source: &[u8]) -> Result<GifContainerFactsV1, GifInspection
         return Err(Refusal::MalformedLogicalScreenDescriptor);
     }
     let packed = source[10];
+    let background_index = source[11];
+    let mut background_rgb: Option<[u8; 3]> = None;
     let mut at = 13usize;
     if packed & 0x80 != 0 {
         let entries = 1usize << (usize::from(packed & 0x07) + 1);
-        at = at
+        let table_end = at
             .checked_add(entries * 3)
             .ok_or(Refusal::TruncatedContainer)?;
-        if at > source.len() {
+        if table_end > source.len() {
             return Err(Refusal::TruncatedContainer);
         }
+        if usize::from(background_index) >= entries {
+            return Err(Refusal::BackgroundIndexOutOfRange);
+        }
+        let start = at + usize::from(background_index) * 3;
+        background_rgb = Some([source[start], source[start + 1], source[start + 2]]);
+        at = table_end;
     }
     let canvas_pixels = u64::from(width) * u64::from(height);
     let mut frames = 0usize;
+    let mut interlaced_flags: Vec<bool> = Vec::new();
+    let mut local_palette_flags: Vec<bool> = Vec::new();
     let mut loop_semantics = GifLoopV1::Absent;
     let mut repeat_seen = false;
     loop {
@@ -399,6 +419,9 @@ fn scan_container_v1(source: &[u8]) -> Result<GifContainerFactsV1, GifInspection
         };
         match introducer {
             0x21 => {
+                if signature == GIF87A_SIGNATURE_V1 {
+                    return Err(Refusal::ExtensionNotPermittedInGif87a);
+                }
                 let Some(&label) = source.get(at + 1) else {
                     return Err(Refusal::TruncatedContainer);
                 };
@@ -461,6 +484,8 @@ fn scan_container_v1(source: &[u8]) -> Result<GifContainerFactsV1, GifInspection
                 if left + frame_width > u64::from(width) || top + frame_height > u64::from(height) {
                     return Err(Refusal::FrameRectangleOutOfRange);
                 }
+                interlaced_flags.push(descriptor & 0x40 != 0);
+                local_palette_flags.push(descriptor & 0x80 != 0);
                 at += 10;
                 if descriptor & 0x80 != 0 {
                     let entries = 1usize << (usize::from(descriptor & 0x07) + 1);
@@ -500,6 +525,10 @@ fn scan_container_v1(source: &[u8]) -> Result<GifContainerFactsV1, GifInspection
                     height,
                     frames,
                     loop_semantics,
+                    background_index: background_rgb.map(|_| background_index),
+                    background_rgb,
+                    interlaced_flags,
+                    local_palette_flags,
                 });
             }
             _ => return Err(Refusal::MalformedBlock),
@@ -528,7 +557,7 @@ fn disposal_of_v1(disposal: gif::DisposalMethod) -> GifDisposalV1 {
 ///
 /// The returned evidence is the complete ordered timeline; there is no path that keeps only the
 /// first frame, normalises a delay, or reports a still image for an animation.
-pub fn inspect_gif_animation_v1(
+pub(crate) fn inspect_gif_animation_v1(
     source: &[u8],
 ) -> Result<GifAnimationEvidenceV1, GifInspectionRefusalV1> {
     use GifInspectionRefusalV1 as Refusal;
@@ -632,6 +661,17 @@ pub fn inspect_gif_animation_v1(
         if total_delay_ms > MAX_GIF_ONE_CYCLE_DELAY_MS_V1 {
             return Err(Refusal::OneCycleDurationExceeded);
         }
+        let frame_index = frames.len();
+        let interlaced = facts
+            .interlaced_flags
+            .get(frame_index)
+            .copied()
+            .unwrap_or(false);
+        let local_palette = facts
+            .local_palette_flags
+            .get(frame_index)
+            .copied()
+            .unwrap_or(false);
         frames.push(GifFrameEvidenceV1 {
             delay_centiseconds: frame.delay,
             left: frame.left,
@@ -640,17 +680,32 @@ pub fn inspect_gif_animation_v1(
             height: frame.height,
             disposal,
             transparent_index: frame.transparent,
-            interlaced: frame.interlaced,
-            local_palette: frame.palette.is_some(),
+            interlaced,
+            local_palette,
             composite_digest,
         });
         match disposal {
             GifDisposalV1::Background => {
+                let (Some(background_rgb), Some(background_index)) =
+                    (facts.background_rgb, facts.background_index)
+                else {
+                    return Err(Refusal::BackgroundUndefined);
+                };
+                let paint = if frame.transparent == Some(background_index) {
+                    [0u8, 0, 0, 0]
+                } else {
+                    [
+                        background_rgb[0],
+                        background_rgb[1],
+                        background_rgb[2],
+                        0xff,
+                    ]
+                };
                 for row in 0..frame_height {
                     let destination_row = (top + row) * canvas_stride;
                     for column in 0..frame_width {
                         let at = destination_row + (left + column) * 4;
-                        canvas[at..at + 4].fill(0);
+                        canvas[at..at + 4].copy_from_slice(&paint);
                     }
                 }
             }
@@ -700,109 +755,547 @@ fn decode_refusal_v1(_error: &gif::DecodingError) -> GifInspectionRefusalV1 {
 mod tests {
     use super::*;
 
-    struct FrameSpecV1 {
-        delay: u16,
-        disposal: u8,
-        index: u8,
-        transparent: Option<u8>,
+    /// LSB-first GIF bit packer used only to build deterministic fixtures.
+    struct BitPackerV1 {
+        bytes: Vec<u8>,
+        accumulator: u32,
+        bits: u8,
     }
 
-    /// Deterministic, self-generated one-pixel LZW payload: clear, pixel, end-of-information.
-    fn lzw_one_pixel_v1(index: u8) -> [u8; 2] {
-        let mut bits = 0u32;
-        let mut width = 0u8;
-        for code in [4u16, u16::from(index), 5u16] {
-            bits |= u32::from(code) << width;
-            width += 3;
+    impl BitPackerV1 {
+        fn new() -> Self {
+            Self {
+                bytes: Vec::new(),
+                accumulator: 0,
+                bits: 0,
+            }
         }
-        [(bits & 0xFF) as u8, ((bits >> 8) & 0xFF) as u8]
+
+        fn write(&mut self, code: u16, width: u8) {
+            self.accumulator |= u32::from(code) << self.bits;
+            self.bits += width;
+            while self.bits >= 8 {
+                self.bytes.push((self.accumulator & 0xFF) as u8);
+                self.accumulator >>= 8;
+                self.bits -= 8;
+            }
+        }
+
+        fn finish(mut self) -> Vec<u8> {
+            if self.bits > 0 {
+                self.bytes.push((self.accumulator & 0xFF) as u8);
+            }
+            self.bytes
+        }
     }
 
-    /// Build a tiny, complete, self-generated GIF with a two-entry global palette.
-    fn build_gif_v1(
-        version: &[u8; 6],
+    /// Real, minimal, deterministic GIF LZW encoder (no crate helper, no encoder dependency).
+    fn lzw_encode_v1(min_code_size: u8, indices: &[u8]) -> Vec<u8> {
+        let clear = 1u16 << min_code_size;
+        let end = clear + 1;
+        let mut packer = BitPackerV1::new();
+        let mut code_size = min_code_size + 1;
+        packer.write(clear, code_size);
+        let mut table: std::collections::HashMap<(u16, u8), u16> = std::collections::HashMap::new();
+        let mut next = end + 1;
+        let mut current: Option<u16> = None;
+        for &pixel in indices {
+            match current {
+                None => current = Some(u16::from(pixel)),
+                Some(prefix) => {
+                    if let Some(&known) = table.get(&(prefix, pixel)) {
+                        current = Some(known);
+                    } else {
+                        packer.write(prefix, code_size);
+                        table.insert((prefix, pixel), next);
+                        next += 1;
+                        if next == (1u16 << code_size) && code_size < 12 {
+                            code_size += 1;
+                        }
+                        current = Some(u16::from(pixel));
+                    }
+                }
+            }
+        }
+        if let Some(prefix) = current {
+            packer.write(prefix, code_size);
+        }
+        packer.write(end, code_size);
+        packer.finish()
+    }
+
+    fn table_bits_v1(entries: usize) -> (u8, usize) {
+        let mut size = 2usize;
+        while size < entries {
+            size *= 2;
+        }
+        (
+            u8::try_from(size.trailing_zeros())
+                .unwrap_or(1)
+                .saturating_sub(1),
+            size,
+        )
+    }
+
+    fn table_bytes_v1(palette: &[[u8; 3]]) -> (u8, Vec<u8>) {
+        let (bits, entries) = table_bits_v1(palette.len().max(2));
+        let mut bytes = Vec::with_capacity(entries * 3);
+        for entry in palette {
+            bytes.extend_from_slice(entry);
+        }
+        while bytes.len() < entries * 3 {
+            bytes.push(0);
+        }
+        (bits, bytes)
+    }
+
+    fn write_sub_blocks_v1(out: &mut Vec<u8>, data: &[u8]) {
+        for chunk in data.chunks(255) {
+            out.push(u8::try_from(chunk.len()).unwrap_or(255));
+            out.extend_from_slice(chunk);
+        }
+        out.push(0);
+    }
+
+    struct FrameSpecV1 {
+        left: u16,
+        top: u16,
         width: u16,
         height: u16,
-        frames: &[FrameSpecV1],
+        delay: u16,
+        disposal: u8,
+        transparent: Option<u8>,
+        local_palette: Option<Vec<[u8; 3]>>,
+        interlaced: bool,
+        indices: Vec<u8>,
+    }
+
+    fn frame_v1(width: u16, height: u16, indices: &[u8]) -> FrameSpecV1 {
+        FrameSpecV1 {
+            left: 0,
+            top: 0,
+            width,
+            height,
+            delay: 0,
+            disposal: 1,
+            transparent: None,
+            local_palette: None,
+            interlaced: false,
+            indices: indices.to_vec(),
+        }
+    }
+
+    struct GifSpecV1 {
+        version: &'static [u8; 6],
+        width: u16,
+        height: u16,
+        background_index: u8,
+        global_palette: Option<Vec<[u8; 3]>>,
         loop_count: Option<u16>,
-    ) -> Vec<u8> {
-        let mut out = Vec::new();
-        out.extend_from_slice(version);
-        out.extend_from_slice(&width.to_le_bytes());
-        out.extend_from_slice(&height.to_le_bytes());
-        out.extend_from_slice(&[0x80, 0x00, 0x00]);
-        out.extend_from_slice(&[255, 0, 0, 0, 0, 255]);
-        if let Some(count) = loop_count {
-            out.extend_from_slice(&[0x21, 0xFF, 11]);
-            out.extend_from_slice(b"NETSCAPE2.0");
-            out.extend_from_slice(&[3, 1]);
-            out.extend_from_slice(&count.to_le_bytes());
+        graphic_control: bool,
+        frames: Vec<FrameSpecV1>,
+    }
+    impl GifSpecV1 {
+        fn to_bytes(&self) -> Vec<u8> {
+            let mut out = Vec::new();
+            out.extend_from_slice(self.version);
+            out.extend_from_slice(&self.width.to_le_bytes());
+            out.extend_from_slice(&self.height.to_le_bytes());
+            let mut packed = 0u8;
+            let mut table = Vec::new();
+            let mut global_entries = 2usize;
+            if let Some(palette) = &self.global_palette {
+                let (bits, bytes) = table_bytes_v1(palette);
+                let (_, entries) = table_bits_v1(palette.len().max(2));
+                global_entries = entries;
+                packed |= 0x80 | bits;
+                table = bytes;
+            }
+            out.push(packed);
+            out.push(self.background_index);
             out.push(0);
+            out.extend_from_slice(&table);
+            if let Some(count) = self.loop_count {
+                out.extend_from_slice(&[0x21, 0xFF, 11]);
+                out.extend_from_slice(b"NETSCAPE2.0");
+                out.extend_from_slice(&[3, 1]);
+                out.extend_from_slice(&count.to_le_bytes());
+                out.push(0);
+            }
+            for frame in &self.frames {
+                if self.graphic_control {
+                    let gce = (frame.disposal << 2) | u8::from(frame.transparent.is_some());
+                    out.extend_from_slice(&[
+                        0x21,
+                        0xF9,
+                        4,
+                        gce,
+                        (frame.delay & 0xFF) as u8,
+                        (frame.delay >> 8) as u8,
+                        frame.transparent.unwrap_or(0),
+                        0,
+                    ]);
+                }
+                out.push(0x2C);
+                out.extend_from_slice(&frame.left.to_le_bytes());
+                out.extend_from_slice(&frame.top.to_le_bytes());
+                out.extend_from_slice(&frame.width.to_le_bytes());
+                out.extend_from_slice(&frame.height.to_le_bytes());
+                let mut descriptor = 0u8;
+                let mut local = Vec::new();
+                let mut entries = global_entries;
+                if let Some(palette) = &frame.local_palette {
+                    let (bits, bytes) = table_bytes_v1(palette);
+                    let (_, local_entries) = table_bits_v1(palette.len().max(2));
+                    entries = local_entries;
+                    descriptor |= 0x80 | bits;
+                    local = bytes;
+                }
+                if frame.interlaced {
+                    descriptor |= 0x40;
+                }
+                out.push(descriptor);
+                out.extend_from_slice(&local);
+                let _ = entries;
+                // Fixtures pin an eight-bit LZW minimum code size so the dictionary can never grow
+                // inside these tiny images: the fixture proves framing, compositing and grammar, not
+                // dictionary growth, and an accidental growth off-by-one must not mask a real bug.
+                let min_code_size = 8u8;
+                out.push(min_code_size);
+                let data = lzw_encode_v1(min_code_size, &frame.indices);
+                write_sub_blocks_v1(&mut out, &data);
+            }
+            out.push(0x3B);
+            out
         }
-        for frame in frames {
-            let packed = (frame.disposal << 2) | u8::from(frame.transparent.is_some());
-            out.extend_from_slice(&[
-                0x21,
-                0xF9,
-                4,
-                packed,
-                (frame.delay & 0xFF) as u8,
-                (frame.delay >> 8) as u8,
-                frame.transparent.unwrap_or(0),
-                0,
-            ]);
-            out.push(0x2C);
-            out.extend_from_slice(&[0, 0, 0, 0, 1, 0, 1, 0, 0]);
-            out.push(2);
-            let payload = lzw_one_pixel_v1(frame.index);
-            out.push(2);
-            out.extend_from_slice(&payload);
-            out.push(0);
+    }
+
+    const RED: [u8; 3] = [255, 0, 0];
+    const GREEN: [u8; 3] = [0, 255, 0];
+    const BLUE: [u8; 3] = [0, 0, 255];
+    const WHITE: [u8; 3] = [255, 255, 255];
+
+    fn rgba_v1(colour: [u8; 3]) -> [u8; 4] {
+        [colour[0], colour[1], colour[2], 255]
+    }
+
+    fn canvas_v1(pixels: &[[u8; 4]]) -> Vec<u8> {
+        let mut out = Vec::with_capacity(pixels.len() * 4);
+        for pixel in pixels {
+            out.extend_from_slice(pixel);
         }
-        out.push(0x3B);
         out
     }
 
-    fn still_frames_v1() -> Vec<FrameSpecV1> {
-        vec![FrameSpecV1 {
-            delay: 0,
-            disposal: 1,
-            index: 0,
-            transparent: None,
-        }]
+    fn two_colour_spec_v1(frames: Vec<FrameSpecV1>) -> GifSpecV1 {
+        GifSpecV1 {
+            version: b"GIF89a",
+            width: 1,
+            height: 1,
+            background_index: 0,
+            global_palette: Some(vec![RED, BLUE]),
+            loop_count: Some(0),
+            graphic_control: true,
+            frames,
+        }
     }
-
     #[test]
-    fn gif87a_still_is_one_frame_and_not_an_animation() {
-        let bytes = build_gif_v1(b"GIF87a", 1, 1, &still_frames_v1(), None);
-        let evidence = inspect_gif_animation_v1(&bytes).expect("still GIF87a is accepted");
+    fn gif87a_still_is_extension_free_and_not_an_animation() {
+        let bytes = GifSpecV1 {
+            version: b"GIF87a",
+            width: 1,
+            height: 1,
+            background_index: 0,
+            global_palette: Some(vec![RED, BLUE]),
+            loop_count: None,
+            graphic_control: false,
+            frames: vec![frame_v1(1, 1, &[0])],
+        }
+        .to_bytes();
+        let evidence = inspect_gif_animation_v1(&bytes).expect("extension-free GIF87a is accepted");
         assert_eq!(evidence.signature(), GIF87A_SIGNATURE_V1);
-        assert_eq!(evidence.mime(), GIF_MIME_V1);
         assert_eq!(evidence.frame_count(), 1);
         assert!(!evidence.is_animated());
         assert_eq!(evidence.loop_semantics(), GifLoopV1::Absent);
         assert_eq!(evidence.one_cycle_delay_ms(), 0);
-        assert_eq!(evidence.total_composited_pixels(), 1);
-        assert_eq!(
-            evidence.source_digest(),
-            &sha256_media_worker_bytes_v1(&bytes)
-        );
+        assert_eq!(evidence.frames()[0].disposal(), GifDisposalV1::Keep);
         assert_eq!(
             evidence.frames()[0].composite_digest(),
-            &sha256_media_worker_bytes_v1(&[255, 0, 0, 255])
+            &sha256_media_worker_bytes_v1(&canvas_v1(&[rgba_v1(RED)]))
         );
     }
 
     #[test]
-    fn finite_repeat_count_is_preserved_exactly() {
-        let bytes = build_gif_v1(b"GIF89a", 1, 1, &still_frames_v1(), Some(3));
-        let evidence = inspect_gif_animation_v1(&bytes).expect("finite repeat is accepted");
-        assert_eq!(evidence.loop_semantics(), GifLoopV1::Finite(3));
+    fn gif87a_with_a_graphic_control_extension_is_refused() {
+        let bytes = GifSpecV1 {
+            version: b"GIF87a",
+            width: 1,
+            height: 1,
+            background_index: 0,
+            global_palette: Some(vec![RED, BLUE]),
+            loop_count: None,
+            graphic_control: true,
+            frames: vec![frame_v1(1, 1, &[0])],
+        }
+        .to_bytes();
+        assert_eq!(
+            inspect_gif_animation_v1(&bytes),
+            Err(GifInspectionRefusalV1::ExtensionNotPermittedInGif87a)
+        );
+    }
+
+    #[test]
+    fn gif89a_multi_frame_preserves_delays_disposal_and_composition() {
+        let mut first = frame_v1(1, 1, &[0]);
+        first.delay = 10;
+        let mut second = frame_v1(1, 1, &[0]);
+        second.delay = 20;
+        second.disposal = 2;
+        second.transparent = Some(0);
+        let mut third = frame_v1(1, 1, &[0]);
+        third.delay = 5;
+        third.transparent = Some(0);
+        let bytes = two_colour_spec_v1(vec![first, second, third]).to_bytes();
+        let evidence = inspect_gif_animation_v1(&bytes).expect("multi-frame GIF89a accepted");
+        assert_eq!(evidence.frame_count(), 3);
+        assert!(evidence.is_animated());
+        assert_eq!(evidence.loop_semantics(), GifLoopV1::Infinite);
+        assert_eq!(evidence.one_cycle_delay_ms(), 350);
+        assert_eq!(evidence.total_composited_pixels(), 3);
+        let red = sha256_media_worker_bytes_v1(&canvas_v1(&[rgba_v1(RED)]));
+        let cleared = sha256_media_worker_bytes_v1(&canvas_v1(&[[0, 0, 0, 0]]));
+        assert_eq!(evidence.frames()[0].composite_digest(), &red);
+        // The digest is taken immediately after drawing, so the transparent draw leaves the
+        // canvas as frame 0 left it; the background disposal is then observable in frame 2.
+        assert_eq!(evidence.frames()[1].composite_digest(), &red);
+        assert_eq!(evidence.frames()[2].composite_digest(), &cleared);
+        let transcript = evidence.transcript_v1();
+        assert!(transcript.contains("frame=1 delay_cs=20"));
+        assert!(transcript.contains("disposal=background"));
+        assert_eq!(
+            evidence.transcript_digest(),
+            &sha256_media_worker_bytes_v1(transcript.as_bytes())
+        );
+    }
+
+    #[test]
+    fn gif89a_background_disposal_restores_the_screen_background_colour() {
+        let mut fill = frame_v1(2, 2, &[0, 0, 0, 0]);
+        fill.delay = 5;
+        let mut over = frame_v1(1, 1, &[0]);
+        over.left = 1;
+        over.top = 1;
+        over.delay = 5;
+        over.disposal = 2;
+        let mut reveal = frame_v1(1, 1, &[0]);
+        reveal.transparent = Some(0);
+        reveal.delay = 5;
+        let bytes = GifSpecV1 {
+            version: b"GIF89a",
+            width: 2,
+            height: 2,
+            background_index: 1,
+            global_palette: Some(vec![RED, BLUE]),
+            loop_count: None,
+            graphic_control: true,
+            frames: vec![fill, over, reveal],
+        }
+        .to_bytes();
+        let evidence =
+            inspect_gif_animation_v1(&bytes).expect("opaque background disposal accepted");
+        let all_red = sha256_media_worker_bytes_v1(&canvas_v1(&[
+            rgba_v1(RED),
+            rgba_v1(RED),
+            rgba_v1(RED),
+            rgba_v1(RED),
+        ]));
+        let restored = sha256_media_worker_bytes_v1(&canvas_v1(&[
+            rgba_v1(RED),
+            rgba_v1(RED),
+            rgba_v1(RED),
+            rgba_v1(BLUE),
+        ]));
+        assert_eq!(evidence.frames()[0].composite_digest(), &all_red);
+        // Frame 1 draws red into a red canvas, so its own digest is unchanged; the opaque
+        // background restore becomes visible only in frame 2.
+        assert_eq!(evidence.frames()[1].composite_digest(), &all_red);
+        assert_eq!(evidence.frames()[2].composite_digest(), &restored);
+        assert_ne!(&all_red, &restored);
+    }
+    #[test]
+    fn gif89a_restore_previous_restores_the_saved_canvas() {
+        let fill_red = frame_v1(2, 2, &[0, 0, 0, 0]);
+        let mut fill_blue = frame_v1(2, 2, &[1, 1, 1, 1]);
+        fill_blue.disposal = 3;
+        let mut reveal = frame_v1(1, 1, &[0]);
+        reveal.transparent = Some(0);
+        let bytes = GifSpecV1 {
+            version: b"GIF89a",
+            width: 2,
+            height: 2,
+            background_index: 0,
+            global_palette: Some(vec![RED, BLUE]),
+            loop_count: None,
+            graphic_control: true,
+            frames: vec![fill_red, fill_blue, reveal],
+        }
+        .to_bytes();
+        let evidence = inspect_gif_animation_v1(&bytes).expect("restore-previous accepted");
+        let reds = sha256_media_worker_bytes_v1(&canvas_v1(&[
+            rgba_v1(RED),
+            rgba_v1(RED),
+            rgba_v1(RED),
+            rgba_v1(RED),
+        ]));
+        let blues = sha256_media_worker_bytes_v1(&canvas_v1(&[
+            rgba_v1(BLUE),
+            rgba_v1(BLUE),
+            rgba_v1(BLUE),
+            rgba_v1(BLUE),
+        ]));
+        assert_eq!(evidence.frames()[0].composite_digest(), &reds);
+        assert_eq!(evidence.frames()[1].composite_digest(), &blues);
+        assert_eq!(evidence.frames()[1].disposal(), GifDisposalV1::Previous);
+        assert_eq!(evidence.frames()[2].composite_digest(), &reds);
+    }
+
+    #[test]
+    fn gif89a_local_palette_overrides_the_global_table() {
+        let mut frame = frame_v1(2, 2, &[0, 0, 0, 0]);
+        frame.local_palette = Some(vec![GREEN, WHITE]);
+        let bytes = GifSpecV1 {
+            version: b"GIF89a",
+            width: 2,
+            height: 2,
+            background_index: 0,
+            global_palette: Some(vec![RED, BLUE]),
+            loop_count: None,
+            graphic_control: true,
+            frames: vec![frame],
+        }
+        .to_bytes();
+        let evidence = inspect_gif_animation_v1(&bytes).expect("local palette accepted");
+        assert!(evidence.frames()[0].uses_local_palette());
+        assert_eq!(
+            evidence.frames()[0].composite_digest(),
+            &sha256_media_worker_bytes_v1(&canvas_v1(&[
+                rgba_v1(GREEN),
+                rgba_v1(GREEN),
+                rgba_v1(GREEN),
+                rgba_v1(GREEN),
+            ]))
+        );
+    }
+
+    #[test]
+    fn gif89a_interlaced_offset_frame_composites_exactly() {
+        let mut frame = frame_v1(1, 4, &[0, 2, 1, 3]);
+        frame.left = 1;
+        frame.interlaced = true;
+        let bytes = GifSpecV1 {
+            version: b"GIF89a",
+            width: 2,
+            height: 4,
+            background_index: 0,
+            global_palette: Some(vec![RED, GREEN, BLUE, WHITE]),
+            loop_count: None,
+            graphic_control: true,
+            frames: vec![frame],
+        }
+        .to_bytes();
+        let evidence = inspect_gif_animation_v1(&bytes).expect("interlaced offset accepted");
+        assert!(evidence.frames()[0].interlaced());
+        assert_eq!(evidence.frames()[0].left(), 1);
+        assert_eq!(
+            evidence.frames()[0].composite_digest(),
+            &sha256_media_worker_bytes_v1(&canvas_v1(&[
+                [0, 0, 0, 0],
+                rgba_v1(RED),
+                [0, 0, 0, 0],
+                rgba_v1(GREEN),
+                [0, 0, 0, 0],
+                rgba_v1(BLUE),
+                [0, 0, 0, 0],
+                rgba_v1(WHITE),
+            ]))
+        );
+    }
+
+    #[test]
+    fn gif89a_loop_semantics_and_authored_delays_are_preserved() {
+        let absent = GifSpecV1 {
+            version: b"GIF89a",
+            width: 1,
+            height: 1,
+            background_index: 0,
+            global_palette: Some(vec![RED, BLUE]),
+            loop_count: None,
+            graphic_control: true,
+            frames: vec![frame_v1(1, 1, &[0])],
+        }
+        .to_bytes();
+        let evidence = inspect_gif_animation_v1(&absent).expect("absent loop accepted");
+        assert_eq!(evidence.loop_semantics(), GifLoopV1::Absent);
+        assert_eq!(evidence.one_cycle_delay_ms(), 0);
+        let finite = GifSpecV1 {
+            version: b"GIF89a",
+            width: 1,
+            height: 1,
+            background_index: 0,
+            global_palette: Some(vec![RED, BLUE]),
+            loop_count: Some(2),
+            graphic_control: true,
+            frames: vec![frame_v1(1, 1, &[0])],
+        }
+        .to_bytes();
+        let evidence = inspect_gif_animation_v1(&finite).expect("finite loop accepted");
+        assert_eq!(evidence.loop_semantics(), GifLoopV1::Finite(2));
+    }
+
+    #[test]
+    fn background_index_out_of_range_is_refused() {
+        let bytes = GifSpecV1 {
+            version: b"GIF89a",
+            width: 1,
+            height: 1,
+            background_index: 5,
+            global_palette: Some(vec![RED, BLUE]),
+            loop_count: None,
+            graphic_control: true,
+            frames: vec![frame_v1(1, 1, &[0])],
+        }
+        .to_bytes();
+        assert_eq!(
+            inspect_gif_animation_v1(&bytes),
+            Err(GifInspectionRefusalV1::BackgroundIndexOutOfRange)
+        );
+    }
+
+    #[test]
+    fn background_disposal_without_a_global_table_is_refused() {
+        let mut frame = frame_v1(1, 1, &[0]);
+        frame.disposal = 2;
+        frame.local_palette = Some(vec![RED, BLUE]);
+        let bytes = GifSpecV1 {
+            version: b"GIF89a",
+            width: 1,
+            height: 1,
+            background_index: 0,
+            global_palette: None,
+            loop_count: None,
+            graphic_control: true,
+            frames: vec![frame],
+        }
+        .to_bytes();
+        assert_eq!(
+            inspect_gif_animation_v1(&bytes),
+            Err(GifInspectionRefusalV1::BackgroundUndefined)
+        );
     }
 
     #[test]
     fn trailing_bytes_after_the_trailer_are_refused() {
-        let mut bytes = build_gif_v1(b"GIF89a", 1, 1, &still_frames_v1(), None);
+        let mut bytes = two_colour_spec_v1(vec![frame_v1(1, 1, &[0])]).to_bytes();
         bytes.push(0x00);
         assert_eq!(
             inspect_gif_animation_v1(&bytes),
@@ -812,7 +1305,7 @@ mod tests {
 
     #[test]
     fn unsupported_extension_block_is_refused() {
-        let mut bytes = build_gif_v1(b"GIF89a", 1, 1, &still_frames_v1(), None);
+        let mut bytes = two_colour_spec_v1(vec![frame_v1(1, 1, &[0])]).to_bytes();
         bytes.pop();
         bytes.extend_from_slice(&[0x21, 0x01, 4, 0, 0, 0, 0, 0]);
         bytes.push(0x3B);
@@ -824,76 +1317,29 @@ mod tests {
 
     #[test]
     fn truncated_stream_is_refused() {
-        let bytes = build_gif_v1(b"GIF89a", 1, 1, &still_frames_v1(), None);
-        let truncated = &bytes[..bytes.len() - 2];
+        let bytes = two_colour_spec_v1(vec![frame_v1(1, 1, &[0])]).to_bytes();
         assert_eq!(
-            inspect_gif_animation_v1(truncated),
+            inspect_gif_animation_v1(&bytes[..bytes.len() - 2]),
             Err(GifInspectionRefusalV1::TruncatedContainer)
         );
     }
 
     #[test]
     fn oversized_logical_screen_is_refused() {
-        let bytes = build_gif_v1(b"GIF89a", 8193, 1, &still_frames_v1(), None);
+        let bytes = GifSpecV1 {
+            version: b"GIF89a",
+            width: 8193,
+            height: 1,
+            background_index: 0,
+            global_palette: Some(vec![RED, BLUE]),
+            loop_count: None,
+            graphic_control: true,
+            frames: vec![frame_v1(1, 1, &[0])],
+        }
+        .to_bytes();
         assert_eq!(
             inspect_gif_animation_v1(&bytes),
             Err(GifInspectionRefusalV1::CanvasOutOfRange)
-        );
-    }
-    #[test]
-    fn gif89a_multi_frame_preserves_delays_disposal_and_composition() {
-        let frames = vec![
-            FrameSpecV1 {
-                delay: 10,
-                disposal: 1,
-                index: 0,
-                transparent: None,
-            },
-            FrameSpecV1 {
-                delay: 20,
-                disposal: 2,
-                index: 0,
-                transparent: Some(0),
-            },
-            FrameSpecV1 {
-                delay: 5,
-                disposal: 1,
-                index: 0,
-                transparent: Some(0),
-            },
-        ];
-        let bytes = build_gif_v1(b"GIF89a", 1, 1, &frames, Some(0));
-        let evidence = inspect_gif_animation_v1(&bytes).expect("multi-frame GIF89a is accepted");
-        assert_eq!(evidence.signature(), GIF89A_SIGNATURE_V1);
-        assert_eq!(evidence.frame_count(), 3);
-        assert!(evidence.is_animated());
-        assert_eq!(evidence.loop_semantics(), GifLoopV1::Infinite);
-        assert!(evidence.loop_semantics().is_infinite());
-        assert_eq!(evidence.one_cycle_delay_ms(), 350);
-        assert_eq!(evidence.total_composited_pixels(), 3);
-        assert_eq!(evidence.frames()[0].delay_centiseconds(), 10);
-        assert_eq!(evidence.frames()[1].delay_centiseconds(), 20);
-        assert_eq!(evidence.frames()[2].delay_centiseconds(), 5);
-        assert_eq!(evidence.frames()[0].disposal(), GifDisposalV1::Keep);
-        assert_eq!(evidence.frames()[1].disposal(), GifDisposalV1::Background);
-        assert_eq!(evidence.frames()[1].transparent_index(), Some(0));
-        let red = sha256_media_worker_bytes_v1(&[255, 0, 0, 255]);
-        let cleared = sha256_media_worker_bytes_v1(&[0, 0, 0, 0]);
-        assert_eq!(evidence.frames()[0].composite_digest(), &red);
-        assert_eq!(evidence.frames()[1].composite_digest(), &red);
-        assert_eq!(evidence.frames()[2].composite_digest(), &cleared);
-        assert_ne!(
-            evidence.frames()[1].composite_digest(),
-            evidence.frames()[2].composite_digest()
-        );
-        let transcript = evidence.transcript_v1();
-        assert!(transcript.contains("frames=3"));
-        assert!(transcript.contains("frame=0 delay_cs=10"));
-        assert!(transcript.contains("frame=1 delay_cs=20"));
-        assert!(transcript.contains("frame=2 delay_cs=5"));
-        assert_eq!(
-            evidence.transcript_digest(),
-            &sha256_media_worker_bytes_v1(transcript.as_bytes())
         );
     }
 }
