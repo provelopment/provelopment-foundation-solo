@@ -3409,4 +3409,138 @@ mod n108 {
             obs.transcript_digest().to_hex()
         );
     }
+
+    #[test]
+    fn n108_06_gif_resource_budget_and_frame_rectangle_refusals() {
+        let control = gif89a_red_delays(None, &[0]);
+        let accepted = inspect_gif_bytes_with_executable_v1(Path::new(super::BIN), &control)
+            .expect("the 1x1 GIF89a control must stay accepted");
+        assert_eq!(accepted.frame_count(), 1);
+        println!(
+            "n108_gif=budget control frames=1 pid={} src={}",
+            accepted.worker_pid(),
+            accepted.source_digest().to_hex()
+        );
+
+        // 1. 1025 frames: exactly one over MAX_GIF_FRAMES_V1. The whole animation must refuse; no
+        // partial timeline may survive.
+        let frames: Vec<FrameSpecV1> = (0..=1024).map(|_| frame_v1(1, 1, &[0])).collect();
+        let too_many_frames = GifSpecV1 {
+            version: b"GIF89a",
+            width: 1,
+            height: 1,
+            background_index: 0,
+            global_palette: Some(vec![RED, BLUE]),
+            loop_count: None,
+            graphic_control: true,
+            frames,
+        }
+        .to_bytes();
+
+        // 2. Logical screen side 8193 with a compact 1x1 frame: the canvas side limit is eight
+        // thousand one hundred and ninety-two.
+        let over_wide_canvas = GifSpecV1 {
+            version: b"GIF89a",
+            width: 8193,
+            height: 1,
+            background_index: 0,
+            global_palette: Some(vec![RED, BLUE]),
+            loop_count: None,
+            graphic_control: true,
+            frames: vec![frame_v1(1, 1, &[0])],
+        }
+        .to_bytes();
+
+        // 3. 8192 x 8192 logical screen with two 1x1 frames: 2 x 67,108,864 composed pixels exceeds
+        // 128,000,000 and must refuse from the container scan before any canvas allocation. The
+        // fixture stays compact because no large bitmap is ever built.
+        let composed_pixels_exceeded = GifSpecV1 {
+            version: b"GIF89a",
+            width: 8192,
+            height: 8192,
+            background_index: 0,
+            global_palette: Some(vec![RED, BLUE]),
+            loop_count: None,
+            graphic_control: true,
+            frames: vec![frame_v1(1, 1, &[0]), frame_v1(1, 1, &[0])],
+        }
+        .to_bytes();
+        assert_eq!(2u64 * 8192 * 8192, 134_217_728);
+
+        // 4. Six frames of 65,535 centiseconds: 3,932,100 ms exceeds the 3,600,000 ms cycle limit.
+        let duration_exceeded = gif89a_red_delays(None, &[u16::MAX; 6]);
+        assert_eq!(6u64 * 655_350, 3_932_100);
+
+        // 5. Authored frame rectangle outside a 2x2 canvas: no clipping, no partial success.
+        let mut outside = frame_v1(2, 2, &[0, 0, 0, 0]);
+        outside.left = 1;
+        let rectangle_outside = GifSpecV1 {
+            version: b"GIF89a",
+            width: 2,
+            height: 2,
+            background_index: 0,
+            global_palette: Some(vec![RED, BLUE]),
+            loop_count: None,
+            graphic_control: true,
+            frames: vec![outside],
+        }
+        .to_bytes();
+
+        // 6. Exactly one byte over the source ceiling: refused by the parent before any child spawn.
+        let ceiling = usize::try_from(solo_adapters::MAX_GIF_SOURCE_BYTES_V1)
+            .expect("the GIF source ceiling fits usize")
+            + 1;
+        let mut over_source = b"GIF89a".to_vec();
+        over_source.resize(ceiling, 0);
+        assert_eq!(over_source.len(), ceiling);
+
+        let cases: [(&str, &[u8], &str); 6] = [
+            (
+                "frames-1025",
+                &too_many_frames,
+                "gif-worker-supervisor-refused",
+            ),
+            (
+                "canvas-8193",
+                &over_wide_canvas,
+                "gif-worker-supervisor-refused",
+            ),
+            (
+                "composed-134217728",
+                &composed_pixels_exceeded,
+                "gif-worker-supervisor-refused",
+            ),
+            (
+                "duration-3932100",
+                &duration_exceeded,
+                "gif-worker-supervisor-refused",
+            ),
+            (
+                "frame-outside-canvas",
+                &rectangle_outside,
+                "gif-worker-supervisor-refused",
+            ),
+            (
+                "source-over-ceiling",
+                &over_source,
+                "gif-worker-source-rejected",
+            ),
+        ];
+        for (label, bytes, expected) in cases {
+            match inspect_gif_bytes_with_executable_v1(Path::new(super::BIN), bytes) {
+                Ok(observation) => panic!(
+                    "{label}: refused specimen was accepted with {} frames",
+                    observation.frame_count()
+                ),
+                Err(refusal) => {
+                    println!("n108_gif=budget case={label} token={}", refusal.token());
+                    assert_eq!(
+                        refusal.token(),
+                        expected,
+                        "{label}: unexpected refusal token"
+                    );
+                }
+            }
+        }
+    }
 }
