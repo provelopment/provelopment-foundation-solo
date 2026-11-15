@@ -1,52 +1,144 @@
-# SOLO-WO-116 R04 — CORRECT EXACT N116 HOST FAILURES; PROVE COMPLETE SVG TECHNICAL CI ON UBUNTU + WINDOWS
+# SOLO-WO-117 R01 — INTEGRATE EXACT VERIFIED SVG V3 TECHNICAL BLOBS INTO MAIN; PROVE FULL TWO-HOST CI
 
-**STATUS: OWNER-REVIEW DRAFT — NOT EXECUTABLE UNTIL THE OWNER INSTALLS THESE EXACT BYTES INTO THE SOLE ACTIVE SLOT AND SEPARATELY ISSUES A MATCHING `SOLO-WO-116 R04` ACTIVATION HANDOFF.** Do not execute a chat summary, this unattached draft, R03, or another work order. The Chief Master Architect is GitHub **read-only**; all authorized writes are by the Owner-activated Implementation Agent. **Date: 2026-11-15. Repository: `provelopment/provelopment-foundation-solo`. Checkout: `C:\Users\Sean\Documents\Provelopment\00.foundation-solo`.**
+**STATUS: OWNER-ISSUED — EXECUTE THIS WORK ORDER.**  
+**Date:** 2026-11-15  
+**Repository:** `provelopment/provelopment-foundation-solo`  
+**Owner checkout:** `C:\Users\Sean\Documents\Provelopment\00.foundation-solo`  
+**Active order:** `C:\Users\Sean\Documents\Provelopment\00.foundation-solo\.documents\WIP\workorder-active.md`  
+**Required outcome:** `R03C-SVG-V3-EXACT-BLOB-MAIN-INTEGRATION-TWO-HOST-VERIFIED`.
 
-**Single bounded outcome:** `R03C-SVG-N116-FOUR-CASE-TWO-HOST-TECHNICAL-VERIFIED`. This is a **correction/proof order** for four *demonstrated* full-workspace integration failures of WO-116 R03, not a new SVG, AVIF or asset-library project. Resume the existing technical branch at its exact R03 head. Correct the tightly scoped external dependency-graph admission and test assertions, then obtain one **fresh, all-green same-SHA native Ubuntu 24.04 + Windows 2025 technical run** including the actual four-case N116 gate, retained N097/N102/N108/N113 and security/reproducibility tests. **Do not integrate technical code into `main` under this order**; controlled integration is a separate small Owner order after independent acceptance of the technical head. No Stage 03 closure, public route, provider use, tag, release or deployment.
+## 1. Mission and fixed inputs
 
-## 1. Binding state, exact evidence and preflight
+Integrate **exactly** the 23 verified technical files at source commit `d82ae76273b57b37014d3b4c557b8debd5299eea` from the existing `solo-wo-115-avif-svg-v3-r02` branch into `main`, without merging branch history, creating a new branch, changing the technical branch, reimplementing code, or importing any technical-branch WIP/governance files. Prove complete native Ubuntu 24.04 and Windows 2025 `rust-verify.yml` on one integrated `main` commit. Publish the single canonical report; verify baseline CI again at its report commit.
 
-Read `README.md`, `AGENTS.md`, `.documents/About/FOUNDATION-SOLO.md`, `.documents/Architecture/ARCHITECTURE.md` (especially §§6.2G/6.2I/6.2K/6A.8), `.documents/SOP/sop-architect.md`, `.documents/SOP/sop-implementation.md`, all **four** `.documents/WIP/` files and the **single** `.documents/Reports/execution-report.md`. SOPs are binding. Match the repository's exact approved architecture, not an inferred test convenience. Verify one Windows/WSL checkout, one correct `origin`, one worktree, clean tree/index except this exact Owner-installed ACTIVE before A7, no uncommitted Owner work, empty stash, exactly four WIP files, no scratch collision and all protected ref tips. Any mismatch: STOP and report; **never reset, clean, rebase, destructively checkout, force-push or delete Owner material**.
+Authoritative starting remote tips:
 
-**Starting `main == origin/main`:** `6737e256d5bd68f2d42b2e072c847203331002e3`, tree `2607d6a2f10cfbf1d9522bf61832b9aa3fbfa58d`, parent `6f5a69b9a2d14f99fd3fb8da0f21406087e987db`, canonical R03 STOP report blob `9fd7f1f1dec0028e2a6a51ab9edb53d9bb51fd6c`, installed R03 ACTIVE blob `1e1c56473e4f2a0c91610452fa9031243442894e`. **Existing, and only permissible technical branch:** `solo-wo-115-avif-svg-v3-r02`, tip `82d9dbc3e10df3a0a56c881bd6b22f5bc8146080`, tree `7eee284272ce28f22b249b0cbaeef41b5e565a2a`, parent `c46a8f379e7a9116718ff028f2cfef619a5c6653`. Its accepted ancestry is B0 `8c7b6573`, S1 `e5a3058e`, S2 `87d66cd8`, T2 `29726fc7`, S3 `c46a8f37`, correction `82d9dbc3`. **27 remote refs** remain, including frozen `solo-wo-113-gif-v2-r01` `ad7b74df8638ff56c7137f33d9242da54583f17b` and `solo-wo-112-gif8-host-r01` `40b03c73b0bc8544359438daea6218caa496e85d`. Do not create another branch or alter any other protected ref.
+- `main`: `da63eaa2e732c2587856cee3bfbce36bc34a27f1` (`SOLO-WO-116 R04` report, R7).
+- Technical source: `solo-wo-115-avif-svg-v3-r02` at `d82ae76273b57b37014d3b4c557b8debd5299eea`, tree `b6daae33`.
+- Hosted technical proof: GitHub Actions run `43674236111`, Ubuntu job `132690745816`, Windows job `132690745654`, both successful at that exact technical SHA. Its N116 4/4, six mutation checks, RED/GREEN and full retained gates are the accepted **technical input evidence**; this order is the fresh integration authorization and proof.
+- Hosted current-main proof: run `43674735216`, successful on both hosts at `da63eaa2`.
 
-Freeze the verified governance blobs: `AGENTS.md` `6eae1da8c721e13cea0c6689a1665e98fa5a9abb`; Architecture `f66096ec375a497ac6de9a65cfbeae4c5dc85844`; Architect SOP `1483c9bec1dc9cc7bb7a51590b72eb90c1506af1`; Implementation SOP `51bb37922cf7fc56952e4ad6155c9`; source checker `crates/solo-cli/tests/architecture_checks/source.rs` `1c99d3482dd2a9bd7b027f5f193e17603976e361`; unsafe checker `crates/solo-cli/tests/unsafe_boundary.rs` `57d7579616fc0bab96dcb1e371584f20cfd5d8f9`; root `Cargo.toml` `14505be49a281ba0495eabea5ca386548cc36347`; `rust-toolchain.toml` `9ec55b3b621dbc75fc68817cd51b96e407d3c94c`; ROADMAP/NEXT/OUTLOOK `9d7a86226878f490fd5e26c6813a81e5f73f3f37` / `92fa562b1af0c54391851aa5c79deb1631127069` / `cb9c7a610cf3c537557e060ca9656e44a053e69d`. All immutable under this order.
+The exact source includes the justified architecture checker `edges=81` assertions on both hosts and the fixed N116 gate. The verified dependency allowlist admits only the approved adapter normal roots `quick-xml`/`svgtypes` and exactly 47 adapter-closure package names. These exact source bytes are **authorized as the integration input of this work order**. Do not re-edit or weaken them.
 
-**Independent verification of R03, not an agent interpretation:** compare initial R03 main `0d715f98`→R6 `6737e256` changes exactly ACTIVE and canonical report. S3 changed only `.github/workflows/rust-verify.yml`, `crates/solo-adapters/src/graphic_svg_inspection.rs`, `crates/solo-cli/tests/media_worker_host_smoke.rs`; correction changed only the smoke test. Two *real* same-SHA per-host hosted attempts failed: technical run `43621074854` at `c46a8f379e7a9116718ff028f2cfef619a5c6653` (Ubuntu job `132526670343`, Windows `132526670471`) and technical run `43621661869` at `82d9dbc3e10df3a0a56c881bd6b22f5bc8146080` (Ubuntu `132528489392`, Windows `132528489627`). Both failed **Test (workspace, all targets, locked)**. The second run passed `n116_01`, `n116_02`, `n116_04` on both hosts but failed `n116_03`, old `n113_03`, real workspace dependency-graph tests and architecture fixture real-tree checks. The report's two highlighted workspace-graph failures were incomplete: a **third** assertion `the_real_graph_exposes_exactly_the_reviewed_adapter_external_normal_roots` also failed. **Main** baseline run `43622216067` at R6, Ubuntu `132530192809` and Windows `132530193012`, attempt 1 successful; it is NOT SVG technical proof. Do not report any attempted technical run as green.
+Read `README.md`, `AGENTS.md`, `.documents/About/FOUNDATION-SOLO.md`, `.documents/Architecture/ARCHITECTURE.md` (especially §§5, 5A, 6.2G/I/K, 6A.8), both SOPs, all four WIP files, and the current `.documents/Reports/execution-report.md` before acting. Keep all previously accepted contracts, A1 rules, security/source/architecture refusal gates, and the single Owner/Architect/Implementation Agent division of responsibility. No work outside this repository.
 
-All accepted PNG/JPEG/WebP/GIF, real GIF animation, N108 8/8, N113 4/4, Windows N102 4/4 and native 12/12, confinement and Btrfs proof, S1 sanitizer, S2 V3 five-format product code, B0 ten exact licence-documented donor fixtures and R03's four real N116 cases + 4/4 gate/RED oracle must remain intact. The active V3 AVIF arm **refuses before starting any worker**; AVIF production is unfinished. S1 `graphic_svg_inspection.rs` is **currently** blob `ded4d3d067e3967a5c5c992d1d0db6465b2d5d83`; don't confuse it with the older pre-correction `aac743e2`. S3 smoke blob `e315043a66db19b64028f4364806ffb52aae3c48`; `Cargo.lock` `d4eeb3956f3d21dc2fdd3a194e4ffbbea42e81f8`; `crates/solo-adapters/Cargo.toml` `47537c5c1539b57109a37de56b05cfc9c71cbfcc`; workflow at branch must be pinned by its *actual* blob before editing. Preserve exact B0 fixture bytes and donor origins.
+## 2. Hard preflight; safety before source mutation
 
-## 2. Closed write ledger and forward-only operations
+Use the existing **one** checkout; work from local Windows 11 and/or WSL Ubuntu 26.04 on that same checkout, not a clone or second worktree. Confirm `git rev-parse --show-toplevel` is the actual Solo root, one worktree, branch `main`, exactly one remote `origin` pointing to `https://github.com/provelopment/provelopment-foundation-solo` (the equivalent `.git` remote is acceptable), empty stash, exactly four WIP files, and clean index/worktree **except** the Owner-installed new `workorder-active.md` content. Confirm `origin/main` is the exact pinned `da63eaa2` and the named technical remote branch is exactly pinned `d82ae762`. Inspect all unexpected local/remote changes; **STOP**, preserve them, and report. Never reset, rebase, force-push, `git clean`, delete unknown/Owner-owned files or temp, or add worktrees/remotes/branches.
 
-**On `main` only:** A7 commit and push **exactly** the Owner-installed `.documents/WIP/workorder-active.md` alone, verifying raw/filtered/index/GitHub blob equality; after technical disposition, R7 overwrite and commit/push **only** `.documents/Reports/execution-report.md`, then run fresh baseline Ubuntu + Windows CI at exact R7 SHA. **No technical product/test/manifest/architecture/workflow or fixture file is integrated onto `main` under R04.** Do not edit any other main path. Do not produce a report archive.
+Only the following commits on `main` are authorized:
 
-**On the existing technical branch only:** T3 copy the **same exact A7 ACTIVE Git blob** into `.documents/WIP/workorder-active.md` via verified byte-safe `git cat-file blob` redirection, commit it alone as a forward descendant of `82d9dbc3`, and check Git worktree/index/source equality. **Do not repeat `git checkout main -- .documents/WIP/workorder-active.md`** or overwrite the freshly installed Owner order. Then limit durable corrective changes to the following:
+1. **A8:** stage, commit and push **only** this exact Owner-installed `.documents/WIP/workorder-active.md`; verify working/index/remote Git blob identity. The published work order must be identical to the Owner-installed file. Do not carry older technical-branch ACTIVE text into main.
+2. **I8:** integrate precisely the 23 file paths in §3 from the pinned technical SHA as identical Git blobs, commit and push only those 23 paths, then verify full hosted Linux/Windows CI at that **one I8 SHA**.
+3. **R8:** overwrite, commit and push **only** `.documents/Reports/execution-report.md` with the complete current run evidence. Then verify a fresh native Linux/Windows baseline CI at the **one R8 SHA**. Do not put R8's own SHA inside its own report; give the SHA in the final handoff.
 
-1. `crates/solo-cli/tests/architecture_checks/graph.rs` — **required**. Adjust ONLY exact reviewed normal external roots and the exact audited reachable third-party closure for the already-authorized pinned SVG parser dependencies; maintain the same guard code, exclusive adapter ownership, kind checking, forbidden-edge/refusal behavior and executable checker semantics. Narrow graph fixture/architecture count corrections within this file only if a real checker run proves them necessary. No global whitelist, `allow(any)`, bypass, ignored test, dropped fixture, source-checker change or loosening of graph rules.
-2. `crates/solo-cli/tests/media_worker_host_smoke.rs` — **required**. Correct precisely the one stale `n097::n113_03_declared_format_and_favicon_refusals` `.svg` declaration assertion to the actual accepted syntax/role and V2 inspection policy, and repair the real invalid-owner/role/cardinality fixture in `n116_03_active_svg_and_hidden_obligation_refuse_whole`. Preserve the other N113 and N116 assertions, the all-or-refused semantics, five real owners, hidden/suppressed declarations and the hostile document/RED tests. Narrow test-helper diagnostics may be improved where necessary to identify the true schema refusal; no fake source set or bypass of the validator.
-3. `.github/workflows/rust-verify.yml` — **conditional only** if, *after* a real complete workspace pass, the committed N116 exact-4/4 / RED step itself demonstrably fails for a strictly provable script defect. Edit only the already-added three N116 gate steps; keep the same exact test count, seven evidence tokens, missing/failed/ignored/duplicate/3-of-4 refusal probes, RED→GREEN, all retained workflow steps and failure propagation. Do not reformat/unpin unrelated workflow steps or mask errors. If no such evidence, this path is frozen.
-4. `crates/solo-cli/tests/workspace_graph.rs` — **normally frozen**. GitHub source verifies it imports `APPROVED_ADAPTER_EXTERNAL_NORMAL` and `APPROVED_ADAPTER_CLOSURE` from `architecture_checks/graph.rs`; all three reported assertion failures should resolve from the one shared policy change. Edit this file **only** if a fresh real failing test *after correct `graph.rs` updates* proves a distinct obsolete **literal exact-set assertion**; then correct ONLY that single expected literal. No changes to rules, functions, assertions, negative fixtures or test execution. Document the demonstration before any such edit.
+No pull request, merge commit, cherry-pick, tag, release, deployment, provider action, dependency upgrade, force-push, unauthorized code fix, or WIP/archive proliferation. Preserve the technical branch and all other remote refs unchanged. The authorization permits ordinary exact-path `git restore` for the §3 blob transfer from the pinned SHA on a verified clean `main` after A8; it does **not** permit restoring, overwriting or checking out `workorder-active.md` from the technical branch.
 
-**Every other permanent file is FROZEN:** in particular `Cargo.lock`, all Cargo manifests, `.gitattributes`, `deny.toml`, `AGENTS.md`, Architecture and SOPs, WIP plans, all source/unsafe checkers, `graphic_svg_inspection.rs`, `graphic_image_inspection.rs`, application/domain/adapter production code, `media_worker_host_native.rs`, CLI entrypoint, all B0 fixtures/provenance, tests outside the four paths above and any future `platform/assets`. No new dependency/crate/version, unsafe, font, native codec, HTTP route, alternate worker or production format. A genuinely discovered product bug outside this exact ledger: STOP with precise evidence for new Owner authority; do not silently edit it. No change to Foundation donor repo.
+## 3. Exact 23-path integration ledger — no additions or omissions
 
-Only ordinary forward commits/pushes to authorized `main` and this technical branch, read-only inspections, hosted CI at exact heads and SOP-compliant **task-owned** temporary work are permitted. No branch creation/deletion, PR, merge, cherry-pick, rebase, reset, force-push, destructive checkout, `git clean`, tag, release, deployment, changes to external providers or Owner scratch cleanup. A failed CI may be fixed by a fresh forward technical commit if and only if the fix is within this narrow ledger; otherwise STOP without main integration.
+Transfer these file contents from the **single** source commit `d82ae76273b57b37014d3b4c557b8debd5299eea`:
 
-## 3. Mandatory corrections — exact policy, not weakened checks
+```text
+.github/workflows/rust-verify.yml
+Cargo.lock
+crates/solo-adapters/Cargo.toml
+crates/solo-adapters/src/graphic_image_inspection.rs
+crates/solo-adapters/src/graphic_svg_inspection.rs
+crates/solo-adapters/src/lib.rs
+crates/solo-adapters/tests/property_resolution.rs
+crates/solo-application/src/graphic_image_inspection.rs
+crates/solo-application/src/lib.rs
+crates/solo-cli/tests/architecture_checks/graph.rs
+crates/solo-cli/tests/fixtures/avif/LICENSE-AND-PROVENANCE.md
+crates/solo-cli/tests/fixtures/avif/abc_color_irot_alpha_NOirot.avif
+crates/solo-cli/tests/fixtures/avif/abc_color_irot_alpha_irot.avif
+crates/solo-cli/tests/fixtures/avif/clap_irot_imir_non_essential.avif
+crates/solo-cli/tests/fixtures/avif/fox-profile0.10bpc.yuv420.avif
+crates/solo-cli/tests/fixtures/avif/fox-profile0.8bpc.yuv420.avif
+crates/solo-cli/tests/fixtures/avif/fox-profile2.12bpc.yuv420.avif
+crates/solo-cli/tests/fixtures/avif/white_1x1.avif
+crates/solo-cli/tests/fixtures/svg/TABLER-ICONS-MIT.txt
+crates/solo-cli/tests/fixtures/svg/icon-home.svg
+crates/solo-cli/tests/media_worker_host_smoke.rs
+crates/solo-domain/src/property_registry.rs
+crates/solo-domain/tests/property_resolution.rs
+```
 
-**C1 — one shared architecture graph admission.** The already accepted `solo-adapters` direct normal dependencies are `quick-xml =0.42.0` and `svgtypes =0.16.1`, pure Rust, already in the locked manifest since S1. In `graph.rs` the root constant `APPROVED_ADAPTER_EXTERNAL_NORMAL` currently has 7 names; make it **exactly 9** by adding `quick-xml`, `svgtypes`, sorted with the existing seven. Do not allow either root on any other workspace owner or as `dev`/`build` or an alias. The transitive constant `APPROVED_ADAPTER_CLOSURE` currently has 39 names; the independently verified locked S1 graph adds **exactly eight** package identities, giving **47** names when combined with the original list: `arrayvec 0.7.8`, `euclid 0.22.14`, `kurbo 0.13.1`, `polycool 0.4.0`, `quick-xml 0.42.0`, `siphasher 1.0.4`, `smallvec 1.16.5`, `svgtypes 0.16.1`. The **versions are pinned in unchanged `Cargo.lock`**, while the guard currently uses package *names*; preserve that rule and its fail-closed exact-closure character. Independently derive the actual `cargo metadata --locked` reachable closure and compare to those eight (do not merely paste the report), ensure no other drift, retain in-memory forbidden-owner/kind/alias/unlisted-node negatives, and show the architecture checker plus its negative self-test suite still independently refuses a malicious sample. If an exact documented count elsewhere in the **same** graph module is made stale, correct the count to the actual validated real graph only, not to a wished-for value. The two failing real-tree architecture fixtures are a consequence of this same shared rule, not grounds to edit `check_architecture_fixtures.rs`, the source checker or governance.
+**Use byte-safe Git objects, not PowerShell `>` redirection for binary AVIF files.** After A8, while on clean `main`, the following Bash example (Git Bash or WSL) is the prescribed transfer. It must not run on an unverified dirty tree:
 
-**C2 — the one stale N113 declaration assertion.** In `n097::n113_03_declared_format_and_favicon_refusals`, the legacy list asserts `('svg','logo','vector.svg')` must fail *property validation*; that contradicts accepted S2 lowercase `.svg` syntax admission. Replace that stale case with the actual unsupported uppercase `vector.SVG` as a property-stage refusal, and add a meaningful positive check that lowercase `vector.svg` is admitted by a valid non-favicon property declaration. **Crucially**, prove a `vector.svg` source is **still refused by the V2 four-format inspector** (`UnsupportedFormat`), and an `.svg` favicon is still refused by the registered PNG-only favicon role. Preserve all other N113 invalid MIME, GIF, AVIF, oversized, missing, corrupted and worker-forgery cases and the test's exact function name and count. Do not make an old refusal disappear without replacing it with the correct stage-specific assertion.
+```bash
+set -euo pipefail
+TECH=d82ae76273b57b37014d3b4c557b8debd5299eea
+mapfile -t paths <<'PATHS'
+.github/workflows/rust-verify.yml
+Cargo.lock
+crates/solo-adapters/Cargo.toml
+crates/solo-adapters/src/graphic_image_inspection.rs
+crates/solo-adapters/src/graphic_svg_inspection.rs
+crates/solo-adapters/src/lib.rs
+crates/solo-adapters/tests/property_resolution.rs
+crates/solo-application/src/graphic_image_inspection.rs
+crates/solo-application/src/lib.rs
+crates/solo-cli/tests/architecture_checks/graph.rs
+crates/solo-cli/tests/fixtures/avif/LICENSE-AND-PROVENANCE.md
+crates/solo-cli/tests/fixtures/avif/abc_color_irot_alpha_NOirot.avif
+crates/solo-cli/tests/fixtures/avif/abc_color_irot_alpha_irot.avif
+crates/solo-cli/tests/fixtures/avif/clap_irot_imir_non_essential.avif
+crates/solo-cli/tests/fixtures/avif/fox-profile0.10bpc.yuv420.avif
+crates/solo-cli/tests/fixtures/avif/fox-profile0.8bpc.yuv420.avif
+crates/solo-cli/tests/fixtures/avif/fox-profile2.12bpc.yuv420.avif
+crates/solo-cli/tests/fixtures/avif/white_1x1.avif
+crates/solo-cli/tests/fixtures/svg/TABLER-ICONS-MIT.txt
+crates/solo-cli/tests/fixtures/svg/icon-home.svg
+crates/solo-cli/tests/media_worker_host_smoke.rs
+crates/solo-domain/src/property_registry.rs
+crates/solo-domain/tests/property_resolution.rs
+PATHS
+[ "${#paths[@]}" -eq 23 ]
+[ "$(git branch --show-current)" = main ]
+[ -z "$(git status --porcelain)" ]
+for p in "${paths[@]}"; do git cat-file -e "$TECH:$p"; done
 
-**C3 — the invalid `n116_03` inventory.** Hosted attempt 2 `n116_01` passed, while `n116_03` panicked at the shared `inventory_of` helper with `a validated test inventory`. Do not guess which of the several inventories (hostile, late, suppressed, missing) is invalid. Instrument only a **test-local, bounded diagnostic** or construct these inventories individually through the real existing validation helper to recover the exact owner/property/cardinality violation, then correct the **test declaration** to a real legal set; remove unneeded diagnostics before the final technical commit. In particular, preserve five actual independently-originated obligations in the late-corrupt test, the hidden/suppressed declaration inspection, and the true confined missing-file refusal; no fabricated or manually constructed `GraphicAssetSourceSetV1`, no substitute fake port, no dropping `n116_03` subcases, no `#[ignore]`, and no changed production schema to accommodate a mistaken test. `n116_03` must pass natively on **both** hosts and still report a whole-candidate refusal with no partial output.
+git restore --source="$TECH" --staged --worktree -- "${paths[@]}"
+# Verify the exact changed-path set, then every index blob is byte-identical.
+diff -u <(printf '%s\n' "${paths[@]}" | LC_ALL=C sort) \
+        <(git diff --cached --name-only | LC_ALL=C sort)
+for p in "${paths[@]}"; do
+  expected=$(git rev-parse "$TECH:$p")
+  actual=$(git rev-parse ":$p")
+  [ "$expected" = "$actual" ] || { echo "BLOB MISMATCH: $p" >&2; exit 1; }
+done
+# Run §4 LOCAL checks before committing I8 or dispatching hosted CI.
+```
 
-## 4. Actual proof and refusal gates
+This exact-path list includes ten donor fixture/provenance files (eight AVIF paths and two SVG paths). Never import `.documents/WIP/workorder-active.md` from the technical branch. Do not import the technical branch's commit ancestry or change the source branch. Do not touch any other file, including other WIP plans, architecture/SOPs, `deny.toml`, root `Cargo.toml`, source/unsafe checkers, and unchanged files.
 
-**Before dispatch:** verify the S1/S2 product and B0 fixture blob hashes did not drift; source edits are limited to exactly the ledger. Run `cargo fmt --all -- --check`, `cargo check --workspace --all-targets --locked`, `cargo clippy --workspace --all-targets --locked -- -D warnings`, full runnable workspace unit/integration suites, especially `cargo test -p solo-cli --test workspace_graph --locked`, `cargo test -p solo-cli --test check_architecture_fixtures --locked`, the architecture checker and negative fixtures, `cargo test -p solo-cli --test media_worker_host_smoke --locked n113_`, `n116_02` and `n116_04`, dedicated SVG 14/14, domain/adapters property tests and unsafe boundary/tripwires. Reverify `Cargo.lock` and Cargo manifests frozen. If local WSL lacks the Btrfs `SOLO_TEST_SOURCE_FS_ROOT`, explicitly distinguish tests that cannot be run there; neither claim they passed nor skip them in hosted Linux. Run `SOLO_N116_RED_ORACLE=wrong` to observe a **nonzero, expected actual test failure**, restore unset normal environment and observe success. The scripts' missing/FAILED/ignored/duplicate/three-of-four mutations must each be refused, not merely printed. No new dependence on `sudo`, native `dav1d`, system fonts, AVIF encoder or external media service.
+## 4. Local-first tests and exact acceptance gates
 
-**Technical D7 — indispensable same-head CI:** push the minimal correction on the **same** technical branch with ordinary forward commit(s). Trigger or observe a genuinely fresh **full** `rust-verify.yml` run on Ubuntu 24.04 and native Windows 2025 at the **identical final correction SHA**, attempt and jobs fully identified. Both jobs must conclude **success**: full locked workspace suite, real Btrfs source tests, native Windows N102 gates, all old architecture/source/unsafe/security/snapshot/reproducibility/refusal tests and security advisories, and **actual N116 exact 4/4 + real positive/negative evidence + RED sensitivity**. The existing workflow adds three N116 steps to the retained original job; `skipped` steps when platform-specific are not claimed successful, but no required test may be absent, ignored, masked or short. Verify the real job log outputs: all four `n116_0[1-4]` test names, exact 4/4, expected vector digests, actual worker PIDs, true five-format source chain, hidden refusal and whole-set atomic behavior, lost trust on forged source/output, deliberate RED failure and normal GREEN, script mutation rejection. Compare cross-host canonical hashes, not host-specific PIDs. Full security checker/`cargo-deny` and its advisory negative case must pass without waiver; disclose any warnings honestly. A job that fails before the N116 gate is not evidence of its success. For another narrow fix, forward commit then rerun **both** hosts from the new SHA. A broad unrelated failure or forbidden-path fix is STOP and no integration.
+**First, before GitHub CI,** run all applicable checks locally on Windows 11 and/or WSL Ubuntu 26.04 against the staged 23-file integration, retaining the exact command, environment, exit status and relevant output. In the approved checkout:
 
-**Main R7:** Whether D7 is green or STOPPED, overwrite the one canonical report on `main` alone, commit/push report-only R7 and run fresh hosted Ubuntu and Windows baseline CI at **exact R7 SHA**. Report A7/T3/C/D7/R7 commits, trees, parents and complete changed file/sha ledger; the two earlier failed technical attempts with exact jobs, corrected three graph assertions, N113 stage-policy evidence, actual inventory diagnosis, every N116 hosted case/gate/red oracle, per-host canonical digests and worker PIDs, retained N102/N108/N113/security gates, `cargo-deny` results, exact original ref preservation and cleanliness, real local Btrfs limitations, and any unresolved issue. Do not embed R7's own SHA in its own report body; give it in the handoff. `status=COMPLETE — pending independent Chief Master Architect review` **only** with all required technical same-head two-host green evidence; otherwise `STOPPED`/`FAILED` explicitly, and do not claim feature integrated. `main` must have changed only ACTIVE+report from its initial R6 baseline.
+```bash
+cargo fmt --all -- --check
+cargo check --workspace --all-targets --locked
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo test -p solo-cli --test workspace_graph --locked
+cargo test -p solo-cli --test check_architecture_fixtures --locked
+cargo test -p solo-cli --test check_architecture --locked
+cargo test -p solo-cli --test media_worker_host_smoke --locked n116_02 -- --nocapture
+cargo test -p solo-cli --test media_worker_host_smoke --locked n116_04 -- --nocapture
+cargo test -p solo-adapters --locked
+```
 
-## 5. Next authorized decision only after independent acceptance
+Run the full `cargo test --workspace --all-targets --locked` on any local host where its real-source/snapshot test prerequisites are present; run the complete N113/N116 native-host subset there as well. WSL without an actual prepared `SOLO_TEST_SOURCE_FS_ROOT` Btrfs fixture may legitimately be unable to execute `n113_`, `n116_01`, `n116_03` and five native snapshot tests. State those as **NOT RUN LOCALLY** and rely on genuinely executed hosted Ubuntu verification; do not bypass, ignore or fake them. Use the Windows local machine for additional native checks where runnable, sequentially on the same checkout rather than making a second worktree. Fixing product code is **not authorized in this exact-blob integration order**: a surprising failure is STOP with diagnostics, not an improvised patch.
 
-The Chief Master Architect must read the **published canonical report first**, independently inspect actual changed code and full CI/job logs, then return `ACCEPT`, `REVISE`, or `STOP`. Green technical acceptance authorizes preparation of a **separate Owner-reviewed exact-blob integration order**; it does not itself grant permission to import into `main`. That integration order will transfer the accepted S1/S2/S3/D7 technical source/tests/workflow and the frozen B0 test-only fixtures, verify blob equality, run fresh native Ubuntu/Windows CI at integration and report heads, and prohibit broader edits. **After SVG integration:** finish real AVIF 8/10/12-bit, alpha and safe orientation with pinned dav1d/native both-host proof, then deliver the lawful Foundation-sourced read-only `platformAssetLibraryVersion: "1.0.0"` asset catalogue, derived variants and whole-candidate exposure/suppression. The binding common Solo artwork source remains `provelopment/provelopment-foundation` pinned `fa599973a88ff77f6a8e012f3266c3c139b52c17` with its 84 SVG icons and exact licence/provenance; no invented parallel icon set and no automatic approval of parked or withheld trademarked platform marks. Stage 03, `R03.C` and `R03.C3` stay **OPEN** until *all* graphical obligations are proven and accepted; only then may the Owner's existing conditional administrative closure authority be considered. No release or deployment is authorized by R04.
+Verify the imported workflow still has N116 four exact tests, two host gate steps plus RED, six mutated-log rejections, the independently pinned canonical SVG digests, and retained exact real-tree `edges=81` checks. Verify `Cargo.lock` is identical to the pinned technical source, the approved `quick-xml =0.42.0` and `svgtypes =0.16.1` normal roots occur only in `solo-adapters`, the 47-name closure still fails closed, and both negative architecture fixtures remain effective. No relaxed CI check, missing/ignored canary, hidden error, changed fixture byte, uncontrolled dependency, or unreviewed warning is allowed.
+
+**After local checks pass:** commit I8, confirm all 23 `HEAD:path` Git blob SHAs exactly equal `TECH:path`, verify `origin/main` still matches the expected predecessor, push by ordinary fast-forward, and examine the fresh `rust-verify.yml` workflow triggered by that `main` push. Obtain **one complete native Ubuntu 24.04 + Windows 2025 run at identical I8 SHA**, both jobs `success`, including complete locked workspace tests, architecture/source/unsafe/security gates, RustSec negative probe, N102/N108/N113, N116 exact 4/4 plus six mutations and deliberate RED/GREEN, all host snapshots and reproduction gates, V2 and V3 evidence, and the `edges=81` checker. Inspect actual logs, not only the green badge. Confirm both pinned SVG digests match across hosts and every essential step was actually reached. Do not count legitimate platform-inapplicable steps as failures or as performed work.
+
+After I8 proof, overwrite the **single** canonical `.documents/Reports/execution-report.md` with the run's full evidence and an explicit `status=COMPLETE — pending independent Chief Master Architect review`, commit/push only that report as R8, and verify fresh Linux/Windows hosted CI at the exact R8 SHA. If an error or unresolved scope/authority issue occurs at any phase, STOP safely, leave no unauthorized changes and publish an honest `STOPPED` report whenever the report-only safety gate permits.
+
+## 5. Required report and explicit exclusions
+
+The report must identify A8, I8 and R8 commits, parents, trees, exact paths and blob equality; source and destination tips; local versions/commands/results and any Btrfs limits; two-host run IDs, jobs, attempts, SHAs, step conclusions, complete N116 evidence including process IDs and per-host digests; retained negative/refusal/security/reproducibility gates; all warnings and skips, and local cleanliness/temporary cleanup. Preserve exactly four WIP files and 27 existing branch refs with no unapproved changes. No reporting archive and no reference to a second checkout. Give the final report commit SHA in the Implementation Agent chat handoff only.
+
+**Do not** implement real AVIF decoding, modify graphics policy, add platform assets, complete `R03.C`, close Stage 03, build a browser/HTTP route, change the contact system, publish a release, create a PR, deploy, or use a provider. AVIF still refuses before any worker; the SVG integration is one bounded step of the open Stage 03. Following a successful report I will independently inspect the published report, exact I8/R8 code, tests and two-host logs and return `ACCEPT / REVISE / STOP`; work on AVIF and platform catalogue remains separately sequenced.
