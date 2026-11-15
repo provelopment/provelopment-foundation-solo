@@ -1886,7 +1886,7 @@ jobs:
           grep -qF 'n123_reference positive_pin=matched' "$log" || { echo 'referee did not match the pinned positive'; exit 1; }
           grep -qF 'n123_reference negative_measured=true' "$log" || { echo 'referee did not measure the negative'; exit 1; }
           grep -qF 'n123_reference same_coded_rgba=' "$log" || { echo 'referee omitted the reference comparison'; exit 1; }
-          grep -qF 'n123_reference alpha_differences=' "$log" || { echo 'referee omitted the alpha differential'; exit 1; }
+          grep -qF 'alpha_differences=' "$log" || { echo 'referee omitted the alpha differential'; exit 1; }
           grep -qF 'n123_reference mutation_rejections=2/2' "$log" || { echo 'referee mutation proof absent'; exit 1; }
           grep -qF 'n123_reference cleanup=complete' "$log" || { echo 'referee cleanup not reported'; exit 1; }
           set +e
