@@ -2784,9 +2784,11 @@ mod n097 {
         }
 
         // Declaration-level refusals happen at the real property-validation stage, before any read.
+        // Lowercase `.svg` is admitted *syntax* since the accepted S2 grammar, so the property-stage
+        // case is the uppercase extension, which stays outside the authored token set.
         for (tag, role, reference) in [
             ("uppercase", "logo", "hero.PNG"),
-            ("svg", "logo", "vector.svg"),
+            ("uppercase-svg", "logo", "vector.SVG"),
             ("unknown", "logo", "hero.bmp"),
             ("favicon-gif", "favicon", "favicon.gif"),
             ("favicon-webp", "favicon", "favicon.webp"),
@@ -2797,6 +2799,51 @@ mod n097 {
             );
             println!("n113_declared case={tag} refused=true stage=property-validation");
         }
+
+        // The positive counterpart: lowercase `.svg` passes a valid non-favicon declaration, and the
+        // four-format V2 inspector then refuses it as an unsupported format for *this* gate. The same
+        // `.svg` under the registered PNG-only favicon role is refused by the role, not the grammar.
+        let vector_svg = b"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"4\" height=\"4\"/>";
+        assert!(
+            test_inventory_v1(&[(TestOwnerV1::Page, "logo", "vector.svg", "public")]).is_some(),
+            "lowercase .svg must be admitted as declared syntax"
+        );
+        let svg_root = Root::new("n113-03-svg-admitted", &[("vector.svg", &vector_svg[..])]);
+        match inspection_refusal_v2(inspect_entity_graphic_images_v2(
+            &svg_root.capability(),
+            &one_logo("vector.svg"),
+            Path::new(BIN),
+        )) {
+            EntityImageRefusalV2::Inspection(refusal) => {
+                assert_eq!(
+                    refusal.kind(),
+                    GraphicImageInspectRefusalKindV2::UnsupportedFormat,
+                    "the four-format V2 inspector must still refuse an .svg source"
+                );
+            }
+            other => panic!("svg: expected an inspection refusal, got {other:?}"),
+        }
+        println!(
+            "n113_declared case=svg-admitted-then-unsupported refused=true kind=unsupported-format"
+        );
+
+        let svg_favicon_root =
+            Root::new("n113-03-svg-favicon", &[("favicon.svg", &vector_svg[..])]);
+        match inspection_refusal_v2(inspect_entity_graphic_images_v2(
+            &svg_favicon_root.capability(),
+            &inventory_of(&[(TestOwnerV1::Page, "favicon", "favicon.svg", "public")]),
+            Path::new(BIN),
+        )) {
+            EntityImageRefusalV2::Inspection(refusal) => {
+                assert_eq!(
+                    refusal.kind(),
+                    GraphicImageInspectRefusalKindV2::FaviconNotPng,
+                    "an .svg favicon must still be refused by the PNG-only registered role"
+                );
+            }
+            other => panic!("svg-favicon: expected an inspection refusal, got {other:?}"),
+        }
+        println!("n113_declared case=svg-favicon refused=true kind=favicon-not-png");
 
         // AVIF is a valid *reference* but is outside this four-format gate, so it refuses here.
         let root = Root::new("n113-03-avif", &[("hero.avif", &png_bytes)]);
@@ -4889,27 +4936,32 @@ mod n116 {
             "a suppressed declaration is still inspected and still refuses"
         );
 
-        // Registered role policy, grammar case and unsupported declarations.
+        // Registered role policy. The favicon role is PNG-only in the **authored declaration
+        // validator**, which is stricter than the inspection stage: an `.svg` or `.gif` favicon is
+        // refused before a source read or a worker can exist. Measured with the real validator, so a
+        // future widening of the role cannot pass this case silently.
         let svg_bytes = good.clone();
-        let role_root = Root::new("roles", &[("icon.svg", &svg_bytes)]);
+        for (tag, reference) in [("icon.svg", "icon.svg"), ("icon.gif", "icon.gif")] {
+            assert!(
+                test_inventory_v1(&[(TestOwnerV1::Entity, "favicon", reference, "public")])
+                    .is_none(),
+                "{tag} must be refused by the registered PNG-only favicon role at declaration"
+            );
+        }
+        // The same declared bytes under a non-favicon role reach the inspector, which accepts the
+        // SVG — proving the refusal above is the role, not the format gate.
+        let role_root = Root::new("roles", &[("mark.svg", &svg_bytes)]);
+        let role_set = complete(inspect_entity_graphic_images_v3(
+            &role_root.capability(),
+            &inventory_of(&[(TestOwnerV1::Entity, "logo", "mark.svg", "public")]),
+            std::path::Path::new(BIN),
+        ));
         assert_eq!(
-            refusal_kind(inspect_entity_graphic_images_v3(
-                &role_root.capability(),
-                &inventory_of(&[(TestOwnerV1::Entity, "favicon", "icon.svg", "public")]),
-                std::path::Path::new(BIN)
-            )),
-            GraphicImageInspectRefusalKindV3::FaviconNotPng,
-            "the favicon role is PNG-only"
+            role_set.len(),
+            1,
+            "an .svg under a non-favicon role inspects"
         );
-        let gif_role_root = Root::new("gifrole", &[("icon.gif", &gif_fixture())]);
-        assert_eq!(
-            refusal_kind(inspect_entity_graphic_images_v3(
-                &gif_role_root.capability(),
-                &inventory_of(&[(TestOwnerV1::Entity, "favicon", "icon.gif", "public")]),
-                std::path::Path::new(BIN)
-            )),
-            GraphicImageInspectRefusalKindV3::FaviconNotPng
-        );
+        assert!(role_set.inspections()[0].vector().is_some());
 
         // A missing file is a real source-read refusal, never a silent skip.
         let missing_root = Root::new("missing", &[("logo.jpg", &jpeg())]);
@@ -4929,7 +4981,7 @@ mod n116 {
         assert!(refusals.len() >= 14);
         println!(
             "n116_evidence case=n116_03 refusals={} late_refusal={} hidden_refused=true \
-             favicon_svg=favicon-not-png-v3 favicon_gif=favicon-not-png-v3 \
+             favicon_svg=declaration-refused favicon_gif=declaration-refused svg_nonfavicon_role=inspected \
              missing=read-refused partial=false fallback=none",
             refusals.len(),
             late_kind.token()

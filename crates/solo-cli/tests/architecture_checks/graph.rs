@@ -38,13 +38,15 @@ pub const APPROVED_DEV_OWNER: &str = "solo-cli";
 /// only for `cfg(target_os = "linux")` and `windows-sys` only for `cfg(windows)` — so a
 /// single host never compiles both, and the locked graph therefore carries exactly one
 /// `windows-sys`, which is what keeps `multiple-versions = "deny"` satisfied.
-pub const APPROVED_ADAPTER_EXTERNAL_NORMAL: [&str; 7] = [
+pub const APPROVED_ADAPTER_EXTERNAL_NORMAL: [&str; 9] = [
     "gif",
     "image",
     "libc",
+    "quick-xml",
     "rustix",
     "serde",
     "serde_json",
+    "svgtypes",
     "windows-sys",
 ];
 
@@ -56,8 +58,9 @@ pub const APPROVED_ADAPTER_EXTERNAL_OWNER: &str = "solo-adapters";
 ///
 /// It is enumerated rather than computed so that a new transitive component cannot
 /// appear silently: an unlisted node is an unapproved reachability and is refused.
-pub const APPROVED_ADAPTER_CLOSURE: [&str; 39] = [
+pub const APPROVED_ADAPTER_CLOSURE: [&str; 47] = [
     "adler2",
+    "arrayvec",
     "autocfg",
     "bitflags",
     "bytemuck",
@@ -65,12 +68,14 @@ pub const APPROVED_ADAPTER_CLOSURE: [&str; 39] = [
     "cfg-if",
     "crc32fast",
     "errno",
+    "euclid",
     "fdeflate",
     "flate2",
     "gif",
     "image",
     "image-webp",
     "itoa",
+    "kurbo",
     "libc",
     "linux-raw-sys",
     "memchr",
@@ -78,9 +83,11 @@ pub const APPROVED_ADAPTER_CLOSURE: [&str; 39] = [
     "moxcms",
     "num-traits",
     "png",
+    "polycool",
     "proc-macro2",
     "pxfm",
     "quick-error",
+    "quick-xml",
     "quote",
     "rustix",
     "serde",
@@ -88,6 +95,9 @@ pub const APPROVED_ADAPTER_CLOSURE: [&str; 39] = [
     "serde_derive",
     "serde_json",
     "simd-adler32",
+    "siphasher",
+    "smallvec",
+    "svgtypes",
     "syn",
     "unicode-ident",
     "weezl",
