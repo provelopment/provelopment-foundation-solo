@@ -1,130 +1,108 @@
 # Execution Report
 
-**Work order:** `SOLO-WO-118 R08` — independently adjudicate the associated-alpha `irot` disagreement before any decoder repair.
-**Required outcome:** `R03C-AVIF-ASSOCIATED-ALPHA-REFERENCE-AND-DECODER-ROOT-CAUSE-ADJUDICATED`.
+**Work order:** `SOLO-WO-118 R09` — pin the published upstream alpha-composition repair and prove genuine N123 RED → GREEN on both hosts.
+**Required outcome:** `R03C-AVIF-UPSTREAM-ALPHA-COMPOSITION-REPAIR-PINNED-RED-GREEN-TWO-HOST-V1`.
 
-**status=COMPLETE** for that adjudication only. The question R07 left open is settled by measurement on both sides, not by argument: the immutable R03 reference is **correct and reproducible**, and the pinned Rust decoder **deviates** by transforming the alpha auxiliary twice with a lossy intermediate resample. The R07 inference that the pinned digest "belonged to the negative fixture" is **refuted**. No N122, V4, Stage 03, publication or product-repair claim is made here.
+**status=COMPLETE** for that outcome only. `oxideav-avif` moved from `=0.0.16` to the published, checksum-verified `=0.0.18`; the tightened N123 test failed for a real reason before the upgrade (14,460 wrong alpha samples) and now reproduces the immutable independent reference display RGBA **exactly**, with zero differing alpha samples, on both native hosts and in the unchanged R03 oracle. The confined child still refuses every `has_alpha=true` image, including the now-correctly-decoding valid fixture. **No N122, V4, R03.C, Stage 03, catalogue, publication, release or deployment claim is made.**
 
 ## 1. Transaction
 
-| Step | SHA | Notes |
+| Step | SHA | Validation |
 |---|---|---|
-| baseline (R15) | `ee447a33c17108418e2c2c9f48f457affbc3f993` | verified `origin/main`, only ACTIVE dirty |
-| **A16** (`main`) | `021bdc3900ec9f11b7b3014ecb15bb3708bfc5da` — tree `b013d85fb104f738e166dc4cc44e42a8390a7648`, parent `ee447a33` | ACTIVE blob `a8919044a1f843026352c610a2c70c5017180874` identical in worktree, index, commit and `origin/main` |
-| **T16.0** (branch) | `d800cb77b823ca397084cc97ce992954845a6563`, parent `405b11c9` | single-path `git restore --source=A16`, identical blob, ACTIVE-only |
-| T16.1 … T16.4 (branch) | `06f24c20` → `63434b75` → `2988a5a0` → **`448a7a04d6b587d9756b70ef1b8efe5a5d7a159d`** | referee + Rust differential + two-host gates, then three forward corrections (§6) |
-| **R16** | this report on `main` | ACTIVE-only predecessor A16 |
+| baseline | `main` = `b74e5e3ec760a8d8ab60e8e8af64c7ded7b04a43`, branch = `448a7a04d6b587d9756b70ef1b8efe5a5d7a159d` | as required by §2 |
+| **A17** (`main`) | `fe37f71171d1997c9a5bddc51393c7ec7bab6803` — tree `4cc962b4c4acd5122922aa6a435aabe250fbe7bb`, parent `b74e5e3e` | ACTIVE blob `08a29efa250cce4c686b73bdd9c5c60d2c723e6a` identical in worktree, index, A17 commit and `origin/main` |
+| **T17.0** (branch) | `abbe4234b34ee241dbc18dff43cd24350b543243`, parent `448a7a04` | single-path `git restore --source=A17`; index blob identical to A17's; staged path set = ACTIVE only |
+| **T17** (branch) | `d31fc0d94b9dd5b92c0e48d1528ac45bfc748777` | the one final technical commit; `4 files changed, 128 insertions(+), 39 deletions(-)` |
 
-Final technical SHA `448a7a04d6b587d9756b70ef1b8efe5a5d7a159d`: push run `43716332607`, attempt 2 — `verify (ubuntu-24.04)` `132821014884` ✅, `verify (windows-2025)` `132821013943` ✅, `avif-reference-oracle` `132821015756` ✅. Attempt 1 of the same run failed **only** on the inherited `Windows N102 event-identity repeatability (12 runs)` stress gate; the AVIF jobs were green in attempt 1 too. That inherited intermittent is recorded, not waived (§7).
+Final technical SHA `d31fc0d94b9dd5b92c0e48d1528ac45bfc748777` on `solo-wo-118-avif-v4-r01`: push run `43719845299`, **attempt 1** (fresh push, no rerun) — `verify (ubuntu-24.04)` `132829229170` ✅, `verify (windows-2025)` `132829229404` ✅, `avif-reference-oracle` `132829229355` ✅, all `success`. No failed attempt needed to be retried.
 
+## 2. The one authorised upgrade
 
-## 2. Independent reference measurement (pinned `avifdec 1.0.4` / dav1d 1.4.1 / Pillow 10.2.0)
+`crates/solo-adapters/Cargo.toml`:
 
-`alpha_transform_referee.py` measured **both** reference PNGs produced by the unchanged pinned tool inside the unchanged `avif-reference-oracle` job, from the immutable sources, with closed arity, exact source digests, rotation-invertibility proof, aliasing refusal and in-memory manifest mutations:
-
-```text
-n123_reference positive_pin=matched png_sha256=20c06c7c94427c97ef962b5529a633a42f90f4c05bebc1c99ef0b813fd12f97b
-  rgba_sha256=5102863ca73f618c60944e490aa3982e7a1afd6975f4d0edf12b40ac85c88f82
-  rgba_display_sha256=950be879c536c208d4e2dc0cdb8aa698e73922b4a57e8070c4fea389c84cc744
-  alpha_min=128 alpha_max=255 alpha_non_opaque=123952 coded=512x256 display=256x512
-n123_reference negative_measured=true rgba_sha256=5102863ca73f618c60944e490aa3982e7a1afd6975f4d0edf12b40ac85c88f82
-  rgba_display_sha256=950be879c536c208d4e2dc0cdb8aa698e73922b4a57e8070c4fea389c84cc744
-  alpha_min=128 alpha_max=255 alpha_non_opaque=123952 coded=512x256
-n123_reference same_coded_rgba=true same_display_rgba=true alpha_differences=0 rgb_differences=0 coordinates=none truncated=false
-n123_reference mutation_rejections=2/2
-n123_reference alias_refusal=verified
-n123_reference cleanup=complete
+```toml
+oxideav-avif = { version = "=0.0.18", default-features = false, features = ["registry"] }
 ```
 
-The pinned R03 facts (`pristine_manifest_matches=true`, `mutation_rejections=3/3`) still hold unchanged in the same job.
+`cargo update -p oxideav-avif --precise 0.0.18` resolved purely from the official registry, and `Cargo.lock` changed in exactly two lines:
 
-**What this means.** The independent tool produces **byte-identical** reference pixels for the valid associated-alpha positive and the invalid missing-association negative: identical coded RGBA, identical whole-buffer anticlockwise display RGBA, identical alpha statistics, zero differing samples. `avifdec` writes the **coded** 512×256 PNG (it does not apply `irot` to the file), and the pinned 256×512 display digest is recovered by the audited whole-buffer rotation. The reference does **not** rotate the alpha item separately; it treats the primary transform as applying to the composite. Therefore:
+```diff
+ name = "oxideav-avif"
+-version = "0.0.16"
++version = "0.0.18"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "f36a98615006596baed023d26c16d58bf9327126c919b716ebfdf8122fee8c78"
++checksum = "fcaf60ff8283c30fc9e84e462fc9a9e016f5f4e4f1ab1817a15cebf2885b1cee"
+ dependencies = ["oxideav-av1", "oxideav-core", "oxideav-heif"]
+```
 
-1. The R03 pin `950be879…` **is** the correct display image of the valid positive — it was not derived from the negative.
-2. R15's statement that "the pinned display RGBA equals what the decoder produces for the negative" was a true measurement with a wrong inference: both sources share one reference image, so reproducing it from the negative says nothing about provenance.
-3. **R15's "exactly ten differing alpha samples" was wrong** and is corrected here: ten is the *net non-opaque count difference* (123,962 − 123,952). The actual decoded alpha disagreement is **14,460 differing samples** (11.03 % of 131,072), as the new differential test measures and asserts.
+- Registry checksum equals the Architect's `fcaf60ff8283c30fc9e84e462fc9a9e016f5f4e4f1ab1817a15cebf2885b1cee` exactly; source is the crates.io index, not a Git URL or tag.
+- Dependency names remain exactly `oxideav-av1`, `oxideav-core`, `oxideav-heif`; locked `oxideav-av1 0.1.24`, `oxideav-core 0.1.43`, `oxideav-heif 0.0.15` unchanged, as is every other package version, checksum, source and feature set. Total locked packages unchanged (57). No `[patch.crates-io]`, no vendor directory, no wildcard, no duplicate node.
+- Installed crate metadata verified locally: `version = "0.0.18"`, `license = "MIT"`, `edition = "2024"`, `rust-version = "1.95"` — inside the accepted `1.99.1` toolchain and the already permitted MIT licence in strict `deny.toml`. The dated upstream fix is recorded in the dependency comment for the outstanding later `NOTICE`/provenance obligation, which this order does **not** close.
 
-## 3. Rust decoder measurement (`oxideav-avif =0.0.16`, locked, unmodified)
+## 3. Genuine RED before GREEN (same command, same fixtures, only the lock changed)
 
-`n123_associated_alpha_irot_decoder_differential_is_measured`, on both hosts:
+Red, with the tightened test and the lock still at 0.0.16:
 
 ```text
+$ cargo test -p solo-adapters --test graphic_avif_inspection --locked n123_associated_alpha_irot_decoder_differential_is_measured -- --nocapture
+exit 101
+n123_evidence positive_rgba=a03a44d4ed770e3f9448889ec3df6577d86ffce02f893309d09629de4a4690fa positive_alpha_min=128 positive_alpha_max=255 positive_alpha_nonopaque=123962 negative_rgba=950be879…84cc744 negative_alpha_nonopaque=123952 pinned_display=950be879…84cc744
+n123_evidence alpha_differences=14460 rgb_differences=0 coordinates=156,133:128>132;157,133:128>156;…
+n123_evidence positive_matches=false negative_matches=true same_between_sources=false
+panicked at …: the valid associated-alpha source must decode to the immutable reference display RGBA
+  left: "a03a44d4…4690fa"   right: "950be879…84cc744"
+test result: FAILED. 0 passed; 1 failed
+```
+
+Green, identical command, after only the dependency upgrade:
+
+```text
+$ cargo test -p solo-adapters --test graphic_avif_inspection --locked n123_associated_alpha_irot_decoder_differential_is_measured -- --nocapture
+exit 0
 n123_evidence payloads colour_equal=true alpha_equal=true primary_ids=1/1 alpha_ids=2/2
-n123_evidence positive_planes=["5de419d1…cbdd","ea0ff906…be9","ea0ff906…be9","45b5b954…b5a9"]
-             negative_planes=["5de419d1…cbdd","ea0ff906…be9","ea0ff906…be9","96b18d51…6ff6"]
-n123_evidence positive_rgba=a03a44d4ed770e3f9448889ec3df6577d86ffce02f893309d09629de4a4690fa
-             positive_alpha_nonopaque=123962 negative_rgba=950be879c536c208d4e2dc0cdb8aa698e73922b4a57e8070c4fea389c84cc744
-             negative_alpha_nonopaque=123952 pinned_display=950be879…84cc744
-n123_evidence alpha_differences=14460 rgb_differences=0
-             coordinates=156,133:128>132;157,133:128>156;158,133:128>167;159,133:128>154;160,133:128>129;115,134:128>129;…
-n123_evidence plane_alpha_differences=14460 rgba_alpha_equals_plane=true nonopaque_delta=10
-n123_evidence pin_relation positive_matches=false negative_matches=true same_between_sources=false
-n123_decoder measured=true
+n123_evidence positive_rgba=950be879c536c208d4e2dc0cdb8aa698e73922b4a57e8070c4fea389c84cc744 positive_alpha_min=128 positive_alpha_max=255 positive_alpha_nonopaque=123952 negative_rgba=950be879…84cc744 negative_alpha_nonopaque=123952 pinned_display=950be879…84cc744
+n123_evidence alpha_differences=0 rgb_differences=0 coordinates=none
+n123_evidence positive_matches=true negative_matches=true same_between_sources=true
+n123_evidence plane_alpha_differences=0 rgba_alpha_equals_plane=true nonopaque_delta=0
+n123_decoder repair_verified=true
+test result: ok. 1 passed; 0 failed; 0 ignored
 ```
 
-**Payload identity was checked, not assumed**: the files differ in total length by one byte, yet the **coded colour payload and the coded alpha payload are byte-identical** (`colour_equal=true alpha_equal=true`; primary item 1, alpha item 2 in both). The only difference is the `ipma` association — the essential `Irot{angle:1}` on item 2 in the positive, absent in the negative. Any pixel delta therefore comes purely from transform handling.
+The two sources carry byte-identical coded colour and alpha payloads (primary item 1, alpha item 2), so this delta isolates transform composition. Geometry on both: 256×512, `Yuva444P`, 8-bit, four canonical stride-256 planes of 131,072 bytes; the RGBA alpha channel equals plane 4 sample for sample. A raw decode match for the negative never promotes its missing association to an acceptance.
 
-Decoded geometry is identical and correct in both cases: 256×512, `Yuva444P`, 8-bit, four planes at canonical stride 256 and 131,072 bytes each. Colour planes are byte-identical between the sources (`rgb_differences=0`); only the alpha plane differs, and the packed RGBA alpha channel is exactly the transferred plane, sample for sample (`rgba_alpha_equals_plane=true`).
+## 4. Retained behaviour: R03 reference, N120 goldens, N121 real child
 
-## 4. Evidence table (both fixtures, both sides)
+- **R03 oracle, untouched** (`reference-goldens.json`, `reference_oracle.py`, `alpha_transform_referee.py`, fixtures, provenance all byte-identical): `pristine_manifest_matches=true`, `mutation_rejections=3/3`, and the R08 referee in the same job still reports `n123_reference same_coded_rgba=true same_display_rgba=true alpha_differences=0 rgb_differences=0 coordinates=none`, `positive_pin=matched`, `alias_refusal=verified`, `cleanup=complete`. The pinned `avifdec 1.0.4`/dav1d 1.4.1/Pillow 10.2.0 tool identity is unchanged — no reference data was re-pinned.
+- **N120 goldens byte-exact after the upgrade**: `white_1x1.avif` (1×1, 8-bit, 444) and the three fox fixtures (1204×800 at 8-bit 420jpeg, 10-bit 420p10, 12-bit 420p12) all report `aggregate_matches=true`; the whole `graphic_avif_inspection` file ran `3 passed; 0 failed` locally and inside both native `verify` jobs' workspace test step. The alpha-enabled valid fixture did **not** change the 8/10/12-bit plane goldens.
+- **N121 real child, unaltered and green on both hosts**: `n121_01_four_coded_plane_goldens_cross_worker_and_parent` and `n121_02_real_worker_and_hostile_claim_refusals` ran `2 passed; 0 failed` natively (Ubuntu `132829229170`, Windows `132829229404`), with `records=4`, `planes=12`, `depths=8,10,12`, `orientation=unverified publication=false`, `counterfeits=12 counterfeits_refused=true`, `whole_set_discarded=true`, `unconfined_decoded=false`, and the refusal labels still including **`alpha-irot.avif`** and **`alpha-noirot.avif`**. The repaired decoder therefore did **not** widen the worker's accepted media classes: the valid fixture now decodes correctly in the test-only inspection path and is still refused by the confined product child, exactly as §1 requires.
+- **V3 refusal, favicon and publication properties** untouched (no file in that scope changed).
 
-| quantity | positive `abc_color_irot_alpha_irot.avif` | negative `abc_color_irot_alpha_NOirot.avif` |
-|---|---|---|
-| source SHA-256 | `b371cc88…9abd3b` | `f2c8cd6d…65ffb9a` |
-| container transforms / `essential` | item 1: `Av1C` **ess**, `Irot{angle:1}` **ess**, `Ispe`/`Pixi`/`Colr` non-ess · item 2: `Av1C` **ess**, `AuxC(alpha)` non-ess, **`Irot{angle:1}` ess** | item 1 identical · item 2 **no `Irot` at all** |
-| coded payloads | colour and alpha payloads byte-identical to the negative | identical to the positive |
-| independent PNG (coded, `avifdec`) | 512×256, `20c06c7c…2f97b` | 512×256, **`20c06c7c…2f97b`** |
-| independent coded RGBA | `5102863c…c88f82` | **`5102863c…c88f82`** |
-| independent rotated RGBA (256×512 display) | `950be879…84cc744` | **`950be879…84cc744`** |
-| independent alpha range / non-opaque | `128..255` / `123952` | `128..255` / `123952` |
-| Rust decoded geometry / format | 256×512 `Yuva444P` 8-bit, 4 × 131,072 B | 256×512 `Yuva444P` 8-bit, 4 × 131,072 B |
-| Rust Y / U / V plane SHA | `5de419d1…` / `ea0ff906…` / `ea0ff906…` | identical |
-| Rust alpha plane SHA | `45b5b954…b5a9` | `96b18d51…6ff6` |
-| Rust `try_to_rgba8` digest (524,288 B) | **`a03a44d4…4690fa`** | **`950be879…84cc744`** |
-| Rust alpha non-opaque samples | 123,962 | 123,952 |
-| colour agreement with the independent reference | exact: Rust's RGBA for the alpha-untransformed source equals the independent display digest byte for byte, so the colour conversion itself agrees; RGB samples differing between the two sources = 0 | exact, as measured |
-| alpha agreement with the independent reference | **no** — 14,460 differing samples against 0 | yes |
-| differing alpha coordinates | **14,460** (first 64 enumerated in display coordinates, e.g. `156,133:128→132`, `157,133:128→156`) | none |
+## 5. Native and CI proof, including forged-log rejection
 
-The pinned donor distinction, quoted from the immutable provenance record (`crates/solo-cli/tests/fixtures/avif/LICENSE-AND-PROVENANCE.md`, source commit `37a5461042aa3b1eb105193724ee41bfd2478d0b`): the positive is `abc.png` with **a valid association** between the `irot` transformative property and the alpha auxiliary item, and `abc_color_irot_alpha_NOirot.avif` is the specimen "**missing** an association between the `irot` transformative property and the alpha auxiliary image item" — an inconsistent associated-alpha transform that Solo refuses by authored policy regardless of what any decoder renders. The negative stays invalid; no measurement here promotes it.
+The N123 gate was rewritten from proving an old defect to proving a repair. On each host the authentic single-test log must contain `test n123_associated_alpha_irot_decoder_differential_is_measured`, exactly one `^test n123_…` line, `test result: ok. 1 passed; 0 failed; 0 ignored`, `n123_decoder repair_verified=true`, `positive_matches=true`, `alpha_differences=0 rgb_differences=0`, `plane_alpha_differences=0`, `positive_rgba=950be879…84cc744`, `positive_alpha_min=128`, `positive_alpha_max=255`, `positive_alpha_nonopaque=123952` — and must **not** contain the stale `n123_decoder measured=true` or the historical `alpha_differences=14460`. Four forged copies are rejected on each host before the gate prints its verdict: repaired evidence deleted, the differential rewritten to the historical `14460`, the positive digest rewritten to the pre-repair `a03a44d4…`, and a false `0 passed; 1 failed` count — then `n123_gate mutation=rejected`.
 
-## 5. Causal trace inside the pinned decoder
+Runtime evidence, `verify (ubuntu-24.04)` and `verify (windows-2025)`:
 
-All paths and lines are the installed registry source `oxideav-avif-0.0.16/src/`, crate licence **MIT**, unchanged by this order.
+```text
+n123_evidence positive_rgba=950be879c536c208d4e2dc0cdb8aa698e73922b4a57e8070c4fea389c84cc744 positive_alpha_min=128
+  positive_alpha_max=255 positive_alpha_nonopaque=123952 negative_rgba=950be879…84cc744 negative_alpha_nonopaque=123952
+n123_evidence alpha_differences=0 rgb_differences=0 coordinates=none
+n123_decoder repair_verified=true
+n123_gate authentic=accepted
+n123_gate mutation=rejected
+```
 
-1. `decoder.rs:795` `decode_item_output_inner(hdr, item_id, depth, ctx, with_alpha)` decodes the primary, then at `decoder.rs:842` decodes the alpha auxiliary **recursively**: `decode_item_output(hdr, alpha_id, depth + 1, ctx, false)?`.
-2. That recursion returns through the same function's tail loop `decoder.rs:861–885` `for prop in transforms_for(&hdr.meta, item_id)`, so the **alpha item's own** `Irot{angle:1}` is applied and the alpha becomes 256×512.
-3. `decoder.rs:847` then calls `alpha_as_gray(&alpha, image.width, image.height)` while `image` is still the **coded** 512×256 primary. `alpha_as_gray` (`decoder.rs:1299–1330`) cannot resize by transformation: because `(aw, ah) != (master_w, master_h)` it takes the nearest-neighbour path `sc = c·aw/master_w`, `sr = r·ah/master_h`, decimating the already-rotated alpha back to 512×256 — losing three quarters of its samples and repeating values. This is visible in the data: the positive's alpha is a constant `128` (the alpha floor) in the enumerated positions where the negative carries real samples.
-4. `decoder.rs:856` `compose::attach_alpha(&image, &alpha)` attaches that resampled alpha as the fourth plane.
-5. `decoder.rs:861–885` applies the **primary's** `Irot{angle:1}` to the composite, rotating colour and the once-rotated-then-resampled alpha together.
-
-Net effect for a correctly associated alpha: **two transforms and one lossy resample**. For the missing-association negative step 2 does nothing, `alpha_as_gray` copies 1:1, and the single primary rotation yields the reference image exactly (`950be879…`). Because colour is decoded once and transformed once in both cases, Y/U/V are byte-identical across the two sources (`rgb_differences=0`), which is exactly what a double-transformed-alpha-only defect predicts.
-
-The ten-sample non-opaque delta versus the 14,460 differing samples is consistent with this mechanism: the double transform mostly permutes alpha values inside a similar coverage region rather than changing overall coverage.
+The Linux verifier logic was extracted from the committed workflow and executed locally against the real captured log before the push (`n123_gate authentic=accepted`, `n123_gate mutation=rejected`), so the gate was proven rather than assumed.
 
 
-## 6. Recommendation, and the corrections made during this order
+## 6. Local verification and honest limits
 
-**Decision record.** The evidence supports exactly one reading: the R03 source-mapped reference is **correct**, and the pinned decoder's associated-alpha transform pipeline is **wrong** for this profile. There is no live "either/or": the reference needs no correction and the decoder needs a repair. Nothing was re-pinned, no tolerance was introduced, the vendor source was not modified and the invalid fixture was not accepted.
+Recorded before the push, in the single Owner checkout: `cargo fmt --all -- --check` 0; `cargo check --workspace --all-targets --locked` 0; `cargo clippy --workspace --all-targets --locked -- -D warnings` 0; `workspace_graph` `32 passed`; `check_architecture_fixtures` 0; `check-architecture` 0 with the unchanged branch measurement `architecture=legal packages=4 targets=34 files=66 edges=93`; `graphic_avif_inspection` `3 passed` (two N120 tests plus the repaired N123); `media_worker` `11 passed`; host-smoke `--no-run` builds; `cargo test --workspace --all-targets --locked` → **84 passed, 5 failed**, all five being `source_read_native::snapshot_proofs` panics at `crates/solo-adapters/src/source_read_native.rs:2017` because this WSL host has no verified disposable Btrfs `SOLO_TEST_SOURCE_FS_ROOT`. Those real-source N121/snapshot cases and Windows native linkage (`link.exe` absent) are **NOT RUN LOCALLY** and were proven natively in the hosted jobs at `d31fc0d9`.
 
-**Recommended repair (next Owner-authorized order, not performed here).** Decode the alpha auxiliary **without** its own transformative properties, attach it at the master's **coded** extents, and apply the master's transforms **once** to the composite. Concretely, in `oxideav-avif`'s `decode_item_output_inner`: give auxiliary decoding a "no item transforms" mode (the recursive call at `decoder.rs:842` must not run `transforms_for(alpha_id)`), and replace the nearest-neighbour resize in `alpha_as_gray` (`decoder.rs:1299`) with a strict refusal when coded extents differ, since a compliant `auxl` alpha shares the master's coded extents. There is **no adapter-only repair**: the double transform happens inside `decode()`, so `crates/solo-adapters/src/graphic_avif_inspection.rs` can neither observe nor undo it.
+## 7. Repository state and completion boundary
 
-**Test that fails before the repair and passes after it** — the test added here, with assertions strengthened from "measurement" to "correctness": `n123_associated_alpha_irot_decoder_differential_is_measured` must then assert `alpha_differences == 0`, `rgb_differences == 0`, `positive_rgba == 950be879…84cc744` and `alpha_non_opaque == 123952`. Today the first measures 14,460 and the third is `a03a44d4…`, so the strengthened form is a real red-before / green-after gate. The two-host N122 proof then follows with the valid positive accepted (`orientation=identity`, four canonical YUVA planes, display digest equal to the pin) and both negatives refused on their metadata.
+`main` = A17 `fe37f711` + this report; technical branch = `d31fc0d9` (clean); **28** remote heads, one worktree, one `origin`, exactly four `.documents/WIP/` files, empty stash, no new branch/tag/PR/release/deploy, no force push, no `reset --hard`, no `git clean`. Files changed by the order: `.documents/WIP/workorder-active.md` (A17, T17.0), `crates/solo-adapters/Cargo.toml`, `Cargo.lock`, `crates/solo-adapters/tests/graphic_avif_inspection.rs`, `.github/workflows/rust-verify.yml`, and this report. Production runtime source `crates/solo-adapters/src/graphic_avif_inspection.rs` needed **no** API-compatibility change — 0.0.18 compiled against the existing invoked surface — so it stays byte-identical to T16.4. Task scratch (`.temp/a17.sh`) removed.
 
-**Minimum next-order surface.** Either an upstream `OxideAV/oxideav-avif` fix (preferred: no Solo file changes, only a version bump in `Cargo.toml`/`Cargo.lock`) or a minimal vendored fork: `vendor/oxideav-avif/{Cargo.toml,src/decoder.rs}`, root `Cargo.toml` `[patch.crates-io]`, `Cargo.lock`, a `deny.toml` source/licence entry, a `LICENSE-AND-PROVENANCE` note, and the architecture checker's expected `targets/files/edges` measurement (a vendored crate root changes the closure). Licence impact is **MIT** for `oxideav-avif` and must be recorded in the third-party `NOTICE` obligation already tracked for release.
-
-**Corrections made during this order (all forward, none relaxing).** (a) The referee initially omitted the positive `source_sha256` from its measured fact map (a real bug surfacing as `KeyError`) — fixed by measuring it. (b) Its anticlockwise coordinate mapping used `height-1-x` instead of `width-1-x`; its own cross-check caught this and it was corrected. (c) The workflow asserted the referee's `alpha_differences` token with a prefix that never appears in output — corrected to the token actually printed. (d) R15's "ten differing samples" is corrected to 14,460 differing samples with a 10-sample net coverage delta.
-
-
-## 7. Gates, local results and repository state
-
-At the final technical SHA `448a7a04`, push run `43716332607` attempt 2, all three required jobs succeeded: `verify (ubuntu-24.04)` `132821014884`, `verify (windows-2025)` `132821013943`, `avif-reference-oracle` `132821015756`. Both native hosts ran the new differential as a load-bearing step and printed `n123_gate authentic=accepted` and `n123_gate mutation=rejected` after rejecting three corrupted copies of the authentic log (missing `n123_decoder measured=true`, altered `alpha_differences`, false `0 passed; 1 failed` count). Both hosts retained N121 2/2 and its mutations, the N093/N102/N108/N113/N116 gates, cargo-deny/RustSec, the Btrfs snapshot setup, image/release/reproducibility/tripwire and forbidden-import gates; the oracle job retained `pristine_manifest_matches=true` with `mutation_rejections=3/3` alongside the new `n123_reference mutation_rejections=2/2`, `alias_refusal=verified` and `cleanup=complete`.
-
-Attempt 1 of the same run failed only at the inherited `Windows N102 event-identity repeatability (Windows only, 12 runs)` stress step, after that job had already passed the N102 canaries, N121 and the new N123 gate; the same SHA passed it on the fresh attempt 2, and it had passed in run `43714553572`. It is recorded as an inherited host intermittent — not waived, not edited, not skipped.
-
-Local, in the single Owner checkout before the pushes: `cargo fmt --all -- --check` 0, `cargo check --workspace --all-targets --locked` 0, `cargo clippy --workspace --all-targets --locked -- -D warnings` 0, `workspace_graph` 0, `check_architecture_fixtures` 0, `check-architecture` 0 with the unchanged branch measurement `architecture=legal packages=4 targets=34 files=66 edges=93`, `graphic_avif_inspection` 3 passed (two R04 positives plus the new differential), `media_worker` 11 passed, smoke `--no-run` builds. **NOT RUN LOCALLY**: every N121/N122 source-dependent case (no verified Btrfs `SOLO_TEST_SOURCE_FS_ROOT` on this WSL host) and native Windows linkage (`link.exe` absent) — both proven natively in CI instead. The referee cannot run locally (no Pillow, no `avifdec`); it ran only in the pinned CI toolchain, which is the environment R03 itself pinned.
-
-Repository: `main` = A16 `021bdc39` + this report; branch `solo-wo-118-avif-v4-r01` = `448a7a04` (clean); **28** remote heads, one worktree, one `origin`, exactly four WIP files, empty stash, both trees clean; task scratch (`.temp/a16.sh`) removed. Files changed: `.documents/WIP/workorder-active.md` (A16, T16.0), `.github/workflows/rust-verify.yml` (oracle-job extension plus two N123 host gates), `crates/solo-cli/tests/fixtures/avif/alpha_transform_referee.py` (new), `crates/solo-adapters/tests/graphic_avif_inspection.rs` (one added test), and this report. No golden, oracle, fixture, `Cargo.toml`/`Cargo.lock`, codec, production source, N093–N122 test or architecture file was modified.
-
-**Status:** `status=COMPLETE` for `R03C-AVIF-ASSOCIATED-ALPHA-REFERENCE-AND-DECODER-ROOT-CAUSE-ADJUDICATED` only. N122, V4, Stage 03, the Platform catalogue, publication, release and deployment remain **open**, and no decoder repair has been performed or authorized.
+`status=COMPLETE` **only** for `R03C-AVIF-UPSTREAM-ALPHA-COMPOSITION-REPAIR-PINNED-RED-GREEN-TWO-HOST-V1`: the registry upgrade is exact with no other dependency drift, the valid fixture's corrected RGBA digest and zero alpha delta are proven on both hosts, the 8/10/12-bit goldens remain exact, real N121 2/2 and both alpha refusals remain intact, and all three branch jobs are green at one SHA. **N122 is not started, alpha acceptance is not enabled, and V4 / R03.C / Stage 03 closure is not claimed.** The next order must explicitly add the associated-alpha YUVA444P/essential-`irot` worker and parent policy, including the transparent migration of N121's current valid-alpha refusal, before any six-format integration.
 
