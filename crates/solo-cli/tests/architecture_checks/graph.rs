@@ -38,10 +38,11 @@ pub const APPROVED_DEV_OWNER: &str = "solo-cli";
 /// only for `cfg(target_os = "linux")` and `windows-sys` only for `cfg(windows)` — so a
 /// single host never compiles both, and the locked graph therefore carries exactly one
 /// `windows-sys`, which is what keeps `multiple-versions = "deny"` satisfied.
-pub const APPROVED_ADAPTER_EXTERNAL_NORMAL: [&str; 9] = [
+pub const APPROVED_ADAPTER_EXTERNAL_NORMAL: [&str; 10] = [
     "gif",
     "image",
     "libc",
+    "oxideav-avif",
     "quick-xml",
     "rustix",
     "serde",
@@ -58,7 +59,7 @@ pub const APPROVED_ADAPTER_EXTERNAL_OWNER: &str = "solo-adapters";
 ///
 /// It is enumerated rather than computed so that a new transitive component cannot
 /// appear silently: an unlisted node is an unapproved reachability and is refused.
-pub const APPROVED_ADAPTER_CLOSURE: [&str; 47] = [
+pub const APPROVED_ADAPTER_CLOSURE: [&str; 53] = [
     "adler2",
     "arrayvec",
     "autocfg",
@@ -82,6 +83,10 @@ pub const APPROVED_ADAPTER_CLOSURE: [&str; 47] = [
     "miniz_oxide",
     "moxcms",
     "num-traits",
+    "oxideav-av1",
+    "oxideav-avif",
+    "oxideav-core",
+    "oxideav-heif",
     "png",
     "polycool",
     "proc-macro2",
@@ -99,6 +104,8 @@ pub const APPROVED_ADAPTER_CLOSURE: [&str; 47] = [
     "smallvec",
     "svgtypes",
     "syn",
+    "thiserror",
+    "thiserror-impl",
     "unicode-ident",
     "weezl",
     "windows-link",
