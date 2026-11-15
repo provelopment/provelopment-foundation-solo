@@ -5051,8 +5051,8 @@ mod n121 {
         MediaWorkerFormatV1, MediaWorkerLimitsV1, MediaWorkerMimeV1, MediaWorkerObservationV1,
         MediaWorkerOrientationV1, MediaWorkerPlaneClaimV1, MediaWorkerPortV1,
         MediaWorkerRefusalKindV1, MediaWorkerRequestV1, MediaWorkerRunV1, MediaWorkerStatusV1,
-        inspect_media_worker_source_set_v1, read_graphic_asset_bytes_v1,
-        sha256_media_worker_bytes_v1,
+        inspect_media_worker_source_set_v1, media_worker_output_sha256_v1,
+        read_graphic_asset_bytes_v1, sha256_media_worker_bytes_v1,
     };
 
     use super::n116::{Root, inventory_of, suppressed_inventory_of};
@@ -5334,6 +5334,32 @@ mod n121 {
             }
             assert_eq!(
                 envelope.output_sha256(),
+                media_worker_output_sha256_v1(envelope.planes(), observed.planes()),
+                "{fixture}: the protocol digest is exactly the parent's own recomputation"
+            );
+            // The pinned aggregate is the **independent oracle's** documented framing, which is
+            // deliberately not the product's own scheme: for each plane in Y, U, V order feed
+            // `PLANE|ordinal|name|stride|rows|length\n` and then that plane's raw bytes.
+            let mut framed: Vec<u8> = Vec::new();
+            for (plane_index, plane_claim) in envelope.planes().iter().enumerate() {
+                let name = pinned["planes"][plane_index]["name"]
+                    .as_str()
+                    .expect("plane name");
+                framed.extend_from_slice(
+                    format!(
+                        "PLANE|{}|{}|{}|{}|{}\n",
+                        plane_claim.ordinal(),
+                        name,
+                        plane_claim.stride(),
+                        plane_claim.rows(),
+                        plane_claim.length()
+                    )
+                    .as_bytes(),
+                );
+                framed.extend_from_slice(&observed.planes()[plane_index]);
+            }
+            assert_eq!(
+                sha256_media_worker_bytes_v1(&framed),
                 hex_digest(pinned["aggregate_sha256"].as_str().expect("aggregate hex")),
                 "{fixture}: aggregate against the independent golden"
             );
@@ -5416,15 +5442,15 @@ mod n121 {
             ("bad-magic.avif", b"this is not an avif still".to_vec()),
             ("truncated.avif", fox[..64].to_vec()),
             (
-                "alpha-irot",
+                "alpha-irot.avif",
                 fixture_bytes("abc_color_irot_alpha_irot.avif"),
             ),
             (
-                "alpha-noirot",
+                "alpha-noirot.avif",
                 fixture_bytes("abc_color_irot_alpha_NOirot.avif"),
             ),
             (
-                "clap-irot-imir",
+                "clap-irot-imir.avif",
                 fixture_bytes("clap_irot_imir_non_essential.avif"),
             ),
         ];
