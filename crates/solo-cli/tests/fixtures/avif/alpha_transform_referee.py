@@ -177,6 +177,8 @@ def require_positive_pin(manifest, positive_facts):
     for field in PINNED_FIELDS:
         if field not in spec:
             raise Refusal("pinned positive is missing field %s" % field)
+        if positive_facts.get(field) is None:
+            raise Refusal("the referee did not measure pinned field %s" % field)
         if spec[field] != positive_facts[field]:
             raise Refusal(
                 "pinned positive %s differs: manifest %r measured %r"
@@ -231,6 +233,7 @@ def measure(manifest_path, positive_avif, positive_png, negative_avif, negative_
         "display_width": display_w,
         "display_height": display_h,
         "rgba_display_sha256": sha256_bytes(rotated_positive),
+        "source_sha256": sha256_file(positive_avif),
     }
     positive_facts.update(alpha_facts(positive))
     require_positive_pin(manifest, positive_facts)
