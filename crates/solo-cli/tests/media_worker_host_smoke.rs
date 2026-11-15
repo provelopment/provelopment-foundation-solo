@@ -2827,23 +2827,13 @@ mod n097 {
             "n113_declared case=svg-admitted-then-unsupported refused=true kind=unsupported-format"
         );
 
-        let svg_favicon_root =
-            Root::new("n113-03-svg-favicon", &[("favicon.svg", &vector_svg[..])]);
-        match inspection_refusal_v2(inspect_entity_graphic_images_v2(
-            &svg_favicon_root.capability(),
-            &inventory_of(&[(TestOwnerV1::Page, "favicon", "favicon.svg", "public")]),
-            Path::new(BIN),
-        )) {
-            EntityImageRefusalV2::Inspection(refusal) => {
-                assert_eq!(
-                    refusal.kind(),
-                    GraphicImageInspectRefusalKindV2::FaviconNotPng,
-                    "an .svg favicon must still be refused by the PNG-only registered role"
-                );
-            }
-            other => panic!("svg-favicon: expected an inspection refusal, got {other:?}"),
-        }
-        println!("n113_declared case=svg-favicon refused=true kind=favicon-not-png");
+        // An `.svg` favicon never reaches inspection at all: the registered PNG-only role refuses
+        // the declaration itself, which is the strictly stronger guarantee.
+        assert!(
+            test_inventory_v1(&[(TestOwnerV1::Page, "favicon", "favicon.svg", "public")]).is_none(),
+            "an .svg favicon must be refused by the PNG-only registered role at declaration"
+        );
+        println!("n113_declared case=svg-favicon refused=true stage=property-validation");
 
         // AVIF is a valid *reference* but is outside this four-format gate, so it refuses here.
         let root = Root::new("n113-03-avif", &[("hero.avif", &png_bytes)]);
