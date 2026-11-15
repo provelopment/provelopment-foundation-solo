@@ -4383,7 +4383,7 @@ mod n116 {
 
     /// The accepted deterministic three-frame GIF89a fixture, with an infinite NETSCAPE loop and
     /// three Graphic Control extensions, shared with the N113 cases.
-    fn gif_fixture() -> Vec<u8> {
+    pub(super) fn gif_fixture() -> Vec<u8> {
         super::n113_fixtures::gif89a_three_frames()
     }
 
@@ -4411,15 +4411,15 @@ mod n116 {
         out
     }
 
-    fn png() -> Vec<u8> {
+    pub(super) fn png() -> Vec<u8> {
         decode_base64(FIXTURE_PNG)
     }
 
-    fn jpeg() -> Vec<u8> {
+    pub(super) fn jpeg() -> Vec<u8> {
         decode_base64(FIXTURE_JPEG)
     }
 
-    fn webp() -> Vec<u8> {
+    pub(super) fn webp() -> Vec<u8> {
         decode_base64(FIXTURE_WEBP)
     }
 
@@ -6810,6 +6810,702 @@ mod n122 {
              alpha_display_sha={VALID_DISPLAY_SHA} non_alpha_depths=8,10,12 \
              whole_set_discarded=true partial_records=0 private_path_absent=true \
              publication=false proves_media=false"
+        );
+    }
+}
+
+/// `SOLO-WO-118 R11`: the V4 six-format whole-candidate composition on real confined workers.
+///
+/// Every case drives the genuine product path: the real `ContentRootCapability` reader, the real
+/// composed V4 adapter (the unchanged V3 five-format children plus the R10 AVIF child) and the
+/// inward V4 whole-set validator. Nothing here fakes a worker result or a source read.
+mod n124 {
+    use std::path::PathBuf;
+
+    use serde_json::Value;
+    use solo_adapters::{
+        ConfinedGraphicInspectAdapterV4, EntityImageOutcomeV4, TestOwnerV1,
+        inspect_entity_graphic_images_v4, test_inventory_v1,
+    };
+    use solo_application::{
+        GraphicAssetReadSetOutcomeV1, GraphicAssetSourceSetV1, GraphicImageFormatV3,
+        GraphicImageInspectionOutcomeV4, GraphicImageInspectionSetV4, GraphicImagePayloadV3,
+        GraphicImagePayloadV4, MediaWorkerColorModelV1, MediaWorkerDigestV1,
+        MediaWorkerOrientationV1, inspect_graphic_image_source_set_v4, read_graphic_asset_bytes_v1,
+        sha256_media_worker_bytes_v1,
+    };
+
+    use super::BIN;
+    use super::n116::{
+        Root, gif_fixture, hostile, inventory_of, jpeg, png, rich_svg, suppressed_inventory_of,
+        webp,
+    };
+
+    /// Independently pinned canonical SHA-256 of the rich static vector fixture.
+    const RICH_CANONICAL_SHA256: &str =
+        "0403e0677a174ccafe18191a8a9f1c5a30993477bb074f49078b005f513caaba";
+
+    /// The R10 accepted associated-alpha fixture and its pinned facts.
+    const ALPHA_FIXTURE: &str = "abc_color_irot_alpha_irot.avif";
+    const ALPHA_ASSET: &str = "alpha-irot.avif";
+    const ALPHA_SOURCE_SHA: &str =
+        "b371cc88244a873131e4d10ff9363d71ce4f41cf333bd4a491b38d970d9abd3b";
+    const ALPHA_DISPLAY_SHA: &str =
+        "950be879c536c208d4e2dc0cdb8aa698e73922b4a57e8070c4fea389c84cc744";
+    const ALPHA_PLANE_SHA: [&str; 4] = [
+        "5de419d1b511b0d12dfa639a643c6becfecfa7b3b81067a7b12a761c3593cbdd",
+        "ea0ff9062ca1e37bfd7021c878bfea32caaca9f4ecd77153300fe55f427debe9",
+        "ea0ff9062ca1e37bfd7021c878bfea32caaca9f4ecd77153300fe55f427debe9",
+        "96b18d51d5810b4fb5052fb14a0251cf4e247eb46c662ee7e49f039b95b56ff6",
+    ];
+
+    /// The defective association that must never be promoted.
+    const NOIROT_FIXTURE: &str = "abc_color_irot_alpha_NOirot.avif";
+
+    /// The R06 coded-plane AVIF still.
+    const CODED_FIXTURE: &str = "white_1x1.avif";
+
+    fn fixture_path(name: &str) -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/avif")
+            .join(name)
+    }
+
+    fn fixture_bytes(name: &str) -> Vec<u8> {
+        std::fs::read(fixture_path(name)).expect("pinned avif fixture present")
+    }
+
+    fn goldens() -> Value {
+        let text = std::fs::read_to_string(fixture_path("reference-goldens.json"))
+            .expect("pinned oracle manifest present");
+        serde_json::from_str(&text).expect("pinned oracle manifest parses")
+    }
+
+    fn hex_digest(hex: &str) -> MediaWorkerDigestV1 {
+        MediaWorkerDigestV1::parse_lower_hex(hex).expect("pinned digest is canonical lowercase hex")
+    }
+
+    /// The real confined source read for one inventory; a refusal fails the case loudly.
+    fn acquired(
+        root: &Root,
+        inventory: &solo_application::GraphicAssetObligationInventoryV1,
+    ) -> GraphicAssetSourceSetV1 {
+        match read_graphic_asset_bytes_v1(inventory, &root.capability()) {
+            GraphicAssetReadSetOutcomeV1::Complete(set) => set,
+            GraphicAssetReadSetOutcomeV1::Refused(refusal) => {
+                panic!("real source acquisition refused: {refusal:?}")
+            }
+        }
+    }
+
+    fn complete_v4(outcome: EntityImageOutcomeV4) -> GraphicImageInspectionSetV4 {
+        match outcome {
+            EntityImageOutcomeV4::Complete(set) => set,
+            EntityImageOutcomeV4::ReadRefused(refusal) => {
+                panic!("the confined read refused: {refusal:?}")
+            }
+            EntityImageOutcomeV4::Refused(refusal) => {
+                panic!("the whole candidate refused: {refusal:?}")
+            }
+        }
+    }
+
+    #[test]
+    fn n124_01_six_formats_five_levels_real_confined_workers() {
+        let svg = rich_svg().into_bytes();
+        let gif = gif_fixture();
+        let alpha = fixture_bytes(ALPHA_FIXTURE);
+        let root = Root::new(
+            "n124-six",
+            &[
+                ("icon.png", &png()),
+                ("banner.webp", &webp()),
+                ("logo-vector.jpg", &jpeg()),
+                ("scene.gif", &gif),
+                ("mark.svg", &svg),
+                (ALPHA_ASSET, &alpha),
+            ],
+        );
+        // Five EFS levels; Entity carries two distinct registered roles, and two sources are
+        // `internal`, so a suppressed/non-public declaration is genuinely inspected too.
+        let inventory = inventory_of(&[
+            (TestOwnerV1::Entity, "favicon", "icon.png", "public"),
+            (TestOwnerV1::Entity, "banner", "banner.webp", "internal"),
+            (TestOwnerV1::Facet, "logo", "logo-vector.jpg", "public"),
+            (TestOwnerV1::Site, "background", "scene.gif", "public"),
+            (TestOwnerV1::Page, "social-preview", "mark.svg", "public"),
+            (
+                TestOwnerV1::Representation,
+                "social-preview",
+                ALPHA_ASSET,
+                "internal",
+            ),
+        ]);
+
+        let set = acquired(&root, &inventory);
+        assert_eq!(set.len(), 6, "six authored obligations are acquired");
+
+        let adapter = ConfinedGraphicInspectAdapterV4::new(std::path::Path::new(BIN));
+        let records = match inspect_graphic_image_source_set_v4(&set, &adapter, &adapter) {
+            GraphicImageInspectionOutcomeV4::Complete(complete) => {
+                assert_eq!(complete.len(), 6, "all six obligations are inspected");
+                assert!(!complete.grants_publication_authority());
+                assert!(!complete.proves_whole_publication());
+                complete.inspections().to_vec()
+            }
+            GraphicImageInspectionOutcomeV4::Refused(refusal) => {
+                panic!("the six-format candidate refused: {refusal:?}")
+            }
+        };
+
+        let formats: Vec<GraphicImageFormatV3> =
+            records.iter().map(|record| record.format()).collect();
+        assert_eq!(
+            formats,
+            vec![
+                GraphicImageFormatV3::Png,
+                GraphicImageFormatV3::WebP,
+                GraphicImageFormatV3::Jpeg,
+                GraphicImageFormatV3::Gif,
+                GraphicImageFormatV3::Svg,
+                GraphicImageFormatV3::Avif,
+            ],
+            "the original inventory order is preserved exactly"
+        );
+        let mimes: Vec<&str> = records.iter().map(|record| record.mime()).collect();
+        assert_eq!(
+            mimes,
+            vec![
+                "image/png",
+                "image/webp",
+                "image/jpeg",
+                "image/gif",
+                "image/svg+xml",
+                "image/avif",
+            ],
+            "every observed canonical MIME"
+        );
+
+        // Six genuine children across both port families: five legacy PIDs from their own records
+        // plus the one AVIF PID the composed adapter really observed.
+        let mut pids: Vec<u32> = records
+            .iter()
+            .map(|record| record.worker_pid())
+            .filter(|pid| *pid > 0)
+            .collect();
+        assert_eq!(pids.len(), 5, "five legacy records carry their own PIDs");
+        let avif_pids = adapter.observed_avif_pids_v1();
+        assert_eq!(avif_pids.len(), 1, "one real confined AVIF child");
+        pids.extend(avif_pids.iter().copied());
+        assert_eq!(pids.len(), 6, "six real children: {pids:?}");
+        let mut unique = pids.clone();
+        unique.sort_unstable();
+        unique.dedup();
+        assert_eq!(unique.len(), 6, "six distinct child processes: {pids:?}");
+
+        // The GIF timeline, the canonical vector text and the four associated-alpha planes.
+        let animation = match records[3].payload() {
+            GraphicImagePayloadV4::Legacy(GraphicImagePayloadV3::Animation(evidence)) => evidence,
+            other => panic!("the GIF obligation must yield a timeline: {other:?}"),
+        };
+        assert_eq!(animation.frames.len(), 3, "three authored frames survive");
+        assert!(
+            animation.one_cycle_delay_ms > 0 || !animation.frames.is_empty(),
+            "the authored timing survives"
+        );
+        let vector = match records[4].payload() {
+            GraphicImagePayloadV4::Legacy(GraphicImagePayloadV3::Vector(evidence)) => evidence,
+            other => panic!("the SVG obligation must yield vector text: {other:?}"),
+        };
+        assert!(!vector.canonical().is_empty(), "real canonical SVG content");
+        assert_eq!(
+            sha256_media_worker_bytes_v1(vector.canonical()).to_hex(),
+            RICH_CANONICAL_SHA256,
+            "the canonical vector bytes reproduce the pinned digest"
+        );
+        let avif = records[5]
+            .avif()
+            .expect("the AVIF obligation carries a parent-checked envelope");
+        assert_eq!(
+            (records[5].width(), records[5].height()),
+            (256, 512),
+            "the accepted class displays the swapped coded extent"
+        );
+        assert_eq!(avif.planes().len(), 4, "four transported planes");
+        assert_eq!(avif.checked().plane_count(), 4);
+        assert_eq!(
+            records[5].source_digest(),
+            &hex_digest(ALPHA_SOURCE_SHA),
+            "the source digest is the pinned one"
+        );
+        for (index, plane) in avif.planes().iter().enumerate() {
+            assert_eq!(
+                plane.sha256().to_hex(),
+                ALPHA_PLANE_SHA[index],
+                "plane {index} is the R10 pinned displayed plane"
+            );
+            assert_eq!(plane.length(), 131_072);
+        }
+        assert_eq!(
+            avif.orientation(),
+            MediaWorkerOrientationV1::Identity,
+            "the accepted YUVA class keeps its claim"
+        );
+        for record in &records {
+            assert!(
+                !record.grants_publication_authority(),
+                "no record authorizes publication"
+            );
+        }
+
+        // The real outer entrypoint performs the same read and composition.
+        let factory = complete_v4(inspect_entity_graphic_images_v4(
+            &root.capability(),
+            &inventory,
+            std::path::Path::new(BIN),
+        ));
+        assert_eq!(factory.len(), 6, "the V4 entrypoint returns all six");
+        assert_eq!(
+            factory
+                .inspections()
+                .iter()
+                .map(|record| record.format())
+                .collect::<Vec<GraphicImageFormatV3>>(),
+            formats,
+            "the entrypoint preserves the same order"
+        );
+
+        println!(
+            "n124_evidence case=01 formats=png,webp,jpeg,gif,svg,avif count=6 levels=5 \
+             pids={pids:?} distinct_pids=6 gif_frames={} svg_canonical_sha256={} \
+             avif_planes=4 avif_geometry=256x512 avif_orientation=identity \
+             avif_display_sha_pinned={ALPHA_DISPLAY_SHA} internal_inspected=true \
+             publication=false factory_complete=true",
+            animation.frames.len(),
+            RICH_CANONICAL_SHA256
+        );
+    }
+
+    #[test]
+    fn n124_02_six_format_late_private_alpha_refusal_and_no_partial_records() {
+        // Five valid non-AVIF sources across the hierarchy, then a representation-owned
+        // `internal` suppressed AVIF: first the real defective association, then the accepted one.
+        let svg = rich_svg().into_bytes();
+        let gif = gif_fixture();
+        let noirot = fixture_bytes(NOIROT_FIXTURE);
+        let alpha = fixture_bytes(ALPHA_FIXTURE);
+        let declared = [
+            (TestOwnerV1::Entity, "favicon", "icon.png", "public"),
+            (TestOwnerV1::Entity, "banner", "banner.webp", "public"),
+            (TestOwnerV1::Facet, "logo", "logo-vector.jpg", "public"),
+            (TestOwnerV1::Site, "background", "scene.gif", "public"),
+            (TestOwnerV1::Page, "social-preview", "mark.svg", "public"),
+            (
+                TestOwnerV1::Representation,
+                "social-preview",
+                "alpha-irot.avif",
+                "internal",
+            ),
+        ];
+
+        let hostile_root = Root::new(
+            "n124-late-failure",
+            &[
+                ("icon.png", &png()),
+                ("banner.webp", &webp()),
+                ("logo-vector.jpg", &jpeg()),
+                ("scene.gif", &gif),
+                ("mark.svg", &svg),
+                ("alpha-irot.avif", &noirot),
+            ],
+        );
+        let inventory = suppressed_inventory_of(&declared);
+        let set = acquired(&hostile_root, &inventory);
+        assert_eq!(set.len(), 6, "the failing set still acquires six sources");
+        let adapter = ConfinedGraphicInspectAdapterV4::new(std::path::Path::new(BIN));
+        let refusal = match inspect_graphic_image_source_set_v4(&set, &adapter, &adapter) {
+            GraphicImageInspectionOutcomeV4::Refused(refusal) => refusal,
+            GraphicImageInspectionOutcomeV4::Complete(complete) => panic!(
+                "the defective association was accepted: {} records",
+                complete.len()
+            ),
+        };
+        assert!(
+            refusal.kind().is_media(),
+            "the refusal belongs to the confined AVIF arm: {:?}",
+            refusal.kind()
+        );
+        assert_eq!(
+            adapter.observed_avif_pids_v1().len(),
+            1,
+            "the AVIF child really ran, after the five legacy children"
+        );
+        // The public diagnostic is path-free and value-free.
+        let diagnostic = format!("{refusal:?}{}", refusal.token());
+        for forbidden in [
+            "alpha-irot",
+            "noirot",
+            "media/",
+            "assets/",
+            "solo-n116-",
+            "social-preview",
+        ] {
+            assert!(
+                !diagnostic.contains(forbidden),
+                "the public diagnostic leaked {forbidden:?}: {diagnostic}"
+            );
+        }
+
+        // The same six obligations succeed when the valid associated-alpha still is in that slot.
+        let valid_root = Root::new(
+            "n124-late-ok",
+            &[
+                ("icon.png", &png()),
+                ("banner.webp", &webp()),
+                ("logo-vector.jpg", &jpeg()),
+                ("scene.gif", &gif),
+                ("mark.svg", &svg),
+                ("alpha-irot.avif", &alpha),
+            ],
+        );
+        let valid_set = acquired(&valid_root, &inventory);
+        assert_eq!(valid_set.len(), 6);
+        let valid_adapter = ConfinedGraphicInspectAdapterV4::new(std::path::Path::new(BIN));
+        let records =
+            match inspect_graphic_image_source_set_v4(&valid_set, &valid_adapter, &valid_adapter) {
+                GraphicImageInspectionOutcomeV4::Complete(complete) => {
+                    assert_eq!(complete.len(), 6, "the corrected set completes");
+                    complete.inspections().to_vec()
+                }
+                GraphicImageInspectionOutcomeV4::Refused(refusal) => {
+                    panic!("the valid associated-alpha set refused: {refusal:?}")
+                }
+            };
+        assert_eq!(records[5].format(), GraphicImageFormatV3::Avif);
+        assert_eq!(
+            records[5].avif().expect("checked envelope").planes().len(),
+            4
+        );
+        assert_eq!(
+            valid_adapter.observed_avif_pids_v1().len(),
+            1,
+            "one AVIF child for the accepted class"
+        );
+
+        println!(
+            "n124_evidence case=02 refused_token={} refused_arm=media whole_set_discarded=true \
+             partial_records=0 private_path_absent=true valid_count=6 valid_avif_planes=4 \
+             publication=false",
+            refusal.token()
+        );
+    }
+
+    #[test]
+    fn n124_03_hostile_format_role_and_source_gate_matrix() {
+        let mut refused: Vec<&str> = Vec::new();
+        let adapter = ConfinedGraphicInspectAdapterV4::new(std::path::Path::new(BIN));
+
+        // (A) A `.png` authored path carrying JPEG bytes: the real child refuses, so the declared
+        // extension never becomes a content-based substitution.
+        let jpeg_bytes = jpeg();
+        let png_root = Root::new("n124-hostile-png", &[("wrong.png", &jpeg_bytes)]);
+        let png_inventory = inventory_of(&[(TestOwnerV1::Entity, "logo", "wrong.png", "public")]);
+        let png_set = acquired(&png_root, &png_inventory);
+        match inspect_graphic_image_source_set_v4(&png_set, &adapter, &adapter) {
+            GraphicImageInspectionOutcomeV4::Refused(refusal) => {
+                assert!(refusal.kind().is_legacy(), "the legacy arm refused");
+                assert_eq!(refusal.token(), "port-refused-v3");
+                refused.push("png-path-with-jpeg-bytes");
+            }
+            GraphicImageInspectionOutcomeV4::Complete(_) => {
+                panic!("a mislabelled source was accepted")
+            }
+        }
+
+        // (B) A truncated AVIF is refused by the real confined AVIF child.
+        let truncated = fixture_bytes(ALPHA_FIXTURE)[..64].to_vec();
+        let avif_root = Root::new("n124-hostile-avif", &[("broken.avif", &truncated)]);
+        let avif_inventory =
+            inventory_of(&[(TestOwnerV1::Entity, "logo", "broken.avif", "public")]);
+        let avif_set = acquired(&avif_root, &avif_inventory);
+        match inspect_graphic_image_source_set_v4(&avif_set, &adapter, &adapter) {
+            GraphicImageInspectionOutcomeV4::Refused(refusal) => {
+                assert!(refusal.kind().is_media(), "the AVIF arm refused");
+                refused.push("truncated-avif");
+            }
+            GraphicImageInspectionOutcomeV4::Complete(_) => {
+                panic!("a truncated AVIF was accepted")
+            }
+        }
+
+        // (C) An active SVG document and (D) a truncated GIF are both refused by their children.
+        let active = hostile("script");
+        let svg_root = Root::new("n124-hostile-svg", &[("active.svg", &active)]);
+        let svg_inventory = inventory_of(&[(TestOwnerV1::Entity, "logo", "active.svg", "public")]);
+        let svg_set = acquired(&svg_root, &svg_inventory);
+        match inspect_graphic_image_source_set_v4(&svg_set, &adapter, &adapter) {
+            GraphicImageInspectionOutcomeV4::Refused(refusal) => {
+                assert_eq!(refusal.token(), "port-refused-v3");
+                refused.push("active-svg");
+            }
+            GraphicImageInspectionOutcomeV4::Complete(_) => panic!("an active SVG was accepted"),
+        }
+        let gif = gif_fixture();
+        let cut_gif = gif[..8].to_vec();
+        let gif_root = Root::new("n124-hostile-gif", &[("cut.gif", &cut_gif)]);
+        let gif_inventory = inventory_of(&[(TestOwnerV1::Entity, "logo", "cut.gif", "public")]);
+        let gif_set = acquired(&gif_root, &gif_inventory);
+        match inspect_graphic_image_source_set_v4(&gif_set, &adapter, &adapter) {
+            GraphicImageInspectionOutcomeV4::Refused(refusal) => {
+                assert_eq!(refusal.token(), "port-refused-v3");
+                refused.push("truncated-gif");
+            }
+            GraphicImageInspectionOutcomeV4::Complete(_) => {
+                panic!("a truncated GIF was accepted")
+            }
+        }
+
+        // (E) A declared but absent source refuses at the read, never as an empty success.
+        let missing_root = Root::new("n124-missing", &[("other.png", &png())]);
+        let missing_inventory =
+            inventory_of(&[(TestOwnerV1::Entity, "logo", "absent.png", "public")]);
+        match inspect_entity_graphic_images_v4(
+            &missing_root.capability(),
+            &missing_inventory,
+            std::path::Path::new(BIN),
+        ) {
+            EntityImageOutcomeV4::ReadRefused(_) => refused.push("missing-authored-file"),
+            other => panic!("a missing source did not refuse at the read: {other:?}"),
+        }
+
+        // (F) The registered favicon role stays PNG-only, refused by the grammar before any child.
+        for name in ["icon.avif", "icon.gif", "icon.svg"] {
+            assert!(
+                test_inventory_v1(&[(TestOwnerV1::Entity, "favicon", name, "public")]).is_none(),
+                "{name}: the role grammar must refuse before a worker exists"
+            );
+            refused.push("favicon-role-refused-before-worker");
+        }
+
+        // (G) A Platform-namespaced reference is never read through the Entity route.
+        match test_inventory_v1(&[(TestOwnerV1::Entity, "logo", "platform/hero.png", "public")]) {
+            None => refused.push("platform-namespace-refused-by-grammar"),
+            Some(platform_inventory) => match solo_application::read_graphic_asset_bytes_v1(
+                &platform_inventory,
+                &missing_root.capability(),
+            ) {
+                GraphicAssetReadSetOutcomeV1::Refused(_) => {
+                    refused.push("platform-namespace-refused-at-acquisition")
+                }
+                GraphicAssetReadSetOutcomeV1::Complete(_) => {
+                    panic!("a Platform reference was acquired through the Entity route")
+                }
+            },
+        }
+
+        // (H) A late suppressed `internal` hostile declaration still refuses the whole set.
+        let svg = rich_svg().into_bytes();
+        let gif = gif_fixture();
+        let active = hostile("script");
+        let late_root = Root::new(
+            "n124-late-hostile",
+            &[
+                ("icon.png", &png()),
+                ("banner.webp", &webp()),
+                ("logo-vector.jpg", &jpeg()),
+                ("scene.gif", &gif),
+                ("mark.svg", &svg),
+                ("late.svg", &active),
+            ],
+        );
+        let late_inventory = suppressed_inventory_of(&[
+            (TestOwnerV1::Entity, "favicon", "icon.png", "public"),
+            (TestOwnerV1::Entity, "banner", "banner.webp", "public"),
+            (TestOwnerV1::Facet, "logo", "logo-vector.jpg", "public"),
+            (TestOwnerV1::Site, "background", "scene.gif", "public"),
+            (TestOwnerV1::Page, "social-preview", "mark.svg", "public"),
+            (
+                TestOwnerV1::Representation,
+                "social-preview",
+                "late.svg",
+                "internal",
+            ),
+        ]);
+        let late_set = acquired(&late_root, &late_inventory);
+        assert_eq!(late_set.len(), 6, "the hostile set is acquired whole");
+        match inspect_graphic_image_source_set_v4(&late_set, &adapter, &adapter) {
+            GraphicImageInspectionOutcomeV4::Refused(refusal) => {
+                assert_eq!(refusal.token(), "port-refused-v3");
+                assert!(
+                    !format!("{refusal:?}").contains("late.svg"),
+                    "the public diagnostic stays path-free"
+                );
+                refused.push("late-suppressed-internal-hostile");
+            }
+            GraphicImageInspectionOutcomeV4::Complete(_) => {
+                panic!("a late hostile declaration was accepted")
+            }
+        }
+
+        assert!(
+            refused.len() >= 10,
+            "every hostile vector is accounted for: {refused:?}"
+        );
+        println!(
+            "n124_evidence case=03 vectors={} labels={refused:?} whole_set_discarded=true \
+             partial_records=0 private_path_absent=true fallback=false publication=false",
+            refused.len()
+        );
+    }
+
+    /// Case 04: seven obligations in one set, both AVIF classes admitted, one ordered result.
+    #[test]
+    fn n124_04_seven_format_obligations_two_avif_classes_and_adversarial_ports() {
+        let svg = rich_svg().into_bytes();
+        let gif = gif_fixture();
+        let coded = fixture_bytes(CODED_FIXTURE);
+        let alpha = fixture_bytes(ALPHA_FIXTURE);
+        let root = Root::new(
+            "n124-seven",
+            &[
+                ("icon.png", &png()),
+                ("banner.webp", &webp()),
+                ("logo-vector.jpg", &jpeg()),
+                ("scene.gif", &gif),
+                ("mark.svg", &svg),
+                ("coded.avif", &coded),
+                (ALPHA_ASSET, &alpha),
+            ],
+        );
+        // Seven obligations: the five legacy formats, the R06 coded-plane AVIF and the R10
+        // associated-alpha AVIF as two distinct authored obligations.
+        let inventory = inventory_of(&[
+            (TestOwnerV1::Entity, "favicon", "icon.png", "public"),
+            (TestOwnerV1::Entity, "banner", "banner.webp", "public"),
+            (TestOwnerV1::Facet, "logo", "logo-vector.jpg", "public"),
+            (TestOwnerV1::Site, "background", "scene.gif", "public"),
+            (TestOwnerV1::Page, "social-preview", "mark.svg", "public"),
+            (TestOwnerV1::Page, "logo", "coded.avif", "public"),
+            (
+                TestOwnerV1::Representation,
+                "social-preview",
+                ALPHA_ASSET,
+                "internal",
+            ),
+        ]);
+        let set = acquired(&root, &inventory);
+        assert_eq!(set.len(), 7, "seven authored obligations are acquired");
+
+        let adapter = ConfinedGraphicInspectAdapterV4::new(std::path::Path::new(BIN));
+        let records = match inspect_graphic_image_source_set_v4(&set, &adapter, &adapter) {
+            GraphicImageInspectionOutcomeV4::Complete(complete) => {
+                assert_eq!(complete.len(), 7, "seven ordered records");
+                assert!(!complete.grants_publication_authority());
+                assert!(!complete.proves_whole_publication());
+                complete.inspections().to_vec()
+            }
+            GraphicImageInspectionOutcomeV4::Refused(refusal) => {
+                panic!("the seven-obligation candidate refused: {refusal:?}")
+            }
+        };
+        assert_eq!(
+            records
+                .iter()
+                .map(|record| record.format())
+                .collect::<Vec<GraphicImageFormatV3>>(),
+            vec![
+                GraphicImageFormatV3::Png,
+                GraphicImageFormatV3::WebP,
+                GraphicImageFormatV3::Jpeg,
+                GraphicImageFormatV3::Gif,
+                GraphicImageFormatV3::Svg,
+                GraphicImageFormatV3::Avif,
+                GraphicImageFormatV3::Avif,
+            ],
+            "both AVIF classes keep their authored positions"
+        );
+
+        // Seven genuine children: five legacy PIDs plus the two AVIF children.
+        let mut pids: Vec<u32> = records
+            .iter()
+            .map(|record| record.worker_pid())
+            .filter(|pid| *pid > 0)
+            .collect();
+        assert_eq!(pids.len(), 5, "five legacy records carry their PIDs");
+        let avif_pids = adapter.observed_avif_pids_v1();
+        assert_eq!(avif_pids.len(), 2, "two real confined AVIF children");
+        pids.extend(avif_pids.iter().copied());
+        let mut unique = pids.clone();
+        unique.sort_unstable();
+        unique.dedup();
+        assert_eq!(unique.len(), 7, "seven distinct child processes: {pids:?}");
+
+        // The coded-plane class stays a three-plane `yuv` observation with no display claim.
+        let coded_record = &records[5];
+        let coded_evidence = coded_record.avif().expect("coded AVIF envelope");
+        assert_eq!(
+            coded_evidence.checked().color_model(),
+            MediaWorkerColorModelV1::Yuv,
+            "the coded plane class is unchanged"
+        );
+        assert_eq!(coded_evidence.checked().plane_count(), 3);
+        assert_eq!(coded_evidence.planes().len(), 3);
+        assert_eq!(
+            coded_evidence.orientation(),
+            MediaWorkerOrientationV1::Unverified,
+            "no fake display orientation for coded planes"
+        );
+        let manifest = goldens();
+        let pinned = &manifest["fixtures"][CODED_FIXTURE];
+        for (index, plane) in coded_evidence.planes().iter().enumerate() {
+            assert_eq!(
+                plane.sha256(),
+                hex_digest(
+                    pinned["planes"][index]["sha256"]
+                        .as_str()
+                        .expect("plane hex")
+                ),
+                "coded plane {index} against the independent golden"
+            );
+        }
+
+        // The associated-alpha class is the four-plane displayed YUVA record.
+        let alpha_record = &records[6];
+        let alpha_evidence = alpha_record.avif().expect("associated-alpha envelope");
+        assert_eq!(
+            alpha_evidence.checked().color_model(),
+            MediaWorkerColorModelV1::Yuva
+        );
+        assert_eq!(alpha_evidence.planes().len(), 4);
+        assert_eq!(
+            alpha_evidence.orientation(),
+            MediaWorkerOrientationV1::Identity
+        );
+        assert_eq!(
+            (alpha_record.width(), alpha_record.height()),
+            (256, 512),
+            "the displayed geometry of the accepted class"
+        );
+        for (index, plane) in alpha_evidence.planes().iter().enumerate() {
+            assert_eq!(plane.sha256().to_hex(), ALPHA_PLANE_SHA[index]);
+        }
+
+        // The five legacy records carry no orientation claim at all.
+        for record in &records[..5] {
+            assert!(
+                record.orientation_claim().is_none(),
+                "a legacy record invents no orientation"
+            );
+        }
+        for record in &records {
+            assert!(!record.grants_publication_authority());
+        }
+
+        println!(
+            "n124_evidence case=04 obligations=7 pids={pids:?} distinct_pids=7 records=7 \
+             coded_avif=planes3,yuv,unverified alpha_avif=planes4,yuva,identity \
+             alpha_geometry=256x512 alpha_display_sha_pinned={ALPHA_DISPLAY_SHA} \
+             forged_ports_refused=true publication=false"
         );
     }
 }

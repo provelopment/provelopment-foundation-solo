@@ -17,15 +17,19 @@ use std::cell::RefCell;
 use solo_application::{
     EntityAssetSourceV1, GraphicAssetObligationInventoryV1, GraphicAssetReadPort,
     GraphicAssetReadRefusalKind, GraphicAssetReadRefusalV1, GraphicAssetReadSetOutcomeV1,
-    GraphicAssetSourceSetV1, MAX_GRAPHIC_SOURCE_BYTES, MEDIA_WORKER_MAX_SOURCE_BYTES_V1,
-    MEDIA_WORKER_PROTOCOL_VERSION_V1, MediaWorkerBoundaryOutcomeV1, MediaWorkerColorModelV1,
-    MediaWorkerDigestV1, MediaWorkerEnvelopeV1, MediaWorkerExitV1, MediaWorkerFormatV1,
-    MediaWorkerLimitsV1, MediaWorkerMimeV1, MediaWorkerObservationV1, MediaWorkerOrientationV1,
-    MediaWorkerPlaneClaimV1, MediaWorkerPortV1, MediaWorkerRefusalKindV1, MediaWorkerRequestV1,
-    MediaWorkerRunV1, MediaWorkerStatusV1, PhysicalIdentityV1, PropertyResolutionRequestV1,
-    collect_graphic_asset_obligations_v1, fingerprint_of, inspect_media_worker_source_set_v1,
-    media_worker_output_sha256_v1, read_graphic_asset_bytes_v1, resolve_declared_properties_v1,
-    sha256_media_worker_bytes_v1,
+    GraphicAssetSourceSetV1, GraphicImageFormatV1, GraphicImageFormatV3,
+    GraphicImageInspectPortOutcomeV3, GraphicImageInspectPortV3, GraphicImageInspectRequestV3,
+    GraphicImageInspectionOutcomeV4, GraphicImageObservationV3, GraphicImagePayloadV3,
+    GraphicImagePayloadV4, GraphicImageWorkerObservationV1, MAX_GRAPHIC_SOURCE_BYTES,
+    MEDIA_WORKER_MAX_SOURCE_BYTES_V1, MEDIA_WORKER_PROTOCOL_VERSION_V1,
+    MediaWorkerBoundaryOutcomeV1, MediaWorkerColorModelV1, MediaWorkerDigestV1,
+    MediaWorkerEnvelopeV1, MediaWorkerExitV1, MediaWorkerFormatV1, MediaWorkerLimitsV1,
+    MediaWorkerMimeV1, MediaWorkerObservationV1, MediaWorkerOrientationV1, MediaWorkerPlaneClaimV1,
+    MediaWorkerPortV1, MediaWorkerRefusalKindV1, MediaWorkerRequestV1, MediaWorkerRunV1,
+    MediaWorkerStatusV1, PhysicalIdentityV1, PropertyResolutionRequestV1,
+    collect_graphic_asset_obligations_v1, fingerprint_of, inspect_graphic_image_source_set_v4,
+    inspect_media_worker_source_set_v1, media_worker_output_sha256_v1, read_graphic_asset_bytes_v1,
+    resolve_declared_properties_v1, sha256_media_worker_bytes_v1,
 };
 use solo_domain::{
     AssetNamespace, AssetReferenceV1, AuthoredPropertyValueV1, CurrentContextV1,
@@ -1270,4 +1274,223 @@ fn the_alpha_class_admits_only_eight_bit_identity_and_exact_payloads() {
         ),
         "false-exit"
     );
+}
+
+/// A controllable V3 port for the V4 composition tests: it replays one still observation whose
+/// fields a test can forge, and never decodes anything.
+struct FakeLegacyV4 {
+    digest: Option<MediaWorkerDigestV1>,
+    limits_verified: bool,
+    mime: &'static str,
+}
+
+impl FakeLegacyV4 {
+    fn honest() -> Self {
+        Self {
+            digest: None,
+            limits_verified: true,
+            mime: "image/png",
+        }
+    }
+}
+
+impl GraphicImageInspectPortV3 for FakeLegacyV4 {
+    fn inspect_v3(
+        &self,
+        request: &GraphicImageInspectRequestV3,
+    ) -> GraphicImageInspectPortOutcomeV3 {
+        GraphicImageInspectPortOutcomeV3::Inspected(Box::new(GraphicImageObservationV3::Still(
+            GraphicImageWorkerObservationV1 {
+                confirmed_format: GraphicImageFormatV1::Png,
+                observed_mime: self.mime,
+                source_digest: self.digest.unwrap_or(*request.source_digest()),
+                width: 2,
+                height: 2,
+                decoded_bytes: 16,
+                decoded_digest: sha256_media_worker_bytes_v1(b"a decoded still plane"),
+                worker_pid: 4242,
+                limits_verified: self.limits_verified,
+                cleanup_verified: true,
+                wall_ms: 5,
+            },
+        )))
+    }
+}
+
+/// The two-obligation V4 candidate: one PNG through the legacy port and one AVIF through V1.
+fn v4_candidate() -> (GraphicAssetSourceSetV1, Vec<u8>, Vec<Vec<u8>>) {
+    let png = source_body(0x71);
+    let avif = source_body(0x72);
+    let set = source_set(&[
+        ("media/hero.png", Exposure::Public, png),
+        ("media/alpha.avif", Exposure::Internal, avif.clone()),
+    ]);
+    let planes = yuv_planes();
+    (set, avif, planes)
+}
+
+#[test]
+fn the_v4_six_format_composition_accepts_both_port_families_in_order() {
+    let (set, avif, planes) = v4_candidate();
+    let claim = valid_claim(&avif, &planes);
+    let port = FakeWorkerPort::new(vec![MediaWorkerRunV1::Observed(observation(
+        &claim,
+        planes.clone(),
+    ))]);
+    let outcome = inspect_graphic_image_source_set_v4(&set, &FakeLegacyV4::honest(), &port);
+    let records = match outcome {
+        GraphicImageInspectionOutcomeV4::Complete(set) => {
+            assert_eq!(set.len(), 2, "both obligations are retained");
+            assert!(!set.grants_publication_authority());
+            assert!(!set.proves_whole_publication());
+            set.inspections().to_vec()
+        }
+        GraphicImageInspectionOutcomeV4::Refused(refusal) => {
+            panic!("the honest composite refused: {refusal:?}")
+        }
+    };
+    assert_eq!(records.len(), 2, "original inventory order, both records");
+    assert_eq!(records[0].format(), GraphicImageFormatV3::Png);
+    assert_eq!(records[0].mime(), "image/png");
+    assert!(matches!(
+        records[0].payload(),
+        GraphicImagePayloadV4::Legacy(GraphicImagePayloadV3::Still(_))
+    ));
+    assert!(
+        records[0].orientation_claim().is_none(),
+        "no invented claim"
+    );
+    assert_eq!(records[1].format(), GraphicImageFormatV3::Avif);
+    assert_eq!(records[1].mime(), "image/avif");
+    let evidence = records[1]
+        .avif()
+        .expect("the AVIF arm carries its envelope");
+    assert_eq!(evidence.checked().plane_count(), 3);
+    assert_eq!(evidence.planes().len(), 3);
+    assert_eq!(
+        evidence.orientation(),
+        MediaWorkerOrientationV1::Identity,
+        "the worker's claim is preserved verbatim"
+    );
+    for record in &records {
+        assert!(!record.grants_publication_authority());
+    }
+}
+
+#[test]
+fn every_forged_port_fact_refuses_the_whole_v4_candidate() {
+    let (set, avif, planes) = v4_candidate();
+    let claim = valid_claim(&avif, &planes);
+
+    fn expect(
+        set: &GraphicAssetSourceSetV1,
+        legacy: &FakeLegacyV4,
+        port: &FakeWorkerPort,
+        label: &str,
+        token: &str,
+        media: bool,
+    ) {
+        match inspect_graphic_image_source_set_v4(set, legacy, port) {
+            GraphicImageInspectionOutcomeV4::Refused(refusal) => {
+                assert_eq!(refusal.token(), token, "{label}: typed V4 refusal");
+                assert_eq!(refusal.kind().is_media(), media, "{label}: arm");
+                assert!(
+                    !format!("{refusal:?}").contains("media/"),
+                    "{label}: the public diagnostic stays path-free"
+                );
+            }
+            GraphicImageInspectionOutcomeV4::Complete(result) => panic!(
+                "{label}: the whole candidate was retained with {} records",
+                result.len()
+            ),
+        }
+    }
+
+    // A forged V3 source digest, host fact and format each refuse the *entire* set.
+    let honest_avif = FakeWorkerPort::new(vec![MediaWorkerRunV1::Observed(observation(
+        &claim,
+        planes.clone(),
+    ))]);
+    expect(
+        &set,
+        &FakeLegacyV4 {
+            digest: Some(sha256_media_worker_bytes_v1(b"another source")),
+            ..FakeLegacyV4::honest()
+        },
+        &honest_avif,
+        "forged-v3-source-digest",
+        "source-digest-mismatch-v3",
+        false,
+    );
+    expect(
+        &set,
+        &FakeLegacyV4 {
+            limits_verified: false,
+            ..FakeLegacyV4::honest()
+        },
+        &honest_avif,
+        "forged-v3-host-fact",
+        "unverified-worker-v3",
+        false,
+    );
+    expect(
+        &set,
+        &FakeLegacyV4 {
+            mime: "image/jpeg",
+            ..FakeLegacyV4::honest()
+        },
+        &honest_avif,
+        "forged-v3-format",
+        "format-mismatch-v3",
+        false,
+    );
+
+    // A forged V1 source digest, host fact, plane claim and aggregate each refuse everything.
+    let mut false_source = valid_claim(&avif, &planes);
+    false_source.source_sha256 = sha256_media_worker_bytes_v1(b"another avif");
+    let honest = observation(&claim, planes.clone());
+    let false_limits = MediaWorkerObservationV1::new(
+        false,
+        honest.exit(),
+        honest.wall_deadline_met(),
+        honest.descendants_reaped(),
+        honest.leak_observed(),
+        MediaWorkerLimitsV1::reference(),
+        claim.build(),
+        planes.clone(),
+    );
+    let mut bad_plane = valid_claim(&avif, &planes);
+    bad_plane.planes[1] = MediaWorkerPlaneClaimV1::new(1, 16, 16, 256, {
+        let mut digest = [0u8; 32];
+        digest[0] = 1;
+        MediaWorkerDigestV1::from_bytes(digest)
+    });
+    let mut bad_digest = valid_claim(&avif, &planes);
+    bad_digest.output_sha256 = sha256_media_worker_bytes_v1(b"another aggregate");
+
+    for (label, forged, token) in [
+        (
+            "forged-v1-source-digest",
+            observation(&false_source, planes.clone()),
+            "WORKER_SOURCE_MISMATCH",
+        ),
+        (
+            "forged-v1-host-fact",
+            false_limits,
+            "WORKER_LIMIT_UNVERIFIED",
+        ),
+        (
+            "forged-v1-plane-claim",
+            observation(&bad_plane, planes.clone()),
+            "WORKER_DIGEST_MISMATCH",
+        ),
+        (
+            "forged-v1-aggregate",
+            observation(&bad_digest, planes.clone()),
+            "WORKER_DIGEST_MISMATCH",
+        ),
+    ] {
+        let port = FakeWorkerPort::new(vec![MediaWorkerRunV1::Observed(forged)]);
+        expect(&set, &FakeLegacyV4::honest(), &port, label, token, true);
+    }
 }

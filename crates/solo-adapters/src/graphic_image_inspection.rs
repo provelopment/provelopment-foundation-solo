@@ -3159,3 +3159,102 @@ pub fn inspect_entity_graphic_images_v3(
         }
     }
 }
+
+// ---------------------------------------------------------------------------------------------
+// `SOLO-WO-118 R11` — the V4 six-format whole-candidate composition.
+//
+// V4 adds no decoder and no second child. It composes the two already-accepted confined ports —
+// the V3 five-format adapter and the R10 AVIF V1 adapter — behind one read of the real confined
+// source set, and hands their results to the inward V4 whole-set validator. The V3 entrypoints and
+// their historic `avif-unsupported-v3` refusal are untouched.
+// ---------------------------------------------------------------------------------------------
+
+/// The composed six-format inspection adapter: five legacy formats plus the confined AVIF class.
+pub struct ConfinedGraphicInspectAdapterV4 {
+    legacy: ConfinedGraphicInspectAdapterV3,
+    avif: crate::graphic_avif_inspection::ConfinedAvifInspectAdapterV1,
+}
+
+impl ConfinedGraphicInspectAdapterV4 {
+    /// Binds both halves to the one already-trusted `solo-cli` executable.
+    ///
+    /// No second binary, decoder or process launcher exists: the V3 half starts the accepted
+    /// PNG/JPEG/WebP/GIF/SVG child paths and the AVIF half starts the accepted R10 child path.
+    #[must_use]
+    pub fn new(executable: &Path) -> Self {
+        Self {
+            legacy: ConfinedGraphicInspectAdapterV3::new(executable),
+            avif: crate::graphic_avif_inspection::ConfinedAvifInspectAdapterV1::new(
+                executable.to_path_buf(),
+            ),
+        }
+    }
+
+    /// Every child process the AVIF half actually observed, in launch order.
+    ///
+    /// This is reported host evidence for tests; it grants nothing and is never consulted by a
+    /// decision. The V3 half reports its own identifiers inside each observation.
+    #[must_use]
+    pub fn observed_avif_pids_v1(&self) -> Vec<u32> {
+        self.avif.observed_pids_v1()
+    }
+}
+
+impl solo_application::GraphicImageInspectPortV3 for ConfinedGraphicInspectAdapterV4 {
+    fn inspect_v3(
+        &self,
+        request: &solo_application::GraphicImageInspectRequestV3,
+    ) -> solo_application::GraphicImageInspectPortOutcomeV3 {
+        self.legacy.inspect_v3(request)
+    }
+}
+
+impl solo_application::MediaWorkerPortV1 for ConfinedGraphicInspectAdapterV4 {
+    fn inspect_avif(
+        &self,
+        request: &solo_application::MediaWorkerRequestV1<'_>,
+    ) -> solo_application::MediaWorkerRunV1 {
+        self.avif.inspect_avif(request)
+    }
+}
+
+/// One whole-owner V4 outcome: every obligation inspected, or one attributable refusal.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EntityImageOutcomeV4 {
+    /// Every declared obligation was inspected across all six formats.
+    Complete(solo_application::GraphicImageInspectionSetV4),
+    /// The confined source read failed with its own typed refusal.
+    ReadRefused(solo_application::GraphicAssetReadRefusalV1),
+    /// One obligation was refused; no partial result exists.
+    Refused(solo_application::GraphicImageInspectRefusalV4),
+}
+
+/// Reads the real confined sources once, then inspects the whole six-format candidate.
+///
+/// The chain is the accepted one: validated inventory, one real confined source read over the
+/// owner's capability, one freshly supervised single-use child per source in exactly the accepted
+/// form for that format, then the inward whole-set validator. Nothing here decodes in the parent,
+/// infers a format from bytes, or substitutes a reader.
+#[must_use]
+pub fn inspect_entity_graphic_images_v4(
+    root: &ContentRootCapability,
+    inventory: &GraphicAssetObligationInventoryV1,
+    executable: &Path,
+) -> EntityImageOutcomeV4 {
+    use solo_application::GraphicAssetReadSetOutcomeV1;
+    let source_set = match read_graphic_asset_bytes_v1(inventory, root) {
+        GraphicAssetReadSetOutcomeV1::Complete(set) => set,
+        GraphicAssetReadSetOutcomeV1::Refused(refusal) => {
+            return EntityImageOutcomeV4::ReadRefused(refusal);
+        }
+    };
+    let adapter = ConfinedGraphicInspectAdapterV4::new(executable);
+    match solo_application::inspect_graphic_image_source_set_v4(&source_set, &adapter, &adapter) {
+        solo_application::GraphicImageInspectionOutcomeV4::Complete(set) => {
+            EntityImageOutcomeV4::Complete(set)
+        }
+        solo_application::GraphicImageInspectionOutcomeV4::Refused(refusal) => {
+            EntityImageOutcomeV4::Refused(refusal)
+        }
+    }
+}

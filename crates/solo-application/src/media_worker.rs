@@ -1508,7 +1508,7 @@ fn canonical_yuva_layout_matches_v1(
     })
 }
 
-fn check_observation_v1(
+pub(crate) fn check_observation_v1(
     obligation: &GraphicAssetObligationV1,
     request: &MediaWorkerRequestV1<'_>,
     observation: &MediaWorkerObservationV1,

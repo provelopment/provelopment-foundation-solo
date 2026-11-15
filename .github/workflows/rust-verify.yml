@@ -1171,6 +1171,107 @@ jobs:
           (Get-Content -LiteralPath $log) | ForEach-Object { $_.Replace('3 passed; 0 failed; 0 ignored', '2 passed; 1 failed; 0 ignored') } | Set-Content -LiteralPath $probe
           if (Test-N122Log -Path $probe) { throw 'partial or failed N122 run accepted' }
           Write-Output 'n122_gate mutation=rejected'
+      - name: Six-format V4 whole-candidate N124 gate (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $required = @(
+            'n124_01_six_formats_five_levels_real_confined_workers',
+            'n124_02_six_format_late_private_alpha_refusal_and_no_partial_records',
+            'n124_03_hostile_format_role_and_source_gate_matrix',
+            'n124_04_seven_format_obligations_two_avif_classes_and_adversarial_ports')
+          $tokens = @(
+            'distinct_pids=6',
+            'distinct_pids=7',
+            'alpha_display_sha_pinned=950be879c536c208d4e2dc0cdb8aa698e73922b4a57e8070c4fea389c84cc744',
+            'svg_canonical_sha256=0403e0677a174ccafe18191a8a9f1c5a30993477bb074f49078b005f513caaba',
+            'whole_set_discarded=true',
+            'partial_records=0 private_path_absent=true',
+            'publication=false')
+          function Test-N124Log {
+            param([string]$Path)
+            $text = Get-Content -LiteralPath $Path -Raw
+            foreach ($name in $required) {
+              if (-not $text.Contains('test n124::' + $name + ' ')) { return $false }
+            }
+            if (([regex]::Matches($text, '(?m)^test n124::n124_0[0-9]_[A-Za-z0-9_]*( |$)')).Count -ne 4) { return $false }
+            if (-not $text.Contains('test result: ok. 4 passed; 0 failed; 0 ignored')) { return $false }
+            if ($text.Contains('... FAILED') -or $text.Contains('... ignored') -or $text.Contains('test result: FAILED')) { return $false }
+            foreach ($marker in @('n124_evidence case=01', 'n124_evidence case=02', 'n124_evidence case=03', 'n124_evidence case=04')) {
+              if (([regex]::Matches($text, [regex]::Escape($marker))).Count -ne 1) { return $false }
+            }
+            foreach ($token in $tokens) {
+              if (-not $text.Contains($token)) { return $false }
+            }
+            return $true
+          }
+          $log = Join-Path $env:RUNNER_TEMP 'n124-four.txt'
+          cargo test -p solo-cli --test media_worker_host_smoke --locked n124_ -- --nocapture --test-threads=1 *>&1 | Tee-Object -FilePath $log
+          if ($LASTEXITCODE -ne 0) { throw 'the N124 suite did not exit zero' }
+          Get-Content -LiteralPath $log
+          if (-not (Test-N124Log -Path $log)) { throw 'authentic N124 4/4 run rejected' }
+          Write-Output 'n124_gate authentic=accepted'
+          $probe = Join-Path $env:RUNNER_TEMP 'n124-probe.txt'
+          (Get-Content -LiteralPath $log | Where-Object { -not $_.Contains('n124_04_seven_format_obligations_two_avif_classes_and_adversarial_ports') }) | Set-Content -LiteralPath $probe
+          if (Test-N124Log -Path $probe) { throw 'missing N124 case accepted' }
+          (Get-Content -LiteralPath $log) | ForEach-Object { $_.Replace('4 passed; 0 failed; 0 ignored', '3 passed; 1 failed; 0 ignored') } | Set-Content -LiteralPath $probe
+          if (Test-N124Log -Path $probe) { throw 'false 3-of-4 result accepted' }
+          (Get-Content -LiteralPath $log) | ForEach-Object { $_.Replace('alpha_display_sha_pinned=950be879c536c208d4e2dc0cdb8aa698e73922b4a57e8070c4fea389c84cc744', 'alpha_display_sha_pinned=0000000000000000000000000000000000000000000000000000000000000000').Replace('svg_canonical_sha256=0403e0677a174ccafe18191a8a9f1c5a30993477bb074f49078b005f513caaba', 'svg_canonical_sha256=1111111111111111111111111111111111111111111111111111111111111111') } | Set-Content -LiteralPath $probe
+          if (Test-N124Log -Path $probe) { throw 'changed digest claim accepted' }
+          (Get-Content -LiteralPath $log) | ForEach-Object { $_.Replace('private_path_absent=true', 'private_path_absent=false').Replace('whole_set_discarded=true', 'whole_set_discarded=false') } | Set-Content -LiteralPath $probe
+          if (Test-N124Log -Path $probe) { throw 'false privacy or whole-set flag accepted' }
+          Write-Output 'n124_gate mutation=rejected'
+      # Mandatory `SOLO-WO-118 R11` N124 gate: the V4 six-format whole-candidate composition on this
+      # host, including the associated-alpha AVIF class beside the five legacy formats. The same
+      # verifier must reject four altered copies of the real log before printing its verdict.
+      - name: Six-format V4 whole-candidate N124 gate (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          check_n124() {
+            local log="$1"
+            for name in n124_01_six_formats_five_levels_real_confined_workers n124_02_six_format_late_private_alpha_refusal_and_no_partial_records n124_03_hostile_format_role_and_source_gate_matrix n124_04_seven_format_obligations_two_avif_classes_and_adversarial_ports; do
+              grep -qF "test n124::$name " "$log" || return 1
+            done
+            [ "$(grep -Ec '^test n124::n124_0[0-9]_[A-Za-z0-9_]*( |$)' "$log")" -eq 4 ] || return 1
+            grep -qF 'test result: ok. 4 passed; 0 failed; 0 ignored' "$log" || return 1
+            ! grep -qF '... FAILED' "$log" || return 1
+            ! grep -qF '... ignored' "$log" || return 1
+            ! grep -qF 'test result: FAILED' "$log" || return 1
+            [ "$(grep -cF 'n124_evidence case=01' "$log")" -eq 1 ] || return 1
+            [ "$(grep -cF 'n124_evidence case=02' "$log")" -eq 1 ] || return 1
+            [ "$(grep -cF 'n124_evidence case=03' "$log")" -eq 1 ] || return 1
+            [ "$(grep -cF 'n124_evidence case=04' "$log")" -eq 1 ] || return 1
+            grep -qF 'distinct_pids=6' "$log" || return 1
+            grep -qF 'distinct_pids=7' "$log" || return 1
+            grep -qF 'alpha_display_sha_pinned=950be879c536c208d4e2dc0cdb8aa698e73922b4a57e8070c4fea389c84cc744' "$log" || return 1
+            grep -qF 'svg_canonical_sha256=0403e0677a174ccafe18191a8a9f1c5a30993477bb074f49078b005f513caaba' "$log" || return 1
+            grep -qF 'whole_set_discarded=true' "$log" || return 1
+            grep -qF 'partial_records=0 private_path_absent=true' "$log" || return 1
+            grep -qF 'publication=false' "$log" || return 1
+          }
+          log="$RUNNER_TEMP/n124-four.txt"
+          cargo test -p solo-cli --test media_worker_host_smoke --locked n124_ -- --nocapture --test-threads=1 >"$log" 2>&1 || { cat "$log"; exit 1; }
+          cat "$log"
+          check_n124 "$log" || { echo 'authentic N124 4/4 run rejected'; exit 1; }
+          echo 'n124_gate authentic=accepted'
+          probe="$RUNNER_TEMP/n124-probe.txt"
+          cp "$log" "$probe"
+          sed -i '/n124_04_seven_format_obligations_two_avif_classes_and_adversarial_ports/d' "$probe"
+          if check_n124 "$probe"; then echo 'missing N124 case accepted'; exit 1; fi
+          cp "$log" "$probe"
+          sed -i 's/4 passed; 0 failed; 0 ignored/3 passed; 1 failed; 0 ignored/' "$probe"
+          if check_n124 "$probe"; then echo 'false 3-of-4 result accepted'; exit 1; fi
+          cp "$log" "$probe"
+          sed -i 's/alpha_display_sha_pinned=950be879c536c208d4e2dc0cdb8aa698e73922b4a57e8070c4fea389c84cc744/alpha_display_sha_pinned=0000000000000000000000000000000000000000000000000000000000000000/' "$probe"
+          sed -i 's/svg_canonical_sha256=0403e0677a174ccafe18191a8a9f1c5a30993477bb074f49078b005f513caaba/svg_canonical_sha256=1111111111111111111111111111111111111111111111111111111111111111/' "$probe"
+          if check_n124 "$probe"; then echo 'changed digest claim accepted'; exit 1; fi
+          cp "$log" "$probe"
+          sed -i 's/private_path_absent=true/private_path_absent=false/' "$probe"
+          sed -i 's/whole_set_discarded=true/whole_set_discarded=false/' "$probe"
+          if check_n124 "$probe"; then echo 'false privacy or whole-set flag accepted'; exit 1; fi
+          echo 'n124_gate mutation=rejected'
       # Mandatory `SOLO-WO-105 R01` Windows canaries. These four cases drive the real production
       # `CreateProcessW` / attribute-list / Job Object / minimal-environment path, so a Windows job is
       # the only place such facts exist. The gate fails when a required case is absent, filtered,

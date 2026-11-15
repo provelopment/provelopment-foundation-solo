@@ -36,6 +36,12 @@ pub use graphic_asset_read::{
     MAX_GRAPHIC_SOURCE_BYTES, read_graphic_asset_bytes_v1,
 };
 pub use graphic_image_inspection::{
+    AvifEvidenceV4, AvifPlaneEvidenceV4, GRAPHIC_IMAGE_INSPECTION_V4_GRANTS_PUBLICATION_AUTHORITY,
+    GRAPHIC_IMAGE_INSPECTION_V4_PROVES_WHOLE_PUBLICATION, GraphicImageInspectRefusalKindV4,
+    GraphicImageInspectRefusalV4, GraphicImageInspectionOutcomeV4, GraphicImageInspectionSetV4,
+    GraphicImageInspectionV4, GraphicImagePayloadV4, inspect_graphic_image_source_set_v4,
+};
+pub use graphic_image_inspection::{
     GIF87A_SIGNATURE_V2, GIF89A_SIGNATURE_V2,
     GRAPHIC_IMAGE_INSPECTION_GRANTS_PUBLICATION_AUTHORITY,
     GRAPHIC_IMAGE_INSPECTION_PROVES_MEDIA_CORRECTNESS,

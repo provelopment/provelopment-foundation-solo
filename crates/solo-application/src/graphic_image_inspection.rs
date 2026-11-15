@@ -30,7 +30,11 @@ use solo_domain::{AssetNamespace, PropertyKey, QualifiedOwnerV1};
 
 use crate::graphic_asset_inventory::GraphicAssetObligationV1;
 use crate::graphic_asset_read::{GraphicAssetSourceSetV1, MAX_GRAPHIC_SOURCE_BYTES};
-use crate::media_worker::{MediaWorkerDigestV1, sha256_media_worker_bytes_v1};
+use crate::media_worker::{
+    MediaWorkerCheckedEnvelopeV1, MediaWorkerDigestV1, MediaWorkerOrientationV1, MediaWorkerPortV1,
+    MediaWorkerRefusalKindV1, MediaWorkerRequestV1, MediaWorkerRunV1, check_observation_v1,
+    sha256_media_worker_bytes_v1,
+};
 
 /// Whether a complete inspection authorizes publication of any kind.
 ///
@@ -3154,4 +3158,585 @@ pub fn inspect_graphic_image_source_set_v3(
     }
 
     GraphicImageInspectionOutcomeV3::Complete(GraphicImageInspectionSetV3 { inspections })
+}
+
+// ---------------------------------------------------------------------------------------------
+// `SOLO-WO-118 R11` — the V4 whole-candidate six-format composition.
+//
+// V4 adds **no** decoding rule of its own. It iterates the acquired obligation set once, in order,
+// and dispatches each declared format either to the already-accepted V3 five-format port or to the
+// R10 confined AVIF V1 port plus the existing trusted-parent check. The V3 entrypoints, their
+// discriminants, tokens and the historic `avif-unsupported-v3` refusal are deliberately unchanged:
+// the AVIF arm exists only here.
+// ---------------------------------------------------------------------------------------------
+
+/// Whether a V4 inspection set authorizes publication. Always `false`.
+pub const GRAPHIC_IMAGE_INSPECTION_V4_GRANTS_PUBLICATION_AUTHORITY: bool = false;
+
+/// Whether a V4 inspection set proves the whole publication. Always `false`.
+pub const GRAPHIC_IMAGE_INSPECTION_V4_PROVES_WHOLE_PUBLICATION: bool = false;
+
+/// One AVIF plane exactly as the trusted parent received and re-hashed it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AvifPlaneEvidenceV4 {
+    ordinal: u32,
+    stride: u64,
+    rows: u64,
+    length: u64,
+    sha256: MediaWorkerDigestV1,
+}
+
+impl AvifPlaneEvidenceV4 {
+    /// The plane ordinal, `0..plane_count`.
+    #[must_use]
+    pub const fn ordinal(&self) -> u32 {
+        self.ordinal
+    }
+
+    /// The claimed canonical stride the parent re-derived.
+    #[must_use]
+    pub const fn stride(&self) -> u64 {
+        self.stride
+    }
+
+    /// The claimed canonical row count the parent re-derived.
+    #[must_use]
+    pub const fn rows(&self) -> u64 {
+        self.rows
+    }
+
+    /// The claimed byte length the parent verified against its own buffer.
+    #[must_use]
+    pub const fn length(&self) -> u64 {
+        self.length
+    }
+
+    /// The parent's own digest of exactly those received bytes.
+    #[must_use]
+    pub const fn sha256(&self) -> MediaWorkerDigestV1 {
+        self.sha256
+    }
+}
+
+/// The parent-checked AVIF half of one V4 record.
+///
+/// Everything here is what the trusted parent itself verified: the closed V1 envelope, its own
+/// source and plane digests, its own aggregate framing, and the worker's orientation **claim**.
+/// None of it proves image correctness, display semantics or publication authority.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AvifEvidenceV4 {
+    checked: MediaWorkerCheckedEnvelopeV1,
+    orientation: MediaWorkerOrientationV1,
+    planes: Vec<AvifPlaneEvidenceV4>,
+    wall_ms: u64,
+}
+
+impl AvifEvidenceV4 {
+    /// The closed, parent-checked V1 envelope.
+    #[must_use]
+    pub const fn checked(&self) -> &MediaWorkerCheckedEnvelopeV1 {
+        &self.checked
+    }
+
+    /// The orientation the worker claimed; `Identity` is only reachable for the one accepted
+    /// four-plane YUVA class.
+    #[must_use]
+    pub const fn orientation(&self) -> MediaWorkerOrientationV1 {
+        self.orientation
+    }
+
+    /// Every transported plane, in order.
+    #[must_use]
+    pub fn planes(&self) -> &[AvifPlaneEvidenceV4] {
+        &self.planes
+    }
+
+    /// The observed wall time of the confined child.
+    #[must_use]
+    pub const fn wall_ms(&self) -> u64 {
+        self.wall_ms
+    }
+
+    /// Whether this evidence authorizes publication. Always `false`.
+    #[must_use]
+    pub const fn grants_publication_authority(&self) -> bool {
+        false
+    }
+}
+
+/// The typed payload of one V4 record: retained V3 evidence or a parent-checked AVIF envelope.
+///
+/// The union is deliberately closed and asymmetric: a GIF timeline, a canonical SVG text document,
+/// a decoded still plane and a four-plane YUVA envelope are different facts and are never flattened
+/// into one invented RGBA shape.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GraphicImagePayloadV4 {
+    /// The unchanged V3 still, GIF or vector evidence.
+    Legacy(GraphicImagePayloadV3),
+    /// A parent-checked AVIF envelope with its transported planes.
+    Avif(AvifEvidenceV4),
+}
+
+/// Every way one V4 obligation can be refused. Each refuses the **whole** candidate.
+///
+/// The legacy arm preserves the accepted V3 category verbatim, so a caller can still tell
+/// `unsupported-format-v3` from `favicon-not-png-v3`; the media arm preserves the accepted V1
+/// parent category, so a transport refusal is never flattened into a decode failure.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GraphicImageInspectRefusalKindV4 {
+    /// The unchanged V3 category, including its historic AVIF refusal for the V3 API itself.
+    Legacy(GraphicImageInspectRefusalKindV3),
+    /// The accepted V1 trusted-parent category for the confined AVIF worker.
+    Media(MediaWorkerRefusalKindV1),
+}
+
+impl GraphicImageInspectRefusalKindV4 {
+    /// The stable machine-readable token of this refusal.
+    #[must_use]
+    pub const fn token(self) -> &'static str {
+        match self {
+            Self::Legacy(kind) => kind.token(),
+            Self::Media(kind) => kind.code(),
+        }
+    }
+
+    /// Whether this refusal came from the V3 five-format path.
+    #[must_use]
+    pub const fn is_legacy(self) -> bool {
+        matches!(self, Self::Legacy(_))
+    }
+
+    /// Whether this refusal came from the confined AVIF V1 path.
+    #[must_use]
+    pub const fn is_media(self) -> bool {
+        matches!(self, Self::Media(_))
+    }
+}
+
+/// One typed V4 refusal with the exact obligation that caused it.
+///
+/// The obligation is retained for **diagnosis inside the process**; its rendering is deliberately
+/// not part of any diagnostic string. [`Self::token`] is the only public diagnostic, and it carries
+/// no path, reference, buffer, worker identifier or declaration text.
+#[derive(Clone, PartialEq, Eq)]
+pub struct GraphicImageInspectRefusalV4 {
+    kind: GraphicImageInspectRefusalKindV4,
+    obligation: GraphicAssetObligationV1,
+}
+
+impl GraphicImageInspectRefusalV4 {
+    /// The closed refusal kind.
+    #[must_use]
+    pub const fn kind(&self) -> GraphicImageInspectRefusalKindV4 {
+        self.kind
+    }
+
+    /// The stable token of the kind; the only public diagnostic text.
+    #[must_use]
+    pub const fn token(&self) -> &'static str {
+        self.kind.token()
+    }
+
+    /// The authored obligation this refusal answers, for internal attribution.
+    #[must_use]
+    pub const fn obligation(&self) -> &GraphicAssetObligationV1 {
+        &self.obligation
+    }
+
+    /// The qualified owner of the refusing obligation.
+    #[must_use]
+    pub const fn owner(&self) -> &solo_domain::QualifiedOwnerV1 {
+        self.obligation.declaring_owner()
+    }
+}
+
+impl std::fmt::Debug for GraphicImageInspectRefusalV4 {
+    /// Renders only the closed category token: no path, reference, owner text or worker value.
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("GraphicImageInspectRefusalV4")
+            .field("token", &self.kind.token())
+            .finish()
+    }
+}
+
+/// Builds one attributable V4 refusal for the obligation that caused it.
+fn refuse_v4(
+    kind: GraphicImageInspectRefusalKindV4,
+    obligation: &GraphicAssetObligationV1,
+) -> GraphicImageInspectionOutcomeV4 {
+    GraphicImageInspectionOutcomeV4::Refused(GraphicImageInspectRefusalV4 {
+        kind,
+        obligation: obligation.clone(),
+    })
+}
+
+/// One inspected image of a V4 candidate. Still inert: it authorizes nothing.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GraphicImageInspectionV4 {
+    obligation: GraphicAssetObligationV1,
+    logical_path: String,
+    format: GraphicImageFormatV3,
+    mime: &'static str,
+    source_digest: MediaWorkerDigestV1,
+    width: u32,
+    height: u32,
+    pixels: u64,
+    payload: GraphicImagePayloadV4,
+    worker_pid: u32,
+    wall_ms: u64,
+}
+
+impl GraphicImageInspectionV4 {
+    /// The authored obligation this result answers, unchanged.
+    #[must_use]
+    pub const fn obligation(&self) -> &GraphicAssetObligationV1 {
+        &self.obligation
+    }
+
+    /// The confined logical path the source bytes came from.
+    #[must_use]
+    pub fn logical_path(&self) -> &str {
+        &self.logical_path
+    }
+
+    /// The confirmed format, from the closed authored extension grammar.
+    #[must_use]
+    pub const fn format(&self) -> GraphicImageFormatV3 {
+        self.format
+    }
+
+    /// The canonical MIME of that format.
+    #[must_use]
+    pub const fn mime(&self) -> &'static str {
+        self.mime
+    }
+
+    /// The parent's own digest of the acquired source bytes.
+    #[must_use]
+    pub const fn source_digest(&self) -> &MediaWorkerDigestV1 {
+        &self.source_digest
+    }
+
+    /// The confirmed intrinsic or displayed width.
+    #[must_use]
+    pub const fn width(&self) -> u32 {
+        self.width
+    }
+
+    /// The confirmed intrinsic or displayed height.
+    #[must_use]
+    pub const fn height(&self) -> u32 {
+        self.height
+    }
+
+    /// `width × height` under checked arithmetic.
+    #[must_use]
+    pub const fn pixels(&self) -> u64 {
+        self.pixels
+    }
+
+    /// The typed payload: retained V3 evidence or a parent-checked AVIF envelope.
+    #[must_use]
+    pub const fn payload(&self) -> &GraphicImagePayloadV4 {
+        &self.payload
+    }
+
+    /// The parent-checked AVIF evidence, when this record is the AVIF arm.
+    #[must_use]
+    pub const fn avif(&self) -> Option<&AvifEvidenceV4> {
+        match &self.payload {
+            GraphicImagePayloadV4::Avif(evidence) => Some(evidence),
+            GraphicImagePayloadV4::Legacy(_) => None,
+        }
+    }
+
+    /// The orientation **claim** this record carries, if it carries one at all.
+    ///
+    /// Only the confined AVIF arm can make such a claim; the retained V3 still/GIF/SVG evidence has
+    /// no orientation field, which is why this is `None` rather than an invented value.
+    #[must_use]
+    pub const fn orientation_claim(&self) -> Option<MediaWorkerOrientationV1> {
+        match &self.payload {
+            GraphicImagePayloadV4::Avif(evidence) => Some(evidence.orientation),
+            GraphicImagePayloadV4::Legacy(_) => None,
+        }
+    }
+
+    /// The real child process that produced this record.
+    #[must_use]
+    pub const fn worker_pid(&self) -> u32 {
+        self.worker_pid
+    }
+
+    /// The observed wall time of that child.
+    #[must_use]
+    pub const fn wall_ms(&self) -> u64 {
+        self.wall_ms
+    }
+
+    /// Whether this record authorizes publication. Always `false`.
+    #[must_use]
+    pub const fn grants_publication_authority(&self) -> bool {
+        false
+    }
+}
+
+/// The complete inspected set of one whole V4 candidate. Complete or absent.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct GraphicImageInspectionSetV4 {
+    inspections: Vec<GraphicImageInspectionV4>,
+}
+
+impl GraphicImageInspectionSetV4 {
+    /// Every inspection, in the original inventory order.
+    #[must_use]
+    pub fn inspections(&self) -> &[GraphicImageInspectionV4] {
+        &self.inspections
+    }
+
+    /// How many independently declared obligations were inspected.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.inspections.len()
+    }
+
+    /// Whether the candidate declared no graphic obligation at all.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.inspections.is_empty()
+    }
+
+    /// Whether this set authorizes publication. Always `false`.
+    #[must_use]
+    pub const fn grants_publication_authority(&self) -> bool {
+        GRAPHIC_IMAGE_INSPECTION_V4_GRANTS_PUBLICATION_AUTHORITY
+    }
+
+    /// Whether this set is a global publishable snapshot. Always `false`.
+    #[must_use]
+    pub const fn proves_whole_publication(&self) -> bool {
+        GRAPHIC_IMAGE_INSPECTION_V4_PROVES_WHOLE_PUBLICATION
+    }
+}
+
+/// The closed result of one whole-candidate V4 inspection.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GraphicImageInspectionOutcomeV4 {
+    /// Every declared obligation was inspected.
+    Complete(GraphicImageInspectionSetV4),
+    /// Exactly one typed refusal; no partial set exists or can be recovered.
+    Refused(GraphicImageInspectRefusalV4),
+}
+
+/// The checked facts of one retained V3 record, as V4 needs them.
+struct LegacyCheckedV4 {
+    width: u32,
+    height: u32,
+    pixels: u64,
+    payload: GraphicImagePayloadV3,
+    worker_pid: u32,
+    wall_ms: u64,
+}
+
+/// Runs exactly one accepted V3 attempt for a non-AVIF declaration and validates its observation.
+///
+/// The sequence mirrors the accepted V3 loop check for check and validation for validation; it is
+/// used only by V4, so the V3 entrypoint keeps its own body untouched.
+fn inspect_legacy_v4(
+    format: GraphicImageFormatV3,
+    bytes: &[u8],
+    port: &impl GraphicImageInspectPortV3,
+) -> Result<(GraphicImageInspectRequestV3, LegacyCheckedV4), GraphicImageInspectRefusalKindV3> {
+    use GraphicImageInspectRefusalKindV3 as Kind;
+    let request = GraphicImageInspectRequestV3::of(bytes.to_vec(), format);
+    let observation = match port.inspect_v3(&request) {
+        GraphicImageInspectPortOutcomeV3::Inspected(observation) => *observation,
+        GraphicImageInspectPortOutcomeV3::Refused(kind) => return Err(kind),
+    };
+    let checked = match observation {
+        GraphicImageObservationV3::Still(observation) => {
+            if format.is_gif() || format.is_svg() {
+                return Err(Kind::FormatMismatch);
+            }
+            let (width, height, pixels, still) = validate_still_v3(&observation, &request)?;
+            LegacyCheckedV4 {
+                width,
+                height,
+                pixels,
+                payload: GraphicImagePayloadV3::Still(still),
+                worker_pid: observation.worker_pid,
+                wall_ms: observation.wall_ms,
+            }
+        }
+        GraphicImageObservationV3::Animation(evidence) => {
+            if !format.is_gif() {
+                return Err(Kind::FormatMismatch);
+            }
+            let (width, height, pixels) = validate_animation_v3(&evidence, &request)?;
+            LegacyCheckedV4 {
+                width,
+                height,
+                pixels,
+                worker_pid: evidence.worker_pid,
+                wall_ms: evidence.wall_ms,
+                payload: GraphicImagePayloadV3::Animation(evidence),
+            }
+        }
+        GraphicImageObservationV3::Vector(evidence) => {
+            if !format.is_svg() {
+                return Err(Kind::FormatMismatch);
+            }
+            let (width, height, pixels) = validate_vector_v3(&evidence, &request)?;
+            LegacyCheckedV4 {
+                width,
+                height,
+                pixels,
+                worker_pid: evidence.worker_pid,
+                wall_ms: evidence.wall_ms,
+                payload: GraphicImagePayloadV3::Vector(evidence),
+            }
+        }
+    };
+    Ok((request, checked))
+}
+
+/// The checked facts of the one confined-AVIF attempt V4 makes for an AVIF declaration.
+struct AvifCheckedV4 {
+    checked: MediaWorkerCheckedEnvelopeV1,
+    orientation: MediaWorkerOrientationV1,
+    planes: Vec<AvifPlaneEvidenceV4>,
+    pixels: u64,
+}
+
+/// Runs exactly one confined AVIF child over the acquired bytes and the accepted parent check.
+///
+/// The request, the single child launch and the trusted-parent validation are the accepted R10
+/// sequence; V4 only wraps its outcome in the closed V4 category.
+fn inspect_avif_v4(
+    obligation: &GraphicAssetObligationV1,
+    bytes: &[u8],
+    avif: &impl MediaWorkerPortV1,
+) -> Result<AvifCheckedV4, GraphicImageInspectRefusalKindV4> {
+    use GraphicImageInspectRefusalKindV3 as LegacyKind;
+    use GraphicImageInspectRefusalKindV4 as Kind;
+    let request = match MediaWorkerRequestV1::for_source(bytes) {
+        Ok(request) => request,
+        Err(MediaWorkerRefusalKindV1::SourceEmpty) => {
+            return Err(Kind::Legacy(LegacyKind::EmptySource));
+        }
+        Err(MediaWorkerRefusalKindV1::SourceOversize) => {
+            return Err(Kind::Legacy(LegacyKind::OversizeSource));
+        }
+        Err(kind) => return Err(Kind::Media(kind)),
+    };
+    let observation = match avif.inspect_avif(&request) {
+        MediaWorkerRunV1::Observed(observation) => observation,
+        MediaWorkerRunV1::Refused(kind) => return Err(Kind::Media(kind)),
+    };
+    let checked = check_observation_v1(obligation, &request, &observation).map_err(Kind::Media)?;
+    let envelope = observation.envelope();
+    let planes = envelope
+        .planes()
+        .iter()
+        .map(|claim| AvifPlaneEvidenceV4 {
+            ordinal: claim.ordinal(),
+            stride: claim.stride(),
+            rows: claim.rows(),
+            length: claim.length(),
+            sha256: claim.sha256(),
+        })
+        .collect::<Vec<AvifPlaneEvidenceV4>>();
+    let pixels = u64::from(checked.width()).saturating_mul(u64::from(checked.height()));
+    Ok(AvifCheckedV4 {
+        checked,
+        orientation: envelope.orientation(),
+        planes,
+        pixels,
+    })
+}
+
+/// Inspects one whole candidate across all six declared formats, once, in one order.
+///
+/// Each obligation is dispatched on its authored extension alone: PNG/JPEG/WebP/GIF/SVG through the
+/// unchanged V3 port, AVIF through the confined V1 port plus the existing trusted-parent check. The
+/// first failure returns one attributed refusal and **no** earlier record survives.
+#[must_use]
+pub fn inspect_graphic_image_source_set_v4(
+    source_set: &GraphicAssetSourceSetV1,
+    legacy: &impl GraphicImageInspectPortV3,
+    avif: &impl MediaWorkerPortV1,
+) -> GraphicImageInspectionOutcomeV4 {
+    use GraphicImageInspectRefusalKindV3 as LegacyKind;
+    use GraphicImageInspectRefusalKindV4 as Kind;
+
+    let evidence = source_set.evidence();
+    let mut inspections: Vec<GraphicImageInspectionV4> = Vec::with_capacity(evidence.len());
+
+    for item in evidence {
+        let obligation = item.obligation();
+        let Some(format) = GraphicImageFormatV3::declared_by(obligation.reference()) else {
+            return refuse_v4(Kind::Legacy(LegacyKind::UnsupportedFormat), obligation);
+        };
+        if !role_admits_format_v3(obligation.role(), format) {
+            return refuse_v4(Kind::Legacy(LegacyKind::FaviconNotPng), obligation);
+        }
+
+        let bytes = item.bytes();
+        let length = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
+        if bytes.is_empty() {
+            return refuse_v4(Kind::Legacy(LegacyKind::EmptySource), obligation);
+        }
+        if length > MAX_IMAGE_SOURCE_BYTES_V1 {
+            return refuse_v4(Kind::Legacy(LegacyKind::OversizeSource), obligation);
+        }
+
+        if format.is_avif() {
+            let checked = match inspect_avif_v4(obligation, bytes, avif) {
+                Ok(checked) => checked,
+                Err(kind) => return refuse_v4(kind, obligation),
+            };
+            inspections.push(GraphicImageInspectionV4 {
+                obligation: obligation.clone(),
+                logical_path: item.logical_path().to_owned(),
+                format,
+                mime: format.canonical_mime(),
+                source_digest: checked.checked.source_sha256(),
+                width: checked.checked.width(),
+                height: checked.checked.height(),
+                pixels: checked.pixels,
+                payload: GraphicImagePayloadV4::Avif(AvifEvidenceV4 {
+                    checked: checked.checked,
+                    orientation: checked.orientation,
+                    planes: checked.planes,
+                    wall_ms: 0,
+                }),
+                // The closed V1 envelope carries no process identifier: the adapter reports the
+                // PIDs it actually observed, and none is invented here.
+                worker_pid: 0,
+                wall_ms: 0,
+            });
+            continue;
+        }
+
+        let (request, checked) = match inspect_legacy_v4(format, bytes, legacy) {
+            Ok(checked) => checked,
+            Err(kind) => return refuse_v4(Kind::Legacy(kind), obligation),
+        };
+        inspections.push(GraphicImageInspectionV4 {
+            obligation: obligation.clone(),
+            logical_path: item.logical_path().to_owned(),
+            format,
+            mime: format.canonical_mime(),
+            source_digest: *request.source_digest(),
+            width: checked.width,
+            height: checked.height,
+            pixels: checked.pixels,
+            payload: GraphicImagePayloadV4::Legacy(checked.payload),
+            worker_pid: checked.worker_pid,
+            wall_ms: checked.wall_ms,
+        });
+    }
+
+    GraphicImageInspectionOutcomeV4::Complete(GraphicImageInspectionSetV4 { inspections })
 }
