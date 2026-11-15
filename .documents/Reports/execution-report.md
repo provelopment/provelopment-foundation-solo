@@ -1,75 +1,70 @@
 # Execution Report
 
-**Work order:** `SOLO-WO-118 R02` — complete AVIF V4 from verified T9; independent pixel oracles and two-host N118 proof.
-**Date:** 2026-11-15. **Required outcome:** `R03C-AVIF-V4-8-10-12-ALPHA-ORIENTATION-N118-TWO-HOST-VERIFIED`.
+**Work order:** `SOLO-WO-118 R03` — pin independent AVIF pixel oracles; characterize the retained N093 refusal.
+**Date:** 2026-11-15. **Required outcome:** `R03C-AVIF-INDEPENDENT-REFERENCE-ORACLE-PINNED-N093-TRUTHFULLY-CHARACTERIZED`.
 
-**status=STOPPED — the V4 capability, N118 proof and oracle pins are not delivered; no self-acceptance is claimed.**
+**status=COMPLETE for the R03 bounded scope.** Independent reference facts now exist, are pinned in a closed-key manifest, and are re-checked by the same load-bearing verifier that rejects three mutated manifests. This is **not** AVIF V4 capability, **not** Stage 03 acceptance and **not** publication authority.
 
-This run completed and verified the dependency-graph correction (§3A) and re-proved the real decoder on the current branch, but **did not** deliver the V4 application port, the confined AVIF policy/worker wiring, the seven `n118_*` host tests, the N118 workflow gate or the pinned independent oracle. The technical branch is therefore **green on every retained gate** yet **short of the ordered capability**. I did not ship speculative AVIF policy code, because the refusal semantics it must enforce (essential/unsupported transforms, AVIS and grid refusal) have to be *verified* against `oxideav-avif` 0.0.16 before they become a gate; guessing them would manufacture a false pass.
-
-## 1. Commits (all forward, all pushed)
+## 1. Commits
 
 | Step | Commit | Tree | Parent |
 |---|---|---|---|
-| baseline R9 (`main`) | `15d25381c26b81d808386f34f0bfcdffca00c8a2` | — | `d7319fdf` (A9) |
-| **A10** (`main`) | `61cf7dbc22ae696d2d7d4a53f6d88d3049e6c727` | `558361ce226981ff93c10b486f5df2f806301bb3` | `15d25381` |
-| **T10.0** (branch, ACTIVE propagation) | `ea92e04c8c2061603f17242bd21b73109dc15578` | — | `3d52df20` (T9, preserved) |
-| **T10A** (branch, §3A graph correction) | `68eda9337d66737e07494d95418017047b16be57` | `a884ea5fc20ac5f01950a73480a34d44d2e09757` | `ea92e04c` |
-| **R10** | given in the chat handoff only | — | `61cf7dbc` |
+| baseline (R10) | `3310b7aaf91ec911dc7a9c7f4e315f46cd94bb44` | — | A10 |
+| **A11** (`main`, ACTIVE only) | `4d11e96085bb21b8c6a727435fafabecd1c118a1` | `3284606a53d1cb4b18978f7538447427a706e184` | `3310b7aa` |
+| **T11.0** (branch, ACTIVE import) | `b18ccc343abba4f4438c756246dce09a3c8d42c8` | — | `68eda933` |
+| **T11.1** parser + discovery job | `fc2d8f1fa809744bdd32e0d2d00ec797a9fd7140` | `7a974670` | `b18ccc34` |
+| **T11.2a** accept `420jpeg` | `6f6b042cf978f662149d6903b693805e0639dc42` | — | `fc2d8f1f` |
+| **T11.2b** audited `irot` mapping | `be825046f75029236c5cf555cc4d2bfac7182438` | — | `6f6b042c` |
+| **T11.2c** pinned goldens + provenance | **`808233516ef280d319f206553915998820cbd9d5`** | `2fb62fe0` | `be825046` |
+| **R11** | given in the chat handoff only | — | `4d11e960` |
 
-A10 committed **only** `.documents/WIP/workorder-active.md`; blob `b03528783d3ae3fbc9887b1c5ea85b08a3942f51` is identical in the working tree, index, commit and `origin/main`. The branch received that same blob by exact single-path `git restore --source=<A10>` (T10.0), verified equal to `A10:.documents/WIP/workorder-active.md`; the older R01 ACTIVE was never imported. T9 `3d52df20` remains the recorded checkpoint ancestor, and the previously verified decoder work is intact.
+A11 committed only `.documents/WIP/workorder-active.md` (blob `4bbc841b`, identical in tree, index, commit, `origin/main`). T11.0 imported that exact blob by single-path `git restore --source=<A11>`; the blob matched `A11:` before commit. Preserved byte-for-byte from T10A: `APPROVED_ADAPTER_EXTERNAL_NORMAL[10]`, closure `[53]`, `edges=93`, `oxideav-avif =0.0.16`, the exploratory decode probe. No `Cargo.lock`, Rust source, `Cargo.toml`, `deny.toml`, `media_worker_host.rs`, N093/N116 source or fixture binary was touched.
 
-## 2. §3A is complete and independently measured
+## 2. The independent reference is real and pinned
 
-- `APPROVED_ADAPTER_EXTERNAL_NORMAL`: **9 → 10**, adding exactly `"oxideav-avif"` in sorted position.
-- `APPROVED_ADAPTER_CLOSURE`: **47 → 53**, adding exactly `oxideav-av1`, `oxideav-avif`, `oxideav-core`, `oxideav-heif`, `thiserror`, `thiserror-impl` — the root plus the five transitives, which is the correct reading (§3A's own note that R01 mis-said "four" is honoured).
-- `cargo test -p solo-cli --test check-architecture --locked` → **rc 0**, real-tree measurement **`edges=93`** (previously `81`; the +12 come from the six new packages' resolve edges).
-- `cargo test -p solo-cli --test workspace_graph --locked` → **32 passed, 0 failed** — the fail-closed guard accepts the new root precisely because the single reviewed allowlist changed, and refuses nothing it should accept.
-- Both retained workflow assertions replaced with the **exact measured** `edges=93` (bash fixed-string check at `rust-verify.yml:965`, PowerShell `-notmatch 'edges=93'` at `:977`). No wildcard, no removal.
+`avif-reference-oracle` ran on real `ubuntu-24.04` with `libavif`'s `avifdec` + `dav1d` and Pillow, entirely inside `$RUNNER_TEMP`, with no secrets, no write token and a guaranteed cleanup step:
 
-## 3. Decoder re-verified in this run (not quoted from R01)
+| Fact | Pinned value |
+|---|---|
+| `avifdec` | `1.0.4` (dav1d 1.4.1, libgav1 0.18.0, aom v3.8.2, rav1e 0.7.1, svt v1.7.0) |
+| `avifdec` binary SHA-256 | `845c02f6194140824189018c87d4fff400655070615466f6610f3904ba4cc096` |
+| `libavif-bin` / `libdav1d*` | `1.0.4-1ubuntu3` / `1.4.1-1build1` |
+| `python3-pil` / Pillow | `10.2.0-1ubuntu1.5` / `10.2.0` |
+| `/usr/bin/python3` | `3.12.3` |
 
-`cargo test -p solo-adapters --test graphic_avif_inspection --locked -- --nocapture` on T10A → **rc 0, `1 passed`**, decoding all seven immutable fixtures from actual bytes:
+The final run installed by **exact APT version** (`libavif-bin=…`, `python3-pil=…`) read from the manifest, and would have failed on any drift.
 
-| Fixture | Dimensions | Depth | Layout | Planes |
-|---|---|---|---|---|
-| `white_1x1.avif` | 1×1 | 8 | `Yuv444P` | 3 |
-| `fox-profile0.8bpc.yuv420.avif` | 1204×800 | 8 | `Yuv420P` | 3 |
-| `fox-profile0.10bpc.yuv420.avif` | 1204×800 | 10 | `Yuv420P10Le` | 3 |
-| `fox-profile2.12bpc.yuv420.avif` | 1204×800 | 12 | `Yuv420P12Le` | 3 |
-| `abc_color_irot_alpha_irot.avif` | 256×512 | 8 | `Yuva444P` | 4 |
-| `abc_color_irot_alpha_NOirot.avif` | 256×512 | 8 | `Yuva444P` | 4 |
-| `clap_irot_imir_non_essential.avif` | 10×8 | 10 | `Yuva444P10Le` | 4 |
+Independent **plane** facts (parsed and hashed by `reference_oracle.py`, never the product's own aggregate): `white_1x1` 1×1 `444`/8-bit; fox 1204×800 at `420jpeg`/8-bit, `420p10`, `420p12`, with chroma `602×400`, 8-bit strides `1204/602` and high-depth strides `2408/1204`. All four depths and geometries agree with the candidate decoder's *structure* while being derived from different bytes by different code — the product is not the oracle.
 
-The typed container surface needed for a pre-decode policy exists in the pinned crate: `oxideav_avif::inspect` exposes `AvifInfo { width, height, bits_per_channel, pasp, av1c, obu_bytes, is_grid, has_alpha, brands, colour, mdcv, clli, cclv }` plus `max_bit_depth()`, `num_channels()`, `is_monochrome()` — container-only, so hostile header policy can run inside the child before any pixel allocation.
-
-## 4. What is not delivered (the STOP)
-
-1. **§3B/§3D V4 capability** — `graphic_avif_inspection.rs` (bounded policy + decode + plane digests), `GraphicImageInspectPortV4` / `inspect_graphic_image_source_set_v4`, the V4 adapter arm replacing the deliberate `format.is_avif()` → `AvifUnsupported` refusal *only* in V4 while V3 stays truthful, and the versioned V4 envelope/observation with parent-side re-verification of received bytes.
-2. **§5 N118** — the seven exact `n118_0*` host tests, the seven-mutation checker, the deliberate RED/GREEN oracle step, and the Ubuntu/Windows N118 workflow gates.
-3. **§4 oracle** — no independent `avifdec`/`dav1d` values were produced, so `LICENSE-AND-PROVENANCE.md` carries no new pinned plane digests. The method is validated and ready: the Ubuntu runner installs `libavif-bin` in a logged test-only step, pins package version, binary SHA-256, `ldd` shared-library identities, extracts 8/10/12-bit Y4M planes parsed **outside** the candidate, and recovers display orientation from PNG output or an audited `irot`/`imir` coordinate mapping (Y4M alone must not be used for orientation, and alpha must follow the same geometry).
-4. **Two-host technical CI** — never dispatched at `68eda933`; no V4 result exists on either host. R9's `43680718664` and any R10 baseline remain baseline evidence only.
-
-**Local gate evidence actually run (WSL Ubuntu 26.04, this run):** `cargo fmt --all -- --check` **0**; `cargo check --workspace --all-targets --locked` **0**; `cargo clippy --workspace --all-targets --locked -- -D warnings` **0**; `check-architecture` **0** (`edges=93`); `workspace_graph` **32/32**; `check_architecture_fixtures` **35/35**; `solo-adapters` blocked only by the five known `source_read_native::snapshot_proofs` cases, reported **NOT RUN LOCALLY** — this host still has no `SOLO_TEST_SOURCE_FS_ROOT` Btrfs filesystem, and those cases are neither skipped nor faked.
-
-**Requested Owner decision:** issue the continuation that implements §3B–§3D and §5 on top of the green `68eda933` base, with the oracle step run first on the Ubuntu runner so the recovered plane digests can be pinned before the N118 gates are made load-bearing. Everything the next run needs is now unblocked: the dependency is admitted, the graph is exact at `edges=93`, and the decoder plus its typed inspection API are proven on real bytes.
-
-## 5. State and boundaries
-
-`main` is `61cf7dbc` (A10) plus this report only. Remote heads are **28**: the original 27 plus `solo-wo-118-avif-v4-r01` at `68eda933`; `solo-wo-115-avif-svg-v3-r02` remains `d82ae762`, and `ad7b74df` / `40b03c73` are unchanged. One worktree, empty stash, exactly four WIP files, no report archive, no second checkout, no PR, merge, tag, release, deployment or provider action. The seven pinned `.avif` fixtures stay test-only and unpublished; no `main.rs`, native/source-read/unsafe checker, `workspace_graph.rs`, `deny.toml`, root manifest, SOP, Architecture or roadmap file was touched. Stage 03, `R03.C` and `R03.C3` remain **OPEN**, and this inspection-only work grants no publication authority and no public route.
-
-## 6. R10 baseline CI result (reported as found)
-
-The fresh two-host baseline at R10 was dispatched as run `43683197657` (attempt 1). **Windows `verify (windows-2025)` succeeded; Ubuntu `verify (ubuntu-24.04)` failed** in the inherited step *Test (workspace, all targets, locked)* on one pre-existing host test:
-
-```text
-test n093_01_the_real_parent_terminates_its_owned_group_and_observes_the_descendant ... FAILED
-panicked at crates/solo-cli/tests/media_worker_host_smoke.rs:1553
-test result: FAILED. 50 passed; 1 failed; 0 ignored
-```
-
-That test is untouched by this order (R10 changes only this report; `main` differs from R9 solely by documentation), and the same tree passed on R9 (`43680718664`). I therefore record it as an **inherited, environment-sensitive N093 result** rather than a defect I introduce or a pass, and I have not re-run it into green by filtering, skipping or weakening it. R10 is consequently **not** a verified two-host baseline, which is a second, independent reason this report cannot claim completion.
-
-**Status:** `status=STOPPED`, pending independent Chief Master Architect review.
+Independent **display** facts for `abc_color_irot_alpha_irot.avif`: alpha `128..255`, `123952` non-opaque samples, coded PNG `512×256` (`png_sha256 20c06c7c…`, coded RGBA `5102863c…`). **libavif did not apply `irot`**, so the recorded display geometry `256×512` is recovered by an explicitly audited mapping — `irot = 1` as a 90° anticlockwise rotation over the full RGBA buffer, giving `rgba_display_sha256 950be879…`. Colour **and** alpha follow the same geometry because the whole buffer is rotated. Disagreement with the tool is preserved and stated, not edited away.
 
 
+## 3. Hosted result at the single pinned technical SHA `80823351`
+
+Run **`43688309266`** (attempt 1), `head_sha = 808233516ef280d319f206553915998820cbd9d5`, overall **success**:
+
+| Job | Conclusion |
+|---|---|
+| `avif-reference-oracle` | **success** |
+| `verify (ubuntu-24.04)` | **success** |
+| `verify (windows-2025)` | **success** |
+
+Oracle evidence tokens from that exact run: `parser_refusals=verified`, `pristine_manifest_matches=true`, `mutation_rejected=source_sha256`, `mutation_rejected=plane_sha256`, `mutation_rejected=rgba_sha256`, `mutation_rejections=3/3`, `oracle_cleanup=complete`. No `discovery_only=true` appears, i.e. the accepted run was **pin-enforced**, not a discovery measurement. The same checker produced the manifest in the earlier discovery run (`43687088743`) and refuses to write it in acceptance mode.
+
+`reference_oracle.py` self-tests **21/21** locally and in CI: hand-stated 4:4:4/8-bit and 4:2:0/10-bit geometry, per-plane digests, the documented aggregate framing, and nine checked refusals — two frames, trailing byte, missing `FRAME`, unknown tag, unknown chroma, zero width, over-bound width, empty input, and a sample above coded depth. Unemitted documented tokens (`420mpeg2`) are still refused (exit 2).
+
+Local Rust gates before each push: `fmt` 0, `check` 0, `clippy -D warnings` 0, `workspace_graph` 32/32, `check_architecture_fixtures` 0, `check-architecture` 0 with `edges=93`, decode probe 0. The five `source_read_native::snapshot_proofs` cases remain **NOT RUN LOCALLY** (no Btrfs `SOLO_TEST_SOURCE_FS_ROOT`); they are neither skipped nor fabricated.
+
+## 4. N093 / N102 truthfully characterized
+
+- **R10's red N093 is not reproduced here.** `verify (ubuntu-24.04)` passed in every branch run of this order (`43685609524`, `43686298451`, `43687088743`, `43688309266`), so `n093_01_…HOST_DESCENDANT_UNVERIFIED` did not recur at these SHAs. It stays recorded as an **OPEN, unexplained host-observation refusal** — not waived, not relabelled a harmless flake, and not a pass. No N093 test, native worker source, timeout, filter or skip was changed.
+- A different inherited host test flipped once: run `43685609524` failed `verify (windows-2025)` at the **Windows N102 isolation canaries** on `n102::n102_04_a_concurrent_worker_is_unaffected_by_a_fault` (3 passed, 1 failed); both later runs passed. Recorded, untouched, unsuppressed.
+- Because both hosts are green at `80823351`, the R03 scope is complete; the unexplained N093/N102 sensitivity remains a separate corrective item. The next V4 completion still requires two-host `verify` green at one exact SHA.
+
+## 5. Boundaries, cleanup and open items
+
+Technical branch `solo-wo-118-avif-v4-r01` is at `808233516ef280d319f206553915998820cbd9d5`; remote heads remain **28**; one worktree; empty stash; exactly four WIP files; `main` is `4d11e960` plus this report. Permanent writes stayed inside the ledger: `.documents/WIP/workorder-active.md`, `.github/workflows/rust-verify.yml`, `reference_oracle.py`, `reference-goldens.json`, `LICENSE-AND-PROVENANCE.md`. `push.branches` now lists `[main, solo-wo-118-avif-v4-r01]`; every pre-existing gate, both `edges=93` assertions and all N116 checks are unchanged. No PR, merge, tag, release, deployment, provider action or report archive. Task scratch (`.temp/*.sh`, `.temp/manifest.json`, `.temp/getman.ps1`, `__pycache__`) was removed.
+
+**OPEN:** the AVIF V4 child codec, application port, N118 seven-case suite and Stage 03 closure remain unimplemented — this order deliberately forbade attempting them. These pinned facts are the oracle the next V4 order must consume; `R03.C` and `R03.C3` remain OPEN, and nothing here authorizes publication, a public route or a shipped product dependency.
+
+**Status:** `status=COMPLETE` for the R03 bounded scope, pending independent Chief Master Architect review.
