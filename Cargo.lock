@@ -202,9 +202,9 @@ dependencies = [
 
 [[package]]
 name = "oxideav-avif"
-version = "0.0.16"
+version = "0.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f36a98615006596baed023d26c16d58bf9327126c919b716ebfdf8122fee8c78"
+checksum = "fcaf60ff8283c30fc9e84e462fc9a9e016f5f4e4f1ab1817a15cebf2885b1cee"
 dependencies = [
  "oxideav-av1",
  "oxideav-core",

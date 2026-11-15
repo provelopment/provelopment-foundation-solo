@@ -48,13 +48,22 @@ gif = { version = "=0.14.2", default-features = false, features = ["std"] }
 quick-xml = "=0.42.0"
 svgtypes = "=0.16.1"
 
-# The single pinned pure-Rust AVIF decoder approved by `SOLO-WO-118 R01` section 3.1.
+# The single pinned pure-Rust AVIF decoder approved by `SOLO-WO-118 R01` section 3.1, upgraded to
+# the published upstream repair by `SOLO-WO-118 R09` section 1.
 #
 # Exact version only, minimum decode surface: the `registry` feature is what wires the
 # AV1 pixel decoder; no encoder, no hardware acceleration, no external plugin and no
 # native `*-sys` node is enabled. Decoding is still invoked only inside the already
 # confined child over owned in-memory bytes.
-oxideav-avif = { version = "=0.0.16", default-features = false, features = ["registry"] }
+#
+# 0.0.18 (2026-11-10, MIT, MSRV 1.95) fixes upstream's associated-alpha composition: an alpha
+# auxiliary carrying its own transformative properties is attached to the already-transformed
+# colour image instead of being resized onto the reconstructed image and transformed a second
+# time. With 0.0.16 the valid `abc_color_irot_alpha_irot.avif` produced 14,460 wrong alpha
+# samples; with 0.0.18 it reproduces the independent reference display RGBA exactly. This
+# changes only the decoder used for inspection evidence: the confined child still refuses every
+# `has_alpha=true` image until a separately authorized order.
+oxideav-avif = { version = "=0.0.18", default-features = false, features = ["registry"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 rustix = { version = "=1.1.6", default-features = false, features = ["fs", "std"] }

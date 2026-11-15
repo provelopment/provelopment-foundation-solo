@@ -347,6 +347,16 @@ fn n123_associated_alpha_irot_decoder_differential_is_measured() {
     let positive_rgba_sha = sha256_media_worker_bytes_v1(&positive_rgba).to_hex();
     let negative_rgba_sha = sha256_media_worker_bytes_v1(&negative_rgba).to_hex();
     let pinned_display = digest(ALPHA_PINNED_DISPLAY_SHA).to_hex();
+    let positive_alpha_min = *positive_rgba[3..]
+        .iter()
+        .step_by(4)
+        .min()
+        .expect("a 256x512 alpha plane has samples");
+    let positive_alpha_max = *positive_rgba[3..]
+        .iter()
+        .step_by(4)
+        .max()
+        .expect("a 256x512 alpha plane has samples");
 
     println!(
         "n123_evidence positive_planes={:?} negative_planes={:?}",
@@ -354,9 +364,10 @@ fn n123_associated_alpha_irot_decoder_differential_is_measured() {
         plane_hex(&negative)
     );
     println!(
-        "n123_evidence positive_rgba={positive_rgba_sha} \
-         positive_alpha_nonopaque={positive_nonopaque} negative_rgba={negative_rgba_sha} \
-         negative_alpha_nonopaque={negative_nonopaque} pinned_display={pinned_display}"
+        "n123_evidence positive_rgba={positive_rgba_sha} positive_alpha_min={positive_alpha_min} \
+         positive_alpha_max={positive_alpha_max} positive_alpha_nonopaque={positive_nonopaque} \
+         negative_rgba={negative_rgba_sha} negative_alpha_nonopaque={negative_nonopaque} \
+         pinned_display={pinned_display}"
     );
 
     println!(
@@ -373,24 +384,65 @@ fn n123_associated_alpha_irot_decoder_differential_is_measured() {
         }
     );
 
-    // Measured relationship to the immutable R03 positive pin. This is a *diagnosis* of the two
-    // decoder outputs, never an endorsement of the invalid fixture as a valid positive.
+    // Measured relationship to the immutable R03 positive pin. A matching raw decode of the
+    // invalid fixture never promotes its metadata association to a valid acceptance.
     let positive_matches_pin = positive_rgba_sha == pinned_display;
     let negative_matches_pin = negative_rgba_sha == pinned_display;
     println!(
-        "n123_evidence pin_relation positive_matches={positive_matches_pin} \
+        "n123_evidence positive_matches={positive_matches_pin} \
          negative_matches={negative_matches_pin} same_between_sources={}",
-        positive_rgba_sha == negative_rgba_sha
+        positive_rgba == negative_rgba
     );
 
-    // The independent R03 alpha statistics are a coded property of the fixture; the decoder
-    // reproduces them exactly on whichever source it treats as alpha-untransformed.
+    // The independent R03 reference is the authority: its pinned digest and alpha statistics are
+    // read from the immutable manifest and must equal the compile-time digest used above.
+    let pinned_spec = &manifest["fixtures"][ALPHA_POSITIVE];
+    assert_eq!(
+        pinned_spec["rgba_display_sha256"]
+            .as_str()
+            .expect("pinned display digest"),
+        ALPHA_PINNED_DISPLAY_SHA,
+        "the compile-time pin must be the immutable manifest digest"
+    );
+    let pinned_alpha_min = u8::try_from(pinned_spec["alpha_min"].as_u64().expect("pinned min"))
+        .expect("alpha min fits a byte");
+    let pinned_alpha_max = u8::try_from(pinned_spec["alpha_max"].as_u64().expect("pinned max"))
+        .expect("alpha max fits a byte");
+    let pinned_nonopaque = pinned_spec["alpha_non_opaque_samples"]
+        .as_u64()
+        .expect("pinned alpha count");
+
+    // The decoder's own colour conversion agrees with the independent tool, so a correct
+    // composite must reproduce the reference digest byte for byte on both sources.
+    assert_eq!(
+        positive_rgba_sha, pinned_display,
+        "the valid associated-alpha source must decode to the immutable reference display RGBA"
+    );
+    assert_eq!(
+        negative_rgba_sha, pinned_display,
+        "the alpha-untransformed source must decode to the same reference display RGBA"
+    );
+    assert_eq!(
+        positive_rgba, negative_rgba,
+        "a correctly associated alpha must not change any composite sample"
+    );
+    assert_eq!(
+        positive_alpha_min, pinned_alpha_min,
+        "decoded alpha minimum must equal the reference minimum"
+    );
+    assert_eq!(
+        positive_alpha_max, pinned_alpha_max,
+        "decoded alpha maximum must equal the reference maximum"
+    );
+    assert_eq!(
+        u64::try_from(positive_nonopaque).expect("count fits"),
+        pinned_nonopaque,
+        "the valid source's non-opaque alpha population must equal the reference count"
+    );
     assert_eq!(
         u64::try_from(negative_nonopaque).expect("count fits"),
-        manifest["fixtures"][ALPHA_POSITIVE]["alpha_non_opaque_samples"]
-            .as_u64()
-            .expect("pinned alpha count"),
-        "the alpha-untransformed decode must reproduce the pinned non-opaque sample count"
+        pinned_nonopaque,
+        "the untransformed decode must reproduce the same reference alpha population"
     );
 
     // Sample-level differential of the transferred alpha plane itself, so the transport-level
@@ -441,8 +493,16 @@ fn n123_associated_alpha_irot_decoder_differential_is_measured() {
         "only alpha may differ between the two sources; {rgb_differences} RGB samples differed"
     );
     assert_eq!(
-        alpha_differences, 14_460,
-        "the measured associated-alpha differential is 14,460 samples, not {alpha_differences}"
+        alpha_differences, 0,
+        "a repaired decoder must show zero differing alpha samples, not {alpha_differences}"
     );
-    println!("n123_decoder measured=true");
+    assert_eq!(
+        plane_alpha_differences, 0,
+        "the transferred alpha planes must be identical, not {plane_alpha_differences} samples apart"
+    );
+    assert!(
+        positive_matches_pin && negative_matches_pin,
+        "both sources must reproduce the immutable reference digest"
+    );
+    println!("n123_decoder repair_verified=true");
 }
