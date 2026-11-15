@@ -109,9 +109,15 @@ def rotate_back(rgba, width, height):
 
 
 def coded_to_rotated(index, width, height):
+    """Map a coded sample to its position in the 90 degree anticlockwise rotation.
+
+    The rotated image is ``height`` wide and ``width`` high, and coded ``(x, y)``
+    lands at ``(y, width - 1 - x)``. ``height`` is deliberately unused: the
+    transposed extent is ``width``.
+    """
     x = index % width
     y = index // width
-    return (y, height - 1 - x)
+    return (y, width - 1 - x)
 
 
 def rotate_back_check(rgba, width, height):
