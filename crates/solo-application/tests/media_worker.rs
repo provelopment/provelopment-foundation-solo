@@ -966,3 +966,308 @@ fn aggregate_digest_encoding_is_exactly_the_documented_v1_layout() {
         "ordinal:u32 LE || stride:u64 LE || rows:u64 LE || length:u64 LE || bytes"
     );
 }
+
+/// Four deterministic full-resolution alpha planes for a 32×32 displayed YUVA 4:4:4 claim.
+fn yuva_planes() -> Vec<Vec<u8>> {
+    vec![
+        vec![0x41u8; 32 * 32],
+        vec![0x42u8; 32 * 32],
+        vec![0x43u8; 32 * 32],
+        vec![0x80u8; 32 * 32],
+    ]
+}
+
+/// The plane claims that exactly describe [`yuva_planes`].
+fn yuva_claims(planes: &[Vec<u8>]) -> Vec<MediaWorkerPlaneClaimV1> {
+    planes
+        .iter()
+        .enumerate()
+        .map(|(index, bytes)| {
+            MediaWorkerPlaneClaimV1::new(
+                u32::try_from(index).expect("ordinal"),
+                32,
+                32,
+                1024,
+                sha256_media_worker_bytes_v1(bytes),
+            )
+        })
+        .collect()
+}
+
+/// The accepted four-plane baseline claim for the given source bytes.
+fn yuva_claim(source: &[u8], planes: &[Vec<u8>]) -> Claim {
+    let claims = yuva_claims(planes);
+    Claim {
+        protocol_version: MEDIA_WORKER_PROTOCOL_VERSION_V1,
+        status: MediaWorkerStatusV1::Decoded,
+        format: MediaWorkerFormatV1::Avif,
+        mime: MediaWorkerMimeV1::ImageAvif,
+        source_length: source.len() as u64,
+        source_sha256: sha256_media_worker_bytes_v1(source),
+        width: 32,
+        height: 32,
+        bit_depth: 8,
+        color_model: MediaWorkerColorModelV1::Yuva,
+        has_alpha: true,
+        is_grid: false,
+        is_sequence: false,
+        orientation: MediaWorkerOrientationV1::Identity,
+        output_sha256: media_worker_output_sha256_v1(&claims, planes),
+        planes: claims,
+    }
+}
+
+#[test]
+fn the_four_plane_yuva_transport_shape_is_checked_and_grants_nothing() {
+    let source = source_body(0x51);
+    let set = source_set(&[("media/alpha.avif", Exposure::Public, source.clone())]);
+    let planes = yuva_planes();
+    let claim = yuva_claim(&source, &planes);
+    let port = FakeWorkerPort::new(vec![MediaWorkerRunV1::Observed(observation(
+        &claim,
+        planes.clone(),
+    ))]);
+
+    let outcome = inspect_media_worker_source_set_v1(&set, &port);
+    let records = outcome.checked().expect("the four-plane claim is retained");
+    assert_eq!(records.len(), 1);
+    let record = &records[0];
+    assert_eq!(record.plane_count(), 4, "all four planes were transported");
+    assert_eq!(record.color_model(), MediaWorkerColorModelV1::Yuva);
+    assert_eq!(
+        (record.width(), record.height(), record.bit_depth()),
+        (32, 32, 8)
+    );
+    assert_eq!(
+        record.source_sha256(),
+        sha256_media_worker_bytes_v1(&source),
+        "the parent rehashed its own bytes"
+    );
+    assert_eq!(record.output_sha256(), claim.output_sha256);
+    assert!(
+        !record.grants_publication_authority() && !record.proves_media_correctness(),
+        "a transported four-plane observation still proves and grants nothing"
+    );
+}
+
+#[test]
+fn every_hostile_four_plane_claim_is_refused_by_category() {
+    let source = source_body(0x52);
+    let set = source_set(&[("media/alpha.avif", Exposure::Public, source.clone())]);
+    let planes = yuva_planes();
+    let base = yuva_claim(&source, &planes);
+
+    fn expect(
+        set: &GraphicAssetSourceSetV1,
+        label: &str,
+        claim: &Claim,
+        buffers: Vec<Vec<u8>>,
+        kind: MediaWorkerRefusalKindV1,
+    ) {
+        let port = FakeWorkerPort::new(vec![MediaWorkerRunV1::Observed(observation(
+            claim, buffers,
+        ))]);
+        let outcome = inspect_media_worker_source_set_v1(set, &port);
+        assert_eq!(
+            refusal_summary(&outcome),
+            (kind.code().to_owned(), Some(0)),
+            "{label}: expected {kind:?}"
+        );
+    }
+
+    // (A) Plane count and the alpha flag must agree with the claimed colour model.
+    let mut four_without_alpha = yuva_claim(&source, &planes);
+    four_without_alpha.has_alpha = false;
+    expect(
+        &set,
+        "four-planes-has-alpha-false",
+        &four_without_alpha,
+        planes.clone(),
+        MediaWorkerRefusalKindV1::WorkerPlaneInvalid,
+    );
+    let mut three_with_alpha = valid_claim(&source, &yuv_planes());
+    three_with_alpha.color_model = MediaWorkerColorModelV1::Yuva;
+    three_with_alpha.has_alpha = true;
+    expect(
+        &set,
+        "three-planes-yuva-claim",
+        &three_with_alpha,
+        yuv_planes(),
+        MediaWorkerRefusalKindV1::WorkerPlaneInvalid,
+    );
+
+    // (B) The fourth plane's digest and bytes are verified like any other plane's.
+    let mut false_alpha_digest = yuva_claim(&source, &planes);
+    false_alpha_digest.planes[3] =
+        MediaWorkerPlaneClaimV1::new(3, 32, 32, 1024, sha256_media_worker_bytes_v1(&[0u8; 1024]));
+    expect(
+        &set,
+        "false-alpha-digest",
+        &false_alpha_digest,
+        planes.clone(),
+        MediaWorkerRefusalKindV1::WorkerDigestMismatch,
+    );
+    let mut forged_buffers = planes.clone();
+    forged_buffers[3] = vec![0x7fu8; 1024];
+    expect(
+        &set,
+        "false-alpha-bytes",
+        &base,
+        forged_buffers,
+        MediaWorkerRefusalKindV1::WorkerDigestMismatch,
+    );
+
+    // (C) The layout is derived from the geometry: a sub-sampled fourth plane cannot pass.
+    let mut sub_sampled = yuva_claim(&source, &planes);
+    sub_sampled.planes[3] = MediaWorkerPlaneClaimV1::new(
+        3,
+        16,
+        16,
+        256,
+        sha256_media_worker_bytes_v1(&planes[3][..256]),
+    );
+    let mut sub_sampled_buffers = planes.clone();
+    sub_sampled_buffers[3] = planes[3][..256].to_vec();
+    sub_sampled.output_sha256 =
+        media_worker_output_sha256_v1(&sub_sampled.planes, &sub_sampled_buffers);
+    expect(
+        &set,
+        "sub-sampled-alpha-plane",
+        &sub_sampled,
+        sub_sampled_buffers,
+        MediaWorkerRefusalKindV1::WorkerPlaneInvalid,
+    );
+}
+
+#[test]
+fn the_alpha_class_admits_only_eight_bit_identity_and_exact_payloads() {
+    let source = source_body(0x53);
+    let set = source_set(&[("media/alpha.avif", Exposure::Public, source.clone())]);
+    let planes = yuva_planes();
+
+    fn expect(
+        set: &GraphicAssetSourceSetV1,
+        label: &str,
+        claim: &Claim,
+        buffers: Vec<Vec<u8>>,
+        kind: MediaWorkerRefusalKindV1,
+    ) {
+        let port = FakeWorkerPort::new(vec![MediaWorkerRunV1::Observed(observation(
+            claim, buffers,
+        ))]);
+        let outcome = inspect_media_worker_source_set_v1(set, &port);
+        assert_eq!(
+            refusal_summary(&outcome),
+            (kind.code().to_owned(), Some(0)),
+            "{label}: expected {kind:?}"
+        );
+    }
+
+    // (D) One depth and one orientation claim only: 10/12-bit and `transposed`/`unverified` are out.
+    let mut ten_bit = yuva_claim(&source, &planes);
+    ten_bit.bit_depth = 10;
+    ten_bit.planes = (0..4)
+        .map(|index| {
+            MediaWorkerPlaneClaimV1::new(
+                index,
+                64,
+                32,
+                2048,
+                sha256_media_worker_bytes_v1(&vec![0x55u8; 2048]),
+            )
+        })
+        .collect();
+    let ten_bit_buffers = vec![vec![0x55u8; 2048]; 4];
+    ten_bit.output_sha256 = media_worker_output_sha256_v1(&ten_bit.planes, &ten_bit_buffers);
+    expect(
+        &set,
+        "ten-bit-yuva",
+        &ten_bit,
+        ten_bit_buffers,
+        MediaWorkerRefusalKindV1::WorkerPlaneInvalid,
+    );
+    for (label, orientation) in [
+        (
+            "unverified-orientation",
+            MediaWorkerOrientationV1::Unverified,
+        ),
+        (
+            "transposed-orientation",
+            MediaWorkerOrientationV1::Transposed,
+        ),
+    ] {
+        let mut claim = yuva_claim(&source, &planes);
+        claim.orientation = orientation;
+        expect(
+            &set,
+            label,
+            &claim,
+            planes.clone(),
+            MediaWorkerRefusalKindV1::WorkerPlaneInvalid,
+        );
+    }
+
+    // (E) Source identity and the aggregate framing are the parent's own recomputations.
+    let base = yuva_claim(&source, &planes);
+    let mut bad_source = yuva_claim(&source, &planes);
+    bad_source.source_sha256 = sha256_media_worker_bytes_v1(b"a different source");
+    expect(
+        &set,
+        "bad-source-digest",
+        &bad_source,
+        planes.clone(),
+        MediaWorkerRefusalKindV1::WorkerSourceMismatch,
+    );
+    let mut bad_aggregate = yuva_claim(&source, &planes);
+    bad_aggregate.output_sha256 = sha256_media_worker_bytes_v1(b"a different aggregate");
+    expect(
+        &set,
+        "bad-aggregate",
+        &bad_aggregate,
+        planes.clone(),
+        MediaWorkerRefusalKindV1::WorkerDigestMismatch,
+    );
+
+    // (F) The payload must be exactly the claimed planes: short and trailing both refuse.
+    let mut short = yuva_planes();
+    short[3] = short[3][..1023].to_vec();
+    expect(
+        &set,
+        "short-fourth-plane",
+        &base,
+        short,
+        MediaWorkerRefusalKindV1::WorkerPlaneInvalid,
+    );
+    let mut trailing = yuva_planes();
+    trailing[3].push(0x00);
+    expect(
+        &set,
+        "trailing-byte",
+        &base,
+        trailing,
+        MediaWorkerRefusalKindV1::WorkerPlaneInvalid,
+    );
+
+    // (G) Host facts still precede every claim field.
+    let false_exit = MediaWorkerObservationV1::new(
+        true,
+        MediaWorkerExitV1::Abnormal,
+        true,
+        true,
+        false,
+        MediaWorkerLimitsV1::reference(),
+        base.build(),
+        planes.clone(),
+    );
+    let port = FakeWorkerPort::new(vec![MediaWorkerRunV1::Observed(false_exit)]);
+    assert_eq!(
+        refusal_summary(&inspect_media_worker_source_set_v1(&set, &port)),
+        (
+            MediaWorkerRefusalKindV1::WorkerExitAbnormal
+                .code()
+                .to_owned(),
+            Some(0)
+        ),
+        "false-exit"
+    );
+}

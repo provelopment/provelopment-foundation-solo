@@ -1481,6 +1481,33 @@ fn canonical_layout_matches_v1(
         .all(|(claim, (stride, rows))| claim.stride() == stride && claim.rows() == rows)
 }
 
+/// Whether every plane claim carries the canonical full-resolution layout of one 8-bit YUVA 4:4:4
+/// picture: `Y`, `U`, `V`, `A` in that order, each `width` bytes wide and `height` rows tall.
+///
+/// The parent derives this shape from the claimed geometry alone; a worker's own stride/rows are
+/// checked against the derivation rather than trusted, so a sub-sampled, padded, swapped or
+/// three-plane alpha claim can never be retained.
+fn canonical_yuva_layout_matches_v1(
+    planes: &[MediaWorkerPlaneClaimV1],
+    width: u32,
+    height: u32,
+) -> bool {
+    if planes.len() != 4 {
+        return false;
+    }
+    let stride = u64::from(width);
+    let rows = u64::from(height);
+    let Some(length) = stride.checked_mul(rows) else {
+        return false;
+    };
+    planes.iter().enumerate().all(|(index, claim)| {
+        claim.ordinal() == u32::try_from(index).unwrap_or(u32::MAX)
+            && claim.stride() == stride
+            && claim.rows() == rows
+            && claim.length() == length
+    })
+}
+
 fn check_observation_v1(
     obligation: &GraphicAssetObligationV1,
     request: &MediaWorkerRequestV1<'_>,
@@ -1570,28 +1597,41 @@ fn check_observation_v1(
         }
     }
 
-    // Only after the per-claim arithmetic and the total bound: the parent recognizes just the two
-    // admitted complete layouts from the measured geometry. Every claim must carry the canonical
-    // columns/rows/stride of 4:4:4 or of 4:2:0 at this depth, so a worker cannot substitute its own
-    // trusted stride/rows, a mixed layout or a 4:2:2/monochrome shape and still be retained.
+    // Only after the per-claim arithmetic and the total bound: the parent recognizes the admitted
+    // complete layouts from the measured geometry. Every claim must carry the canonical
+    // columns/rows/stride of 4:4:4, of 4:2:0 at this depth, or — for the one admitted alpha class —
+    // of a full-resolution four-plane 8-bit YUVA 4:4:4 picture. A worker cannot substitute its own
+    // trusted stride/rows, a mixed layout, a sub-sampled alpha or a 4:2:2/monochrome shape and
+    // still be retained.
     let bytes_per_sample = if envelope.bit_depth() == 8 { 1 } else { 2 };
-    let canonical_444 = canonical_layout_matches_v1(
-        envelope.planes(),
-        envelope.width(),
-        envelope.height(),
-        1,
-        1,
-        bytes_per_sample,
-    );
-    let canonical_420 = canonical_layout_matches_v1(
-        envelope.planes(),
-        envelope.width(),
-        envelope.height(),
-        2,
-        2,
-        bytes_per_sample,
-    );
-    if !canonical_444 && !canonical_420 {
+    let canonical = if envelope.color_model() == MediaWorkerColorModelV1::Yuva {
+        // One depth, one orientation claim and four full-resolution planes: nothing else is
+        // admitted, so a 10/12-bit or `transposed`/`unverified` alpha claim is refused here.
+        envelope.bit_depth() == 8
+            && envelope.orientation() == MediaWorkerOrientationV1::Identity
+            && canonical_yuva_layout_matches_v1(
+                envelope.planes(),
+                envelope.width(),
+                envelope.height(),
+            )
+    } else {
+        canonical_layout_matches_v1(
+            envelope.planes(),
+            envelope.width(),
+            envelope.height(),
+            1,
+            1,
+            bytes_per_sample,
+        ) || canonical_layout_matches_v1(
+            envelope.planes(),
+            envelope.width(),
+            envelope.height(),
+            2,
+            2,
+            bytes_per_sample,
+        )
+    };
+    if !canonical {
         return Err(MediaWorkerRefusalKindV1::WorkerPlaneInvalid);
     }
 

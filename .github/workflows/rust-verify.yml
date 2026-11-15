@@ -907,6 +907,11 @@ jobs:
             ! grep -qF 'test result: FAILED' "$log" || return 1
             grep -qF 'n121_evidence case=01' "$log" || return 1
             grep -qF 'n121_evidence case=02' "$log" || return 1
+            # The authorised R10 migration: the valid associated-alpha still is no longer an
+            # out-of-scope refusal, so the honest count is ten and that label must be absent.
+            grep -qF 'refused=10 labels=["source-empty-before-launch", "source-oversize-before-launch", "graphic-favicon-not-png", "bad-magic.avif", "truncated.avif", "alpha-noirot.avif", "clap-irot-imir.avif", "whole-set-discarded-by-representation", "platform-namespace-refused-at-acquisition", "unconfined-direct-invocation"]' "$log" || return 1
+            ! grep -qF 'refused=11' "$log" || return 1
+            ! grep -qF 'alpha-irot.avif' "$log" || return 1
             grep -qF 'orientation=unverified publication=false records=4' "$log" || return 1
             grep -qF 'counterfeits_refused=true' "$log" || return 1
             grep -qF 'whole_set_discarded=true' "$log" || return 1
@@ -937,9 +942,11 @@ jobs:
           $tokens = @(
             'n121_evidence case=01',
             'n121_evidence case=02',
+            'refused=10 labels=["source-empty-before-launch", "source-oversize-before-launch", "graphic-favicon-not-png", "bad-magic.avif", "truncated.avif", "alpha-noirot.avif", "clap-irot-imir.avif", "whole-set-discarded-by-representation", "platform-namespace-refused-at-acquisition", "unconfined-direct-invocation"]',
             'orientation=unverified publication=false records=4',
             'counterfeits_refused=true',
             'whole_set_discarded=true')
+          $forbidden = @('refused=11', 'alpha-irot.avif')
           function Test-N121Log {
             param([string]$Path)
             $text = Get-Content -LiteralPath $Path -Raw
@@ -951,6 +958,9 @@ jobs:
             if ($text.Contains('... FAILED') -or $text.Contains('... ignored') -or $text.Contains('test result: FAILED')) { return $false }
             foreach ($token in $tokens) {
               if (-not $text.Contains($token)) { return $false }
+            }
+            foreach ($token in $forbidden) {
+              if ($text.Contains($token)) { return $false }
             }
             return $true
           }
@@ -1067,6 +1077,100 @@ jobs:
           grep -q 'canonical sha-256 oracle' "$RUNNER_TEMP/n116-red.txt"
           cargo test -p solo-cli --test media_worker_host_smoke --locked n116_04 >"$RUNNER_TEMP/n116-green.txt" 2>&1 || { cat "$RUNNER_TEMP/n116-green.txt"; exit 1; }
           grep -q 'test result: ok\. 1 passed; 0 failed; 0 ignored' "$RUNNER_TEMP/n116-green.txt"
+      # Mandatory `SOLO-WO-118 R10` N122 gate: the one admitted associated-alpha class through the
+      # real confined child on this host. Every match is a fixed string because `--nocapture`
+      # interleaves a case's stdout onto its own `test <name> ...` line; the same verifier must
+      # reject altered copies of the real run before printing its verdict.
+      - name: Confined associated-alpha N122 gate (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          check_n122() {
+            local log="$1"
+            for name in n122_01_valid_alpha_irot_confined_display_rgba_oracle n122_02_mismatched_alpha_and_nonessential_transform_refused n122_03_five_level_avif_mix_and_late_private_failure; do
+              grep -qF "test n122::$name " "$log" || return 1
+            done
+            [ "$(grep -Ec '^test n122::n122_0[0-9]_[A-Za-z0-9_]*( |$)' "$log")" -eq 3 ] || return 1
+            grep -qF 'test result: ok. 3 passed; 0 failed; 0 ignored' "$log" || return 1
+            ! grep -qF '... FAILED' "$log" || return 1
+            ! grep -qF '... ignored' "$log" || return 1
+            ! grep -qF 'test result: FAILED' "$log" || return 1
+            [ "$(grep -cF 'n122_evidence case=01' "$log")" -eq 1 ] || return 1
+            [ "$(grep -cF 'n122_evidence case=02' "$log")" -eq 1 ] || return 1
+            [ "$(grep -cF 'n122_evidence case=03' "$log")" -eq 1 ] || return 1
+            grep -qF 'display_sha_pinned=950be879c536c208d4e2dc0cdb8aa698e73922b4a57e8070c4fea389c84cc744' "$log" || return 1
+            grep -qF 'alpha_nonopaque=123952' "$log" || return 1
+            grep -qF 'planes_match_pinned=true' "$log" || return 1
+            grep -qF 'counterfeits=15 counterfeits_refused=true' "$log" || return 1
+            grep -qF 'whole_set_discarded=true unconfined_decoded=false' "$log" || return 1
+            grep -qF 'partial_records=0 private_path_absent=true' "$log" || return 1
+            grep -qF 'publication=false proves_media=false' "$log" || return 1
+          }
+          log="$RUNNER_TEMP/n122-three.txt"
+          cargo test -p solo-cli --test media_worker_host_smoke --locked n122_ -- --nocapture --test-threads=1 >"$log" 2>&1 || { cat "$log"; exit 1; }
+          cat "$log"
+          check_n122 "$log" || { echo 'authentic N122 3/3 run rejected'; exit 1; }
+          echo 'n122_gate authentic=accepted'
+          probe="$RUNNER_TEMP/n122-probe.txt"
+          cp "$log" "$probe"
+          sed -i '/n122_03_five_level_avif_mix_and_late_private_failure/d' "$probe"
+          if check_n122 "$probe"; then echo 'missing N122 case accepted'; exit 1; fi
+          cp "$log" "$probe"
+          sed -i 's/display_sha_pinned=950be879c536c208d4e2dc0cdb8aa698e73922b4a57e8070c4fea389c84cc744/display_sha_pinned=0000000000000000000000000000000000000000000000000000000000000000/' "$probe"
+          sed -i 's/alpha_nonopaque=123952/alpha_nonopaque=123000/' "$probe"
+          if check_n122 "$probe"; then echo 'forged RGBA/alpha evidence accepted'; exit 1; fi
+          cp "$log" "$probe"
+          sed -i 's/3 passed; 0 failed; 0 ignored/2 passed; 1 failed; 0 ignored/' "$probe"
+          if check_n122 "$probe"; then echo 'partial or failed N122 run accepted'; exit 1; fi
+          echo 'n122_gate mutation=rejected'
+      - name: Confined associated-alpha N122 gate (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $required = @(
+            'n122_01_valid_alpha_irot_confined_display_rgba_oracle',
+            'n122_02_mismatched_alpha_and_nonessential_transform_refused',
+            'n122_03_five_level_avif_mix_and_late_private_failure')
+          $tokens = @(
+            'display_sha_pinned=950be879c536c208d4e2dc0cdb8aa698e73922b4a57e8070c4fea389c84cc744',
+            'alpha_nonopaque=123952',
+            'planes_match_pinned=true',
+            'counterfeits=15 counterfeits_refused=true',
+            'whole_set_discarded=true unconfined_decoded=false',
+            'partial_records=0 private_path_absent=true',
+            'publication=false proves_media=false')
+          function Test-N122Log {
+            param([string]$Path)
+            $text = Get-Content -LiteralPath $Path -Raw
+            foreach ($name in $required) {
+              if (-not $text.Contains('test n122::' + $name + ' ')) { return $false }
+            }
+            if (([regex]::Matches($text, '(?m)^test n122::n122_0[0-9]_[A-Za-z0-9_]*( |$)')).Count -ne 3) { return $false }
+            if (-not $text.Contains('test result: ok. 3 passed; 0 failed; 0 ignored')) { return $false }
+            if ($text.Contains('... FAILED') -or $text.Contains('... ignored') -or $text.Contains('test result: FAILED')) { return $false }
+            foreach ($marker in @('n122_evidence case=01', 'n122_evidence case=02', 'n122_evidence case=03')) {
+              if (([regex]::Matches($text, [regex]::Escape($marker))).Count -ne 1) { return $false }
+            }
+            foreach ($token in $tokens) {
+              if (-not $text.Contains($token)) { return $false }
+            }
+            return $true
+          }
+          $log = Join-Path $env:RUNNER_TEMP 'n122-three.txt'
+          cargo test -p solo-cli --test media_worker_host_smoke --locked n122_ -- --nocapture --test-threads=1 *>&1 | Tee-Object -FilePath $log
+          if ($LASTEXITCODE -ne 0) { throw 'the N122 suite did not exit zero' }
+          Get-Content -LiteralPath $log
+          if (-not (Test-N122Log -Path $log)) { throw 'authentic N122 3/3 run rejected' }
+          Write-Output 'n122_gate authentic=accepted'
+          $probe = Join-Path $env:RUNNER_TEMP 'n122-probe.txt'
+          (Get-Content -LiteralPath $log | Where-Object { -not $_.Contains('n122_03_five_level_avif_mix_and_late_private_failure') }) | Set-Content -LiteralPath $probe
+          if (Test-N122Log -Path $probe) { throw 'missing N122 case accepted' }
+          (Get-Content -LiteralPath $log) | ForEach-Object { $_.Replace('display_sha_pinned=950be879c536c208d4e2dc0cdb8aa698e73922b4a57e8070c4fea389c84cc744', 'display_sha_pinned=0000000000000000000000000000000000000000000000000000000000000000').Replace('alpha_nonopaque=123952', 'alpha_nonopaque=123000') } | Set-Content -LiteralPath $probe
+          if (Test-N122Log -Path $probe) { throw 'forged RGBA/alpha evidence accepted' }
+          (Get-Content -LiteralPath $log) | ForEach-Object { $_.Replace('3 passed; 0 failed; 0 ignored', '2 passed; 1 failed; 0 ignored') } | Set-Content -LiteralPath $probe
+          if (Test-N122Log -Path $probe) { throw 'partial or failed N122 run accepted' }
+          Write-Output 'n122_gate mutation=rejected'
       # Mandatory `SOLO-WO-105 R01` Windows canaries. These four cases drive the real production
       # `CreateProcessW` / attribute-list / Job Object / minimal-environment path, so a Windows job is
       # the only place such facts exist. The gate fails when a required case is absent, filtered,

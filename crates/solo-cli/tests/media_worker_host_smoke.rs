@@ -5437,14 +5437,13 @@ mod n121 {
         );
         refused.push("graphic-favicon-not-png");
 
-        // (C) Real child preflight refusals, each through the real confined worker.
-        let hostile: [(&str, Vec<u8>); 5] = [
+        // (C) Real child preflight refusals, each through the real confined worker. The valid
+        // associated-alpha still that this vector used to list is **no longer** an out-of-scope
+        // refusal: `SOLO-WO-118 R10` admits exactly that class, and its positive coverage moved to
+        // `n122_01`. The honest refusal count is therefore ten, not eleven.
+        let hostile: [(&str, Vec<u8>); 4] = [
             ("bad-magic.avif", b"this is not an avif still".to_vec()),
             ("truncated.avif", fox[..64].to_vec()),
-            (
-                "alpha-irot.avif",
-                fixture_bytes("abc_color_irot_alpha_irot.avif"),
-            ),
             (
                 "alpha-noirot.avif",
                 fixture_bytes("abc_color_irot_alpha_NOirot.avif"),
@@ -5846,6 +5845,971 @@ mod n121 {
              counterfeits_refused=true protocol={protocol_kinds:?} whole_set_discarded=true \
              unconfined_decoded=false",
             refused.len()
+        );
+    }
+}
+
+/// `SOLO-WO-118 R10`: the one admitted associated-alpha class through the real confined worker.
+///
+/// Everything here runs the genuine product path: real compiled `solo-cli`, real confined child,
+/// real source acquisition, real parent checks. Test-only direct decoding is used **only** as an
+/// independent pixel oracle, never as production output or worker emulation.
+mod n122 {
+    use std::cell::RefCell;
+    use std::path::PathBuf;
+
+    use serde_json::Value;
+    use solo_adapters::{
+        ConfinedAvifInspectAdapterV1, MediaWorkerProtocolRefusalKindV1, TestOwnerV1,
+        parse_media_worker_envelope_v1,
+    };
+    use solo_application::{
+        GraphicAssetReadSetOutcomeV1, GraphicAssetSourceSetV1, MediaWorkerBoundaryOutcomeV1,
+        MediaWorkerColorModelV1, MediaWorkerDigestV1, MediaWorkerEnvelopeV1, MediaWorkerExitV1,
+        MediaWorkerLimitsV1, MediaWorkerObservationV1, MediaWorkerOrientationV1,
+        MediaWorkerPlaneClaimV1, MediaWorkerPortV1, MediaWorkerRefusalKindV1, MediaWorkerRequestV1,
+        MediaWorkerRunV1, inspect_media_worker_source_set_v1, media_worker_output_sha256_v1,
+        read_graphic_asset_bytes_v1, sha256_media_worker_bytes_v1,
+    };
+
+    use super::n116::{Root, inventory_of, suppressed_inventory_of};
+    use super::{BIN, run};
+
+    /// The four accepted non-alpha stills, unchanged from `N121`.
+    const NON_ALPHA: [(&str, u32, u32, u8); 4] = [
+        ("white_1x1.avif", 1, 1, 8),
+        ("fox-profile0.8bpc.yuv420.avif", 1204, 800, 8),
+        ("fox-profile0.10bpc.yuv420.avif", 1204, 800, 10),
+        ("fox-profile2.12bpc.yuv420.avif", 1204, 800, 12),
+    ];
+
+    /// The admitted positive, its normalized authored name and every pinned fact about it.
+    const VALID_FIXTURE: &str = "abc_color_irot_alpha_irot.avif";
+    const VALID_ASSET: &str = "alpha-irot.avif";
+    const VALID_SOURCE_SHA: &str =
+        "b371cc88244a873131e4d10ff9363d71ce4f41cf333bd4a491b38d970d9abd3b";
+    const VALID_DISPLAY_SHA: &str =
+        "950be879c536c208d4e2dc0cdb8aa698e73922b4a57e8070c4fea389c84cc744";
+    const VALID_CODED_SHA: &str =
+        "5102863ca73f618c60944e490aa3982e7a1afd6975f4d0edf12b40ac85c88f82";
+    const VALID_NONOPAQUE: usize = 123_952;
+
+    /// The four displayed plane digests of the admitted positive, exactly as `N123` measures them
+    /// through the pinned decoder and exactly as they must arrive through the confined child.
+    /// These are test expectations over immutable fixture bytes, never a production fingerprint.
+    const VALID_PLANE_SHA: [&str; 4] = [
+        "5de419d1b511b0d12dfa639a643c6becfecfa7b3b81067a7b12a761c3593cbdd",
+        "ea0ff9062ca1e37bfd7021c878bfea32caaca9f4ecd77153300fe55f427debe9",
+        "ea0ff9062ca1e37bfd7021c878bfea32caaca9f4ecd77153300fe55f427debe9",
+        "96b18d51d5810b4fb5052fb14a0251cf4e247eb46c662ee7e49f039b95b56ff6",
+    ];
+
+    /// The two originals that must never be promoted, whatever the codec renders.
+    const NEGATIVES: [(&str, &str, &str); 2] = [
+        (
+            "abc_color_irot_alpha_NOirot.avif",
+            "alpha-noirot.avif",
+            "f2c8cd6ded641c68d13b3363417a62288a5eb335870de8d0b9da5093865ffb9a",
+        ),
+        (
+            "clap_irot_imir_non_essential.avif",
+            "clap-irot-imir.avif",
+            "33f869fcf2a879913eb394982b8fc03e9a60c25831aa37622ddefa656fd39fc1",
+        ),
+    ];
+
+    fn fixture_path(name: &str) -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/avif")
+            .join(name)
+    }
+
+    fn fixture_bytes(name: &str) -> Vec<u8> {
+        std::fs::read(fixture_path(name)).expect("pinned avif fixture present")
+    }
+
+    fn goldens() -> Value {
+        let text = std::fs::read_to_string(fixture_path("reference-goldens.json"))
+            .expect("pinned oracle manifest present");
+        serde_json::from_str(&text).expect("pinned oracle manifest parses")
+    }
+
+    fn hex_digest(hex: &str) -> MediaWorkerDigestV1 {
+        MediaWorkerDigestV1::parse_lower_hex(hex).expect("pinned digest is canonical lowercase hex")
+    }
+
+    fn complete(outcome: GraphicAssetReadSetOutcomeV1) -> GraphicAssetSourceSetV1 {
+        match outcome {
+            GraphicAssetReadSetOutcomeV1::Complete(set) => set,
+            GraphicAssetReadSetOutcomeV1::Refused(refusal) => {
+                panic!("real source acquisition refused: {refusal:?}")
+            }
+        }
+    }
+
+    fn checked(
+        outcome: MediaWorkerBoundaryOutcomeV1,
+    ) -> Vec<solo_application::MediaWorkerCheckedEnvelopeV1> {
+        match outcome {
+            MediaWorkerBoundaryOutcomeV1::EnvelopeChecked(checked) => checked,
+            MediaWorkerBoundaryOutcomeV1::Refused(refusal) => {
+                panic!("the inward boundary refused: {refusal:?}")
+            }
+        }
+    }
+
+    /// A test-only port forwarding every call to the real adapter and retaining the observations.
+    struct RecordingPort<'a> {
+        inner: &'a ConfinedAvifInspectAdapterV1,
+        seen: RefCell<Vec<MediaWorkerObservationV1>>,
+    }
+
+    impl<'a> RecordingPort<'a> {
+        fn new(inner: &'a ConfinedAvifInspectAdapterV1) -> Self {
+            Self {
+                inner,
+                seen: RefCell::new(Vec::new()),
+            }
+        }
+    }
+
+    impl MediaWorkerPortV1 for RecordingPort<'_> {
+        fn inspect_avif(&self, request: &MediaWorkerRequestV1<'_>) -> MediaWorkerRunV1 {
+            let run = self.inner.inspect_avif(request);
+            if let MediaWorkerRunV1::Observed(observation) = &run {
+                self.seen.borrow_mut().push(observation.clone());
+            }
+            run
+        }
+    }
+
+    /// A test-only port replaying one constructed claim; it can only prove inward refusal rules.
+    struct StaticPort(MediaWorkerObservationV1);
+
+    impl MediaWorkerPortV1 for StaticPort {
+        fn inspect_avif(&self, _request: &MediaWorkerRequestV1<'_>) -> MediaWorkerRunV1 {
+            MediaWorkerRunV1::Observed(self.0.clone())
+        }
+    }
+
+    fn claim(
+        ordinal: u32,
+        stride: u64,
+        rows: u64,
+        length: u64,
+        sha256: MediaWorkerDigestV1,
+    ) -> MediaWorkerPlaneClaimV1 {
+        MediaWorkerPlaneClaimV1::new(ordinal, stride, rows, length, sha256)
+    }
+
+    fn observation(
+        limits_verified: bool,
+        exit: MediaWorkerExitV1,
+        wall_deadline_met: bool,
+        descendants_reaped: bool,
+        envelope: MediaWorkerEnvelopeV1,
+        planes: Vec<Vec<u8>>,
+    ) -> MediaWorkerObservationV1 {
+        MediaWorkerObservationV1::new(
+            limits_verified,
+            exit,
+            wall_deadline_met,
+            descendants_reaped,
+            !descendants_reaped,
+            MediaWorkerLimitsV1::reference(),
+            envelope,
+            planes,
+        )
+    }
+
+    /// Case 01: the valid associated-alpha `irot` still is admitted by the real confined child and
+    /// its four displayed planes and composite are compared with the independent R03 oracle.
+    #[test]
+    fn n122_01_valid_alpha_irot_confined_display_rgba_oracle() {
+        let bytes = fixture_bytes(VALID_FIXTURE);
+        assert_eq!(
+            sha256_media_worker_bytes_v1(&bytes).to_hex(),
+            VALID_SOURCE_SHA,
+            "the fixture must be the pinned source"
+        );
+        let assets = [(VALID_ASSET, bytes.clone())];
+        let refs: Vec<(&str, &[u8])> = assets
+            .iter()
+            .map(|(name, body)| (*name, body.as_slice()))
+            .collect();
+        let root = Root::new("n122-valid", &refs);
+        let inventory = inventory_of(&[(TestOwnerV1::Entity, "logo", VALID_ASSET, "public")]);
+        let set = complete(read_graphic_asset_bytes_v1(&inventory, &root.capability()));
+        assert_eq!(set.len(), 1, "one authored obligation is acquired");
+        assert_eq!(
+            set.evidence()[0].bytes(),
+            bytes.as_slice(),
+            "the acquired bytes are the authored bytes"
+        );
+        assert!(
+            !set.grants_publication_authority() && !set.validates_media(),
+            "source acquisition neither publishes nor validates"
+        );
+
+        let adapter = ConfinedAvifInspectAdapterV1::new(PathBuf::from(BIN));
+        let recording = RecordingPort::new(&adapter);
+        let records = checked(inspect_media_worker_source_set_v1(&set, &recording));
+        let seen = recording.seen.borrow().clone();
+        assert_eq!(seen.len(), 1, "exactly one real confined run");
+        assert_eq!(records.len(), 1, "exactly one parent-checked record");
+
+        let observed = &seen[0];
+        assert_eq!(observed.exit(), MediaWorkerExitV1::Normal);
+        assert!(observed.limits_verified(), "the host limits were read back");
+        assert_eq!(
+            observed.effective_limits(),
+            MediaWorkerLimitsV1::reference(),
+            "512 MiB / 10 CPU seconds / 15 second wall"
+        );
+        assert!(observed.wall_deadline_met());
+        assert!(
+            observed.descendants_reaped(),
+            "the child was actually reaped"
+        );
+        assert!(!observed.leak_observed());
+
+        let envelope = observed.envelope();
+        assert_eq!(
+            (envelope.width(), envelope.height(), envelope.bit_depth()),
+            (256, 512, 8),
+            "the quarter turn is applied: displayed 256×512 at eight bits"
+        );
+        assert_eq!(envelope.color_model(), MediaWorkerColorModelV1::Yuva);
+        assert!(envelope.has_alpha(), "the alpha plane is declared");
+        assert_eq!(
+            envelope.orientation(),
+            MediaWorkerOrientationV1::Identity,
+            "identity is a worker claim about the transferred planes"
+        );
+        assert!(!envelope.is_grid() && !envelope.is_sequence());
+        assert_eq!(envelope.source_length(), bytes.len() as u64);
+        assert_eq!(envelope.source_sha256(), hex_digest(VALID_SOURCE_SHA));
+        assert_eq!(envelope.planes().len(), 4, "Y, U, V and A");
+        assert_eq!(observed.planes().len(), 4, "four owned buffers arrived");
+
+        // The transferred bytes are exactly the four displayed planes the pinned decoder produces
+        // for this immutable source: the independent per-plane digests `N123` measures. The display
+        // composite itself is measured by the adapter-level oracle over the same bytes, because the
+        // CLI test target deliberately has no codec dependency.
+        for (index, plane_claim) in envelope.planes().iter().enumerate() {
+            assert_eq!(
+                plane_claim.ordinal(),
+                u32::try_from(index).expect("ordinal")
+            );
+            assert_eq!(plane_claim.stride(), 256, "plane {index}: display width");
+            assert_eq!(plane_claim.rows(), 512, "plane {index}: display height");
+            assert_eq!(plane_claim.length(), 131_072, "plane {index}: exact bytes");
+            assert_eq!(
+                plane_claim.sha256().to_hex(),
+                VALID_PLANE_SHA[index],
+                "plane {index}: the transported bytes are the pinned displayed plane"
+            );
+            assert_eq!(
+                plane_claim.sha256(),
+                sha256_media_worker_bytes_v1(&observed.planes()[index]),
+                "plane {index}: the parent rehashed the bytes it owns"
+            );
+        }
+        assert_eq!(
+            envelope.output_sha256(),
+            media_worker_output_sha256_v1(envelope.planes(), observed.planes()),
+            "the aggregate is exactly the parent's own recomputation"
+        );
+
+        // The composite and coded-orientation pins are measured on these same immutable bytes by
+        // `solo-adapters`' `n122_oracle_*` tests, which do have the pinned decoder: `try_to_rgba8`
+        // yields exactly the R03 display digest and the inverse quarter turn yields the distinct
+        // coded digest. This host test therefore proves byte-identical transport of exactly those
+        // four planes, and the alpha population below is measured from the transported fourth plane
+        // itself rather than asserted from a table.
+        let alpha = &observed.planes()[3];
+        assert_eq!(u64::from(*alpha.iter().min().expect("samples")), 128);
+        assert_eq!(u64::from(*alpha.iter().max().expect("samples")), 255);
+        assert_eq!(
+            alpha.iter().filter(|value| **value != 255).count(),
+            VALID_NONOPAQUE,
+            "the pinned non-opaque alpha population, measured on the transported plane"
+        );
+
+        let record = &records[0];
+        assert_eq!(record.plane_count(), 4, "the parent checked four planes");
+        assert_eq!(
+            (record.width(), record.height(), record.bit_depth()),
+            (256, 512, 8)
+        );
+        assert_eq!(record.color_model(), MediaWorkerColorModelV1::Yuva);
+        assert_eq!(record.source_length(), bytes.len() as u64);
+        assert!(
+            !record.grants_publication_authority(),
+            "a verified four-plane transport never authorises publication"
+        );
+        assert!(
+            !record.proves_media_correctness(),
+            "the envelope still proves no media correctness"
+        );
+
+        let pids = adapter.observed_pids_v1();
+        assert_eq!(pids.len(), 1, "one real confined child: {pids:?}");
+        assert!(pids[0] > 0, "the launch has a real pid");
+
+        println!(
+            "n122_evidence case=01 pids={pids:?} distinct_pids=1 planes=4 geometry=256x512 \
+             depth=8 orientation=identity planes_match_pinned=true \
+             display_sha_pinned={VALID_DISPLAY_SHA} alpha_nonopaque={VALID_NONOPAQUE} \
+             coded_sha_pinned={VALID_CODED_SHA} records=1 publication=false proves_media=false \
+             limits=verified reaped=true"
+        );
+    }
+
+    /// The genuine four-plane envelope shape, rebuilt field by field so one forged field can be
+    /// changed without touching the production types.
+    #[allow(clippy::too_many_arguments)]
+    fn yuva_envelope(
+        source_length: u64,
+        source_sha: MediaWorkerDigestV1,
+        width: u32,
+        height: u32,
+        bit_depth: u8,
+        color_model: MediaWorkerColorModelV1,
+        has_alpha: bool,
+        orientation: MediaWorkerOrientationV1,
+        planes: Vec<MediaWorkerPlaneClaimV1>,
+        output_sha: MediaWorkerDigestV1,
+    ) -> MediaWorkerEnvelopeV1 {
+        MediaWorkerEnvelopeV1::new(
+            1,
+            solo_application::MediaWorkerStatusV1::Decoded,
+            solo_application::MediaWorkerFormatV1::Avif,
+            solo_application::MediaWorkerMimeV1::ImageAvif,
+            source_length,
+            source_sha,
+            width,
+            height,
+            bit_depth,
+            color_model,
+            has_alpha,
+            false,
+            false,
+            orientation,
+            planes,
+            output_sha,
+        )
+    }
+
+    #[test]
+    fn n122_02_mismatched_alpha_and_nonessential_transform_refused() {
+        let adapter = ConfinedAvifInspectAdapterV1::new(PathBuf::from(BIN));
+        let mut refused: Vec<&str> = Vec::new();
+
+        // (A) Each negative reaches the real confined child and is refused by item-association
+        // policy. The pinned typed-metadata cross-check for these same bytes lives in
+        // `solo-adapters`' `n122_oracle_*` tests, which own the pinned decoder.
+        for (fixture, asset, sha) in NEGATIVES {
+            let bytes = fixture_bytes(fixture);
+            assert_eq!(
+                sha256_media_worker_bytes_v1(&bytes).to_hex(),
+                sha,
+                "{fixture}: the negative is the pinned source"
+            );
+            let assets = [(asset, bytes.clone())];
+            let refs: Vec<(&str, &[u8])> = assets
+                .iter()
+                .map(|(name, body)| (*name, body.as_slice()))
+                .collect();
+            let root = Root::new("n122-negative", &refs);
+            let inventory = inventory_of(&[(TestOwnerV1::Entity, "logo", asset, "internal")]);
+            let set = complete(read_graphic_asset_bytes_v1(&inventory, &root.capability()));
+            assert_eq!(set.len(), 1, "{fixture}: the authored source is acquired");
+            let request = MediaWorkerRequestV1::for_source(set.evidence()[0].bytes())
+                .expect("bounded source");
+            match adapter.inspect_avif(&request) {
+                MediaWorkerRunV1::Refused(_) => refused.push(asset),
+                MediaWorkerRunV1::Observed(observation) => panic!(
+                    "{fixture}: the real child accepted a defective association: exit={:?} \
+                     planes={} depth={}",
+                    observation.exit(),
+                    observation.planes().len(),
+                    observation.envelope().bit_depth()
+                ),
+            }
+        }
+        assert_eq!(refused.len(), 2, "both negatives refused: {refused:?}");
+
+        // (B) The same valid positive still succeeds inside this case.
+        let valid = fixture_bytes(VALID_FIXTURE);
+        let valid_assets = [(VALID_ASSET, valid.clone())];
+        let valid_refs: Vec<(&str, &[u8])> = valid_assets
+            .iter()
+            .map(|(name, body)| (*name, body.as_slice()))
+            .collect();
+        let valid_root = Root::new("n122-positive", &valid_refs);
+        let valid_inventory = inventory_of(&[(TestOwnerV1::Entity, "logo", VALID_ASSET, "public")]);
+        let positive = complete(read_graphic_asset_bytes_v1(
+            &valid_inventory,
+            &valid_root.capability(),
+        ));
+        let request =
+            MediaWorkerRequestV1::for_source(positive.evidence()[0].bytes()).expect("bounded");
+        let genuine = match adapter.inspect_avif(&request) {
+            MediaWorkerRunV1::Observed(observation) => observation,
+            MediaWorkerRunV1::Refused(kind) => {
+                panic!("the admitted positive must still succeed: {kind:?}")
+            }
+        };
+        let envelope = genuine.envelope();
+        assert_eq!(envelope.planes().len(), 4, "the positive keeps four planes");
+        let source_length = envelope.source_length();
+        let source_sha = envelope.source_sha256();
+        let output_sha = envelope.output_sha256();
+        let claims = envelope.planes().to_vec();
+        let buffers = genuine.planes().to_vec();
+        assert_eq!(buffers.len(), 4);
+
+        // (C) Forged four-plane claims against that genuinely acquired positive source.
+        let base = |planes: Vec<MediaWorkerPlaneClaimV1>| {
+            yuva_envelope(
+                source_length,
+                source_sha,
+                256,
+                512,
+                8,
+                MediaWorkerColorModelV1::Yuva,
+                true,
+                MediaWorkerOrientationV1::Identity,
+                planes,
+                output_sha,
+            )
+        };
+        let obs = |envelope: MediaWorkerEnvelopeV1, planes: Vec<Vec<u8>>| {
+            observation(
+                true,
+                MediaWorkerExitV1::Normal,
+                true,
+                true,
+                envelope,
+                planes,
+            )
+        };
+
+        let mut forged_alpha_claims = claims.clone();
+        forged_alpha_claims[3] = claim(3, 256, 512, 131_072, hex_digest(&"00".repeat(32)));
+        let mut forged_buffers = buffers.clone();
+        forged_buffers[3] = vec![0x5au8; 131_072];
+        let mut sub_sampled_claims = claims.clone();
+        sub_sampled_claims[3] = claim(
+            3,
+            128,
+            512,
+            65_536,
+            sha256_media_worker_bytes_v1(&buffers[3][..65_536]),
+        );
+        let mut sub_sampled_buffers = buffers.clone();
+        sub_sampled_buffers[3] = buffers[3][..65_536].to_vec();
+        let ten_bit_claims: Vec<MediaWorkerPlaneClaimV1> = (0..4)
+            .map(|index| {
+                claim(
+                    index,
+                    512,
+                    512,
+                    262_144,
+                    sha256_media_worker_bytes_v1(&vec![0x61u8; 262_144]),
+                )
+            })
+            .collect();
+        let ten_bit_buffers = vec![vec![0x61u8; 262_144]; 4];
+        let short_buffers = {
+            let mut short = buffers.clone();
+            short[3] = short[3][..131_071].to_vec();
+            short
+        };
+        let trailing_buffers = {
+            let mut trailing = buffers.clone();
+            trailing[3].push(0x00);
+            trailing
+        };
+        let three_claims = claims[..3].to_vec();
+        let three_buffers = buffers[..3].to_vec();
+        let three_output = media_worker_output_sha256_v1(&claims[..3], &buffers[..3]);
+
+        let cases: Vec<(&str, MediaWorkerObservationV1, MediaWorkerRefusalKindV1)> = vec![
+            (
+                "four-planes-has-alpha-false",
+                obs(
+                    yuva_envelope(
+                        source_length,
+                        source_sha,
+                        256,
+                        512,
+                        8,
+                        MediaWorkerColorModelV1::Yuva,
+                        false,
+                        MediaWorkerOrientationV1::Identity,
+                        claims.clone(),
+                        output_sha,
+                    ),
+                    buffers.clone(),
+                ),
+                MediaWorkerRefusalKindV1::WorkerPlaneInvalid,
+            ),
+            (
+                "three-planes-has-alpha-true",
+                obs(
+                    yuva_envelope(
+                        source_length,
+                        source_sha,
+                        256,
+                        512,
+                        8,
+                        MediaWorkerColorModelV1::Yuva,
+                        true,
+                        MediaWorkerOrientationV1::Identity,
+                        three_claims,
+                        three_output,
+                    ),
+                    three_buffers,
+                ),
+                MediaWorkerRefusalKindV1::WorkerPlaneInvalid,
+            ),
+            (
+                "false-alpha-digest",
+                obs(base(forged_alpha_claims), buffers.clone()),
+                MediaWorkerRefusalKindV1::WorkerDigestMismatch,
+            ),
+            (
+                "false-alpha-bytes",
+                obs(base(claims.clone()), forged_buffers),
+                MediaWorkerRefusalKindV1::WorkerDigestMismatch,
+            ),
+            (
+                "sub-sampled-fourth-plane",
+                obs(base(sub_sampled_claims), sub_sampled_buffers),
+                MediaWorkerRefusalKindV1::WorkerPlaneInvalid,
+            ),
+            (
+                "ten-bit-yuva-claim",
+                obs(
+                    yuva_envelope(
+                        source_length,
+                        source_sha,
+                        256,
+                        512,
+                        10,
+                        MediaWorkerColorModelV1::Yuva,
+                        true,
+                        MediaWorkerOrientationV1::Identity,
+                        ten_bit_claims,
+                        output_sha,
+                    ),
+                    ten_bit_buffers,
+                ),
+                MediaWorkerRefusalKindV1::WorkerPlaneInvalid,
+            ),
+            (
+                "unverified-orientation",
+                obs(
+                    yuva_envelope(
+                        source_length,
+                        source_sha,
+                        256,
+                        512,
+                        8,
+                        MediaWorkerColorModelV1::Yuva,
+                        true,
+                        MediaWorkerOrientationV1::Unverified,
+                        claims.clone(),
+                        output_sha,
+                    ),
+                    buffers.clone(),
+                ),
+                MediaWorkerRefusalKindV1::WorkerPlaneInvalid,
+            ),
+            (
+                "transposed-orientation",
+                obs(
+                    yuva_envelope(
+                        source_length,
+                        source_sha,
+                        256,
+                        512,
+                        8,
+                        MediaWorkerColorModelV1::Yuva,
+                        true,
+                        MediaWorkerOrientationV1::Transposed,
+                        claims.clone(),
+                        output_sha,
+                    ),
+                    buffers.clone(),
+                ),
+                MediaWorkerRefusalKindV1::WorkerPlaneInvalid,
+            ),
+        ];
+        let mut cases = cases;
+        cases.extend(vec![
+            (
+                "bad-source-digest",
+                obs(
+                    yuva_envelope(
+                        source_length,
+                        sha256_media_worker_bytes_v1(b"another source"),
+                        256,
+                        512,
+                        8,
+                        MediaWorkerColorModelV1::Yuva,
+                        true,
+                        MediaWorkerOrientationV1::Identity,
+                        claims.clone(),
+                        output_sha,
+                    ),
+                    buffers.clone(),
+                ),
+                MediaWorkerRefusalKindV1::WorkerSourceMismatch,
+            ),
+            (
+                "bad-aggregate",
+                obs(
+                    yuva_envelope(
+                        source_length,
+                        source_sha,
+                        256,
+                        512,
+                        8,
+                        MediaWorkerColorModelV1::Yuva,
+                        true,
+                        MediaWorkerOrientationV1::Identity,
+                        claims.clone(),
+                        sha256_media_worker_bytes_v1(b"another aggregate"),
+                    ),
+                    buffers.clone(),
+                ),
+                MediaWorkerRefusalKindV1::WorkerDigestMismatch,
+            ),
+            (
+                "short-fourth-plane",
+                obs(base(claims.clone()), short_buffers),
+                MediaWorkerRefusalKindV1::WorkerPlaneInvalid,
+            ),
+            (
+                "trailing-byte",
+                obs(base(claims.clone()), trailing_buffers),
+                MediaWorkerRefusalKindV1::WorkerPlaneInvalid,
+            ),
+            (
+                "false-exit",
+                observation(
+                    true,
+                    MediaWorkerExitV1::Abnormal,
+                    true,
+                    true,
+                    base(claims.clone()),
+                    buffers.clone(),
+                ),
+                MediaWorkerRefusalKindV1::WorkerExitAbnormal,
+            ),
+            (
+                "false-limits",
+                observation(
+                    false,
+                    MediaWorkerExitV1::Normal,
+                    true,
+                    true,
+                    base(claims.clone()),
+                    buffers.clone(),
+                ),
+                MediaWorkerRefusalKindV1::WorkerLimitUnverified,
+            ),
+            (
+                "false-cleanup",
+                observation(
+                    true,
+                    MediaWorkerExitV1::Normal,
+                    true,
+                    false,
+                    base(claims.clone()),
+                    buffers.clone(),
+                ),
+                MediaWorkerRefusalKindV1::WorkerDescendantsRemain,
+            ),
+        ]);
+
+        let mut forged_labels: Vec<&str> = Vec::new();
+        for (label, forged, wanted) in cases {
+            match inspect_media_worker_source_set_v1(&positive, &StaticPort(forged)) {
+                MediaWorkerBoundaryOutcomeV1::Refused(refusal) => {
+                    assert_eq!(refusal.kind(), wanted, "{label}: typed inward refusal");
+                    forged_labels.push(label);
+                }
+                MediaWorkerBoundaryOutcomeV1::EnvelopeChecked(checked) => panic!(
+                    "{label}: the boundary retained a forged claim: {} checked",
+                    checked.len()
+                ),
+            }
+        }
+        assert_eq!(
+            forged_labels.len(),
+            15,
+            "every forged claim was refused: {forged_labels:?}"
+        );
+
+        // (D) The unchanged strict parser still refuses missing, duplicate and unknown keys.
+        let header = format!(
+            "{{\"version\":1,\"status\":\"decoded\",\"format\":\"avif\",\"mime\":\"image/avif\",\
+             \"source_length\":{source_length},\"source_sha256\":\"{}\",\"width\":256,\"height\":512,\
+             \"bit_depth\":8,\"color_model\":\"yuva\",\"has_alpha\":true,\"is_grid\":false,\
+             \"is_sequence\":false,\"orientation\":\"identity\",\"planes\":[\
+             {{\"ordinal\":0,\"stride\":256,\"rows\":512,\"length\":131072,\"sha256\":\"{}\"}},\
+             {{\"ordinal\":1,\"stride\":256,\"rows\":512,\"length\":131072,\"sha256\":\"{}\"}},\
+             {{\"ordinal\":2,\"stride\":256,\"rows\":512,\"length\":131072,\"sha256\":\"{}\"}},\
+             {{\"ordinal\":3,\"stride\":256,\"rows\":512,\"length\":131072,\"sha256\":\"{}\"}}],\
+             \"output_sha256\":\"{}\"}}",
+            source_sha.to_hex(),
+            claims[0].sha256().to_hex(),
+            claims[1].sha256().to_hex(),
+            claims[2].sha256().to_hex(),
+            claims[3].sha256().to_hex(),
+            output_sha.to_hex(),
+        );
+        assert!(
+            parse_media_worker_envelope_v1(header.as_bytes()).is_ok(),
+            "the canonical four-plane header parses"
+        );
+        let mut protocol_kinds: Vec<(&str, MediaWorkerProtocolRefusalKindV1)> = Vec::new();
+        for (label, text) in [
+            (
+                "missing-key",
+                header.replacen(",\"orientation\":\"identity\"", "", 1),
+            ),
+            (
+                "duplicate-key",
+                header.replacen("\"width\":256,", "\"width\":256,\"width\":256,", 1),
+            ),
+            (
+                "unknown-key",
+                header.replacen("\"version\":1,", "\"version\":1,\"extra\":1,", 1),
+            ),
+        ] {
+            match parse_media_worker_envelope_v1(text.as_bytes()) {
+                Ok(_) => panic!("{label}: a mutated four-plane header parsed"),
+                Err(refusal) => protocol_kinds.push((label, refusal.kind())),
+            }
+        }
+
+        // (E) A direct invocation without the approved OS confinement refuses before parsing.
+        let direct = run(&[
+            "--internal-image-worker-v1",
+            "avif",
+            &sha256_media_worker_bytes_v1(&valid).to_hex(),
+        ]);
+        assert_ne!(
+            direct.exit_code,
+            Some(0),
+            "an unconfined child must not decode the alpha source"
+        );
+        assert!(
+            direct.stdout.is_empty(),
+            "an unconfined child writes nothing"
+        );
+
+        println!(
+            "n122_evidence case=02 refused={} labels={refused:?} counterfeits={} \
+             counterfeits_refused=true protocol={protocol_kinds:?} positive_ok=true \
+             whole_set_discarded=true unconfined_decoded=false planes=4",
+            refused.len(),
+            forged_labels.len()
+        );
+    }
+
+    #[test]
+    fn n122_03_five_level_avif_mix_and_late_private_failure() {
+        // One authored obligation per EFS level, with a genuinely suppressed `internal`
+        // representation carrying the newly admitted alpha still.
+        let mut declared: Vec<(TestOwnerV1, &str, &str, &str)> = Vec::new();
+        let roles = [
+            (TestOwnerV1::Entity, "logo"),
+            (TestOwnerV1::Facet, "banner"),
+            (TestOwnerV1::Site, "background"),
+            (TestOwnerV1::Page, "social-preview"),
+        ];
+        for (index, (owner, role)) in roles.iter().enumerate() {
+            declared.push((*owner, role, NON_ALPHA[index].0, "public"));
+        }
+        declared.push((
+            TestOwnerV1::Representation,
+            "social-preview",
+            VALID_ASSET,
+            "internal",
+        ));
+
+        let mut assets: Vec<(&str, Vec<u8>)> = NON_ALPHA
+            .iter()
+            .map(|(fixture, _, _, _)| (*fixture, fixture_bytes(fixture)))
+            .collect();
+        assets.push((VALID_ASSET, fixture_bytes(VALID_FIXTURE)));
+        let asset_refs: Vec<(&str, &[u8])> = assets
+            .iter()
+            .map(|(name, body)| (*name, body.as_slice()))
+            .collect();
+        let root = Root::new("n122-mix", &asset_refs);
+        let inventory = suppressed_inventory_of(&declared);
+        let set = complete(read_graphic_asset_bytes_v1(&inventory, &root.capability()));
+        assert_eq!(set.len(), 5, "five authored obligations are acquired");
+        assert!(
+            !set.grants_publication_authority() && !set.validates_media(),
+            "source acquisition neither publishes nor validates"
+        );
+
+        let adapter = ConfinedAvifInspectAdapterV1::new(PathBuf::from(BIN));
+        let recording = RecordingPort::new(&adapter);
+        let records = checked(inspect_media_worker_source_set_v1(&set, &recording));
+        let seen = recording.seen.borrow().clone();
+        assert_eq!(seen.len(), 5, "five real confined runs were observed");
+        assert_eq!(records.len(), 5, "five parent-checked records");
+
+        let manifest = goldens();
+        let mut plane_total = 0usize;
+        for (index, (fixture, width, height, depth)) in NON_ALPHA.iter().enumerate() {
+            let observed = &seen[index];
+            assert_eq!(observed.exit(), MediaWorkerExitV1::Normal, "{fixture}");
+            assert!(observed.limits_verified(), "{fixture}: limits read back");
+            assert!(observed.descendants_reaped(), "{fixture}: reaped");
+            let envelope = observed.envelope();
+            assert_eq!(
+                envelope.color_model(),
+                MediaWorkerColorModelV1::Yuv,
+                "{fixture}: the four coded-plane stills are unchanged"
+            );
+            assert!(!envelope.has_alpha());
+            assert_eq!(
+                envelope.orientation(),
+                MediaWorkerOrientationV1::Unverified,
+                "{fixture}: still no display-orientation claim"
+            );
+            assert_eq!(
+                (envelope.width(), envelope.height(), envelope.bit_depth()),
+                (*width, *height, *depth),
+                "{fixture}: geometry and native depth"
+            );
+            assert_eq!(envelope.planes().len(), 3, "{fixture}: Y/U/V only");
+            plane_total += 3;
+            let pinned = &manifest["fixtures"][*fixture];
+            for (plane_index, plane_claim) in envelope.planes().iter().enumerate() {
+                assert_eq!(
+                    plane_claim.sha256(),
+                    hex_digest(
+                        pinned["planes"][plane_index]["sha256"]
+                            .as_str()
+                            .expect("plane hex")
+                    ),
+                    "{fixture}: plane {plane_index} against the independent golden"
+                );
+            }
+        }
+
+        let alpha_seen = &seen[4];
+        assert_eq!(alpha_seen.exit(), MediaWorkerExitV1::Normal);
+        assert!(alpha_seen.limits_verified() && alpha_seen.descendants_reaped());
+        let alpha_envelope = alpha_seen.envelope();
+        assert_eq!(alpha_envelope.color_model(), MediaWorkerColorModelV1::Yuva);
+        assert!(alpha_envelope.has_alpha());
+        assert_eq!(
+            alpha_envelope.orientation(),
+            MediaWorkerOrientationV1::Identity,
+            "the representation-level alpha still is the one oriented class"
+        );
+        assert_eq!(
+            (
+                alpha_envelope.width(),
+                alpha_envelope.height(),
+                alpha_envelope.bit_depth()
+            ),
+            (256, 512, 8)
+        );
+        assert_eq!(alpha_envelope.planes().len(), 4);
+        plane_total += 4;
+        for (index, plane_claim) in alpha_envelope.planes().iter().enumerate() {
+            assert_eq!(
+                plane_claim.sha256().to_hex(),
+                VALID_PLANE_SHA[index],
+                "alpha plane {index} against the pinned displayed plane"
+            );
+        }
+        assert_eq!(
+            alpha_envelope.output_sha256(),
+            media_worker_output_sha256_v1(alpha_envelope.planes(), alpha_seen.planes())
+        );
+
+        for record in &records {
+            assert!(!record.grants_publication_authority());
+            assert!(!record.proves_media_correctness());
+        }
+        assert_eq!(
+            records[4].plane_count(),
+            4,
+            "the alpha record carries four planes"
+        );
+        assert_eq!(records[4].color_model(), MediaWorkerColorModelV1::Yuva);
+
+        let pids = adapter.observed_pids_v1();
+        assert_eq!(pids.len(), 5, "one real child per obligation: {pids:?}");
+        let mut unique = pids.clone();
+        unique.sort_unstable();
+        unique.dedup();
+        assert_eq!(unique.len(), 5, "five distinct child processes: {pids:?}");
+
+        // The late private failure: the same five-level set, but the representation-level source is
+        // the defective association. The whole source set must be discarded with no partial record
+        // and no private path in the refusal.
+        let mut mixed_assets: Vec<(&str, Vec<u8>)> = NON_ALPHA
+            .iter()
+            .map(|(fixture, _, _, _)| (*fixture, fixture_bytes(fixture)))
+            .collect();
+        mixed_assets.push((VALID_ASSET, fixture_bytes(NEGATIVES[0].0)));
+        let mixed_refs: Vec<(&str, &[u8])> = mixed_assets
+            .iter()
+            .map(|(name, body)| (*name, body.as_slice()))
+            .collect();
+        let mixed_root = Root::new("n122-late-failure", &mixed_refs);
+        let mixed_inventory = suppressed_inventory_of(&declared);
+        let mixed = complete(read_graphic_asset_bytes_v1(
+            &mixed_inventory,
+            &mixed_root.capability(),
+        ));
+        assert_eq!(
+            mixed.len(),
+            5,
+            "the failing set still acquires five sources"
+        );
+        let late_adapter = ConfinedAvifInspectAdapterV1::new(PathBuf::from(BIN));
+        let outcome = inspect_media_worker_source_set_v1(&mixed, &late_adapter);
+        let refusal = match &outcome {
+            MediaWorkerBoundaryOutcomeV1::Refused(refusal) => refusal,
+            MediaWorkerBoundaryOutcomeV1::EnvelopeChecked(checked) => panic!(
+                "the late private failure returned a partial success: {} checked",
+                checked.len()
+            ),
+        };
+        let rendered = format!("{refusal:?}{}", refusal.code());
+        assert!(
+            !rendered.contains(VALID_ASSET)
+                && !rendered.contains("alpha-noirot")
+                && !rendered.contains("n122-late-failure"),
+            "a refusal must never leak the private path: {rendered}"
+        );
+        assert!(
+            outcome.checked().is_none(),
+            "no partial checked record survives a whole-set refusal"
+        );
+
+        println!(
+            "n122_evidence case=03 pids={pids:?} distinct_pids=5 records=5 planes={plane_total} \
+             levels=entity,facet,site,page,representation alpha_planes=4 alpha_orientation=identity \
+             alpha_display_sha={VALID_DISPLAY_SHA} non_alpha_depths=8,10,12 \
+             whole_set_discarded=true partial_records=0 private_path_absent=true \
+             publication=false proves_media=false"
         );
     }
 }

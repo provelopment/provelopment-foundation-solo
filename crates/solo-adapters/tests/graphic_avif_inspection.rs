@@ -506,3 +506,178 @@ fn n123_associated_alpha_irot_decoder_differential_is_measured() {
     );
     println!("n123_decoder repair_verified=true");
 }
+
+/// The one admitted associated-alpha class, checked against the independent R03 display golden
+/// (`SOLO-WO-118 R10` §4, additive to the unchanged N120/N123 evidence).
+///
+/// The decoder is asked directly — no worker, no parent, no policy call — so this is an
+/// *independent* pixel and metadata oracle: the production child's admission rules are mirrored
+/// here from the immutable manifest's facts, and the four displayed planes and the fallible
+/// `try_to_rgba8()` composite are compared against the pinned independent `avifdec`/dav1d values.
+#[test]
+fn n122_oracle_valid_associated_alpha_irot_matches_the_independent_r03_display_golden() {
+    let manifest = goldens();
+    let name = "abc_color_irot_alpha_irot.avif";
+    let bytes = std::fs::read(fixture(name)).expect("fixture bytes must be readable");
+    let pinned = &manifest["fixtures"][name];
+    assert_eq!(
+        digest(pinned["source_sha256"].as_str().expect("source hex")),
+        sha256_media_worker_bytes_v1(&bytes),
+        "the fixture must be the pinned source"
+    );
+
+    // Typed metadata: the two items, their property associations and the single `auxl` reference.
+    let header = oxideav_avif::parse_header(&bytes).expect("the header must parse");
+    let meta = &header.meta;
+    let primary_id = meta
+        .primary_item_id
+        .expect("the primary item must be declared");
+    let alpha_id = oxideav_avif::find_alpha_item_id(meta, primary_id)
+        .expect("the crate must identify the alpha auxiliary");
+    assert_ne!(primary_id, alpha_id, "two distinct items");
+    for item_id in [primary_id, alpha_id] {
+        let item = meta.item_by_id(item_id).expect("the item must exist");
+        assert_eq!(
+            item.item_type,
+            oxideav_avif::parser::ITEM_TYPE_AV01,
+            "item {item_id} is coded AV1"
+        );
+        let association = meta
+            .assoc_by_id(item_id)
+            .expect("the item must be associated");
+        let mut rotations: Vec<(u8, bool)> = Vec::new();
+        let mut extents: Vec<(u32, u32)> = Vec::new();
+        let mut channels: Vec<Vec<u8>> = Vec::new();
+        let mut alphatype: Vec<String> = Vec::new();
+        for entry in &association.entries {
+            match meta
+                .properties
+                .get(entry.index as usize)
+                .expect("index in range")
+            {
+                oxideav_avif::Property::Irot(irot) => rotations.push((irot.angle, entry.essential)),
+                oxideav_avif::Property::Ispe(ispe) => extents.push((ispe.width, ispe.height)),
+                oxideav_avif::Property::Pixi(pixi) => {
+                    channels.push(pixi.bits_per_channel.clone());
+                }
+                oxideav_avif::Property::AuxC(aux) => alphatype.push(aux.aux_type.clone()),
+                oxideav_avif::Property::Clap(_) | oxideav_avif::Property::Imir(_) => {
+                    panic!("item {item_id} must carry no clap/imir in the admitted class");
+                }
+                _ => {}
+            }
+        }
+        assert_eq!(
+            rotations,
+            vec![(1, true)],
+            "item {item_id}: exactly one essential quarter turn"
+        );
+        assert_eq!(
+            extents,
+            vec![(512, 256)],
+            "item {item_id}: matching coded extent"
+        );
+        if item_id == primary_id {
+            assert_eq!(
+                channels,
+                vec![vec![8, 8, 8]],
+                "primary: three 8-bit channels"
+            );
+            assert!(alphatype.is_empty(), "the primary carries no alpha urn");
+        } else {
+            assert_eq!(channels, vec![vec![8]], "auxiliary: one 8-bit channel");
+            assert_eq!(
+                alphatype,
+                vec![oxideav_avif::AUX_URN_ALPHA_MPEG.to_string()],
+                "the auxiliary is the alpha urn"
+            );
+        }
+    }
+    let auxl: Vec<_> = meta
+        .irefs
+        .iter()
+        .filter(|iref| iref.reference_type == *b"auxl")
+        .collect();
+    assert_eq!(auxl.len(), 1, "exactly one auxiliary link");
+    assert_eq!(auxl[0].from_id, alpha_id);
+    assert_eq!(auxl[0].to_ids.as_slice(), [primary_id]);
+}
+
+/// The decoded pixel half of the same oracle: displayed planes, the fallible composite, the alpha
+/// statistics, and the distinct coded-orientation digest.
+#[test]
+fn n122_oracle_display_and_coded_composites_are_distinct_and_pinned() {
+    let manifest = goldens();
+    let name = "abc_color_irot_alpha_irot.avif";
+    let bytes = std::fs::read(fixture(name)).expect("fixture bytes must be readable");
+    let pinned = &manifest["fixtures"][name];
+
+    let image = oxideav_avif::decode(&bytes).expect("the repaired decoder must decode the still");
+    assert_eq!(image.format, oxideav_avif::PixelFormat::Yuva444P);
+    assert_eq!((image.width, image.height, image.bit_depth), (256, 512, 8));
+    assert_eq!(image.planes.len(), 4);
+    assert_eq!(
+        u64::from(image.width),
+        pinned["display_width"].as_u64().expect("display width"),
+        "displayed width is the swapped coded extent"
+    );
+    assert_eq!(
+        u64::from(image.height),
+        pinned["display_height"].as_u64().expect("display height")
+    );
+    for (index, plane) in image.planes.iter().enumerate() {
+        assert_eq!(plane.stride, 256, "plane {index}: full-resolution stride");
+        assert_eq!(plane.data.len(), 131_072, "plane {index}: 256×512 bytes");
+    }
+
+    // The fallible composite must equal the independent display golden exactly.
+    let rgba = image
+        .try_to_rgba8()
+        .expect("the composite must be fallible only");
+    assert_eq!(rgba.len(), 524_288, "256×512 RGBA");
+    assert_eq!(
+        sha256_media_worker_bytes_v1(&rgba),
+        digest(pinned["rgba_display_sha256"].as_str().expect("display hex")),
+        "the display composite must equal the independent R03 golden"
+    );
+    let alpha: Vec<u8> = rgba[3..].iter().step_by(4).copied().collect();
+    assert_eq!(
+        u64::from(*alpha.iter().min().expect("samples")),
+        pinned["alpha_min"].as_u64().expect("alpha min")
+    );
+    assert_eq!(
+        u64::from(*alpha.iter().max().expect("samples")),
+        pinned["alpha_max"].as_u64().expect("alpha max")
+    );
+    assert_eq!(
+        u64::try_from(alpha.iter().filter(|value| **value != 255).count()).expect("count"),
+        pinned["alpha_non_opaque_samples"]
+            .as_u64()
+            .expect("nonopaque count")
+    );
+    assert!(
+        alpha
+            .iter()
+            .enumerate()
+            .all(|(index, value)| image.planes[3].data[index] == *value),
+        "the fourth displayed plane is the composite's alpha channel, sample for sample"
+    );
+
+    // The displayed composite is *not* the coded one: undoing the quarter turn reproduces the
+    // manifest's distinct coded-orientation digest, so a cached or mis-oriented buffer cannot pass.
+    let mut coded = vec![0u8; 512 * 256 * 4];
+    for y_display in 0..512usize {
+        for x_display in 0..256usize {
+            let x_coded = 511 - y_display;
+            let y_coded = x_display;
+            let source = (y_display * 256 + x_display) * 4;
+            let destination = (y_coded * 512 + x_coded) * 4;
+            coded[destination..destination + 4].copy_from_slice(&rgba[source..source + 4]);
+        }
+    }
+    assert_eq!(
+        sha256_media_worker_bytes_v1(&coded),
+        digest(pinned["rgba_sha256"].as_str().expect("coded hex")),
+        "the coded-orientation composite must equal its own distinct pinned digest"
+    );
+}
