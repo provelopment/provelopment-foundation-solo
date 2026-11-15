@@ -28,8 +28,11 @@ MAX_DIMENSION = 8192
 MAX_PIXELS = 32_000_000
 
 # chroma token -> (coded depth, horizontal subsampling, vertical subsampling)
+# `420jpeg` is libavif's actual 8-bit 4:2:0 token ("chroma sample position: jpeg");
+# it is the same 4:2:0 geometry as `420` and is the only extra token observed.
 CHROMA_SPECS = {
     "420": (8, 2, 2),
+    "420jpeg": (8, 2, 2),
     "420p10": (10, 2, 2),
     "420p12": (12, 2, 2),
     "444": (8, 1, 1),
