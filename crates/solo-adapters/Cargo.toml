@@ -47,6 +47,15 @@ gif = { version = "=0.14.2", default-features = false, features = ["std"] }
 # data, no codec and no alternate version.
 quick-xml = "=0.42.0"
 svgtypes = "=0.16.1"
+
+# The single pinned pure-Rust AVIF decoder approved by `SOLO-WO-118 R01` section 3.1.
+#
+# Exact version only, minimum decode surface: the `registry` feature is what wires the
+# AV1 pixel decoder; no encoder, no hardware acceleration, no external plugin and no
+# native `*-sys` node is enabled. Decoding is still invoked only inside the already
+# confined child over owned in-memory bytes.
+oxideav-avif = { version = "=0.0.16", default-features = false, features = ["registry"] }
+
 [target.'cfg(target_os = "linux")'.dependencies]
 rustix = { version = "=1.1.6", default-features = false, features = ["fs", "std"] }
 
