@@ -200,3 +200,249 @@ fn n120_oracle_unsupported_fixtures_are_never_accepted_as_the_four_positives() {
         }
     }
 }
+
+/// The two pinned associated-alpha sources whose decoder results are adjudicated.
+const ALPHA_POSITIVE: &str = "abc_color_irot_alpha_irot.avif";
+const ALPHA_NEGATIVE: &str = "abc_color_irot_alpha_NOirot.avif";
+const ALPHA_PINNED_DISPLAY_SHA: &str =
+    "950be879c536c208d4e2dc0cdb8aa698e73922b4a57e8070c4fea389c84cc744";
+const ALPHA_COORDINATE_LIMIT: usize = 64;
+
+fn read_source(name: &str) -> Vec<u8> {
+    std::fs::read(fixture(name)).expect("pinned AVIF fixture bytes must be readable")
+}
+
+fn plane_hex(image: &oxideav_avif::AvifImage) -> Vec<String> {
+    image
+        .planes
+        .iter()
+        .map(|plane| sha256_media_worker_bytes_v1(&plane.data).to_hex())
+        .collect()
+}
+
+#[test]
+fn n123_associated_alpha_irot_decoder_differential_is_measured() {
+    let manifest = goldens();
+    let positive_bytes = read_source(ALPHA_POSITIVE);
+    let negative_bytes = read_source(ALPHA_NEGATIVE);
+
+    // Input identity first: both sources are the exact pinned fixtures, checked against the
+    // immutable manifest rather than trusted by name.
+    assert_eq!(
+        sha256_media_worker_bytes_v1(&positive_bytes).to_hex(),
+        manifest["fixtures"][ALPHA_POSITIVE]["source_sha256"]
+            .as_str()
+            .expect("pinned positive source digest"),
+        "the valid associated-alpha source must be the pinned fixture"
+    );
+    assert_eq!(
+        sha256_media_worker_bytes_v1(&negative_bytes).to_hex(),
+        manifest["negatives"][ALPHA_NEGATIVE]["source_sha256"]
+            .as_str()
+            .expect("pinned negative source digest"),
+        "the missing-association source must be the pinned invalid fixture"
+    );
+
+    // Payload identity, checked rather than assumed: the two fixture files differ in total length
+    // by one byte, so only the extracted item payloads can settle whether the coded inputs are
+    // the same picture. A difference here would be an alternative explanation for any pixel delta.
+    let positive_header = oxideav_avif::parse_header(&positive_bytes).expect("positive header");
+    let negative_header = oxideav_avif::parse_header(&negative_bytes).expect("negative header");
+    let positive_primary = positive_header
+        .meta
+        .primary_item_id
+        .expect("positive primary item id");
+    let negative_primary = negative_header
+        .meta
+        .primary_item_id
+        .expect("negative primary item id");
+    let positive_alpha = oxideav_avif::find_alpha_item_id(&positive_header.meta, positive_primary)
+        .expect("positive alpha auxiliary");
+    let negative_alpha = oxideav_avif::find_alpha_item_id(&negative_header.meta, negative_primary)
+        .expect("negative alpha auxiliary");
+    let colour_payload_equal = positive_header
+        .item_data(positive_primary)
+        .expect("positive colour payload")
+        == negative_header
+            .item_data(negative_primary)
+            .expect("negative colour payload");
+    let alpha_payload_equal = positive_header
+        .item_data(positive_alpha)
+        .expect("positive alpha payload")
+        == negative_header
+            .item_data(negative_alpha)
+            .expect("negative alpha payload");
+    println!(
+        "n123_evidence payloads colour_equal={colour_payload_equal} \
+         alpha_equal={alpha_payload_equal} primary_ids={positive_primary}/{negative_primary} \
+         alpha_ids={positive_alpha}/{negative_alpha}"
+    );
+
+    let positive =
+        oxideav_avif::decode(&positive_bytes).expect("positive must decode for diagnosis");
+    let negative =
+        oxideav_avif::decode(&negative_bytes).expect("negative must decode for diagnosis");
+
+    // Structural correctness of both decoded pictures: the codec applies the primary transform
+    // itself, so the returned geometry is the display geometry with four full-size 4:4:4 planes.
+    for (label, image) in [("positive", &positive), ("negative", &negative)] {
+        assert_eq!(
+            (image.width, image.height),
+            (256, 512),
+            "{label} display extent"
+        );
+        assert_eq!(image.bit_depth, 8, "{label} depth");
+        assert_eq!(
+            format!("{:?}", image.format),
+            "Yuva444P",
+            "{label} must be four-plane 8-bit 4:4:4 with alpha"
+        );
+        assert_eq!(image.planes.len(), 4, "{label} plane count");
+        for plane in &image.planes {
+            assert_eq!(plane.stride, 256, "{label} canonical alpha-aware stride");
+            assert_eq!(plane.data.len(), 131_072, "{label} canonical plane length");
+        }
+    }
+
+    let positive_rgba = positive.try_to_rgba8().expect("fallible RGBA conversion");
+    let negative_rgba = negative.try_to_rgba8().expect("fallible RGBA conversion");
+    assert_eq!(positive_rgba.len(), 524_288, "512x256x4 packed RGBA");
+    assert_eq!(negative_rgba.len(), 524_288, "512x256x4 packed RGBA");
+
+    let positive_nonopaque = positive_rgba[3..]
+        .iter()
+        .step_by(4)
+        .filter(|alpha| **alpha != 255)
+        .count();
+    let negative_nonopaque = negative_rgba[3..]
+        .iter()
+        .step_by(4)
+        .filter(|alpha| **alpha != 255)
+        .count();
+
+    // Pixel-by-pixel differential: alpha and RGB are counted separately, and every differing
+    // alpha sample is enumerated (bounded) with its display coordinates and both values.
+    let mut alpha_differences = 0usize;
+    let mut rgb_differences = 0usize;
+    let mut coordinates: Vec<(usize, usize, u8, u8)> = Vec::new();
+    for pixel in 0..(256 * 512) {
+        let base = pixel * 4;
+        if positive_rgba[base..base + 3] != negative_rgba[base..base + 3] {
+            rgb_differences += 1;
+        }
+        if positive_rgba[base + 3] != negative_rgba[base + 3] {
+            alpha_differences += 1;
+            if coordinates.len() < ALPHA_COORDINATE_LIMIT {
+                // The packed buffer is the 256x512 display frame: x is the display column.
+                coordinates.push((
+                    pixel % 256,
+                    pixel / 256,
+                    positive_rgba[base + 3],
+                    negative_rgba[base + 3],
+                ));
+            }
+        }
+    }
+
+    let positive_rgba_sha = sha256_media_worker_bytes_v1(&positive_rgba).to_hex();
+    let negative_rgba_sha = sha256_media_worker_bytes_v1(&negative_rgba).to_hex();
+    let pinned_display = digest(ALPHA_PINNED_DISPLAY_SHA).to_hex();
+
+    println!(
+        "n123_evidence positive_planes={:?} negative_planes={:?}",
+        plane_hex(&positive),
+        plane_hex(&negative)
+    );
+    println!(
+        "n123_evidence positive_rgba={positive_rgba_sha} \
+         positive_alpha_nonopaque={positive_nonopaque} negative_rgba={negative_rgba_sha} \
+         negative_alpha_nonopaque={negative_nonopaque} pinned_display={pinned_display}"
+    );
+
+    println!(
+        "n123_evidence alpha_differences={alpha_differences} rgb_differences={rgb_differences} \
+         coordinates={}",
+        if coordinates.is_empty() {
+            "none".to_string()
+        } else {
+            coordinates
+                .iter()
+                .map(|(x, y, pos, neg)| format!("{x},{y}:{pos}>{neg}"))
+                .collect::<Vec<String>>()
+                .join(";")
+        }
+    );
+
+    // Measured relationship to the immutable R03 positive pin. This is a *diagnosis* of the two
+    // decoder outputs, never an endorsement of the invalid fixture as a valid positive.
+    let positive_matches_pin = positive_rgba_sha == pinned_display;
+    let negative_matches_pin = negative_rgba_sha == pinned_display;
+    println!(
+        "n123_evidence pin_relation positive_matches={positive_matches_pin} \
+         negative_matches={negative_matches_pin} same_between_sources={}",
+        positive_rgba_sha == negative_rgba_sha
+    );
+
+    // The independent R03 alpha statistics are a coded property of the fixture; the decoder
+    // reproduces them exactly on whichever source it treats as alpha-untransformed.
+    assert_eq!(
+        u64::try_from(negative_nonopaque).expect("count fits"),
+        manifest["fixtures"][ALPHA_POSITIVE]["alpha_non_opaque_samples"]
+            .as_u64()
+            .expect("pinned alpha count"),
+        "the alpha-untransformed decode must reproduce the pinned non-opaque sample count"
+    );
+
+    // Sample-level differential of the transferred alpha plane itself, so the transport-level
+    // plane difference and the displayed RGBA alpha difference are never conflated.
+    let plane_alpha_differences = positive.planes[3]
+        .data
+        .iter()
+        .zip(negative.planes[3].data.iter())
+        .filter(|(left, right)| left != right)
+        .count();
+    let rgba_alpha_equals_plane = positive.planes[3]
+        .data
+        .iter()
+        .enumerate()
+        .all(|(index, value)| positive_rgba[index * 4 + 3] == *value)
+        && negative.planes[3]
+            .data
+            .iter()
+            .enumerate()
+            .all(|(index, value)| negative_rgba[index * 4 + 3] == *value);
+    println!(
+        "n123_evidence plane_alpha_differences={plane_alpha_differences} \
+         rgba_alpha_equals_plane={rgba_alpha_equals_plane} \
+         nonopaque_delta={}",
+        positive_nonopaque.abs_diff(negative_nonopaque)
+    );
+
+    // Accurate enumeration: the bounded inventory and the counts must describe the same data.
+    assert_eq!(
+        coordinates.len(),
+        alpha_differences.min(ALPHA_COORDINATE_LIMIT),
+        "the bounded coordinate inventory must match the enumerated difference count"
+    );
+    assert!(
+        positive_nonopaque.abs_diff(negative_nonopaque) <= alpha_differences,
+        "differing alpha samples cannot change more non-opaque samples than they touch"
+    );
+    assert!(
+        rgba_alpha_equals_plane,
+        "the packed RGBA alpha channel must be the decoded alpha plane, sample for sample"
+    );
+    assert_eq!(
+        alpha_differences, plane_alpha_differences,
+        "the displayed alpha differential must equal the transferred plane differential"
+    );
+    assert_eq!(
+        rgb_differences, 0,
+        "only alpha may differ between the two sources; {rgb_differences} RGB samples differed"
+    );
+    assert_eq!(
+        alpha_differences, 14_460,
+        "the measured associated-alpha differential is 14,460 samples, not {alpha_differences}"
+    );
+    println!("n123_decoder measured=true");
+}

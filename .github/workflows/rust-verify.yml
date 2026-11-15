@@ -968,6 +968,75 @@ jobs:
           (Get-Content -LiteralPath $log) | ForEach-Object { $_.Replace('counterfeits_refused=true', 'counterfeits_refused=false') } | Set-Content -LiteralPath $probe
           if (Test-N121Log -Path $probe) { throw 'corrupted N121 evidence accepted' }
           Write-Output 'n121_gate mutation=rejected'
+      - name: AVIF alpha-transform decoder differential gate (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          check_n123() {
+            local log="$1"
+            grep -qF 'test n123_associated_alpha_irot_decoder_differential_is_measured ' "$log" || return 1
+            [ "$(grep -Ec '^test n123_[A-Za-z0-9_]*( |$)' "$log")" -eq 1 ] || return 1
+            grep -qF 'test result: ok. 1 passed; 0 failed; 0 ignored' "$log" || return 1
+            ! grep -qF '... FAILED' "$log" || return 1
+            ! grep -qF '... ignored' "$log" || return 1
+            ! grep -qF 'test result: FAILED' "$log" || return 1
+            grep -qF 'n123_decoder measured=true' "$log" || return 1
+            grep -qF 'alpha_differences=14460' "$log" || return 1
+            grep -qF 'rgb_differences=0' "$log" || return 1
+            grep -qF 'plane_alpha_differences=14460' "$log" || return 1
+          }
+          log="$RUNNER_TEMP/n123-differential.txt"
+          cargo test -p solo-adapters --test graphic_avif_inspection --locked n123_ -- --nocapture >"$log" 2>&1 || { cat "$log"; exit 1; }
+          cat "$log"
+          check_n123 "$log" || { echo 'authentic n123 differential rejected'; exit 1; }
+          echo 'n123_gate authentic=accepted'
+          probe="$RUNNER_TEMP/n123-probe.txt"
+          cp "$log" "$probe"
+          sed -i '/n123_decoder measured=true/d' "$probe"
+          if check_n123 "$probe"; then echo 'missing n123 evidence accepted'; exit 1; fi
+          cp "$log" "$probe"
+          sed -i 's/alpha_differences=14460/alpha_differences=0/' "$probe"
+          if check_n123 "$probe"; then echo 'corrupted n123 evidence accepted'; exit 1; fi
+          cp "$log" "$probe"
+          sed -i 's/1 passed; 0 failed; 0 ignored/0 passed; 1 failed; 0 ignored/' "$probe"
+          if check_n123 "$probe"; then echo 'failed n123 run accepted'; exit 1; fi
+          echo 'n123_gate mutation=rejected'
+      - name: AVIF alpha-transform decoder differential gate (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $tokens = @(
+            'n123_decoder measured=true',
+            'alpha_differences=14460',
+            'rgb_differences=0',
+            'plane_alpha_differences=14460')
+          function Test-N123Log {
+            param([string]$Path)
+            $text = Get-Content -LiteralPath $Path -Raw
+            if (-not $text.Contains('test n123_associated_alpha_irot_decoder_differential_is_measured ')) { return $false }
+            if (([regex]::Matches($text, '(?m)^test n123_[A-Za-z0-9_]*( |$)')).Count -ne 1) { return $false }
+            if (-not $text.Contains('test result: ok. 1 passed; 0 failed; 0 ignored')) { return $false }
+            if ($text.Contains('... FAILED') -or $text.Contains('... ignored') -or $text.Contains('test result: FAILED')) { return $false }
+            foreach ($token in $tokens) {
+              if (-not $text.Contains($token)) { return $false }
+            }
+            return $true
+          }
+          $log = Join-Path $env:RUNNER_TEMP 'n123-differential.txt'
+          cargo test -p solo-adapters --test graphic_avif_inspection --locked n123_ -- --nocapture *>&1 | Tee-Object -FilePath $log
+          if ($LASTEXITCODE -ne 0) { throw 'the n123 differential did not exit zero' }
+          Get-Content -LiteralPath $log
+          if (-not (Test-N123Log -Path $log)) { throw 'authentic n123 differential rejected' }
+          Write-Output 'n123_gate authentic=accepted'
+          $probe = Join-Path $env:RUNNER_TEMP 'n123-probe.txt'
+          (Get-Content -LiteralPath $log | Where-Object { -not $_.Contains('n123_decoder measured=true') }) | Set-Content -LiteralPath $probe
+          if (Test-N123Log -Path $probe) { throw 'missing n123 evidence accepted' }
+          (Get-Content -LiteralPath $log) | ForEach-Object { $_.Replace('alpha_differences=14460', 'alpha_differences=0') } | Set-Content -LiteralPath $probe
+          if (Test-N123Log -Path $probe) { throw 'corrupted n123 evidence accepted' }
+          (Get-Content -LiteralPath $log) | ForEach-Object { $_.Replace('1 passed; 0 failed; 0 ignored', '0 passed; 1 failed; 0 ignored') } | Set-Content -LiteralPath $probe
+          if (Test-N123Log -Path $probe) { throw 'failed n123 run accepted' }
+          Write-Output 'n123_gate mutation=rejected'
       - name: Deliberate RED oracle sensitivity
         shell: bash
         run: |
@@ -1573,6 +1642,16 @@ jobs:
           else
             avifdec --codec dav1d --jobs 1 "$F/abc_color_irot_alpha_irot.avif" "$PNG"
           fi
+          NEGPNG="$M/abc_color_irot_alpha_NOirot.avif.png"
+          if grep -q -- '--depth' "$RUNNER_TEMP/tool/avifdec-help.txt"; then
+            avifdec --codec dav1d --jobs 1 --depth 8 "$F/abc_color_irot_alpha_NOirot.avif" "$NEGPNG"
+          else
+            avifdec --codec dav1d --jobs 1 "$F/abc_color_irot_alpha_NOirot.avif" "$NEGPNG"
+          fi
+          # Both references are measured; the negative is never treated as a valid positive.
+          test -s "$PNG"
+          test -s "$NEGPNG"
+          test "$PNG" != "$NEGPNG"
           for produced in "$M"/*.y4m; do
             python3 "$F/reference_oracle.py" y4m "$produced" > "$produced.json"
           done
@@ -1792,12 +1871,43 @@ jobs:
           print("mutation_rejections=3/3")
           PY
 
+      - name: Adjudicate the associated-alpha irot reference independently
+        run: |
+          set -euo pipefail
+          M="$RUNNER_TEMP/measured"
+          F="$FIXTURES"
+          log="$RUNNER_TEMP/n123-reference.txt"
+          python3 "$F/alpha_transform_referee.py" \
+            "$F/reference-goldens.json" \
+            "$F/abc_color_irot_alpha_irot.avif" "$M/abc_color_irot_alpha_irot.avif.png" \
+            "$F/abc_color_irot_alpha_NOirot.avif" "$M/abc_color_irot_alpha_NOirot.avif.png" \
+            >"$log" 2>&1 || { cat "$log"; exit 1; }
+          cat "$log"
+          grep -qF 'n123_reference positive_pin=matched' "$log" || { echo 'referee did not match the pinned positive'; exit 1; }
+          grep -qF 'n123_reference negative_measured=true' "$log" || { echo 'referee did not measure the negative'; exit 1; }
+          grep -qF 'n123_reference same_coded_rgba=' "$log" || { echo 'referee omitted the reference comparison'; exit 1; }
+          grep -qF 'n123_reference alpha_differences=' "$log" || { echo 'referee omitted the alpha differential'; exit 1; }
+          grep -qF 'n123_reference mutation_rejections=2/2' "$log" || { echo 'referee mutation proof absent'; exit 1; }
+          grep -qF 'n123_reference cleanup=complete' "$log" || { echo 'referee cleanup not reported'; exit 1; }
+          set +e
+          python3 "$F/alpha_transform_referee.py" \
+            "$F/reference-goldens.json" \
+            "$F/abc_color_irot_alpha_irot.avif" "$M/abc_color_irot_alpha_irot.avif.png" \
+            "$F/abc_color_irot_alpha_NOirot.avif" "$M/abc_color_irot_alpha_irot.avif.png" \
+            >/dev/null 2>&1
+          alias_rc=$?
+          set -e
+          test "$alias_rc" -eq 1 || { echo "::error::aliasing the two references must be a checked refusal, got $alias_rc"; exit 1; }
+          echo 'n123_reference alias_refusal=verified'
+          echo 'n123_gate reference=accepted'
       - name: Remove task-owned reference material
         if: always()
         run: |
           set -euo pipefail
           rm -rf "$RUNNER_TEMP/measured" "$RUNNER_TEMP/tool"
-          for leftover in "$RUNNER_TEMP/measured" "$RUNNER_TEMP/tool"; do
+          rm -f "$RUNNER_TEMP/n123-reference.txt" "$RUNNER_TEMP/n123-reference-probe.txt"
+          for leftover in "$RUNNER_TEMP/measured" "$RUNNER_TEMP/tool" \
+            "$RUNNER_TEMP/n123-reference.txt"; do
             if [ -e "$leftover" ]; then
               echo "::error::cleanup left $leftover behind"
               exit 1
