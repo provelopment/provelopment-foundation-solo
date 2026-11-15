@@ -17,6 +17,7 @@ mod graphic_asset_inventory;
 mod graphic_asset_read;
 mod graphic_image_inspection;
 mod media_worker;
+mod platform_asset_catalogue;
 mod property_resolution;
 mod source_read;
 
@@ -85,6 +86,19 @@ pub use media_worker::{
     MediaWorkerRefusalV1, MediaWorkerRequestV1, MediaWorkerRunV1, MediaWorkerStatusV1,
     inspect_media_worker_source_set_v1, media_worker_output_sha256_v1,
     sha256_media_worker_bytes_v1,
+};
+pub use platform_asset_catalogue::{
+    MAX_PLATFORM_ASSET_ID_BYTES_V1, MAX_PLATFORM_ASSET_ID_SEGMENTS_V1,
+    MAX_PLATFORM_ASSET_PIXELS_V1, MAX_PLATFORM_ASSET_SIDE_V1, MAX_PLATFORM_CATALOGUE_ENTRIES_V1,
+    MAX_PLATFORM_RIGHTS_SCALARS_V1, PLATFORM_ASSET_CATALOGUE_GRANTS_PUBLICATION_AUTHORITY_V1,
+    PLATFORM_ASSET_CATALOGUE_PLATFORM_SOURCE_READABLE_V1,
+    PLATFORM_ASSET_CATALOGUE_PROVES_MEDIA_CORRECTNESS_V1,
+    PLATFORM_ASSET_CATALOGUE_RIGHTS_REVIEWED_V1, PLATFORM_ASSET_LIBRARY_VERSION_V1,
+    PlatformAssetCatalogueEntryV1, PlatformAssetCatalogueV1, PlatformAssetDeclarationV1,
+    PlatformAssetLicenceV1, PlatformAssetMediaClassV1, PlatformAssetProvenanceV1,
+    PlatformCatalogueBindingScopeV1, PlatformCatalogueBindingV1, PlatformCatalogueMatchRefusalV1,
+    PlatformCatalogueMatchV1, PlatformCatalogueRefusalV1, bind_catalogue_to_v4_evidence_v1,
+    match_catalogue_entry_to_v4_evidence_v1,
 };
 pub use property_resolution::{
     PROPERTY_CANDIDATE_GRANTS_PUBLICATION_AUTHORITY, PropertyResolutionCandidateV1,

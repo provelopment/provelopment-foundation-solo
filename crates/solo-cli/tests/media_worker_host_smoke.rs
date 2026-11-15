@@ -7550,3 +7550,701 @@ mod n124 {
         );
     }
 }
+
+/// `SOLO-WO-118 R12`: the strict, inert `1.0.0` Platform catalogue binding on real confined evidence.
+///
+/// Every catalogue document in this module is **synthetic, test-owned and explicitly unapproved**
+/// text built inside the test process. It is not product artwork, not an installed
+/// `platform/assets/` library and not a rights assertion of any kind: the licence and provenance
+/// strings are placeholders that exist only to satisfy the closed review shape.
+mod n125 {
+    use solo_adapters::{
+        ConfinedGraphicInspectAdapterV4, TestOwnerV1, parse_platform_asset_catalogue_v1,
+    };
+    use solo_application::{
+        GraphicAssetReadSetOutcomeV1, GraphicAssetSourceSetV1, GraphicImageFormatV3,
+        GraphicImageInspectionOutcomeV4, GraphicImageInspectionV4, MediaWorkerColorModelV1,
+        PLATFORM_ASSET_LIBRARY_VERSION_V1, PlatformCatalogueBindingScopeV1,
+        PlatformCatalogueBindingV1, PlatformCatalogueMatchRefusalV1, PlatformCatalogueRefusalV1,
+        bind_catalogue_to_v4_evidence_v1, inspect_graphic_image_source_set_v4,
+        read_graphic_asset_bytes_v1,
+    };
+
+    use super::BIN;
+    use super::n116::{
+        Root, gif_fixture, inventory_of, jpeg, png, rich_svg, suppressed_inventory_of, webp,
+    };
+
+    /// Independently pinned canonical SHA-256 of the rich static vector fixture.
+    const RICH_CANONICAL_SHA256: &str =
+        "0403e0677a174ccafe18191a8a9f1c5a30993477bb074f49078b005f513caaba";
+
+    /// The R10 associated-alpha fixture and its pinned digests.
+    const ALPHA_FIXTURE: &str = "abc_color_irot_alpha_irot.avif";
+    const ALPHA_ASSET: &str = "alpha-irot.avif";
+    const ALPHA_SOURCE_SHA: &str =
+        "b371cc88244a873131e4d10ff9363d71ce4f41cf333bd4a491b38d970d9abd3b";
+    const ALPHA_PLANE_SHA: &str =
+        "5de419d1b511b0d12dfa639a643c6becfecfa7b3b81067a7b12a761c3593cbdd";
+
+    fn fixture_bytes(name: &str) -> Vec<u8> {
+        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/avif")
+            .join(name);
+        std::fs::read(path).expect("pinned avif fixture present")
+    }
+
+    /// The synthetic catalogue identifier for one declared format.
+    ///
+    /// Each name is unique per format, so an entry can never be paired with a record of a different
+    /// format by accident; the identifier is a synthetic test label, not product artwork.
+    fn synthetic_id(format: GraphicImageFormatV3) -> &'static str {
+        match format {
+            GraphicImageFormatV3::Png => "assets/n125-icon.png",
+            GraphicImageFormatV3::Jpeg => "assets/n125-logo.jpg",
+            GraphicImageFormatV3::WebP => "assets/n125-banner.webp",
+            GraphicImageFormatV3::Gif => "assets/n125-scene.gif",
+            GraphicImageFormatV3::Svg => "assets/n125-mark.svg",
+            GraphicImageFormatV3::Avif => "assets/n125-alpha.avif",
+        }
+    }
+
+    /// One synthetic catalogue entry, as the provisional `1.0.0` JSON shape spells it.
+    fn entry_json(id: &str, sha: &str, mime: &str, width: u32, height: u32) -> String {
+        format!(
+            r#"{{"id":"{id}","sha256":"{sha}","mediaClass":"image","mime":"{mime}","width":{width},"height":{height},"licence":{{"expression":"Synthetic-Test-Only-1.0","rightsHolder":"Synthetic placeholder (unapproved)","evidence":"synthetic/n125-notice.txt"}},"provenance":{{"source":"Synthetic bytes generated in this test","evidence":"synthetic/n125-provenance.txt"}}}}"#
+        )
+    }
+
+    /// One synthetic document over the given entries.
+    fn document_json(entries: &[String]) -> Vec<u8> {
+        format!(
+            r#"{{"platformAssetLibraryVersion":"{PLATFORM_ASSET_LIBRARY_VERSION_V1}","assets":[{}]}}"#,
+            entries.join(",")
+        )
+        .into_bytes()
+    }
+
+    /// One honest entry per record, derived from that record's parent-observed facts.
+    fn honest_entries(records: &[GraphicImageInspectionV4]) -> Vec<String> {
+        records
+            .iter()
+            .map(|record| {
+                entry_json(
+                    synthetic_id(record.format()),
+                    &record.source_digest().to_hex(),
+                    record.mime(),
+                    record.width(),
+                    record.height(),
+                )
+            })
+            .collect()
+    }
+
+    /// The accepted five-level, six-format Entity fixture used by the R12 cases.
+    fn six_format_root(tag: &str) -> (Root, solo_application::GraphicAssetObligationInventoryV1) {
+        let svg = rich_svg().into_bytes();
+        let gif = gif_fixture();
+        let alpha = fixture_bytes(ALPHA_FIXTURE);
+        let root = Root::new(
+            tag,
+            &[
+                ("icon.png", &png()),
+                ("banner.webp", &webp()),
+                ("logo-vector.jpg", &jpeg()),
+                ("scene.gif", &gif),
+                ("mark.svg", &svg),
+                (ALPHA_ASSET, &alpha),
+            ],
+        );
+        let inventory = suppressed_inventory_of(&[
+            (TestOwnerV1::Entity, "favicon", "icon.png", "public"),
+            (TestOwnerV1::Entity, "banner", "banner.webp", "internal"),
+            (TestOwnerV1::Facet, "logo", "logo-vector.jpg", "public"),
+            (TestOwnerV1::Site, "background", "scene.gif", "public"),
+            (TestOwnerV1::Page, "social-preview", "mark.svg", "public"),
+            (
+                TestOwnerV1::Representation,
+                "social-preview",
+                ALPHA_ASSET,
+                "internal",
+            ),
+        ]);
+        (root, inventory)
+    }
+
+    /// Acquires and inspects one real six-format candidate through the genuine composed path.
+    fn real_six_format_records(
+        root: &Root,
+        inventory: &solo_application::GraphicAssetObligationInventoryV1,
+        adapter: &ConfinedGraphicInspectAdapterV4,
+    ) -> Vec<GraphicImageInspectionV4> {
+        let set: GraphicAssetSourceSetV1 =
+            match read_graphic_asset_bytes_v1(inventory, &root.capability()) {
+                GraphicAssetReadSetOutcomeV1::Complete(set) => set,
+                GraphicAssetReadSetOutcomeV1::Refused(refusal) => {
+                    panic!("real source acquisition refused: {refusal:?}")
+                }
+            };
+        assert_eq!(set.len(), 6, "six authored obligations are acquired");
+        match inspect_graphic_image_source_set_v4(&set, adapter, adapter) {
+            GraphicImageInspectionOutcomeV4::Complete(complete) => {
+                assert_eq!(complete.len(), 6, "six ordered records");
+                complete.inspections().to_vec()
+            }
+            GraphicImageInspectionOutcomeV4::Refused(refusal) => {
+                panic!("the six-format candidate refused: {refusal:?}")
+            }
+        }
+    }
+
+    #[test]
+    fn n125_01_six_format_catalogue_matches_real_v4_evidence_for_review() {
+        let (root, inventory) = six_format_root("n125-six");
+        let adapter = ConfinedGraphicInspectAdapterV4::new(std::path::Path::new(BIN));
+        let records = real_six_format_records(&root, &inventory, &adapter);
+
+        // Six genuine children: five legacy PIDs from their records plus the observed AVIF child.
+        let mut pids: Vec<u32> = records
+            .iter()
+            .map(|record| record.worker_pid())
+            .filter(|pid| *pid > 0)
+            .collect();
+        assert_eq!(pids.len(), 5, "five legacy records carry their PIDs");
+        let avif_pids = adapter.observed_avif_pids_v1();
+        assert_eq!(avif_pids.len(), 1, "one real confined AVIF child");
+        pids.extend(avif_pids.iter().copied());
+        let mut unique = pids.clone();
+        unique.sort_unstable();
+        unique.dedup();
+        assert_eq!(unique.len(), 6, "six distinct child processes: {pids:?}");
+
+        // The records come from the **Entity** namespace; the catalogue is a **Platform** assertion.
+        for record in &records {
+            assert_eq!(
+                format!("{:?}", record.obligation().reference().namespace()),
+                "Entity",
+                "the reviewed evidence is Entity-sourced"
+            );
+        }
+
+        let entries = honest_entries(&records);
+        let catalogue = parse_platform_asset_catalogue_v1(
+            &document_json(&entries),
+            PLATFORM_ASSET_LIBRARY_VERSION_V1,
+        )
+        .expect("the synthetic catalogue is well formed");
+        assert_eq!(catalogue.len(), 6, "one entry per obligation");
+        for (entry, record) in catalogue.entries().iter().zip(&records) {
+            assert_eq!(entry.id(), synthetic_id(record.format()));
+            assert_eq!(format!("{:?}", entry.namespace()), "Platform");
+            assert_eq!(entry.sha256(), *record.source_digest());
+        }
+        assert!(!catalogue.grants_publication_authority());
+        assert!(!catalogue.rights_reviewed());
+        assert!(!catalogue.platform_source_readable());
+
+        let binding = bind_catalogue_to_v4_evidence_v1(
+            &catalogue,
+            &records,
+            PlatformCatalogueBindingScopeV1::ContentFactComparisonOnly,
+        );
+        assert_eq!(
+            binding,
+            PlatformCatalogueBindingV1::CompleteForReview { matched: 6 },
+            "six entries agree with six parent-observed records"
+        );
+        assert!(!binding.grants_publication_authority());
+        assert!(!binding.platform_source_readable());
+        // The real Platform call site stays unavailable in R12, so no acquisition is claimed.
+        assert_eq!(
+            bind_catalogue_to_v4_evidence_v1(
+                &catalogue,
+                &records,
+                PlatformCatalogueBindingScopeV1::PlatformSource
+            ),
+            PlatformCatalogueBindingV1::Refused {
+                position: 0,
+                kind: PlatformCatalogueMatchRefusalV1::PlatformSourceUnavailable,
+            }
+        );
+
+        // The typed facts of the reviewed records are unchanged by the catalogue.
+        let gif = records
+            .iter()
+            .find(|record| record.format() == GraphicImageFormatV3::Gif)
+            .expect("the GIF record");
+        match gif.payload() {
+            solo_application::GraphicImagePayloadV4::Legacy(
+                solo_application::GraphicImagePayloadV3::Animation(evidence),
+            ) => assert_eq!(evidence.frames.len(), 3, "the GIF timeline is retained"),
+            other => panic!("the GIF record lost its timeline: {other:?}"),
+        }
+        let svg = records
+            .iter()
+            .find(|record| record.format() == GraphicImageFormatV3::Svg)
+            .expect("the SVG record");
+        match svg.payload() {
+            solo_application::GraphicImagePayloadV4::Legacy(
+                solo_application::GraphicImagePayloadV3::Vector(evidence),
+            ) => assert_eq!(
+                solo_application::sha256_media_worker_bytes_v1(evidence.canonical()).to_hex(),
+                RICH_CANONICAL_SHA256,
+                "the canonical vector facts are retained"
+            ),
+            other => panic!("the SVG record lost its vector facts: {other:?}"),
+        }
+        let avif = records
+            .iter()
+            .find(|record| record.format() == GraphicImageFormatV3::Avif)
+            .expect("the AVIF record");
+        let evidence = avif.avif().expect("parent-checked envelope");
+        assert_eq!(
+            evidence.checked().color_model(),
+            MediaWorkerColorModelV1::Yuva
+        );
+        assert_eq!(evidence.planes().len(), 4);
+        assert_eq!((avif.width(), avif.height()), (256, 512));
+        assert_eq!(avif.source_digest().to_hex(), ALPHA_SOURCE_SHA);
+        for record in &records {
+            assert!(!record.grants_publication_authority());
+        }
+
+        println!(
+            "n125_evidence case=01 formats=png,webp,jpeg,gif,svg,avif records=6 levels=5 \
+             pids={pids:?} distinct_pids=6 matched=6 review_only=true platform_read=false \
+             publication=false unapproved_synthetic=true"
+        );
+    }
+
+    /// The synthetic document builder with an explicit version, for version-refusal cases.
+    fn document_json_versioned(version: &str, entries: &[String]) -> Vec<u8> {
+        format!(
+            r#"{{"platformAssetLibraryVersion":"{version}","assets":[{}]}}"#,
+            entries.join(",")
+        )
+        .into_bytes()
+    }
+
+    /// One hostile synthetic document set; every entry is built in this test process only.
+    fn hostile_cases() -> Vec<(&'static str, Vec<u8>, PlatformCatalogueRefusalV1)> {
+        use PlatformCatalogueRefusalV1 as Refusal;
+        let sha = "a".repeat(64);
+        let good = entry_json("assets/n125-icon.png", &sha, "image/png", 2, 2);
+        let mut cases: Vec<(&'static str, Vec<u8>, Refusal)> = Vec::new();
+        cases.push((
+            "bad-version",
+            document_json_versioned("1.1.0", std::slice::from_ref(&good)),
+            Refusal::VersionMismatch,
+        ));
+        cases.push((
+            "missing-version",
+            format!(r#"{{"assets":[{good}]}}"#).into_bytes(),
+            Refusal::InvalidSyntax,
+        ));
+        cases.push((
+            "duplicate-root-key",
+            format!(
+                r#"{{"platformAssetLibraryVersion":"1.0.0","platformAssetLibraryVersion":"1.0.0","assets":[{good}]}}"#
+            )
+            .into_bytes(),
+            Refusal::DuplicateField,
+        ));
+        cases.push((
+            "duplicate-nested-licence-key",
+            format!(
+                r#"{{"platformAssetLibraryVersion":"1.0.0","assets":[{{"id":"assets/n125-icon.png","sha256":"{sha}","mediaClass":"image","mime":"image/png","width":2,"height":2,"licence":{{"expression":"A","expression":"B","rightsHolder":"C","evidence":"D"}},"provenance":{{"source":"S","evidence":"E"}}}}]}}"#
+            )
+            .into_bytes(),
+            Refusal::DuplicateField,
+        ));
+        cases.push((
+            "unknown-field",
+            format!(r#"{{"platformAssetLibraryVersion":"1.0.0","assets":[{good}],"note":"x"}}"#)
+                .into_bytes(),
+            Refusal::UnknownField,
+        ));
+        cases.push(("empty-assets", document_json(&[]), Refusal::EmptyCatalogue));
+        cases.push((
+            "traversal-id",
+            document_json(&[entry_json(
+                "assets/../../n125-icon.png",
+                &sha,
+                "image/png",
+                2,
+                2,
+            )]),
+            Refusal::InvalidId,
+        ));
+        cases.push((
+            "absolute-id",
+            document_json(&[entry_json("/assets/n125-icon.png", &sha, "image/png", 2, 2)]),
+            Refusal::InvalidId,
+        ));
+        cases.push((
+            "reserved-name-id",
+            document_json(&[entry_json("assets/aux.png", &sha, "image/png", 2, 2)]),
+            Refusal::InvalidId,
+        ));
+        cases.push((
+            "uppercase-extension",
+            document_json(&[entry_json("assets/n125-icon.PNG", &sha, "image/png", 2, 2)]),
+            Refusal::InvalidId,
+        ));
+        cases.push((
+            "platform-prefixed-id",
+            document_json(&[entry_json(
+                "platform/n125-icon.png",
+                &sha,
+                "image/png",
+                2,
+                2,
+            )]),
+            Refusal::InvalidId,
+        ));
+
+        cases.push((
+            "malformed-digest",
+            document_json(&[entry_json("assets/n125-icon.png", "abc", "image/png", 2, 2)]),
+            Refusal::InvalidDigest,
+        ));
+        cases.push((
+            "uppercase-digest",
+            document_json(&[entry_json(
+                "assets/n125-icon.png",
+                &"B".repeat(64),
+                "image/png",
+                2,
+                2,
+            )]),
+            Refusal::InvalidDigest,
+        ));
+        cases.push((
+            "zero-digest",
+            document_json(&[entry_json(
+                "assets/n125-icon.png",
+                &"0".repeat(64),
+                "image/png",
+                2,
+                2,
+            )]),
+            Refusal::InvalidDigest,
+        ));
+        cases.push((
+            "unsupported-mime",
+            document_json(&[entry_json("assets/n125-icon.png", &sha, "text/vtt", 2, 2)]),
+            Refusal::UnsupportedMediaType,
+        ));
+        cases.push((
+            "mime-extension-pair",
+            document_json(&[entry_json("assets/n125-icon.png", &sha, "image/jpeg", 2, 2)]),
+            Refusal::MimeExtensionMismatch,
+        ));
+        cases.push((
+            "bad-media-class",
+            document_json(&[format!(
+                r#"{{"id":"assets/n125-icon.png","sha256":"{sha}","mediaClass":"video","mime":"image/png","width":2,"height":2,"licence":{{"expression":"E","rightsHolder":"H","evidence":"V"}},"provenance":{{"source":"S","evidence":"E"}}}}"#
+            )]),
+            Refusal::InvalidMediaClass,
+        ));
+        cases.push((
+            "zero-geometry",
+            document_json(&[entry_json("assets/n125-icon.png", &sha, "image/png", 0, 2)]),
+            Refusal::InvalidDimensions,
+        ));
+        cases.push((
+            "overflow-geometry",
+            document_json(&[entry_json(
+                "assets/n125-icon.png",
+                &sha,
+                "image/png",
+                8192,
+                8192,
+            )]),
+            Refusal::InvalidDimensions,
+        ));
+        cases.push((
+            "missing-licence-evidence",
+            document_json(&[format!(
+                r#"{{"id":"assets/n125-icon.png","sha256":"{sha}","mediaClass":"image","mime":"image/png","width":2,"height":2,"licence":{{"expression":"","rightsHolder":"","evidence":""}},"provenance":{{"source":"S","evidence":"E"}}}}"#
+            )]),
+            Refusal::MissingRightsEvidence,
+        ));
+        cases.push((
+            "missing-provenance-evidence",
+            document_json(&[format!(
+                r#"{{"id":"assets/n125-icon.png","sha256":"{sha}","mediaClass":"image","mime":"image/png","width":2,"height":2,"licence":{{"expression":"E","rightsHolder":"H","evidence":"V"}},"provenance":{{"source":"","evidence":""}}}}"#
+            )]),
+            Refusal::MissingRightsEvidence,
+        ));
+        cases.push((
+            "bom",
+            format!(
+                "\u{FEFF}{}",
+                String::from_utf8_lossy(&document_json(std::slice::from_ref(&good)))
+            )
+            .into_bytes(),
+            Refusal::InvalidSyntax,
+        ));
+        cases.push((
+            "trailing-json",
+            format!(
+                "{}[]",
+                String::from_utf8_lossy(&document_json(std::slice::from_ref(&good)))
+            )
+            .into_bytes(),
+            Refusal::InvalidSyntax,
+        ));
+        cases.push((
+            "oversize-body",
+            vec![b' '; solo_adapters::MAX_PLATFORM_CATALOGUE_BYTES_V1 + 1],
+            Refusal::InvalidSyntax,
+        ));
+        cases
+    }
+
+    #[test]
+    fn n125_02_closed_catalogue_parser_and_version_refusal_matrix() {
+        let version = PLATFORM_ASSET_LIBRARY_VERSION_V1;
+        let cases = hostile_cases();
+        assert!(cases.len() >= 18, "the host matrix is deliberately large");
+        for (label, bytes, want) in &cases {
+            let outcome = parse_platform_asset_catalogue_v1(bytes, version);
+            assert_eq!(outcome.as_ref().err(), Some(want), "case {label}");
+            let rendered = format!("{:?}", outcome.as_ref().err());
+            for forbidden in ["assets/", "synthetic/", "n125-", "Synthetic"] {
+                assert!(
+                    !rendered.contains(forbidden),
+                    "case {label} leaked {forbidden}"
+                );
+            }
+        }
+        // The trusted selected version is independent of the document under review.
+        let honest = document_json(&[entry_json(
+            "assets/n125-icon.png",
+            &"a".repeat(64),
+            "image/png",
+            2,
+            2,
+        )]);
+        assert_eq!(
+            parse_platform_asset_catalogue_v1(&honest, "2.0.0").err(),
+            Some(PlatformCatalogueRefusalV1::VersionMismatch)
+        );
+        let accepted = parse_platform_asset_catalogue_v1(&honest, version)
+            .expect("the single-entry synthetic document is well formed");
+        assert_eq!(accepted.len(), 1);
+        assert!(!accepted.grants_publication_authority());
+        assert!(!accepted.rights_reviewed());
+
+        println!(
+            "n125_evidence case=02 refusals={} duplicate_keys=refused version_mismatch=refused \
+             approval=false review_only=true platform_read=false publication=false",
+            cases.len()
+        );
+    }
+
+    /// The closed position and category of a refused binding, if it refused at all.
+    fn refused_binding(
+        binding: PlatformCatalogueBindingV1,
+    ) -> Option<(usize, PlatformCatalogueMatchRefusalV1)> {
+        match binding {
+            PlatformCatalogueBindingV1::Refused { position, kind } => Some((position, kind)),
+            PlatformCatalogueBindingV1::CompleteForReview { .. } => None,
+        }
+    }
+
+    #[test]
+    fn n125_03_late_inert_catalogue_mismatch_discards_entire_candidate() {
+        use PlatformCatalogueMatchRefusalV1 as Refusal;
+        let (root, inventory) = six_format_root("n125-late");
+        let adapter = ConfinedGraphicInspectAdapterV4::new(std::path::Path::new(BIN));
+        let records = real_six_format_records(&root, &inventory, &adapter);
+        let scope = PlatformCatalogueBindingScopeV1::ContentFactComparisonOnly;
+        let honest = honest_entries(&records);
+        let version = PLATFORM_ASSET_LIBRARY_VERSION_V1;
+        let honest_catalogue = parse_platform_asset_catalogue_v1(&document_json(&honest), version)
+            .expect("the synthetic catalogue is well formed");
+        assert_eq!(
+            bind_catalogue_to_v4_evidence_v1(&honest_catalogue, &records, scope),
+            PlatformCatalogueBindingV1::CompleteForReview { matched: 6 },
+            "the control binding matches all six"
+        );
+
+        let last_index = records
+            .iter()
+            .position(|record| record.format() == GraphicImageFormatV3::Avif)
+            .expect("the AVIF record");
+        let last = &records[last_index];
+        let mut forged = honest.clone();
+        forged[5] = entry_json(
+            synthetic_id(GraphicImageFormatV3::Avif),
+            &"9".repeat(64),
+            last.mime(),
+            last.width(),
+            last.height(),
+        );
+        let catalogue = parse_platform_asset_catalogue_v1(&document_json(&forged), version)
+            .expect("well formed but forged");
+        let binding = bind_catalogue_to_v4_evidence_v1(&catalogue, &records, scope);
+        assert_eq!(
+            refused_binding(binding),
+            Some((last_index, Refusal::SourceDigestMismatch)),
+            "the forged digest refuses the whole set: {binding:?}"
+        );
+
+        let mut forged = honest.clone();
+        forged[5] = entry_json(
+            synthetic_id(GraphicImageFormatV3::Avif),
+            &last.source_digest().to_hex(),
+            last.mime(),
+            256,
+            256,
+        );
+        let catalogue = parse_platform_asset_catalogue_v1(&document_json(&forged), version)
+            .expect("well formed but forged");
+        assert_eq!(
+            refused_binding(bind_catalogue_to_v4_evidence_v1(
+                &catalogue, &records, scope
+            )),
+            Some((last_index, Refusal::DimensionsMismatch)),
+            "the forged geometry refuses the whole set"
+        );
+
+        let mut forged = honest.clone();
+        forged[5] = entry_json(
+            "assets/n125-alpha.png",
+            &last.source_digest().to_hex(),
+            "image/png",
+            last.width(),
+            last.height(),
+        );
+        let catalogue = parse_platform_asset_catalogue_v1(&document_json(&forged), version)
+            .expect("well formed but forged");
+        assert_eq!(
+            refused_binding(bind_catalogue_to_v4_evidence_v1(
+                &catalogue, &records, scope
+            )),
+            Some((last_index, Refusal::FormatMismatch)),
+            "the declared format disagreement refuses the whole set"
+        );
+
+        let mut forged = honest.clone();
+        forged[5] = entry_json(
+            synthetic_id(GraphicImageFormatV3::Avif),
+            ALPHA_PLANE_SHA,
+            last.mime(),
+            last.width(),
+            last.height(),
+        );
+        let catalogue = parse_platform_asset_catalogue_v1(&document_json(&forged), version)
+            .expect("well formed but forged");
+        assert_eq!(
+            refused_binding(bind_catalogue_to_v4_evidence_v1(
+                &catalogue, &records, scope
+            )),
+            Some((last_index, Refusal::SourceDigestMismatch)),
+            "a plane digest is never accepted as the source digest"
+        );
+
+        let mut short = honest.clone();
+        short.pop();
+        let catalogue = parse_platform_asset_catalogue_v1(&document_json(&short), version)
+            .expect("well formed but short");
+        let refusal = bind_catalogue_to_v4_evidence_v1(&catalogue, &records, scope);
+        assert!(
+            matches!(
+                refusal,
+                PlatformCatalogueBindingV1::Refused {
+                    position: 0,
+                    kind: Refusal::CatalogueCountMismatch
+                }
+            ),
+            "an absent identifier never upgrades or falls back"
+        );
+        let rendered = format!("{refusal:?}");
+        for forbidden in ["assets/", "n125-", "alpha-irot", "Synthetic"] {
+            assert!(
+                !rendered.contains(forbidden),
+                "the refusal leaked {forbidden}: {rendered}"
+            );
+        }
+
+        println!(
+            "n125_evidence case=03 records=6 zero_partial=true private_path_absent=true \
+             source_hash_not_plane_hash=true fallback=false version_fallback=false \
+             review_only=true platform_read=false publication=false"
+        );
+    }
+
+    #[test]
+    fn n125_04_real_entity_reader_still_refuses_platform_and_no_unapproved_library() {
+        // A real Entity asset with the same basename exists, so a sloppy fallback would find it.
+        let root = Root::new("n125-platform", &[("icon.png", &png())]);
+        let entity_inventory =
+            inventory_of(&[(TestOwnerV1::Entity, "favicon", "icon.png", "public")]);
+        match read_graphic_asset_bytes_v1(&entity_inventory, &root.capability()) {
+            GraphicAssetReadSetOutcomeV1::Complete(set) => {
+                assert_eq!(set.len(), 1, "the Entity source itself is readable");
+            }
+            GraphicAssetReadSetOutcomeV1::Refused(refusal) => {
+                panic!("the Entity source refused: {refusal:?}")
+            }
+        }
+
+        // The same basename addressed as a Platform path is refused by the closed declaration
+        // grammar before any read; the repository also carries no Platform reader to reach.
+        assert!(
+            solo_adapters::test_inventory_v1(&[(
+                TestOwnerV1::Entity,
+                "favicon",
+                "platform/icon.png",
+                "public"
+            )])
+            .is_none(),
+            "a Platform-namespaced path is refused by the declaration grammar before any read"
+        );
+
+        // A catalogued Platform entry may carry the same basename, and still confers nothing.
+        let catalogue = parse_platform_asset_catalogue_v1(
+            &document_json(&[entry_json("icon.png", &"c".repeat(64), "image/png", 2, 2)]),
+            PLATFORM_ASSET_LIBRARY_VERSION_V1,
+        )
+        .expect("a Platform-namespaced identifier is well formed");
+        let entry = &catalogue.entries()[0];
+        assert_eq!(format!("{:?}", entry.namespace()), "Platform");
+        assert!(!catalogue.platform_source_readable());
+        assert!(!catalogue.grants_publication_authority());
+        assert!(!catalogue.rights_reviewed());
+        assert_eq!(
+            bind_catalogue_to_v4_evidence_v1(
+                &catalogue,
+                &[],
+                PlatformCatalogueBindingScopeV1::PlatformSource
+            ),
+            PlatformCatalogueBindingV1::Refused {
+                position: 0,
+                kind: PlatformCatalogueMatchRefusalV1::PlatformSourceUnavailable,
+            },
+            "the real Platform call site cannot be served in R12"
+        );
+
+        // No product Platform tree or catalogue is introduced by this order.
+        let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        for relative in ["../../platform", "../../platform/assets"] {
+            assert!(
+                !manifest.join(relative).exists(),
+                "no product Platform source tree may exist: {relative}"
+            );
+        }
+        assert!(
+            !manifest.join("../../content/platform").exists(),
+            "no alternate Platform route may exist inside the Entity source tree"
+        );
+
+        println!(
+            "n125_evidence case=04 platform=unverified entity_alias=false worker_launches=0 \
+             catalogue_shipped=false review_only=true platform_read=false publication=false"
+        );
+    }
+}

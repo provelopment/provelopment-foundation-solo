@@ -60,6 +60,7 @@ mod media_worker_host;
 #[cfg_attr(windows, allow(unsafe_code))]
 mod media_worker_host_native;
 mod media_worker_protocol;
+mod platform_asset_catalogue;
 mod property_resolution;
 mod publication_manifest;
 mod source_body_preflight;
@@ -123,6 +124,9 @@ pub use media_worker_host::{
 };
 pub use media_worker_protocol::{
     MediaWorkerProtocolRefusalKindV1, MediaWorkerProtocolRefusalV1, parse_media_worker_envelope_v1,
+};
+pub use platform_asset_catalogue::{
+    MAX_PLATFORM_CATALOGUE_BYTES_V1, parse_platform_asset_catalogue_v1,
 };
 pub use property_resolution::{
     ManifestPropertyCandidateV1, ManifestPropertyRefusalKind, ManifestPropertyRefusalV1,

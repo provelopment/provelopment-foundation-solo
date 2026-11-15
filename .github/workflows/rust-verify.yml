@@ -1221,6 +1221,101 @@ jobs:
           (Get-Content -LiteralPath $log) | ForEach-Object { $_.Replace('private_path_absent=true', 'private_path_absent=false').Replace('whole_set_discarded=true', 'whole_set_discarded=false') } | Set-Content -LiteralPath $probe
           if (Test-N124Log -Path $probe) { throw 'false privacy or whole-set flag accepted' }
           Write-Output 'n124_gate mutation=rejected'
+      # Mandatory `SOLO-WO-118 R12` N125 gate: the strict inert Platform catalogue contract and its
+      # V4 fact binding on this host, exercised over synthetic, explicitly unapproved test records.
+      # The same verifier must reject four altered copies of the real log before its verdict.
+      - name: Strict inert Platform catalogue N125 gate (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          check_n125() {
+            local log="$1"
+            for name in n125_01_six_format_catalogue_matches_real_v4_evidence_for_review n125_02_closed_catalogue_parser_and_version_refusal_matrix n125_03_late_inert_catalogue_mismatch_discards_entire_candidate n125_04_real_entity_reader_still_refuses_platform_and_no_unapproved_library; do
+              grep -qF "test n125::$name " "$log" || return 1
+            done
+            [ "$(grep -Ec '^test n125::n125_0[0-9]_[A-Za-z0-9_]*( |$)' "$log")" -eq 4 ] || return 1
+            grep -qF 'test result: ok. 4 passed; 0 failed; 0 ignored' "$log" || return 1
+            ! grep -qF '... FAILED' "$log" || return 1
+            ! grep -qF '... ignored' "$log" || return 1
+            ! grep -qF 'test result: FAILED' "$log" || return 1
+            [ "$(grep -cF 'n125_evidence case=01' "$log")" -eq 1 ] || return 1
+            [ "$(grep -cF 'n125_evidence case=02' "$log")" -eq 1 ] || return 1
+            [ "$(grep -cF 'n125_evidence case=03' "$log")" -eq 1 ] || return 1
+            [ "$(grep -cF 'n125_evidence case=04' "$log")" -eq 1 ] || return 1
+            grep -qF 'review_only=true platform_read=false publication=false' "$log" || return 1
+            grep -qF 'zero_partial=true' "$log" || return 1
+            grep -qF 'duplicate_keys=refused version_mismatch=refused' "$log" || return 1
+            grep -qF 'approval=false' "$log" || return 1
+            grep -qF 'platform=unverified' "$log" || return 1
+          }
+          log="$RUNNER_TEMP/n125-four.txt"
+          cargo test -p solo-cli --test media_worker_host_smoke --locked n125_ -- --nocapture --test-threads=1 >"$log" 2>&1 || { cat "$log"; exit 1; }
+          cat "$log"
+          check_n125 "$log" || { echo 'authentic N125 4/4 run rejected'; exit 1; }
+          echo 'n125_gate authentic=accepted'
+          probe="$RUNNER_TEMP/n125-probe.txt"
+          cp "$log" "$probe"
+          sed -i '/n125_04_real_entity_reader_still_refuses_platform_and_no_unapproved_library/d' "$probe"
+          if check_n125 "$probe"; then echo 'missing N125 case accepted'; exit 1; fi
+          cp "$log" "$probe"
+          sed -i 's/4 passed; 0 failed; 0 ignored/3 passed; 1 failed; 0 ignored/' "$probe"
+          if check_n125 "$probe"; then echo 'false 3-of-4 result accepted'; exit 1; fi
+          cp "$log" "$probe"
+          sed -i 's/platform_read=false/platform_read=true/g; s/publication=false/publication=true/g' "$probe"
+          if check_n125 "$probe"; then echo 'forged approval flag accepted'; exit 1; fi
+          cp "$log" "$probe"
+          sed -i 's/duplicate_keys=refused/duplicate_keys=accepted/; s/zero_partial=true/zero_partial=false/' "$probe"
+          if check_n125 "$probe"; then echo 'corrupted refusal evidence accepted'; exit 1; fi
+          echo 'n125_gate mutation=rejected'
+      - name: Strict inert Platform catalogue N125 gate (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $required = @(
+            'n125_01_six_format_catalogue_matches_real_v4_evidence_for_review',
+            'n125_02_closed_catalogue_parser_and_version_refusal_matrix',
+            'n125_03_late_inert_catalogue_mismatch_discards_entire_candidate',
+            'n125_04_real_entity_reader_still_refuses_platform_and_no_unapproved_library')
+          $tokens = @(
+            'review_only=true platform_read=false publication=false',
+            'zero_partial=true',
+            'duplicate_keys=refused version_mismatch=refused',
+            'approval=false',
+            'platform=unverified')
+          function Test-N125Log {
+            param([string]$Path)
+            $text = Get-Content -LiteralPath $Path -Raw
+            foreach ($name in $required) {
+              if (-not $text.Contains('test n125::' + $name + ' ')) { return $false }
+            }
+            if (([regex]::Matches($text, '(?m)^test n125::n125_0[0-9]_[A-Za-z0-9_]*( |$)')).Count -ne 4) { return $false }
+            if (-not $text.Contains('test result: ok. 4 passed; 0 failed; 0 ignored')) { return $false }
+            if ($text.Contains('... FAILED') -or $text.Contains('... ignored') -or $text.Contains('test result: FAILED')) { return $false }
+            foreach ($marker in @('n125_evidence case=01', 'n125_evidence case=02', 'n125_evidence case=03', 'n125_evidence case=04')) {
+              if (([regex]::Matches($text, [regex]::Escape($marker))).Count -ne 1) { return $false }
+            }
+            foreach ($token in $tokens) {
+              if (-not $text.Contains($token)) { return $false }
+            }
+            return $true
+          }
+          $log = Join-Path $env:RUNNER_TEMP 'n125-four.txt'
+          cargo test -p solo-cli --test media_worker_host_smoke --locked n125_ -- --nocapture --test-threads=1 *>&1 | Tee-Object -FilePath $log
+          if ($LASTEXITCODE -ne 0) { throw 'the N125 suite did not exit zero' }
+          Get-Content -LiteralPath $log
+          if (-not (Test-N125Log -Path $log)) { throw 'authentic N125 4/4 run rejected' }
+          Write-Output 'n125_gate authentic=accepted'
+          $probe = Join-Path $env:RUNNER_TEMP 'n125-probe.txt'
+          (Get-Content -LiteralPath $log | Where-Object { -not $_.Contains('n125_04_real_entity_reader_still_refuses_platform_and_no_unapproved_library') }) | Set-Content -LiteralPath $probe
+          if (Test-N125Log -Path $probe) { throw 'missing N125 case accepted' }
+          (Get-Content -LiteralPath $log) | ForEach-Object { $_.Replace('4 passed; 0 failed; 0 ignored', '3 passed; 1 failed; 0 ignored') } | Set-Content -LiteralPath $probe
+          if (Test-N125Log -Path $probe) { throw 'false 3-of-4 result accepted' }
+          (Get-Content -LiteralPath $log) | ForEach-Object { $_.Replace('platform_read=false', 'platform_read=true').Replace('publication=false', 'publication=true') } | Set-Content -LiteralPath $probe
+          if (Test-N125Log -Path $probe) { throw 'forged approval flag accepted' }
+          (Get-Content -LiteralPath $log) | ForEach-Object { $_.Replace('duplicate_keys=refused', 'duplicate_keys=accepted').Replace('zero_partial=true', 'zero_partial=false') } | Set-Content -LiteralPath $probe
+          if (Test-N125Log -Path $probe) { throw 'corrupted refusal evidence accepted' }
+          Write-Output 'n125_gate mutation=rejected'
       # Mandatory `SOLO-WO-118 R11` N124 gate: the V4 six-format whole-candidate composition on this
       # host, including the associated-alpha AVIF class beside the five legacy formats. The same
       # verifier must reject four altered copies of the real log before printing its verdict.
