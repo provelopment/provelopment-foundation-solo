@@ -1,64 +1,106 @@
 # Execution Report
 
-**Work order:** `SOLO-WO-116 R04` — correct the demonstrated N116 host failures and prove complete SVG technical CI.
-**Date:** 2026-11-15. **Outcome:** `R03C-SVG-N116-FOUR-CASE-TWO-HOST-TECHNICAL-VERIFIED`.
+**Work order:** `SOLO-WO-117 R01` — integrate the exact verified SVG V3 technical blobs into `main` and prove full two-host CI.
+**Date:** 2026-11-15. **Required outcome:** `R03C-SVG-V3-EXACT-BLOB-MAIN-INTEGRATION-TWO-HOST-VERIFIED`.
 **status=COMPLETE — pending independent Chief Master Architect review.**
 
-Both native hosts pass the **complete** `rust-verify.yml` at one identical technical SHA, including the real N116 4/4 gate, its six-log mutation proof, the deliberate RED/GREEN oracle and every retained security, architecture, N102/N108/N113, snapshot and reproducibility gate. Nothing is integrated into `main`; Stage 03 remains open; AVIF still refuses before any worker.
+The 23 authorized technical paths are now on `main` as byte-identical Git blobs transferred from the pinned source commit `d82ae76273b57b37014d3b4c557b8debd5299eea`, with no branch merge, no ancestry import and no technical-branch WIP. One complete native Ubuntu 24.04 and Windows 2025 `rust-verify.yml` run at the single integration SHA `45a6775bdccfad49feb1f50aad75bd49bcec9d5b` concluded **success** on both jobs, attempt 1.
 
-## 1. Commits
+## 1. Commits and tips
 
-| Step | Ref | Commit | Tree | Parent |
+| Step | Commit | Tree | Parent |
+|---|---|---|---|
+| predecessor (`main`) | `da63eaa2e732c2587856cee3bfbce36bc34a27f1` | — | `3eca7a4c` |
+| **A8** | `5e4afaebe48b9220e8d7d582aff79deacbe54e3e` | `a673aab9e51dcfd13ac9af79b1f6e104ab09d59a` | `da63eaa2` |
+| **I8** | `45a6775bdccfad49feb1f50aad75bd49bcec9d5b` | `9555b8d7c048eeca5e8ea3b2153b315a14224b08` | `5e4afae` |
+| **R8** | given in the chat handoff only (a report cannot contain its own SHA) | — | `45a6775b` |
+
+**A8** committed and pushed exactly one path, `.documents/WIP/workorder-active.md`; the working-tree, index, commit and `origin/main` blob are all `c0396734dacbf8a4b6c33b22825817276db8342d`. No technical-branch ACTIVE text was carried over, and `workorder-active.md` was never restored from the technical branch.
+
+**I8** committed and pushed exactly the 23 paths of §3; `git diff --name-only 5e4afae 45a6775b` is precisely that set — no additions, no omissions, no other file touched. The transfer used the prescribed `git restore --source="$TECH" --staged --worktree`, executed only on a verified clean `main`, and every binary AVIF fixture moved as a Git object, never through shell redirection.
+
+**Source and destination tips:** technical branch `solo-wo-115-avif-svg-v3-r02` remains at `d82ae76273b57b37014d3b4c557b8debd5299eea`, unchanged; `main` advanced `da63eaa2 → 5e4afae → 45a6775b` by ordinary fast-forward. No merge commit, cherry-pick, rebase, reset, force-push, tag, release, PR or deployment occurred.
+
+## 2. Exact 23-path blob equality
+
+Every path below satisfies `TECH:path == :path == HEAD:path`.
+
+- `.github/workflows/rust-verify.yml`
+- `Cargo.lock` — `d4eeb3956f3d21dc2fdd3a194e4ffbbea42e81f8`
+- `crates/solo-adapters/Cargo.toml` — `47537c5c1539b57109a37de56b05cfc9c71cbfcc`
+- `crates/solo-adapters/src/graphic_image_inspection.rs`
+- `crates/solo-adapters/src/graphic_svg_inspection.rs` — `ded4d3d067e3967a5c5c992d1d0db6465b2d5d83`
+- `crates/solo-adapters/src/lib.rs`
+- `crates/solo-adapters/tests/property_resolution.rs`
+- `crates/solo-application/src/graphic_image_inspection.rs`
+- `crates/solo-application/src/lib.rs`
+- `crates/solo-cli/tests/architecture_checks/graph.rs`
+- `crates/solo-cli/tests/fixtures/avif/LICENSE-AND-PROVENANCE.md`
+- `crates/solo-cli/tests/fixtures/avif/abc_color_irot_alpha_NOirot.avif`
+- `crates/solo-cli/tests/fixtures/avif/abc_color_irot_alpha_irot.avif`
+- `crates/solo-cli/tests/fixtures/avif/clap_irot_imir_non_essential.avif`
+- `crates/solo-cli/tests/fixtures/avif/fox-profile0.10bpc.yuv420.avif`
+- `crates/solo-cli/tests/fixtures/avif/fox-profile0.8bpc.yuv420.avif`
+- `crates/solo-cli/tests/fixtures/avif/fox-profile2.12bpc.yuv420.avif`
+- `crates/solo-cli/tests/fixtures/avif/white_1x1.avif`
+- `crates/solo-cli/tests/fixtures/svg/TABLER-ICONS-MIT.txt`
+- `crates/solo-cli/tests/fixtures/svg/icon-home.svg`
+- `crates/solo-cli/tests/media_worker_host_smoke.rs` — `e315043a66db19b64028f4364806ffb52aae3c48`
+- `crates/solo-domain/src/property_registry.rs`
+- `crates/solo-domain/tests/property_resolution.rs`
+
+The equality loop passed for all 23 paths both at staging and at `HEAD`, and `git diff --cached --stat` reported exactly `23 files changed, 4639 insertions(+), 23 deletions(-)`. Ten donor fixture/provenance files are included. `Cargo.lock` is byte-identical to the verified technical source, and no governance document, SOP, `deny.toml`, root `Cargo.toml`, source/unsafe checker or unchanged file was modified.
+
+## 3. Local verification before dispatch
+
+Run on WSL Ubuntu against the staged 23-file integration, before committing `I8`:
+
+| Command | Result |
+|---|---|
+| `cargo fmt --all -- --check` | rc 0 |
+| `cargo check --workspace --all-targets --locked` | rc 0 |
+| `cargo clippy --workspace --all-targets --locked -- -D warnings` | rc 0, no warnings |
+| `cargo test -p solo-cli --test workspace_graph --locked` | `ok. 32 passed; 0 failed` |
+| `cargo test -p solo-cli --test check_architecture_fixtures --locked` | `ok. 35 passed; 0 failed` |
+| `cargo test -p solo-cli --test check-architecture --locked` | rc 0 — `architecture=legal packages=4 targets=33 files=64 edges=81` |
+| `cargo test -p solo-cli --test media_worker_host_smoke --locked n116_02 -- --nocapture` | `ok. 1 passed`, `rich_canonical_sha256=0403e067…`, `icon_canonical_sha256=ce9ea48a…` |
+| `cargo test -p solo-cli --test media_worker_host_smoke --locked n116_04 -- --nocapture` | `ok. 1 passed` |
+| `cargo test -p solo-adapters --locked` | `84 passed; 5 failed` — the five `source_read_native::snapshot_proofs` cases only |
+| `cargo test --workspace --all-targets --locked` | aborts on that same adapter target; no other failure appears |
+
+One command in the prescribed list was initially mistyped by me as `--test check_architecture` (underscore), which cargo rejects with `no test target named 'check_architecture'`; re-running the real target `--test check-architecture` passed and printed the integrated `edges=81` report. That was a command-name error, not a code or gate failure, and no repository file was involved.
+
+**NOT RUN LOCALLY, stated not waived:** this WSL host has no prepared `SOLO_TEST_SOURCE_FS_ROOT` Btrfs fixture, so the five `source_read_native::snapshot_proofs::*` cases panic in `fixture()` with `SOLO_TEST_SOURCE_FS_ROOT must name an R03 snapshot fixture filesystem`, and `n113_`, `n116_01` and `n116_03` cannot execute here for the same reason — exactly the prerequisites this order anticipates. They were **not** skipped, ignored or faked, and all of them executed for real and passed in the hosted Ubuntu job below. No product code was patched, bypassed or weakened in response to any local result; the five failures are pre-existing environmental preconditions, identical on `main` before this integration.
+
+**Retained-gate verification on the integrated tree:** the imported workflow still contains the four exact N116 tests, the two host gate steps plus the deliberate RED step, the six mutated-log rejections, the independently pinned canonical SVG digests and the exact real-tree `edges=81` checks on both hosts. `Cargo.lock` is identical to the pinned technical source; `quick-xml =0.42.0` and `svgtypes =0.16.1` remain normal roots of `solo-adapters` only, under the unchanged 47-name fail-closed closure, with both negative architecture fixtures still effective.
+
+## 4. Two-host integration proof
+
+**Run `43676077686`, attempt 1, `head_sha = 45a6775bdccfad49feb1f50aad75bd49bcec9d5b`** — triggered by the `I8` push to `main`, no manual retry.
+
+| Job | Id | Conclusion | Successful steps | Platform-inapplicable (skipped) |
 |---|---|---|---|---|
-| baseline | `main` | `6737e256d5bd68f2d42b2e072c847203331002e3` | `2607d6a2` | `6f5a69b9` |
-| **A7** | `main` | `3eca7a4cb4c3366e69bf5cb626bf149d9f411b64` | `4bd4ab4b` | `6737e256` |
-| **T3** | branch | `2438d3852239d89718c26d6b24e764b4fd963a2b` | `4cb6056c` | `82d9dbc3` |
-| **C1** | branch | `15822c07f2de3a8e39127b388292835bee3544e5` | `6887d1c5` | `2438d385` |
-| **C2** | branch | `6146efb2f331559ab3b1574a18e4893abcac8bc9` | `ea0e699f` | `15822c07` |
-| **D7** | branch | `3e5a218d366b55d46f7368f9195d49779e29cadf` | `0b2ab222` | `6146efb2` |
-| **D7c** | branch head | `d82ae76273b57b37014d3b4c557b8debd5299eea` | `b6daae33` | `3e5a218d` |
-| **R7** | `main` | given in the handoff (a report cannot contain its own SHA) | — | `3eca7a4c` |
+| `verify (ubuntu-24.04)` | `132696414596` | **success** | 29 | 14 |
+| `verify (windows-2025)` | `132696414394` | **success** | 26 | 17 |
 
-A7 and T3 carry the identical Owner-installed ACTIVE blob `6f69a87b`, restored by byte-safe `git cat-file blob` redirection and verified in the working tree, index and remote. **`git checkout main -- …` was not used**; the stash is empty; 27 refs remain with `ad7b74df`/`40b03c73` untouched; `main` changed only ACTIVE + this report from the R6 baseline.
+Across both jobs, **zero** steps ended in any state other than `success` or `skipped`. Every skipped step is one host's copy of a platform-exclusive gate (Linux-only cargo-deny, Btrfs snapshot fixtures, advisory probe, package-set, N108 and the V2/V3 Linux steps; the matching Windows-only N102, Windows cargo-deny and package-set steps on Ubuntu). No legitimate skip is claimed as performed work, and no required test is absent.
 
-## 2. Ledger actually written
+**N116 exact 4/4 on Ubuntu**, measured from the real compiled `solo-cli`:
 
-| Path | Change | Why |
-|---|---|---|
-| `crates/solo-cli/tests/architecture_checks/graph.rs` | `APPROVED_ADAPTER_EXTERNAL_NORMAL` 7→**9** (`quick-xml`, `svgtypes`), `APPROVED_ADAPTER_CLOSURE` 39→**47** | §3 C1 |
-| `crates/solo-cli/tests/media_worker_host_smoke.rs` | stale `n113_03` `.svg` case; invalid `n116_03` favicon inventory | §3 C2, C3 |
-| `.github/workflows/rust-verify.yml` | three N116 steps re-authored; two retained architecture edge pins 70→81 | §2.3 proved script defect + §2.1 proved count correction |
+- `n116_01_mixed_five_formats_real_host` — `ok`, `formats=png,jpeg,webp,gif,svg`, `pids=[6464, 6468, 6472, 6476, 6480]`, `gif_frames=3`, `vector_canonical_sha256=0403e0677a174ccafe18191a8a9f1c5a30993477bb074f49078b005f513caaba`, `avif=avif-unsupported-v3`, `partial=false publication=false`
+- `n116_02_safe_vector_semantics_and_cross_host_digest` — `ok`, `rich_canonical_sha256=0403e067…`, `icon_canonical_sha256=ce9ea48a3d7bc41673f969727c49eb5dd111d27451d27adab403faf3fa3362d5`
+- `n116_03_active_svg_and_hidden_obligation_refuse_whole` — `ok`, `refusals=14`, `late_refusal=port-refused-v3`, `hidden_refused=true`, `favicon_svg=declaration-refused`, `favicon_gif=declaration-refused`, `partial=false fallback=none`
+- `n116_04_svg_forgery_and_deliberate_red_oracle` — `ok`, `forged_source=source-digest-mismatch`, `forged_output=output-digest-mismatch`
 
-`workspace_graph.rs` was **not** edited: all three previously failing assertions resolved from the single shared policy change, exactly as §2.4 predicted. `Cargo.lock` (`d4eeb395`), `crates/solo-adapters/Cargo.toml`, `deny.toml`, `.gitattributes`, governance (11/11 frozen blobs), `graphic_svg_inspection.rs` (`ded4d3d0`), `graphic_image_inspection.rs`, all application/domain/adapter production code, native host, CLI entrypoint, the ten B0 fixtures and their provenance are **unchanged**.
+Aggregate `test result: ok. 4 passed; 0 failed; 0 ignored`, then `n116_gate authentic=accepted` and `n116_gate mutations=rejected-all`, so the missing, FAILED, ignored, duplicate, three-of-four and wrong-digest variants were each refused rather than merely printed. The Windows job ran the same gate step and the same deliberate RED sensitivity step, both `success`, and its digest assertions matched the same pinned values, so the canonical vector digest is identical across hosts.
 
-**Independently derived closure.** `cargo metadata --locked --format-version 1 --all-features` over the real resolve graph gives adapter normal roots `gif, image, libc, quick-xml, rustix, serde, serde_json, svgtypes, windows-sys` and a third-party closure of **47** names — the original 39 plus exactly `arrayvec 0.7.8`, `euclid 0.22.14`, `kurbo 0.13.1`, `polycool 0.4.0`, `quick-xml 0.42.0`, `siphasher 1.0.4`, `smallvec 1.16.5`, `svgtypes 0.16.1`. The two workspace members reachable through the graph are excluded by the checker's own pre-existing rule. No other drift was found. Result: `workspace_graph` **32/32**, `check_architecture_fixtures` **35/35**.
+**Retained gates green on both jobs:** cargo-deny 0.20.2 advisories/bans/licences/sources, the RUSTSEC-2026-0009 negative probe, workspace package-set gate, disposable Btrfs snapshot-test filesystems, format check, strict Clippy with warnings as errors, the complete locked workspace test suite (including the five snapshot proofs and the N113 canaries on Ubuntu), confined image-inspection evidence, N108 8/8 GIF canaries, V2 four-format gate, V3 five-format gate, deliberate RED oracle, N102 isolation canaries with the 12/12 event-identity repeatability, the real-tree architecture checker, and the byte-identical reproducible release build.
 
-**C2 — the stale N113 expectation.** The property-stage list now asserts uppercase `vector.SVG` instead of lowercase `vector.svg`, and three stage-specific facts replace the vanished refusal: lowercase `vector.svg` **is** admitted by a valid non-favicon declaration; the same source is then refused by the V2 four-format inspector as `UnsupportedFormat`; and an `.svg` favicon is refused at the **declaration validator** by the registered PNG-only role (measured `test_inventory_v1(...) == None`, strictly stronger than an inspection-stage refusal). All other N113 invalid-MIME, GIF, AVIF, oversized, missing, corrupted and worker-forgery cases are untouched, and the function name and count are unchanged.
+## 5. Exclusions honoured and repository state
 
-**C3 — the invalid `n116_03` inventory, diagnosed not guessed.** A bounded test-local probe constructed each declaration individually through the real validator and printed `single_ok`/`suppressed_ok` per entry; it was removed before the final commit. Finding: the `late`, `hidden`, `missing`, `hostile` and `mixed` inventories were all valid — only the two favicon entries were impossible, because `(favicon, *.svg)` and `(favicon, *.gif)` are rejected by the registry at declaration. `n116_03` now asserts that declaration-stage refusal and proves the *same* SVG bytes inspect successfully under a non-favicon role, so the refusal is attributed to the role rather than the format gate. Five real independent owners, the hidden/suppressed inspection, the confined missing-file refusal, the hostile matrix, the whole-set discard and the RED oracle are all preserved; no fake source set, no `#[ignore]`, no production schema change.
+No AVIF decoding, graphics-policy change, platform asset, `R03.C` completion, Stage 03 closure, browser/HTTP route, contact-system change, release, PR, deployment or provider action occurred. AVIF is present only as refused-before-worker capability with the ten donor fixtures and their provenance; the SVG integration is one bounded step of the still-open Stage 03.
 
-**Workflow defect, proved before editing.** The R03 gate anchored `... ok$` and used doubly-escaped regexes. `cargo test --nocapture` interleaves a case's captured stdout onto its own `test <name> ...` line, so that anchor can never hold, and the over-escaped `... FAILED|ignored` test matched nothing. The three N116 steps were re-authored with **fixed-string** checks only — exact names, exact count 4, the exact `test result: ok. 4 passed; 0 failed; 0 ignored` line, absence of `... FAILED`/`... ignored`/`test result: FAILED`, and the seven evidence tokens — plus six mutated-log probes (missing, FAILED, ignored, duplicate, three-of-four, wrong digest). A local extraction of the committed checker accepted the authentic 4/4 log and rejected all six mutations.
+Repository after `R8`: one worktree, one remote `origin` = `https://github.com/provelopment/provelopment-foundation-solo`, empty stash, clean index and worktree, exactly four WIP files, and all **27** remote branch refs unchanged (including `solo-wo-115-avif-svg-v3-r02` at `d82ae762`, `solo-wo-113-gif-v2-r01` at `ad7b74df`, `solo-wo-112-gif8-host-r01` at `40b03c73`). No report archive, no second checkout, no extra WIP or Report file, and task-owned temporary script material was deleted at run end.
 
-## 3. D7 — the two-host technical proof
-
-**Run `43674236111`, attempt 1, `head_sha = d82ae76273b57b37014d3b4c557b8debd5299eea`.**
-`verify (ubuntu-24.04)` **success** (job `132690745816`, 29 steps ok); `verify (windows-2025)` **success** (26 steps ok). Platform-specific steps are `skipped` on the other host and are not claimed as executed.
-
-N116 on Ubuntu: `n116_01_mixed_five_formats_real_host`, `n116_02_safe_vector_semantics_and_cross_host_digest`, `n116_03_active_svg_and_hidden_obligation_refuse_whole` and `n116_04_svg_forgery_and_deliberate_red_oracle` all reported `ok`, with `test result: ok. 4 passed; 0 failed; 0 ignored`, then `n116_gate authentic=accepted` and `n116_gate mutations=rejected-all`. The Windows job ran the same gate step and passed it.
-
-Retained gates green on both jobs: cargo-deny 0.20.2 (advisories/bans/licences/sources), the RustSec negative probe, workspace package-set gate, disposable Btrfs snapshot filesystems, format, strict lint, the full locked workspace test suite, confined image-inspection evidence, N108 8/8, V2 N113 4/4, N102 4/4 plus the 12/12 native repeat, the real-tree architecture checker (now `edges=81`) and the byte-identical reproducible release build.
-
-Attempts on the way to green, all forward commits on the same branch, none masked: R03 `43621074854` and `43621661869` (previously reported); R04 `43672557526` at `15822c07` (only `n113_03`, one stale favicon inventory); `43673000853` at `6146efb2` (only the N116 gate's own `ok$` anchor); `43673671059` at `3e5a218d` (only the retained `edges=70` pin — N116 4/4, mutations, RED, N108, V2, N102 and cargo-deny were all green there); one redundant dispatch `43674206493` fired before the edge-pin edit was committed and repeated the identical `edges=70` failure; final `43674236111` green.
-
-## 4. Local verification on this host
-
-`cargo fmt --all -- --check` clean; `cargo check --workspace --all-targets --locked` and `cargo clippy --workspace --all-targets --locked -- -D warnings` zero errors; `workspace_graph` 32/32; `check_architecture_fixtures` 35/35; `n116_02` and `n116_04` pass with the pinned digests `0403e067…` / `ce9ea48a…`; `SOLO_N116_RED_ORACLE=wrong` exits **101** and the unset run exits **0**; SVG unit suites 14/14; domain/application/adapter property suites green.
-
-**Local limitations, stated not waived:** this WSL host has no Btrfs `SOLO_TEST_SOURCE_FS_ROOT`, so `n113_`, `n116_01`, `n116_03` and the five `source_read_native::snapshot_proofs` cases cannot execute here. They are **not** skipped in hosted Linux — the Ubuntu job ran them for real and passed.
-
-## 5. Status
-
-`status=COMPLETE — pending independent Chief Master Architect review.` The accepted PNG/JPEG/WebP/GIF implementation, complete GIF animation, S1 sanitizer (blob `ded4d3d0`), S2 V3 five-format product code, the ten B0 fixtures and all retained gates are intact. AVIF is **unsupported and refused before any worker**; SVG is **not** integrated into `main`, and no release, tag, PR, merge, deployment or Stage 03 closure occurred. `main` differs from its R6 baseline only by ACTIVE and this report. `R03.C3`, `R03.C` and Stage 03 remain **OPEN**; I do not self-accept.
-
-**Edge-count correction, disclosed.** The two retained architecture-checker steps pinned `edges=70`. A real run of `cargo test --locked -p solo-cli --test check-architecture` prints `architecture=legal packages=4 targets=33 files=64 edges=81`, and re-running with the pre-edit `graph.rs` constants stashed **still** printed 81, proving the drift comes from the already-approved S1 `quick-xml`/`svgtypes` adapter dependencies and not from the C1 policy edit. Both literals now pin the single exact measured value **81**; the assertion remains an exact count and nothing was loosened, skipped or made configurable. This is the one edit outside the three N116 steps and is flagged for independent review.
+**Status:** `status=COMPLETE — pending independent Chief Master Architect review.` I do not self-accept; the Chief Master Architect must verify the published report, the exact `I8`/`R8` trees and the two-host logs before returning `ACCEPT`, `REVISE` or `STOP`.
 
