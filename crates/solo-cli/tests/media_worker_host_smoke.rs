@@ -8192,18 +8192,24 @@ mod n125 {
             }
         }
 
-        // The same basename addressed as a Platform path is refused by the closed declaration
-        // grammar before any read; the repository also carries no Platform reader to reach.
-        assert!(
-            solo_adapters::test_inventory_v1(&[(
-                TestOwnerV1::Entity,
-                "favicon",
-                "platform/icon.png",
-                "public"
-            )])
-            .is_none(),
-            "a Platform-namespaced path is refused by the declaration grammar before any read"
-        );
+        // A path shaped like a Platform route is not a Platform source: declared through the Entity
+        // grammar it simply does not exist inside the Entity tree, so the real read refuses it and
+        // never resolves a Platform asset. The typed `PlatformUnverified` refusal for a real
+        // Platform obligation is asserted in `solo-application`'s catalogue tests, where the
+        // namespace can be constructed directly.
+        let shaped = inventory_of(&[(
+            TestOwnerV1::Entity,
+            "favicon",
+            "platform/icon.png",
+            "public",
+        )]);
+        match read_graphic_asset_bytes_v1(&shaped, &root.capability()) {
+            GraphicAssetReadSetOutcomeV1::Refused(_) => {}
+            GraphicAssetReadSetOutcomeV1::Complete(set) => panic!(
+                "a Platform-shaped path resolved inside the Entity tree: {} sources",
+                set.len()
+            ),
+        }
 
         // A catalogued Platform entry may carry the same basename, and still confers nothing.
         let catalogue = parse_platform_asset_catalogue_v1(
