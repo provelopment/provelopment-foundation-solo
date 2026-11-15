@@ -115,3 +115,71 @@ inside the document instead of inheriting ambient page colour.
 4. Third-party fixture and native-library provenance is checked independently of
    the Cargo licence scan (`cargo-deny` cannot see these files).
 
+
+## Independent AVIF reference oracle (SOLO-WO-118 R03, test-only)
+
+These facts are **reference measurements**, not product capability and not publication
+authority. They were produced by an independent decoder (libavif's `avifdec` with the
+`dav1d` AV1 decoder) and an independent RGBA reader (Pillow), in the dedicated
+`avif-reference-oracle` job on `ubuntu-24.04`, from the immutable fixture bytes above.
+Solo's own Rust decoder is never used to derive them, and none of these tools is a
+product dependency, a linked library or a shipped artifact.
+
+**Pinned reference identity** (recheck-fails-on-drift, all values observed, not assumed):
+
+| Fact | Value |
+|---|---|
+| `avifdec --version` | `1.0.4` (dav1d dec 1.4.1, libgav1 0.18.0, aom v3.8.2, rav1e 0.7.1, svt v1.7.0; libyuv available 1883) |
+| `avifdec` binary SHA-256 | `845c02f6194140824189018c87d4fff400655070615466f6610f3904ba4cc096` |
+| `libavif-bin` package | `1.0.4-1ubuntu3` |
+| `libdav1d*` package | `1.4.1-1build1` |
+| `python3-pil` package / Pillow | `10.2.0-1ubuntu1.5` / Pillow `10.2.0` |
+| `/usr/bin/python3` | `Python 3.12.3` |
+| Reference command (planes) | `avifdec --codec dav1d --jobs 1 <input> <out>.y4m` |
+| Reference command (display) | `avifdec --codec dav1d --jobs 1 --depth 8 <input> <out>.png` |
+
+**Raw YUV plane oracles** (`reference-goldens.json`, schema `solo-avif-oracle-v1`).
+Plane bytes are hashed by `reference_oracle.py`, which parses the YUV4MPEG2 header and
+the single `FRAME` record itself and slices Y/U/V by independently computed chroma
+geometry; the Y4M container is never hashed as if it were pixels. 10/12-bit planes keep
+unaltered little-endian 16-bit samples.
+
+| Fixture | Display | Chroma token | Depth | Y bytes / SHA-256 (16) | U, V bytes / SHA-256 (16) |
+|---|---|---|---|---|---|
+| `white_1x1.avif` | 1×1 | `444` | 8 | 1 / `3e151409ace91cb3` | 1 / `76be8b528d0075f7` each |
+| `fox-profile0.8bpc.yuv420.avif` | 1204×800 | `420jpeg` | 8 | 963200 / `a0d2f16c5eec8b8c` | 240800 / `f83510f5f8ef19ab`, `c054abd53416e580` |
+| `fox-profile0.10bpc.yuv420.avif` | 1204×800 | `420p10` | 10 | 1926400 / `8d5c27f7416fe85d` | 481600 / `3f199ee6d4085556`, `81df894fb38bbd92` |
+| `fox-profile2.12bpc.yuv420.avif` | 1204×800 | `420p12` | 12 | 1926400 / `801efc14eb584b92` | 481600 / `b652cb6b6e57456a`, `2e699cbfb5062e22` |
+
+Aggregate digests use the documented `PLANE|<ordinal>|<name>|<stride>|<rows>|<length>\n`
+framing followed by raw plane bytes — deliberately a different scheme from the product.
+The 4:2:0 chroma geometry is `ceil(1204/2)=602` × `ceil(800/2)=400`; 8-bit strides are
+1204/602 bytes and 10/12-bit strides are 2408/1204 bytes (two bytes per sample).
+
+**Display orientation and alpha** (`abc_color_irot_alpha_irot.avif`). The reference tool
+reports `irot (Rotation): 1` and writes the **coded** image: its PNG is **512×256**, so
+libavif did *not* apply the rotation here and **Y4M/PNG output is not by itself an
+orientation oracle**. The recorded display geometry is therefore recovered by an
+explicitly audited mapping — `irot = 1` is a 90° anticlockwise rotation applied to the
+reference RGBA bytes — and both the coded and displayed facts are pinned separately:
+
+| Fact | Value |
+|---|---|
+| Coded PNG dimensions | 512×256 (unrotated, as written by the reference tool) |
+| Coded PNG file SHA-256 | `20c06c7c94427c97ef962b5529a633a42f90f4c05bebc1c99ef0b813fd12f97b` |
+| Coded RGBA SHA-256 | `5102863ca73f618c60944e490aa3982e7a1afd6975f4d0edf12b40ac85c88f82` |
+| Display dimensions after `irot` | **256×512** |
+| Display RGBA SHA-256 (90° anticlockwise) | `950be879c536c208d4e2dc0cdb8aa698e73922b4a57e8070c4fea389c84cc744` |
+| Alpha range / non-opaque samples | `128..255` / `123952` |
+
+Alpha follows the identical geometry: the rotation is applied to the whole RGBA buffer,
+never to colour alone, so the pinned display digest covers colour **and** alpha.
+
+**Normative refusals (recorded, never promoted to positives).** `avifdec` will decode
+`abc_color_irot_alpha_NOirot.avif` (`f2c8cd6d…`) and
+`clap_irot_imir_non_essential.avif` (`33f869fc…`), so decoder success is explicitly *not*
+policy permission. The alpha auxiliary in the `NOirot` fixture is not associated with the
+primary item by an essential transform, and the `clap`/`irot`/`imir` properties in the
+second fixture are declared non-essential and may be ignored by a viewer. Both remain
+refused by authored media policy; no reference output authorizes them.
+

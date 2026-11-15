@@ -1,76 +1,189 @@
 {
-  "schema": "solo-avif-oracle-v1",
-  "state": "discovery",
-  "note": "Test-only reference facts. Not authoritative for publication. Only independently measured values from pinned libavif/dav1d + Pillow may be pinned here; the verifier recomputes every value and refuses any difference.",
-  "tool": {
-    "avifdec_sha256": "",
-    "avifdec_version": "",
-    "libavif_package": "",
-    "libdav1d_package": "",
-    "pillow_package": "",
-    "python_version": ""
-  },
   "fixtures": {
-    "white_1x1.avif": {
-      "source_sha256": "",
-      "kind": "y4m",
-      "width": 0,
-      "height": 0,
-      "chroma": "",
-      "depth": 0,
-      "planes": [],
-      "aggregate_sha256": ""
-    },
-    "fox-profile0.8bpc.yuv420.avif": {
-      "source_sha256": "",
-      "kind": "y4m",
-      "width": 0,
-      "height": 0,
-      "chroma": "",
-      "depth": 0,
-      "planes": [],
-      "aggregate_sha256": ""
+    "abc_color_irot_alpha_irot.avif": {
+      "alpha_max": 255,
+      "alpha_min": 128,
+      "alpha_non_opaque_samples": 123952,
+      "display_height": 512,
+      "display_width": 256,
+      "kind": "png",
+      "png_sha256": "20c06c7c94427c97ef962b5529a633a42f90f4c05bebc1c99ef0b813fd12f97b",
+      "rgba_display_sha256": "950be879c536c208d4e2dc0cdb8aa698e73922b4a57e8070c4fea389c84cc744",
+      "rgba_sha256": "5102863ca73f618c60944e490aa3982e7a1afd6975f4d0edf12b40ac85c88f82",
+      "source_sha256": "b371cc88244a873131e4d10ff9363d71ce4f41cf333bd4a491b38d970d9abd3b"
     },
     "fox-profile0.10bpc.yuv420.avif": {
-      "source_sha256": "",
+      "aggregate_sha256": "0aff22577675f13e73682aa7ad25d2e51373e16edcaa43d2cd7f7f5eb97b5c2a",
+      "chroma": "420p10",
+      "depth": 10,
+      "height": 800,
       "kind": "y4m",
-      "width": 0,
-      "height": 0,
-      "chroma": "",
-      "depth": 0,
-      "planes": [],
-      "aggregate_sha256": ""
+      "planes": [
+        {
+          "columns": 1204,
+          "length": 1926400,
+          "name": "Y",
+          "ordinal": 0,
+          "rows": 800,
+          "sha256": "8d5c27f7416fe85d83f2ab7e05d30aa6d811a1e5076120b2e5845685291c2ad3",
+          "stride": 2408
+        },
+        {
+          "columns": 602,
+          "length": 481600,
+          "name": "U",
+          "ordinal": 1,
+          "rows": 400,
+          "sha256": "3f199ee6d40855562447c55096dbee64f9d816100f3720f9347358ba18cceeab",
+          "stride": 1204
+        },
+        {
+          "columns": 602,
+          "length": 481600,
+          "name": "V",
+          "ordinal": 2,
+          "rows": 400,
+          "sha256": "81df894fb38bbd92a7d7ceaf1589ea24ad4f98435a762d0173d0ab9600ac8b0d",
+          "stride": 1204
+        }
+      ],
+      "source_sha256": "1564a6cd6fd3350d6b02604c74894bb51f8133ff40fddcb86e521c88130c69f1",
+      "width": 1204
+    },
+    "fox-profile0.8bpc.yuv420.avif": {
+      "aggregate_sha256": "ea256608b4df99f3931321787a5574df001f1a7e5a16e2874706028660986f52",
+      "chroma": "420jpeg",
+      "depth": 8,
+      "height": 800,
+      "kind": "y4m",
+      "planes": [
+        {
+          "columns": 1204,
+          "length": 963200,
+          "name": "Y",
+          "ordinal": 0,
+          "rows": 800,
+          "sha256": "a0d2f16c5eec8b8cf6c4f973b8e2bfea864fb868e45789e785cb9d688444325d",
+          "stride": 1204
+        },
+        {
+          "columns": 602,
+          "length": 240800,
+          "name": "U",
+          "ordinal": 1,
+          "rows": 400,
+          "sha256": "f83510f5f8ef19abc9dba602555e159de9391322a2d89d47957adb49343b1e29",
+          "stride": 602
+        },
+        {
+          "columns": 602,
+          "length": 240800,
+          "name": "V",
+          "ordinal": 2,
+          "rows": 400,
+          "sha256": "c054abd53416e5809fda27e101136a41d8573e05675d9a07072cb0e6cd75a0b2",
+          "stride": 602
+        }
+      ],
+      "source_sha256": "a0ae1ad1aea81291730f42259593b297a8444699f4553de8dc25da2db56a40d9",
+      "width": 1204
     },
     "fox-profile2.12bpc.yuv420.avif": {
-      "source_sha256": "",
+      "aggregate_sha256": "9b6d6347e6fd6d810189d7f7f9005aeec869069a28e83b79914b5481ac6cfa00",
+      "chroma": "420p12",
+      "depth": 12,
+      "height": 800,
       "kind": "y4m",
-      "width": 0,
-      "height": 0,
-      "chroma": "",
-      "depth": 0,
-      "planes": [],
-      "aggregate_sha256": ""
+      "planes": [
+        {
+          "columns": 1204,
+          "length": 1926400,
+          "name": "Y",
+          "ordinal": 0,
+          "rows": 800,
+          "sha256": "801efc14eb584b92dd2fb38b38c3d9bdd8ece7f23a154701411f956be0647b00",
+          "stride": 2408
+        },
+        {
+          "columns": 602,
+          "length": 481600,
+          "name": "U",
+          "ordinal": 1,
+          "rows": 400,
+          "sha256": "b652cb6b6e57456a5030a57a16db97a4539fd26da7a24c80f01a178feffd0b10",
+          "stride": 1204
+        },
+        {
+          "columns": 602,
+          "length": 481600,
+          "name": "V",
+          "ordinal": 2,
+          "rows": 400,
+          "sha256": "2e699cbfb5062e22a1f4ebc937b86e9aecf7c8059a484fc24f5259bedd227244",
+          "stride": 1204
+        }
+      ],
+      "source_sha256": "ce734812bb76659dbaf7c8a96321e12a4281fb7829180cadb685c14b9310fe45",
+      "width": 1204
     },
-    "abc_color_irot_alpha_irot.avif": {
-      "source_sha256": "",
-      "kind": "png",
-      "display_width": 0,
-      "display_height": 0,
-      "png_sha256": "",
-      "rgba_sha256": "",
-      "alpha_min": -1,
-      "alpha_max": -1,
-      "alpha_non_opaque_samples": -1
+    "white_1x1.avif": {
+      "aggregate_sha256": "babab0b045e26527837a92d3bef9250ee5150cdd826d0db79d7ca3435abbac28",
+      "chroma": "444",
+      "depth": 8,
+      "height": 1,
+      "kind": "y4m",
+      "planes": [
+        {
+          "columns": 1,
+          "length": 1,
+          "name": "Y",
+          "ordinal": 0,
+          "rows": 1,
+          "sha256": "3e151409ace91cb3394fecd59e92b5dc42c0aad29993a1858f2f70a0866a539b",
+          "stride": 1
+        },
+        {
+          "columns": 1,
+          "length": 1,
+          "name": "U",
+          "ordinal": 1,
+          "rows": 1,
+          "sha256": "76be8b528d0075f7aae98d6fa57a6d3c83ae480a8469e668d7b0af968995ac71",
+          "stride": 1
+        },
+        {
+          "columns": 1,
+          "length": 1,
+          "name": "V",
+          "ordinal": 2,
+          "rows": 1,
+          "sha256": "76be8b528d0075f7aae98d6fa57a6d3c83ae480a8469e668d7b0af968995ac71",
+          "stride": 1
+        }
+      ],
+      "source_sha256": "ea4e43d1f07e4c00de16c13afa32376111bb306e51f08212cf4c1b6064df3667",
+      "width": 1
     }
   },
   "negatives": {
     "abc_color_irot_alpha_NOirot.avif": {
-      "source_sha256": "",
-      "refusal": "alpha auxiliary is not associated with the primary item by an essential transform; the positive orientation claim is unproven, so the source is refused by authored media policy rather than accepted from raw decoder output"
+      "refusal": "alpha auxiliary is not associated with the primary item by an essential transform; the positive orientation claim is unproven, so the source is refused by authored media policy rather than accepted from raw decoder output",
+      "source_sha256": "f2c8cd6ded641c68d13b3363417a62288a5eb335870de8d0b9da5093865ffb9a"
     },
     "clap_irot_imir_non_essential.avif": {
-      "source_sha256": "",
-      "refusal": "clap/irot/imir are declared non-essential, so a viewer may ignore them; the authored crop/orientation claim is not binding and the source is refused by authored media policy"
+      "refusal": "clap/irot/imir are declared non-essential, so a viewer may ignore them; the authored crop/orientation claim is not binding and the source is refused by authored media policy",
+      "source_sha256": "33f869fcf2a879913eb394982b8fc03e9a60c25831aa37622ddefa656fd39fc1"
     }
+  },
+  "note": "Test-only reference facts. Not authoritative for publication. Only independently measured values from pinned libavif/dav1d + Pillow may be pinned here; the verifier recomputes every value and refuses any difference.",
+  "schema": "solo-avif-oracle-v1",
+  "state": "pinned",
+  "tool": {
+    "avifdec_sha256": "845c02f6194140824189018c87d4fff400655070615466f6610f3904ba4cc096",
+    "avifdec_version": "Version: 1.0.4 (dav1d [dec]:1.4.1, libgav1 [dec]:0.18.0, aom [enc/dec]:v3.8.2, rav1e [enc]:0.7.1 (UNKNOWN), svt [enc]:v1.7.0)\nlibyuv : available (1883)",
+    "libavif_package": "1.0.4-1ubuntu3",
+    "libdav1d_package": "1.4.1-1build1",
+    "pillow_package": "10.2.0-1ubuntu1.5",
+    "python_version": "Python 3.12.3"
   }
 }
