@@ -32,7 +32,7 @@ name: rust-verify
 
 on:
   push:
-    branches: [main]
+    branches: [main, solo-wo-118-avif-v4-r01]
   pull_request:
     branches: [main]
   # Recheck advisory data even when no source changed: a new RustSec entry must be able
@@ -1416,4 +1416,296 @@ jobs:
             fi
           done
           echo "r03_fixture_cleanup=complete"
+
+
+  # ---------------------------------------------------------------------------------
+  # Test-only independent AVIF reference oracle (SOLO-WO-118 R03).
+  #
+  # Purpose: produce independent, reproducible reference measurements for the pinned
+  # AVIF fixtures using libavif's `avifdec` with the `dav1d` decoder, plus Pillow for
+  # display-oriented RGBA. It adds no product dependency, links nothing into any crate,
+  # writes nothing to the repository and grants no publication authority. Its result is
+  # reported separately from `verify`: an oracle pass is never technical AVIF V4
+  # acceptance, and a red `verify` job is never waived by it.
+  # ---------------------------------------------------------------------------------
+  avif-reference-oracle:
+    if: github.ref == 'refs/heads/solo-wo-118-avif-v4-r01' && github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      FIXTURES: crates/solo-cli/tests/fixtures/avif
+    steps:
+      - name: Check out the exact branch revision without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Install the test-only reference tool and record its exact identity
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/measured" "$RUNNER_TEMP/tool"
+          MANIFEST="$FIXTURES/reference-goldens.json"
+          STATE=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["state"])' "$MANIFEST")
+          PIN_LIB=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["tool"]["libavif_package"])' "$MANIFEST")
+          PIN_PIL=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["tool"]["pillow_package"])' "$MANIFEST")
+          echo "manifest_state=$STATE"
+          sudo apt-get update
+          if [ "$STATE" = "pinned" ]; then
+            test -n "$PIN_LIB"
+            test -n "$PIN_PIL"
+            sudo apt-get install -y --no-install-recommends "libavif-bin=$PIN_LIB" "python3-pil=$PIN_PIL"
+          else
+            echo "::warning::discovery run: installing floating test-only reference tools"
+            sudo apt-get install -y --no-install-recommends libavif-bin python3-pil
+          fi
+          command -v avifdec
+          avifdec --version | tee "$RUNNER_TEMP/tool/avifdec-version.txt"
+          avifdec --help > "$RUNNER_TEMP/tool/avifdec-help.txt" 2>&1 || true
+          for flag in --codec --jobs; do
+            grep -q -- "$flag" "$RUNNER_TEMP/tool/avifdec-help.txt" \
+              || { echo "::error::this avifdec lacks the $flag option"; exit 1; }
+          done
+          sha256sum "$(readlink -f "$(command -v avifdec)")" | tee "$RUNNER_TEMP/tool/avifdec-sha256.txt"
+          dpkg-query -W -f='${Package}=${Version}\n' 'libavif*' 'libdav1d*' 'python3-pil' | tee "$RUNNER_TEMP/tool/packages.txt"
+          ldd "$(command -v avifdec)" | tee "$RUNNER_TEMP/tool/ldd.txt"
+          for lib in $(ldd "$(command -v avifdec)" | awk '/libavif|libdav1d/{print $3}'); do
+            sha256sum "$lib"
+          done | tee "$RUNNER_TEMP/tool/ldd-sha256.txt"
+          /usr/bin/python3 --version | tee "$RUNNER_TEMP/tool/python-version.txt"
+          /usr/bin/python3 -c 'import importlib.metadata as m;print("pillow="+m.version("Pillow"))' \
+            | tee "$RUNNER_TEMP/tool/pillow.txt"
+          echo "checkout_sha=$(git rev-parse HEAD)" | tee "$RUNNER_TEMP/tool/checkout.txt"
+          sha256sum "$FIXTURES"/*.avif | tee "$RUNNER_TEMP/tool/fixture-sha256.txt"
+
+      - name: Extract independent Y4M planes and display-oriented RGBA
+        run: |
+          set -euo pipefail
+          M="$RUNNER_TEMP/measured"
+          F="$FIXTURES"
+          for name in white_1x1 fox-profile0.8bpc.yuv420 fox-profile0.10bpc.yuv420 fox-profile2.12bpc.yuv420; do
+            avifdec --codec dav1d --jobs 1 "$F/$name.avif" "$M/$name.avif.y4m"
+          done
+          PNG="$M/abc_color_irot_alpha_irot.avif.png"
+          if grep -q -- '--depth' "$RUNNER_TEMP/tool/avifdec-help.txt"; then
+            avifdec --codec dav1d --jobs 1 --depth 8 "$F/abc_color_irot_alpha_irot.avif" "$PNG"
+          else
+            avifdec --codec dav1d --jobs 1 "$F/abc_color_irot_alpha_irot.avif" "$PNG"
+          fi
+          for produced in "$M"/*.y4m; do
+            python3 "$F/reference_oracle.py" y4m "$produced" > "$produced.json"
+          done
+          python3 "$F/reference_oracle.py" png "$PNG" > "$PNG.json"
+          echo "--- measured fixtures ---"
+          for produced in "$M"/*.json; do basename "$produced"; done
+
+
+      - name: Prove the independent parser on synthetic and deliberately invalid input
+        run: |
+          set -euo pipefail
+          python3 "$FIXTURES/reference_oracle.py" self-test
+          set +e
+          python3 "$FIXTURES/reference_oracle.py" y4m "$RUNNER_TEMP/absent.y4m" >/dev/null 2>&1
+          absent_rc=$?
+          python3 "$FIXTURES/reference_oracle.py" png "$RUNNER_TEMP/absent.png" >/dev/null 2>&1
+          absent_png_rc=$?
+          set -e
+          test "$absent_rc" -eq 2 || { echo "::error::absent Y4M must be a checked refusal, got $absent_rc"; exit 1; }
+          test "$absent_png_rc" -eq 2 || { echo "::error::absent PNG must be a checked refusal, got $absent_png_rc"; exit 1; }
+          echo "parser_refusals=verified"
+
+      - name: Recompute every pinned fact and prove three mutation rejections
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import copy
+          import hashlib
+          import json
+          import os
+          import sys
+
+          FIXTURES = os.environ["FIXTURES"]
+          TMP = os.environ["RUNNER_TEMP"]
+          MANIFEST = os.path.join(FIXTURES, "reference-goldens.json")
+          CLOSED_TOP = {"schema", "state", "note", "tool", "fixtures", "negatives"}
+          Y4M_FIELDS = ("width", "height", "chroma", "depth", "aggregate_sha256")
+          PLANE_FIELDS = ("ordinal", "name", "columns", "rows", "stride", "length", "sha256")
+          PNG_FIELDS = ("png_sha256", "rgba_sha256", "alpha_min", "alpha_max",
+                        "alpha_non_opaque_samples")
+          TOOL_FIELDS = ("avifdec_sha256", "avifdec_version", "libavif_package",
+                         "libdav1d_package", "pillow_package", "python_version")
+
+          def load(path):
+              with open(path, "r", encoding="utf-8") as handle:
+                  return json.load(handle)
+
+          def sha256_file(path):
+              digest = hashlib.sha256()
+              with open(path, "rb") as handle:
+                  for chunk in iter(lambda: handle.read(1 << 20), b""):
+                      digest.update(chunk)
+              return digest.hexdigest()
+
+          def read_text(path):
+              with open(path, "r", encoding="utf-8") as handle:
+                  return handle.read().strip()
+
+          manifest = load(MANIFEST)
+          if set(manifest) != CLOSED_TOP:
+              sys.exit("refused: unexpected manifest key set %s"
+                       % sorted(set(manifest) ^ CLOSED_TOP))
+          if manifest["schema"] != "solo-avif-oracle-v1":
+              sys.exit("refused: unexpected schema %r" % manifest["schema"])
+          if manifest["state"] not in ("discovery", "pinned"):
+              sys.exit("refused: unexpected state %r" % manifest["state"])
+
+          facts = {}
+          measured_dir = os.path.join(TMP, "measured")
+          for name in sorted(os.listdir(measured_dir)):
+              if not name.endswith(".json"):
+                  continue
+              key = name[: -len(".json")]
+              for suffix in (".y4m", ".png"):
+                  if key.endswith(suffix):
+                      facts[key[: -len(suffix)]] = load(os.path.join(measured_dir, name))
+                      break
+
+          packages = {}
+          for line in read_text(os.path.join(TMP, "tool", "packages.txt")).splitlines():
+              if "=" in line:
+                  package, version = line.split("=", 1)
+                  packages[package.strip()] = version.strip()
+          facts["_tool"] = {
+              "avifdec_sha256": read_text(os.path.join(TMP, "tool", "avifdec-sha256.txt")).split()[0],
+              "avifdec_version": read_text(os.path.join(TMP, "tool", "avifdec-version.txt")),
+              "libavif_package": packages.get("libavif-bin", ""),
+              "libdav1d_package": next(
+                  (value for key, value in packages.items() if key.startswith("libdav1d")), ""),
+              "pillow_package": packages.get("python3-pil", ""),
+              "python_version": read_text(os.path.join(TMP, "tool", "python-version.txt")),
+          }
+          sources = {}
+          for name in list(manifest["fixtures"]) + list(manifest["negatives"]):
+              sources[name] = sha256_file(os.path.join(FIXTURES, name))
+          def check(man, observed, source_hashes):
+              errors = []
+              for name, spec in man["fixtures"].items():
+                  fact = observed.get(name)
+                  if fact is None:
+                      errors.append("no independent measurement for %s" % name)
+                      continue
+                  if spec.get("source_sha256") != source_hashes[name]:
+                      errors.append("%s source digest differs" % name)
+                  kind = spec.get("kind")
+                  if kind == "y4m":
+                      for field in Y4M_FIELDS:
+                          if spec.get(field) != fact.get(field):
+                              errors.append("%s %s differs" % (name, field))
+                      expected_planes = spec.get("planes") or []
+                      actual_planes = fact.get("planes") or []
+                      if len(expected_planes) != len(actual_planes):
+                          errors.append("%s plane count differs" % name)
+                      else:
+                          for expected, actual in zip(expected_planes, actual_planes):
+                              for field in PLANE_FIELDS:
+                                  if expected.get(field) != actual.get(field):
+                                      errors.append("%s plane %s %s differs"
+                                                    % (name, actual.get("ordinal"), field))
+                  elif kind == "png":
+                      for field in PNG_FIELDS:
+                          if spec.get(field) != fact.get(field):
+                              errors.append("%s %s differs" % (name, field))
+                      if spec.get("display_width") != fact.get("width"):
+                          errors.append("%s display width differs" % name)
+                      if spec.get("display_height") != fact.get("height"):
+                          errors.append("%s display height differs" % name)
+                  else:
+                      errors.append("%s has unknown kind %r" % (name, kind))
+              for name, spec in man["negatives"].items():
+                  if spec.get("source_sha256") != source_hashes[name]:
+                      errors.append("%s negative source digest differs" % name)
+                  if not spec.get("refusal"):
+                      errors.append("%s has no recorded normative refusal" % name)
+              for field in TOOL_FIELDS:
+                  if man["tool"].get(field) != observed["_tool"].get(field):
+                      errors.append("tool %s differs" % field)
+              return errors
+
+          if manifest["state"] == "discovery":
+              candidate = copy.deepcopy(manifest)
+              candidate["state"] = "pinned"
+              candidate["tool"] = dict(facts["_tool"])
+              for name, spec in candidate["fixtures"].items():
+                  fact = facts[name]
+                  spec["source_sha256"] = sources[name]
+                  if spec["kind"] == "y4m":
+                      for field in Y4M_FIELDS:
+                          spec[field] = fact[field]
+                      spec["planes"] = [
+                          {field: plane[field] for field in PLANE_FIELDS}
+                          for plane in fact["planes"]
+                      ]
+                  else:
+                      spec["display_width"] = fact["width"]
+                      spec["display_height"] = fact["height"]
+                      for field in PNG_FIELDS:
+                          spec[field] = fact[field]
+              for name, spec in candidate["negatives"].items():
+                  spec["source_sha256"] = sources[name]
+              print("CANONICAL_MANIFEST_BEGIN")
+              print(json.dumps(candidate, indent=2, sort_keys=True))
+              print("CANONICAL_MANIFEST_END")
+              print("discovery_only=true")
+              sys.exit(0)
+
+          errors = check(manifest, facts, sources)
+          if errors:
+              for error in errors:
+                  print("::error::" + error)
+              sys.exit(1)
+          print("pristine_manifest_matches=true")
+
+          mutations = []
+          mutated_source = copy.deepcopy(manifest)
+          first_fixture = sorted(mutated_source["fixtures"])[0]
+          mutated_source["fixtures"][first_fixture]["source_sha256"] = "0" * 64
+          mutations.append(("source_sha256", mutated_source))
+
+          mutated_plane = copy.deepcopy(manifest)
+          for name in sorted(mutated_plane["fixtures"]):
+              spec = mutated_plane["fixtures"][name]
+              if spec["kind"] == "y4m" and spec.get("planes"):
+                  spec["planes"][0]["sha256"] = "0" * 64
+                  break
+          mutations.append(("plane_sha256", mutated_plane))
+
+          mutated_rgba = copy.deepcopy(manifest)
+          for name in sorted(mutated_rgba["fixtures"]):
+              spec = mutated_rgba["fixtures"][name]
+              if spec["kind"] == "png":
+                  spec["rgba_sha256"] = "0" * 64
+                  break
+          mutations.append(("rgba_sha256", mutated_rgba))
+
+          for label, mutated in mutations:
+              if not check(mutated, facts, sources):
+                  print("::error::mutated manifest %s was accepted" % label)
+                  sys.exit(1)
+              print("mutation_rejected=" + label)
+          print("mutation_rejections=3/3")
+          PY
+
+      - name: Remove task-owned reference material
+        if: always()
+        run: |
+          set -euo pipefail
+          rm -rf "$RUNNER_TEMP/measured" "$RUNNER_TEMP/tool"
+          for leftover in "$RUNNER_TEMP/measured" "$RUNNER_TEMP/tool"; do
+            if [ -e "$leftover" ]; then
+              echo "::error::cleanup left $leftover behind"
+              exit 1
+            fi
+          done
+          echo "oracle_cleanup=complete"
 

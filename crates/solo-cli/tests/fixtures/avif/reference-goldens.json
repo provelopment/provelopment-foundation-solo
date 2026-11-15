@@ -1,0 +1,76 @@
+{
+  "schema": "solo-avif-oracle-v1",
+  "state": "discovery",
+  "note": "Test-only reference facts. Not authoritative for publication. Only independently measured values from pinned libavif/dav1d + Pillow may be pinned here; the verifier recomputes every value and refuses any difference.",
+  "tool": {
+    "avifdec_sha256": "",
+    "avifdec_version": "",
+    "libavif_package": "",
+    "libdav1d_package": "",
+    "pillow_package": "",
+    "python_version": ""
+  },
+  "fixtures": {
+    "white_1x1.avif": {
+      "source_sha256": "",
+      "kind": "y4m",
+      "width": 0,
+      "height": 0,
+      "chroma": "",
+      "depth": 0,
+      "planes": [],
+      "aggregate_sha256": ""
+    },
+    "fox-profile0.8bpc.yuv420.avif": {
+      "source_sha256": "",
+      "kind": "y4m",
+      "width": 0,
+      "height": 0,
+      "chroma": "",
+      "depth": 0,
+      "planes": [],
+      "aggregate_sha256": ""
+    },
+    "fox-profile0.10bpc.yuv420.avif": {
+      "source_sha256": "",
+      "kind": "y4m",
+      "width": 0,
+      "height": 0,
+      "chroma": "",
+      "depth": 0,
+      "planes": [],
+      "aggregate_sha256": ""
+    },
+    "fox-profile2.12bpc.yuv420.avif": {
+      "source_sha256": "",
+      "kind": "y4m",
+      "width": 0,
+      "height": 0,
+      "chroma": "",
+      "depth": 0,
+      "planes": [],
+      "aggregate_sha256": ""
+    },
+    "abc_color_irot_alpha_irot.avif": {
+      "source_sha256": "",
+      "kind": "png",
+      "display_width": 0,
+      "display_height": 0,
+      "png_sha256": "",
+      "rgba_sha256": "",
+      "alpha_min": -1,
+      "alpha_max": -1,
+      "alpha_non_opaque_samples": -1
+    }
+  },
+  "negatives": {
+    "abc_color_irot_alpha_NOirot.avif": {
+      "source_sha256": "",
+      "refusal": "alpha auxiliary is not associated with the primary item by an essential transform; the positive orientation claim is unproven, so the source is refused by authored media policy rather than accepted from raw decoder output"
+    },
+    "clap_irot_imir_non_essential.avif": {
+      "source_sha256": "",
+      "refusal": "clap/irot/imir are declared non-essential, so a viewer may ignore them; the authored crop/orientation claim is not binding and the source is refused by authored media policy"
+    }
+  }
+}
