@@ -5028,3 +5028,798 @@ mod n116 {
         );
     }
 }
+
+/// `SOLO-WO-118 R06`: the real confined AVIF coded-plane worker proven on both native hosts.
+///
+/// Every positive starts the actual compiled `solo-cli` binary through the real confined
+/// supervisor, acquires bytes through the real `ContentRootCapability` reader and validates the
+/// result with the inward parent verifier. No positive is fabricated and no fixture digest is used
+/// to predict worker output.
+#[cfg(test)]
+mod n121 {
+    use std::cell::RefCell;
+    use std::path::PathBuf;
+
+    use serde_json::Value;
+    use solo_adapters::{
+        ConfinedAvifInspectAdapterV1, MediaWorkerProtocolRefusalKindV1, TestOwnerV1,
+        parse_media_worker_envelope_v1, test_inventory_v1,
+    };
+    use solo_application::{
+        GraphicAssetReadSetOutcomeV1, GraphicAssetSourceSetV1, MediaWorkerBoundaryOutcomeV1,
+        MediaWorkerColorModelV1, MediaWorkerDigestV1, MediaWorkerEnvelopeV1, MediaWorkerExitV1,
+        MediaWorkerFormatV1, MediaWorkerLimitsV1, MediaWorkerMimeV1, MediaWorkerObservationV1,
+        MediaWorkerOrientationV1, MediaWorkerPlaneClaimV1, MediaWorkerPortV1,
+        MediaWorkerRefusalKindV1, MediaWorkerRequestV1, MediaWorkerRunV1, MediaWorkerStatusV1,
+        inspect_media_worker_source_set_v1, read_graphic_asset_bytes_v1,
+        sha256_media_worker_bytes_v1,
+    };
+
+    use super::n116::{Root, inventory_of, suppressed_inventory_of};
+    use super::{BIN, run};
+
+    /// The four authentic stills, as `(fixture, width, height, depth)`.
+    const POSITIVES: [(&str, u32, u32, u8); 4] = [
+        ("white_1x1.avif", 1, 1, 8),
+        ("fox-profile0.8bpc.yuv420.avif", 1204, 800, 8),
+        ("fox-profile0.10bpc.yuv420.avif", 1204, 800, 10),
+        ("fox-profile2.12bpc.yuv420.avif", 1204, 800, 12),
+    ];
+
+    fn fixture_path(name: &str) -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/avif")
+            .join(name)
+    }
+
+    fn fixture_bytes(name: &str) -> Vec<u8> {
+        std::fs::read(fixture_path(name)).expect("pinned avif fixture present")
+    }
+
+    /// The unchanged independent R03 manifest: a fixed test-only path, opened read-only.
+    fn goldens() -> Value {
+        let text = std::fs::read_to_string(fixture_path("reference-goldens.json"))
+            .expect("pinned oracle manifest present");
+        serde_json::from_str(&text).expect("pinned oracle manifest parses")
+    }
+
+    fn hex_digest(hex: &str) -> MediaWorkerDigestV1 {
+        MediaWorkerDigestV1::parse_lower_hex(hex).expect("pinned digest is canonical lowercase hex")
+    }
+
+    fn complete(outcome: GraphicAssetReadSetOutcomeV1) -> GraphicAssetSourceSetV1 {
+        match outcome {
+            GraphicAssetReadSetOutcomeV1::Complete(set) => set,
+            GraphicAssetReadSetOutcomeV1::Refused(refusal) => {
+                panic!("real source acquisition refused: {refusal:?}")
+            }
+        }
+    }
+
+    fn checked(
+        outcome: MediaWorkerBoundaryOutcomeV1,
+    ) -> Vec<solo_application::MediaWorkerCheckedEnvelopeV1> {
+        match outcome {
+            MediaWorkerBoundaryOutcomeV1::EnvelopeChecked(checked) => checked,
+            MediaWorkerBoundaryOutcomeV1::Refused(refusal) => {
+                panic!("the inward boundary refused: {refusal:?}")
+            }
+        }
+    }
+
+    fn refusal_kind(
+        set: &GraphicAssetSourceSetV1,
+        port: &impl MediaWorkerPortV1,
+    ) -> MediaWorkerRefusalKindV1 {
+        match inspect_media_worker_source_set_v1(set, port) {
+            MediaWorkerBoundaryOutcomeV1::Refused(refusal) => refusal.kind(),
+            MediaWorkerBoundaryOutcomeV1::EnvelopeChecked(checked) => panic!(
+                "the boundary accepted a hostile claim set: {} checked",
+                checked.len()
+            ),
+        }
+    }
+
+    /// A test-only port that forwards every call to the real adapter and retains the observation
+    /// the adapter actually returned. It fabricates nothing and launches nothing itself.
+    struct RecordingPort<'a> {
+        inner: &'a ConfinedAvifInspectAdapterV1,
+        seen: RefCell<Vec<MediaWorkerObservationV1>>,
+    }
+
+    impl<'a> RecordingPort<'a> {
+        fn new(inner: &'a ConfinedAvifInspectAdapterV1) -> Self {
+            Self {
+                inner,
+                seen: RefCell::new(Vec::new()),
+            }
+        }
+    }
+
+    impl MediaWorkerPortV1 for RecordingPort<'_> {
+        fn inspect_avif(&self, request: &MediaWorkerRequestV1<'_>) -> MediaWorkerRunV1 {
+            let run = self.inner.inspect_avif(request);
+            if let MediaWorkerRunV1::Observed(observation) = &run {
+                self.seen.borrow_mut().push(observation.clone());
+            }
+            run
+        }
+    }
+
+    /// A test-only port replaying one constructed claim; it can only prove inward refusal rules.
+    struct StaticPort(MediaWorkerObservationV1);
+
+    impl MediaWorkerPortV1 for StaticPort {
+        fn inspect_avif(&self, _request: &MediaWorkerRequestV1<'_>) -> MediaWorkerRunV1 {
+            MediaWorkerRunV1::Observed(self.0.clone())
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn rebuild(
+        source_length: u64,
+        source_sha256: MediaWorkerDigestV1,
+        width: u32,
+        height: u32,
+        bit_depth: u8,
+        planes: Vec<MediaWorkerPlaneClaimV1>,
+        output_sha256: MediaWorkerDigestV1,
+    ) -> MediaWorkerEnvelopeV1 {
+        MediaWorkerEnvelopeV1::new(
+            1,
+            MediaWorkerStatusV1::Decoded,
+            MediaWorkerFormatV1::Avif,
+            MediaWorkerMimeV1::ImageAvif,
+            source_length,
+            source_sha256,
+            width,
+            height,
+            bit_depth,
+            MediaWorkerColorModelV1::Yuv,
+            false,
+            false,
+            false,
+            MediaWorkerOrientationV1::Unverified,
+            planes,
+            output_sha256,
+        )
+    }
+
+    fn claim(
+        ordinal: u32,
+        stride: u64,
+        rows: u64,
+        length: u64,
+        sha256: MediaWorkerDigestV1,
+    ) -> MediaWorkerPlaneClaimV1 {
+        MediaWorkerPlaneClaimV1::new(ordinal, stride, rows, length, sha256)
+    }
+
+    fn observation(
+        limits_verified: bool,
+        exit: MediaWorkerExitV1,
+        wall_deadline_met: bool,
+        descendants_reaped: bool,
+        envelope: MediaWorkerEnvelopeV1,
+        planes: Vec<Vec<u8>>,
+    ) -> MediaWorkerObservationV1 {
+        MediaWorkerObservationV1::new(
+            limits_verified,
+            exit,
+            wall_deadline_met,
+            descendants_reaped,
+            !descendants_reaped,
+            MediaWorkerLimitsV1::reference(),
+            envelope,
+            planes,
+        )
+    }
+
+    #[test]
+    fn n121_01_four_coded_plane_goldens_cross_worker_and_parent() {
+        // Four distinct owners, four distinct registered roles, four distinct authentic stills.
+        let declared = [
+            (TestOwnerV1::Entity, "logo", POSITIVES[0].0, "public"),
+            (TestOwnerV1::Facet, "banner", POSITIVES[1].0, "public"),
+            (TestOwnerV1::Site, "background", POSITIVES[2].0, "public"),
+            (
+                TestOwnerV1::Page,
+                "social-preview",
+                POSITIVES[3].0,
+                "public",
+            ),
+        ];
+        let assets: Vec<(&str, Vec<u8>)> = POSITIVES
+            .iter()
+            .map(|(fixture, _, _, _)| (*fixture, fixture_bytes(fixture)))
+            .collect();
+        let asset_refs: Vec<(&str, &[u8])> = assets
+            .iter()
+            .map(|(name, bytes)| (*name, bytes.as_slice()))
+            .collect();
+        let root = Root::new("n121-four", &asset_refs);
+        let inventory = inventory_of(&declared);
+
+        let set = complete(read_graphic_asset_bytes_v1(&inventory, &root.capability()));
+        assert_eq!(set.len(), 4, "four authored obligations are acquired");
+        for (index, (fixture, _, _, _)) in POSITIVES.iter().enumerate() {
+            assert_eq!(
+                u64::try_from(set.evidence()[index].bytes().len()).expect("length"),
+                u64::try_from(fixture_bytes(fixture).len()).expect("fixture length"),
+                "{fixture}: the acquired bytes are the authored bytes"
+            );
+        }
+        assert!(
+            !set.grants_publication_authority() && !set.validates_media(),
+            "source acquisition neither publishes nor validates"
+        );
+
+        let adapter = ConfinedAvifInspectAdapterV1::new(PathBuf::from(BIN));
+        let recording = RecordingPort::new(&adapter);
+        let records = checked(inspect_media_worker_source_set_v1(&set, &recording));
+        let seen = recording.seen.borrow().clone();
+
+        assert_eq!(seen.len(), 4, "four real confined runs were observed");
+        assert_eq!(records.len(), 4, "four parent-checked records");
+        let manifest = goldens();
+        let mut plane_total = 0usize;
+        for (index, (fixture, width, height, depth)) in POSITIVES.iter().enumerate() {
+            let observed = &seen[index];
+            assert_eq!(
+                observed.exit(),
+                MediaWorkerExitV1::Normal,
+                "{fixture}: the child must exit normally"
+            );
+            assert!(observed.limits_verified(), "{fixture}: limits read back");
+            assert!(
+                observed.wall_deadline_met(),
+                "{fixture}: the wall deadline was met"
+            );
+            assert!(
+                observed.descendants_reaped(),
+                "{fixture}: the child is reaped"
+            );
+            assert!(!observed.leak_observed(), "{fixture}: no leak observed");
+
+            let envelope = observed.envelope();
+            assert_eq!(envelope.format(), MediaWorkerFormatV1::Avif);
+            assert_eq!(
+                envelope.orientation(),
+                MediaWorkerOrientationV1::Unverified,
+                "{fixture}: coded planes only, never a display-orientation claim"
+            );
+            assert_eq!(
+                (envelope.width(), envelope.height(), envelope.bit_depth()),
+                (*width, *height, *depth),
+                "{fixture}: geometry and native depth"
+            );
+            assert_eq!(envelope.planes().len(), 3, "{fixture}: Y/U/V only");
+            assert_eq!(observed.planes().len(), 3, "{fixture}: three owned buffers");
+            plane_total += 3;
+
+            let pinned = &manifest["fixtures"][*fixture];
+            assert_eq!(
+                envelope.source_sha256(),
+                hex_digest(pinned["source_sha256"].as_str().expect("source hex")),
+                "{fixture}: source identity"
+            );
+            for (plane_index, plane_claim) in envelope.planes().iter().enumerate() {
+                let pinned_plane = &pinned["planes"][plane_index];
+                assert_eq!(
+                    plane_claim.stride(),
+                    pinned_plane["stride"].as_u64().expect("stride"),
+                    "{fixture}: plane {plane_index} canonical stride"
+                );
+                assert_eq!(
+                    plane_claim.rows(),
+                    pinned_plane["rows"].as_u64().expect("rows"),
+                    "{fixture}: plane {plane_index} canonical rows"
+                );
+                assert_eq!(
+                    plane_claim.length(),
+                    u64::try_from(observed.planes()[plane_index].len()).expect("length"),
+                    "{fixture}: plane {plane_index} received length"
+                );
+                let pinned_hex = pinned_plane["sha256"].as_str().expect("plane hex");
+                assert_eq!(
+                    plane_claim.sha256(),
+                    hex_digest(pinned_hex),
+                    "{fixture}: plane {plane_index} claim against the independent golden"
+                );
+                assert_eq!(
+                    sha256_media_worker_bytes_v1(&observed.planes()[plane_index]),
+                    hex_digest(pinned_hex),
+                    "{fixture}: plane {plane_index} received bytes against the independent golden"
+                );
+            }
+            assert_eq!(
+                envelope.output_sha256(),
+                hex_digest(pinned["aggregate_sha256"].as_str().expect("aggregate hex")),
+                "{fixture}: aggregate against the independent golden"
+            );
+        }
+
+        for (index, record) in records.iter().enumerate() {
+            let (fixture, width, height, depth) = POSITIVES[index];
+            assert_eq!(
+                record.plane_count(),
+                3,
+                "{fixture}: the parent checked three planes"
+            );
+            assert_eq!(
+                (record.width(), record.height(), record.bit_depth()),
+                (width, height, depth),
+                "{fixture}: the parent checked geometry and depth"
+            );
+            assert_eq!(
+                record.source_length(),
+                u64::try_from(set.evidence()[index].bytes().len()).expect("length"),
+                "{fixture}: the parent checked the source length"
+            );
+            assert!(
+                !record.grants_publication_authority(),
+                "{fixture}: a coded-plane check never authorises publication"
+            );
+            assert!(
+                !record.proves_media_correctness(),
+                "{fixture}: a coded-plane check never proves the media"
+            );
+        }
+
+        let pids = adapter.observed_pids_v1();
+        assert_eq!(pids.len(), 4, "one real child per obligation: {pids:?}");
+        assert!(
+            pids.iter().all(|pid| *pid > 0),
+            "every launch has a real pid"
+        );
+        let mut unique = pids.clone();
+        unique.sort_unstable();
+        unique.dedup();
+        assert_eq!(unique.len(), 4, "four distinct child processes: {pids:?}");
+
+        println!(
+            "n121_evidence case=01 pids={pids:?} distinct_pids=4 fixtures=4 planes={plane_total} \
+             depths=8,10,12 orientation=unverified publication=false records=4"
+        );
+    }
+
+    #[test]
+    fn n121_02_real_worker_and_hostile_claim_refusals() {
+        let adapter = ConfinedAvifInspectAdapterV1::new(PathBuf::from(BIN));
+        let fox = fixture_bytes(POSITIVES[1].0);
+        let mut refused: Vec<&str> = Vec::new();
+
+        // (A) The parent-side source gate refuses before any launch.
+        assert!(
+            MediaWorkerRequestV1::for_source(&[]).is_err(),
+            "zero source bytes refuse before spawn"
+        );
+        refused.push("source-empty-before-launch");
+        let oversize = vec![0u8; (20 * 1024 * 1024) + 1];
+        assert!(
+            MediaWorkerRequestV1::for_source(&oversize).is_err(),
+            "an over-20-MiB source refuses before spawn"
+        );
+        refused.push("source-oversize-before-launch");
+
+        // (B) Authored property grammar: the favicon role is PNG-only, so an AVIF favicon is
+        // refused while the reference grammar itself admits the `.avif` extension.
+        assert!(
+            test_inventory_v1(&[(TestOwnerV1::Entity, "favicon", POSITIVES[0].0, "public")])
+                .is_none(),
+            "an AVIF favicon is refused by the authored property grammar"
+        );
+        refused.push("graphic-favicon-not-png");
+
+        // (C) Real child preflight refusals, each through the real confined worker.
+        let hostile: [(&str, Vec<u8>); 5] = [
+            ("bad-magic.avif", b"this is not an avif still".to_vec()),
+            ("truncated.avif", fox[..64].to_vec()),
+            (
+                "alpha-irot",
+                fixture_bytes("abc_color_irot_alpha_irot.avif"),
+            ),
+            (
+                "alpha-noirot",
+                fixture_bytes("abc_color_irot_alpha_NOirot.avif"),
+            ),
+            (
+                "clap-irot-imir",
+                fixture_bytes("clap_irot_imir_non_essential.avif"),
+            ),
+        ];
+        let hostile_assets: Vec<(&str, &[u8])> = hostile
+            .iter()
+            .map(|(name, bytes)| (*name, bytes.as_slice()))
+            .collect();
+        let hostile_root = Root::new("n121-hostile", &hostile_assets);
+        for (name, _) in &hostile {
+            let inventory = inventory_of(&[(TestOwnerV1::Entity, "logo", name, "internal")]);
+            let set = complete(read_graphic_asset_bytes_v1(
+                &inventory,
+                &hostile_root.capability(),
+            ));
+            let request =
+                MediaWorkerRequestV1::for_source(set.evidence()[0].bytes()).expect("bounded");
+            match adapter.inspect_avif(&request) {
+                MediaWorkerRunV1::Refused(_) => refused.push(name),
+                MediaWorkerRunV1::Observed(observation) => panic!(
+                    "{name}: the real worker accepted an out-of-scope source: exit={:?} planes={}",
+                    observation.exit(),
+                    observation.planes().len()
+                ),
+            }
+        }
+
+        // (D) A complete earlier success is discarded when a later obligation is bad. The second
+        // obligation is a representation-level `internal` declaration.
+        let mixed_assets = [
+            (POSITIVES[0].0, fixture_bytes(POSITIVES[0].0)),
+            ("truncated.avif", fox[..64].to_vec()),
+        ];
+        let mixed_refs: Vec<(&str, &[u8])> = mixed_assets
+            .iter()
+            .map(|(name, bytes)| (*name, bytes.as_slice()))
+            .collect();
+        let mixed_root = Root::new("n121-mixed", &mixed_refs);
+        let mixed_inventory = suppressed_inventory_of(&[
+            (TestOwnerV1::Entity, "logo", POSITIVES[0].0, "public"),
+            (
+                TestOwnerV1::Representation,
+                "social-preview",
+                "truncated.avif",
+                "internal",
+            ),
+        ]);
+        let mixed = complete(read_graphic_asset_bytes_v1(
+            &mixed_inventory,
+            &mixed_root.capability(),
+        ));
+        assert_eq!(mixed.len(), 2, "both authored obligations were acquired");
+        match inspect_media_worker_source_set_v1(&mixed, &adapter) {
+            MediaWorkerBoundaryOutcomeV1::Refused(_) => {
+                refused.push("whole-set-discarded-by-representation")
+            }
+            MediaWorkerBoundaryOutcomeV1::EnvelopeChecked(checked) => panic!(
+                "the boundary returned a partial success: {} checked",
+                checked.len()
+            ),
+        }
+
+        // (E) A Platform-namespaced obligation is never acquired by this Entity path.
+        match test_inventory_v1(&[(TestOwnerV1::Entity, "logo", "platform/hero.avif", "public")]) {
+            None => refused.push("platform-namespace-refused-by-grammar"),
+            Some(inventory) => {
+                match read_graphic_asset_bytes_v1(&inventory, &mixed_root.capability()) {
+                    GraphicAssetReadSetOutcomeV1::Refused(_) => {
+                        refused.push("platform-namespace-refused-at-acquisition")
+                    }
+                    GraphicAssetReadSetOutcomeV1::Complete(_) => {
+                        panic!("a Platform-namespaced obligation was acquired")
+                    }
+                }
+            }
+        }
+
+        // (F) A direct invocation without the approved OS confinement refuses before parsing.
+        let direct = run(&[
+            "--internal-image-worker-v1",
+            "avif",
+            &sha256_media_worker_bytes_v1(&fox).to_hex(),
+        ]);
+        assert_ne!(
+            direct.exit_code,
+            Some(0),
+            "an unconfined child must not decode"
+        );
+        assert!(
+            direct.stdout.is_empty(),
+            "an unconfined child writes nothing"
+        );
+        refused.push("unconfined-direct-invocation");
+
+        // (G) Counterfeit V1 claims against a genuinely acquired single-source set.
+        let single_assets = [(POSITIVES[0].0, fixture_bytes(POSITIVES[0].0))];
+        let single_refs: Vec<(&str, &[u8])> = single_assets
+            .iter()
+            .map(|(name, bytes)| (*name, bytes.as_slice()))
+            .collect();
+        let single_root = Root::new("n121-single", &single_refs);
+        let single_inventory =
+            inventory_of(&[(TestOwnerV1::Entity, "logo", POSITIVES[0].0, "public")]);
+        let single = complete(read_graphic_asset_bytes_v1(
+            &single_inventory,
+            &single_root.capability(),
+        ));
+        let request =
+            MediaWorkerRequestV1::for_source(single.evidence()[0].bytes()).expect("bounded");
+        let genuine = match adapter.inspect_avif(&request) {
+            MediaWorkerRunV1::Observed(observation) => observation,
+            MediaWorkerRunV1::Refused(kind) => panic!("the genuine source was refused: {kind:?}"),
+        };
+        let envelope = genuine.envelope();
+        let source_length = envelope.source_length();
+        let source_sha = envelope.source_sha256();
+        let output_sha = envelope.output_sha256();
+        let claims = envelope.planes().to_vec();
+        let planes = genuine.planes().to_vec();
+        let expect =
+            |label: &str, forged: MediaWorkerObservationV1, wanted: MediaWorkerRefusalKindV1| {
+                let kind = refusal_kind(&single, &StaticPort(forged));
+                assert_eq!(kind, wanted, "{label}: typed inward refusal");
+            };
+        let forged_digest = |hex: [u8; 32]| MediaWorkerDigestV1::from_bytes(hex);
+        let honest = |planes: Vec<Vec<u8>>| {
+            observation(
+                true,
+                MediaWorkerExitV1::Normal,
+                true,
+                true,
+                rebuild(
+                    source_length,
+                    source_sha,
+                    1,
+                    1,
+                    8,
+                    claims.clone(),
+                    output_sha,
+                ),
+                planes,
+            )
+        };
+
+        expect(
+            "forged-source-digest",
+            observation(
+                true,
+                MediaWorkerExitV1::Normal,
+                true,
+                true,
+                rebuild(
+                    source_length,
+                    forged_digest([9u8; 32]),
+                    1,
+                    1,
+                    8,
+                    claims.clone(),
+                    output_sha,
+                ),
+                planes.clone(),
+            ),
+            MediaWorkerRefusalKindV1::WorkerSourceMismatch,
+        );
+        expect(
+            "forged-aggregate-digest",
+            observation(
+                true,
+                MediaWorkerExitV1::Normal,
+                true,
+                true,
+                rebuild(
+                    source_length,
+                    source_sha,
+                    1,
+                    1,
+                    8,
+                    claims.clone(),
+                    forged_digest([7u8; 32]),
+                ),
+                planes.clone(),
+            ),
+            MediaWorkerRefusalKindV1::WorkerDigestMismatch,
+        );
+        let mut wrong_plane_sha = claims.clone();
+        wrong_plane_sha[1] = claim(1, 1, 1, 1, forged_digest([5u8; 32]));
+        expect(
+            "forged-plane-digest",
+            observation(
+                true,
+                MediaWorkerExitV1::Normal,
+                true,
+                true,
+                rebuild(
+                    source_length,
+                    source_sha,
+                    1,
+                    1,
+                    8,
+                    wrong_plane_sha,
+                    output_sha,
+                ),
+                planes.clone(),
+            ),
+            MediaWorkerRefusalKindV1::WorkerDigestMismatch,
+        );
+        let mut swapped = claims.clone();
+        swapped.swap(1, 2);
+        expect(
+            "swapped-uv-ordinals",
+            observation(
+                true,
+                MediaWorkerExitV1::Normal,
+                true,
+                true,
+                rebuild(source_length, source_sha, 1, 1, 8, swapped, output_sha),
+                planes.clone(),
+            ),
+            MediaWorkerRefusalKindV1::WorkerPlaneInvalid,
+        );
+        expect(
+            "wrong-coded-depth",
+            observation(
+                true,
+                MediaWorkerExitV1::Normal,
+                true,
+                true,
+                rebuild(
+                    source_length,
+                    source_sha,
+                    1,
+                    1,
+                    9,
+                    claims.clone(),
+                    output_sha,
+                ),
+                planes.clone(),
+            ),
+            MediaWorkerRefusalKindV1::WorkerMediaUnverified,
+        );
+        let mut bad_stride = claims.clone();
+        bad_stride[0] = claim(0, 2, 1, 1, claims[0].sha256());
+        expect(
+            "invalid-stride",
+            observation(
+                true,
+                MediaWorkerExitV1::Normal,
+                true,
+                true,
+                rebuild(source_length, source_sha, 1, 1, 8, bad_stride, output_sha),
+                planes.clone(),
+            ),
+            MediaWorkerRefusalKindV1::WorkerPlaneInvalid,
+        );
+        let mut short = planes.clone();
+        short[2].pop();
+        expect(
+            "short-payload",
+            honest(short),
+            MediaWorkerRefusalKindV1::WorkerPlaneInvalid,
+        );
+        let mut trailing = planes.clone();
+        trailing[2].push(0);
+        expect(
+            "trailing-payload",
+            honest(trailing),
+            MediaWorkerRefusalKindV1::WorkerPlaneInvalid,
+        );
+        expect(
+            "abnormal-exit",
+            observation(
+                true,
+                MediaWorkerExitV1::Abnormal,
+                true,
+                true,
+                rebuild(
+                    source_length,
+                    source_sha,
+                    1,
+                    1,
+                    8,
+                    claims.clone(),
+                    output_sha,
+                ),
+                planes.clone(),
+            ),
+            MediaWorkerRefusalKindV1::WorkerExitAbnormal,
+        );
+        expect(
+            "false-limits",
+            observation(
+                false,
+                MediaWorkerExitV1::Normal,
+                true,
+                true,
+                rebuild(
+                    source_length,
+                    source_sha,
+                    1,
+                    1,
+                    8,
+                    claims.clone(),
+                    output_sha,
+                ),
+                planes.clone(),
+            ),
+            MediaWorkerRefusalKindV1::WorkerLimitUnverified,
+        );
+        expect(
+            "false-cleanup",
+            observation(
+                true,
+                MediaWorkerExitV1::Normal,
+                true,
+                false,
+                rebuild(
+                    source_length,
+                    source_sha,
+                    1,
+                    1,
+                    8,
+                    claims.clone(),
+                    output_sha,
+                ),
+                planes.clone(),
+            ),
+            MediaWorkerRefusalKindV1::WorkerDescendantsRemain,
+        );
+        expect(
+            "wall-timeout",
+            observation(
+                true,
+                MediaWorkerExitV1::Normal,
+                false,
+                true,
+                rebuild(
+                    source_length,
+                    source_sha,
+                    1,
+                    1,
+                    8,
+                    claims.clone(),
+                    output_sha,
+                ),
+                planes.clone(),
+            ),
+            MediaWorkerRefusalKindV1::WorkerWallTimeout,
+        );
+
+        // (H) The unchanged strict parser refuses missing, duplicate and unknown envelope keys.
+        let header = format!(
+            "{{\"version\":1,\"status\":\"decoded\",\"format\":\"avif\",\"mime\":\"image/avif\",\
+             \"source_length\":{source_length},\"source_sha256\":\"{}\",\"width\":1,\"height\":1,\
+             \"bit_depth\":8,\"color_model\":\"yuv\",\"has_alpha\":false,\"is_grid\":false,\
+             \"is_sequence\":false,\"orientation\":\"unverified\",\"planes\":[\
+             {{\"ordinal\":0,\"stride\":1,\"rows\":1,\"length\":1,\"sha256\":\"{}\"}},\
+             {{\"ordinal\":1,\"stride\":1,\"rows\":1,\"length\":1,\"sha256\":\"{}\"}},\
+             {{\"ordinal\":2,\"stride\":1,\"rows\":1,\"length\":1,\"sha256\":\"{}\"}}],\
+             \"output_sha256\":\"{}\"}}",
+            source_sha.to_hex(),
+            claims[0].sha256().to_hex(),
+            claims[1].sha256().to_hex(),
+            claims[2].sha256().to_hex(),
+            output_sha.to_hex(),
+        );
+        assert!(
+            parse_media_worker_envelope_v1(header.as_bytes()).is_ok(),
+            "the canonical header parses"
+        );
+        let mutations: [(&str, String); 3] = [
+            (
+                "missing-key",
+                header.replacen(",\"orientation\":\"unverified\"", "", 1),
+            ),
+            (
+                "duplicate-key",
+                header.replacen("\"width\":1,", "\"width\":1,\"width\":1,", 1),
+            ),
+            (
+                "unknown-key",
+                header.replacen("\"version\":1,", "\"version\":1,\"extra\":1,", 1),
+            ),
+        ];
+        let mut protocol_kinds: Vec<(&str, MediaWorkerProtocolRefusalKindV1)> = Vec::new();
+        for (label, text) in mutations {
+            match parse_media_worker_envelope_v1(text.as_bytes()) {
+                Ok(_) => panic!("{label}: a mutated header parsed"),
+                Err(refusal) => protocol_kinds.push((label, refusal.kind())),
+            }
+        }
+
+        println!(
+            "n121_evidence case=02 refused={} labels={refused:?} counterfeits=12 \
+             counterfeits_refused=true protocol={protocol_kinds:?} whole_set_discarded=true \
+             unconfined_decoded=false",
+            refused.len()
+        );
+    }
+}

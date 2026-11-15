@@ -888,6 +888,86 @@ jobs:
           (Get-Content -LiteralPath $log) | ForEach-Object { $_.Replace('0403e0677a174ccafe18191a8a9f1c5a30993477bb074f49078b005f513caaba', '2222222222222222222222222222222222222222222222222222222222222222') } | Set-Content -LiteralPath $probe
           if (Test-N116Log -Path $probe) { throw 'wrong digest accepted' }
           Write-Output 'n116_gate mutations=rejected-all'
+      # Mandatory `SOLO-WO-118 R06` N121 gate. The two cases start the actual confined `solo-cli`
+      # child; every match is a fixed string because `--nocapture` interleaves a case's stdout onto
+      # its own `test <name> ...` line. The same verifier must reject altered copies of the log.
+      - name: Confined AVIF coded-plane worker gate (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          check_n121() {
+            local log="$1"
+            grep -qF 'test n121::n121_01_four_coded_plane_goldens_cross_worker_and_parent ' "$log" || return 1
+            grep -qF 'test n121::n121_02_real_worker_and_hostile_claim_refusals ' "$log" || return 1
+            [ "$(grep -Ec '^test n121::n121_0[0-9]_[A-Za-z0-9_]*( |$)' "$log")" -eq 2 ] || return 1
+            grep -qF 'test result: ok. 2 passed; 0 failed; 0 ignored' "$log" || return 1
+            ! grep -qF '... FAILED' "$log" || return 1
+            ! grep -qF '... ignored' "$log" || return 1
+            ! grep -qF 'test result: FAILED' "$log" || return 1
+            grep -qF 'n121_evidence case=01' "$log" || return 1
+            grep -qF 'n121_evidence case=02' "$log" || return 1
+            grep -qF 'orientation=unverified publication=false records=4' "$log" || return 1
+            grep -qF 'counterfeits_refused=true' "$log" || return 1
+            grep -qF 'whole_set_discarded=true' "$log" || return 1
+          }
+          log="$RUNNER_TEMP/n121-two.txt"
+          cargo test -p solo-cli --test media_worker_host_smoke --locked n121_ -- --nocapture --test-threads=1 >"$log" 2>&1 || { cat "$log"; exit 1; }
+          cat "$log"
+          check_n121 "$log" || { echo 'authentic N121 2/2 run rejected'; exit 1; }
+          echo 'n121_gate authentic=accepted'
+          probe="$RUNNER_TEMP/n121-probe.txt"
+          cp "$log" "$probe"
+          sed -i '/n121_02_real_worker_and_hostile_claim_refusals/d' "$probe"
+          if check_n121 "$probe"; then echo 'missing N121 case accepted'; exit 1; fi
+          cp "$log" "$probe"
+          sed -i 's/2 passed; 0 failed; 0 ignored/1 passed; 1 filtered out; 0 ignored/' "$probe"
+          if check_n121 "$probe"; then echo 'partial N121 run accepted'; exit 1; fi
+          cp "$log" "$probe"
+          sed -i 's/counterfeits_refused=true/counterfeits_refused=false/' "$probe"
+          if check_n121 "$probe"; then echo 'corrupted N121 evidence accepted'; exit 1; fi
+          echo 'n121_gate mutation=rejected'
+      - name: Confined AVIF coded-plane worker gate (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $required = @(
+            'n121_01_four_coded_plane_goldens_cross_worker_and_parent',
+            'n121_02_real_worker_and_hostile_claim_refusals')
+          $tokens = @(
+            'n121_evidence case=01',
+            'n121_evidence case=02',
+            'orientation=unverified publication=false records=4',
+            'counterfeits_refused=true',
+            'whole_set_discarded=true')
+          function Test-N121Log {
+            param([string]$Path)
+            $text = Get-Content -LiteralPath $Path -Raw
+            foreach ($name in $required) {
+              if (-not $text.Contains('test n121::' + $name + ' ')) { return $false }
+            }
+            if (([regex]::Matches($text, '(?m)^test n121::n121_0[0-9]_[A-Za-z0-9_]*( |$)')).Count -ne 2) { return $false }
+            if (-not $text.Contains('test result: ok. 2 passed; 0 failed; 0 ignored')) { return $false }
+            if ($text.Contains('... FAILED') -or $text.Contains('... ignored') -or $text.Contains('test result: FAILED')) { return $false }
+            foreach ($token in $tokens) {
+              if (-not $text.Contains($token)) { return $false }
+            }
+            return $true
+          }
+          $log = Join-Path $env:RUNNER_TEMP 'n121-two.txt'
+          cargo test -p solo-cli --test media_worker_host_smoke --locked n121_ -- --nocapture --test-threads=1 *>&1 | Tee-Object -FilePath $log
+          if ($LASTEXITCODE -ne 0) { throw 'N121 suite did not exit zero' }
+          Get-Content -LiteralPath $log
+          if (-not (Test-N121Log -Path $log)) { throw 'authentic N121 2/2 run rejected' }
+          Write-Output 'n121_gate authentic=accepted'
+          $probe = Join-Path $env:RUNNER_TEMP 'n121-probe.txt'
+          (Get-Content -LiteralPath $log | Where-Object { -not $_.Contains('n121_02_real_worker_and_hostile_claim_refusals') }) | Set-Content -LiteralPath $probe
+          if (Test-N121Log -Path $probe) { throw 'missing N121 case accepted' }
+          (Get-Content -LiteralPath $log) | ForEach-Object { $_.Replace('2 passed; 0 failed; 0 ignored', '1 passed; 1 filtered out; 0 ignored') } | Set-Content -LiteralPath $probe
+          if (Test-N121Log -Path $probe) { throw 'partial N121 run accepted' }
+          (Get-Content -LiteralPath $log) | ForEach-Object { $_.Replace('counterfeits_refused=true', 'counterfeits_refused=false') } | Set-Content -LiteralPath $probe
+          if (Test-N121Log -Path $probe) { throw 'corrupted N121 evidence accepted' }
+          Write-Output 'n121_gate mutation=rejected'
       - name: Deliberate RED oracle sensitivity
         shell: bash
         run: |
