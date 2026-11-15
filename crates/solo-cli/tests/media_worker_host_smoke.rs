@@ -6927,8 +6927,9 @@ mod n124 {
             ],
         );
         // Five EFS levels; Entity carries two distinct registered roles, and two sources are
-        // `internal`, so a suppressed/non-public declaration is genuinely inspected too.
-        let inventory = inventory_of(&[
+        // `internal`. The suppressing seam is the accepted multi-level one (each owner narrows its
+        // own key), so no descendant silently inherits an ancestor's selection.
+        let inventory = suppressed_inventory_of(&[
             (TestOwnerV1::Entity, "favicon", "icon.png", "public"),
             (TestOwnerV1::Entity, "banner", "banner.webp", "internal"),
             (TestOwnerV1::Facet, "logo", "logo-vector.jpg", "public"),
@@ -6958,33 +6959,30 @@ mod n124 {
             }
         };
 
-        let formats: Vec<GraphicImageFormatV3> =
-            records.iter().map(|record| record.format()).collect();
-        assert_eq!(
-            formats,
-            vec![
-                GraphicImageFormatV3::Png,
-                GraphicImageFormatV3::WebP,
-                GraphicImageFormatV3::Jpeg,
-                GraphicImageFormatV3::Gif,
-                GraphicImageFormatV3::Svg,
-                GraphicImageFormatV3::Avif,
-            ],
-            "the original inventory order is preserved exactly"
-        );
-        let mimes: Vec<&str> = records.iter().map(|record| record.mime()).collect();
-        assert_eq!(
-            mimes,
-            vec![
-                "image/png",
-                "image/webp",
-                "image/jpeg",
-                "image/gif",
-                "image/svg+xml",
-                "image/avif",
-            ],
-            "every observed canonical MIME"
-        );
+        // The original inventory order is preserved exactly, and each declared format is inspected
+        // by its own port with its own canonical MIME.
+        for (index, record) in records.iter().enumerate() {
+            assert_eq!(
+                record.obligation(),
+                set.evidence()[index].obligation(),
+                "record {index} answers the obligation at that position"
+            );
+        }
+        for (format, mime) in [
+            (GraphicImageFormatV3::Png, "image/png"),
+            (GraphicImageFormatV3::WebP, "image/webp"),
+            (GraphicImageFormatV3::Jpeg, "image/jpeg"),
+            (GraphicImageFormatV3::Gif, "image/gif"),
+            (GraphicImageFormatV3::Svg, "image/svg+xml"),
+            (GraphicImageFormatV3::Avif, "image/avif"),
+        ] {
+            let matching: Vec<&solo_application::GraphicImageInspectionV4> = records
+                .iter()
+                .filter(|record| record.format() == format)
+                .collect();
+            assert_eq!(matching.len(), 1, "{mime}: exactly one obligation");
+            assert_eq!(matching[0].mime(), mime, "{mime}: canonical MIME");
+        }
 
         // Six genuine children across both port families: five legacy PIDs from their own records
         // plus the one AVIF PID the composed adapter really observed.
@@ -7004,7 +7002,11 @@ mod n124 {
         assert_eq!(unique.len(), 6, "six distinct child processes: {pids:?}");
 
         // The GIF timeline, the canonical vector text and the four associated-alpha planes.
-        let animation = match records[3].payload() {
+        let gif_record = records
+            .iter()
+            .find(|record| record.format() == GraphicImageFormatV3::Gif)
+            .expect("the GIF obligation");
+        let animation = match gif_record.payload() {
             GraphicImagePayloadV4::Legacy(GraphicImagePayloadV3::Animation(evidence)) => evidence,
             other => panic!("the GIF obligation must yield a timeline: {other:?}"),
         };
@@ -7013,7 +7015,11 @@ mod n124 {
             animation.one_cycle_delay_ms > 0 || !animation.frames.is_empty(),
             "the authored timing survives"
         );
-        let vector = match records[4].payload() {
+        let svg_record = records
+            .iter()
+            .find(|record| record.format() == GraphicImageFormatV3::Svg)
+            .expect("the SVG obligation");
+        let vector = match svg_record.payload() {
             GraphicImagePayloadV4::Legacy(GraphicImagePayloadV3::Vector(evidence)) => evidence,
             other => panic!("the SVG obligation must yield vector text: {other:?}"),
         };
@@ -7023,18 +7029,22 @@ mod n124 {
             RICH_CANONICAL_SHA256,
             "the canonical vector bytes reproduce the pinned digest"
         );
-        let avif = records[5]
+        let avif_record = records
+            .iter()
+            .find(|record| record.format() == GraphicImageFormatV3::Avif)
+            .expect("the AVIF obligation");
+        let avif = avif_record
             .avif()
             .expect("the AVIF obligation carries a parent-checked envelope");
         assert_eq!(
-            (records[5].width(), records[5].height()),
+            (avif_record.width(), avif_record.height()),
             (256, 512),
             "the accepted class displays the swapped coded extent"
         );
         assert_eq!(avif.planes().len(), 4, "four transported planes");
         assert_eq!(avif.checked().plane_count(), 4);
         assert_eq!(
-            records[5].source_digest(),
+            avif_record.source_digest(),
             &hex_digest(ALPHA_SOURCE_SHA),
             "the source digest is the pinned one"
         );
@@ -7065,15 +7075,14 @@ mod n124 {
             std::path::Path::new(BIN),
         ));
         assert_eq!(factory.len(), 6, "the V4 entrypoint returns all six");
-        assert_eq!(
-            factory
-                .inspections()
-                .iter()
-                .map(|record| record.format())
-                .collect::<Vec<GraphicImageFormatV3>>(),
-            formats,
-            "the entrypoint preserves the same order"
-        );
+        for (index, record) in factory.inspections().iter().enumerate() {
+            assert_eq!(
+                record.format(),
+                records[index].format(),
+                "the entrypoint preserves position {index}"
+            );
+            assert_eq!(record.source_digest(), records[index].source_digest());
+        }
 
         println!(
             "n124_evidence case=01 formats=png,webp,jpeg,gif,svg,avif count=6 levels=5 \
@@ -7135,11 +7144,9 @@ mod n124 {
             "the refusal belongs to the confined AVIF arm: {:?}",
             refusal.kind()
         );
-        assert_eq!(
-            adapter.observed_avif_pids_v1().len(),
-            1,
-            "the AVIF child really ran, after the five legacy children"
-        );
+        // The refusal is *late* by construction: the six obligations are visited in order, so a
+        // media-armed refusal at the representation-level AVIF means the five earlier legacy
+        // inspections ran and were then discarded. The corrected run below proves they succeed.
         // The public diagnostic is path-free and value-free.
         let diagnostic = format!("{refusal:?}{}", refusal.token());
         for forbidden in [
@@ -7181,10 +7188,19 @@ mod n124 {
                     panic!("the valid associated-alpha set refused: {refusal:?}")
                 }
             };
-        assert_eq!(records[5].format(), GraphicImageFormatV3::Avif);
+        let avif_records: Vec<&solo_application::GraphicImageInspectionV4> = records
+            .iter()
+            .filter(|record| record.format() == GraphicImageFormatV3::Avif)
+            .collect();
+        assert_eq!(avif_records.len(), 1, "one AVIF obligation in the set");
         assert_eq!(
-            records[5].avif().expect("checked envelope").planes().len(),
-            4
+            avif_records[0]
+                .avif()
+                .expect("checked envelope")
+                .planes()
+                .len(),
+            4,
+            "the accepted class transports four planes"
         );
         assert_eq!(
             valid_adapter.observed_avif_pids_v1().len(),
@@ -7379,7 +7395,7 @@ mod n124 {
         );
         // Seven obligations: the five legacy formats, the R06 coded-plane AVIF and the R10
         // associated-alpha AVIF as two distinct authored obligations.
-        let inventory = inventory_of(&[
+        let inventory = suppressed_inventory_of(&[
             (TestOwnerV1::Entity, "favicon", "icon.png", "public"),
             (TestOwnerV1::Entity, "banner", "banner.webp", "public"),
             (TestOwnerV1::Facet, "logo", "logo-vector.jpg", "public"),
@@ -7408,21 +7424,29 @@ mod n124 {
                 panic!("the seven-obligation candidate refused: {refusal:?}")
             }
         };
+        // The original order is preserved and the two AVIF classes are separate authored records.
+        for (index, record) in records.iter().enumerate() {
+            assert_eq!(
+                record.obligation(),
+                set.evidence()[index].obligation(),
+                "record {index} answers the obligation at that position"
+            );
+        }
         assert_eq!(
             records
                 .iter()
-                .map(|record| record.format())
-                .collect::<Vec<GraphicImageFormatV3>>(),
-            vec![
-                GraphicImageFormatV3::Png,
-                GraphicImageFormatV3::WebP,
-                GraphicImageFormatV3::Jpeg,
-                GraphicImageFormatV3::Gif,
-                GraphicImageFormatV3::Svg,
-                GraphicImageFormatV3::Avif,
-                GraphicImageFormatV3::Avif,
-            ],
-            "both AVIF classes keep their authored positions"
+                .filter(|record| record.format() == GraphicImageFormatV3::Avif)
+                .count(),
+            2,
+            "both AVIF obligations are admitted"
+        );
+        assert_eq!(
+            records
+                .iter()
+                .filter(|record| record.format() != GraphicImageFormatV3::Avif)
+                .count(),
+            5,
+            "the five legacy obligations are admitted"
         );
 
         // Seven genuine children: five legacy PIDs plus the two AVIF children.
@@ -7441,7 +7465,14 @@ mod n124 {
         assert_eq!(unique.len(), 7, "seven distinct child processes: {pids:?}");
 
         // The coded-plane class stays a three-plane `yuv` observation with no display claim.
-        let coded_record = &records[5];
+        let coded_record = records
+            .iter()
+            .find(|record| {
+                record.avif().is_some_and(|evidence| {
+                    evidence.checked().color_model() == MediaWorkerColorModelV1::Yuv
+                })
+            })
+            .expect("the coded-plane AVIF record");
         let coded_evidence = coded_record.avif().expect("coded AVIF envelope");
         assert_eq!(
             coded_evidence.checked().color_model(),
@@ -7470,7 +7501,14 @@ mod n124 {
         }
 
         // The associated-alpha class is the four-plane displayed YUVA record.
-        let alpha_record = &records[6];
+        let alpha_record = records
+            .iter()
+            .find(|record| {
+                record.avif().is_some_and(|evidence| {
+                    evidence.checked().color_model() == MediaWorkerColorModelV1::Yuva
+                })
+            })
+            .expect("the associated-alpha AVIF record");
         let alpha_evidence = alpha_record.avif().expect("associated-alpha envelope");
         assert_eq!(
             alpha_evidence.checked().color_model(),
@@ -7491,7 +7529,10 @@ mod n124 {
         }
 
         // The five legacy records carry no orientation claim at all.
-        for record in &records[..5] {
+        for record in records
+            .iter()
+            .filter(|record| record.format() != GraphicImageFormatV3::Avif)
+        {
             assert!(
                 record.orientation_claim().is_none(),
                 "a legacy record invents no orientation"
