@@ -1533,8 +1533,25 @@ jobs:
           PLANE_FIELDS = ("ordinal", "name", "columns", "rows", "stride", "length", "sha256")
           PNG_FIELDS = ("png_sha256", "rgba_sha256", "alpha_min", "alpha_max",
                         "alpha_non_opaque_samples")
+          DISPLAY_FIELDS = ("display_width", "display_height", "rgba_display_sha256")
           TOOL_FIELDS = ("avifdec_sha256", "avifdec_version", "libavif_package",
                          "libdav1d_package", "pillow_package", "python_version")
+
+          # The pinned reference tool writes the *coded* image: its PNG for the
+          # alpha fixture is 512x256 and does not apply `irot`. Display geometry is
+          # therefore recovered by an explicitly audited mapping: `irot = 1` is a
+          # 90 degree anticlockwise rotation, applied here to the reference RGBA
+          # bytes with Pillow, never inferred from the candidate decoder.
+          def display_facts(name):
+              from PIL import Image
+              path = os.path.join(TMP, "measured", name + ".png")
+              with Image.open(path) as image:
+                  rotated = image.convert("RGBA").transpose(Image.ROTATE_90)
+                  return {
+                      "display_width": rotated.size[0],
+                      "display_height": rotated.size[1],
+                      "rgba_display_sha256": hashlib.sha256(rotated.tobytes()).hexdigest(),
+                  }
 
           def load(path):
               with open(path, "r", encoding="utf-8") as handle:
@@ -1616,10 +1633,10 @@ jobs:
                       for field in PNG_FIELDS:
                           if spec.get(field) != fact.get(field):
                               errors.append("%s %s differs" % (name, field))
-                      if spec.get("display_width") != fact.get("width"):
-                          errors.append("%s display width differs" % name)
-                      if spec.get("display_height") != fact.get("height"):
-                          errors.append("%s display height differs" % name)
+                      derived = display_facts(name)
+                      for field in DISPLAY_FIELDS:
+                          if spec.get(field) != derived[field]:
+                              errors.append("%s %s differs" % (name, field))
                   else:
                       errors.append("%s has unknown kind %r" % (name, kind))
               for name, spec in man["negatives"].items():
@@ -1647,10 +1664,9 @@ jobs:
                           for plane in fact["planes"]
                       ]
                   else:
-                      spec["display_width"] = fact["width"]
-                      spec["display_height"] = fact["height"]
                       for field in PNG_FIELDS:
                           spec[field] = fact[field]
+                      spec.update(display_facts(name))
               for name, spec in candidate["negatives"].items():
                   spec["source_sha256"] = sources[name]
               print("CANONICAL_MANIFEST_BEGIN")
