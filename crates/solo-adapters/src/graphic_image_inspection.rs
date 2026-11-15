@@ -682,6 +682,25 @@ pub fn run_internal_image_worker_v1(args: &[std::ffi::OsString]) -> Option<u8> {
         }
         return Some(run_svg_worker_child_v1(claimed, mode));
     }
+    // The AVIF still worker is its own closed token: the accepted five-format V3 arm below stays
+    // exactly as it is, so no V3 path can reach this decoder.
+    if args.get(2).and_then(|token| token.to_str())
+        == Some(crate::graphic_avif_inspection::AVIF_WORKER_TOKEN_V1)
+    {
+        let Some(claimed) = args
+            .get(3)
+            .and_then(|token| token.to_str())
+            .and_then(MediaWorkerDigestV1::parse_lower_hex)
+        else {
+            return Some(IMAGE_WORKER_EXIT_REFUSED_V1);
+        };
+        if args.len() > 4 {
+            return Some(IMAGE_WORKER_EXIT_REFUSED_V1);
+        }
+        return Some(crate::graphic_avif_inspection::run_avif_worker_child_v1(
+            claimed,
+        ));
+    }
     let Some(format) = args
         .get(2)
         .and_then(|token| token.to_str())

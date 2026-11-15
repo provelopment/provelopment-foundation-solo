@@ -1435,6 +1435,52 @@ pub fn inspect_media_worker_source_set_v1<P: MediaWorkerPortV1 + ?Sized>(
 /// The check order is fixed so a refusal category is deterministic for a given hostile input. Every
 /// host fact is evaluated before any envelope field, so a run that did not demonstrably complete
 /// under the agreed limits is refused without ever reading its claim.
+/// Whether every plane claim carries the canonical columns/rows/stride of one admitted layout.
+///
+/// The parent derives the shape from the **claimed** width, height, depth and sub-sampling alone;
+/// a worker's own `stride`/`rows` are checked against that derivation rather than trusted. Only
+/// complete 4:4:4 or 4:2:0 three-plane layouts can match, so a mixed, 4:2:2, monochrome or padded
+/// claim is refused.
+fn canonical_layout_matches_v1(
+    planes: &[MediaWorkerPlaneClaimV1],
+    width: u32,
+    height: u32,
+    sub_x: u64,
+    sub_y: u64,
+    bytes_per_sample: u64,
+) -> bool {
+    if planes.len() != 3 {
+        return false;
+    }
+    let Some(y_stride) = u64::from(width).checked_mul(bytes_per_sample) else {
+        return false;
+    };
+    let Some(c_columns) = u64::from(width)
+        .checked_add(sub_x - 1)
+        .and_then(|value| value.checked_div(sub_x))
+    else {
+        return false;
+    };
+    let Some(c_rows) = u64::from(height)
+        .checked_add(sub_y - 1)
+        .and_then(|value| value.checked_div(sub_y))
+    else {
+        return false;
+    };
+    let Some(c_stride) = c_columns.checked_mul(bytes_per_sample) else {
+        return false;
+    };
+    let layout = [
+        (y_stride, u64::from(height)),
+        (c_stride, c_rows),
+        (c_stride, c_rows),
+    ];
+    planes
+        .iter()
+        .zip(layout)
+        .all(|(claim, (stride, rows))| claim.stride() == stride && claim.rows() == rows)
+}
+
 fn check_observation_v1(
     obligation: &GraphicAssetObligationV1,
     request: &MediaWorkerRequestV1<'_>,
@@ -1522,6 +1568,31 @@ fn check_observation_v1(
         if total_output > MEDIA_WORKER_MAX_DECODED_BYTES_V1 {
             return Err(MediaWorkerRefusalKindV1::WorkerOutputOversize);
         }
+    }
+
+    // Only after the per-claim arithmetic and the total bound: the parent recognizes just the two
+    // admitted complete layouts from the measured geometry. Every claim must carry the canonical
+    // columns/rows/stride of 4:4:4 or of 4:2:0 at this depth, so a worker cannot substitute its own
+    // trusted stride/rows, a mixed layout or a 4:2:2/monochrome shape and still be retained.
+    let bytes_per_sample = if envelope.bit_depth() == 8 { 1 } else { 2 };
+    let canonical_444 = canonical_layout_matches_v1(
+        envelope.planes(),
+        envelope.width(),
+        envelope.height(),
+        1,
+        1,
+        bytes_per_sample,
+    );
+    let canonical_420 = canonical_layout_matches_v1(
+        envelope.planes(),
+        envelope.width(),
+        envelope.height(),
+        2,
+        2,
+        bytes_per_sample,
+    );
+    if !canonical_444 && !canonical_420 {
+        return Err(MediaWorkerRefusalKindV1::WorkerPlaneInvalid);
     }
 
     for (index, claim) in planes.iter().enumerate() {

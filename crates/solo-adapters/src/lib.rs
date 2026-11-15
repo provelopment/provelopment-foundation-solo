@@ -46,6 +46,7 @@
 #![deny(unsafe_code)]
 
 mod bootstrap_cli;
+mod graphic_avif_inspection;
 mod graphic_gif_inspection;
 mod graphic_image_inspection;
 mod graphic_svg_inspection;
@@ -72,6 +73,7 @@ pub use bootstrap_cli::{
     CliOutcome, CliRefusal, CliRefusalCode, EXIT_INTERNAL, EXIT_OK, EXIT_REFUSED, FLAG_BASE_URL,
     FLAG_ENTITY_ID, SUBCOMMAND, parse_request, run,
 };
+pub use graphic_avif_inspection::{AVIF_WORKER_TOKEN_V1, ConfinedAvifInspectAdapterV1};
 pub use graphic_gif_inspection::{
     GIF_MIME_V1, GIF87A_SIGNATURE_V1, GIF89A_SIGNATURE_V1, GifAnimationEvidenceV1, GifDisposalV1,
     GifFrameEvidenceV1, GifInspectionRefusalV1, GifLoopV1, MAX_GIF_FRAMES_V1,
