@@ -58,5 +58,18 @@ The typed container surface needed for a pre-decode policy exists in the pinned 
 
 `main` is `61cf7dbc` (A10) plus this report only. Remote heads are **28**: the original 27 plus `solo-wo-118-avif-v4-r01` at `68eda933`; `solo-wo-115-avif-svg-v3-r02` remains `d82ae762`, and `ad7b74df` / `40b03c73` are unchanged. One worktree, empty stash, exactly four WIP files, no report archive, no second checkout, no PR, merge, tag, release, deployment or provider action. The seven pinned `.avif` fixtures stay test-only and unpublished; no `main.rs`, native/source-read/unsafe checker, `workspace_graph.rs`, `deny.toml`, root manifest, SOP, Architecture or roadmap file was touched. Stage 03, `R03.C` and `R03.C3` remain **OPEN**, and this inspection-only work grants no publication authority and no public route.
 
+## 6. R10 baseline CI result (reported as found)
+
+The fresh two-host baseline at R10 was dispatched as run `43683197657` (attempt 1). **Windows `verify (windows-2025)` succeeded; Ubuntu `verify (ubuntu-24.04)` failed** in the inherited step *Test (workspace, all targets, locked)* on one pre-existing host test:
+
+```text
+test n093_01_the_real_parent_terminates_its_owned_group_and_observes_the_descendant ... FAILED
+panicked at crates/solo-cli/tests/media_worker_host_smoke.rs:1553
+test result: FAILED. 50 passed; 1 failed; 0 ignored
+```
+
+That test is untouched by this order (R10 changes only this report; `main` differs from R9 solely by documentation), and the same tree passed on R9 (`43680718664`). I therefore record it as an **inherited, environment-sensitive N093 result** rather than a defect I introduce or a pass, and I have not re-run it into green by filtering, skipping or weakening it. R10 is consequently **not** a verified two-host baseline, which is a second, independent reason this report cannot claim completion.
+
 **Status:** `status=STOPPED`, pending independent Chief Master Architect review.
+
 
