@@ -777,6 +777,127 @@ jobs:
             'n113_forged adapter_wrong_source=refused')) {
             if (-not $text.Contains($token)) { throw "missing V2 evidence token: $token" }
           }
+      # Mandatory `SOLO-WO-116` five-format N116 gate. Every match below is a *fixed string*:
+      # `cargo test --nocapture` interleaves a case's stdout onto its own `test <name> ...` line,
+      # so no trailing-`ok` or escaped-regex anchor may be relied on. Exact names, exact count, the
+      # exact aggregate result and the absence of FAILED/ignored are all still asserted, together
+      # with seven evidence tokens the cases actually printed.
+      - name: V3 five-format SVG inspection gate (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          check_n116() {
+            local log="$1"
+            local name
+            for name in \
+              n116_01_mixed_five_formats_real_host \
+              n116_02_safe_vector_semantics_and_cross_host_digest \
+              n116_03_active_svg_and_hidden_obligation_refuse_whole \
+              n116_04_svg_forgery_and_deliberate_red_oracle; do
+              grep -qF "test n116::${name} " "$log" || return 1
+            done
+            [ "$(grep -Ec '^test n116::n116_0[1-4]_[A-Za-z0-9_]*( |$)' "$log")" -eq 4 ] || return 1
+            grep -qF 'test result: ok. 4 passed; 0 failed; 0 ignored' "$log" || return 1
+            ! grep -qF '... FAILED' "$log" || return 1
+            ! grep -qF '... ignored' "$log" || return 1
+            ! grep -qF 'test result: FAILED' "$log" || return 1
+            grep -qF 'n116_evidence case=n116_01 formats=png,jpeg,webp,gif,svg' "$log" || return 1
+            grep -qF 'avif=avif-unsupported-v3 partial=false publication=false' "$log" || return 1
+            grep -qF 'rich_canonical_sha256=0403e0677a174ccafe18191a8a9f1c5a30993477bb074f49078b005f513caaba' "$log" || return 1
+            grep -qF 'icon_canonical_sha256=ce9ea48a3d7bc41673f969727c49eb5dd111d27451d27adab403faf3fa3362d5' "$log" || return 1
+            grep -qF 'n116_evidence case=n116_03' "$log" || return 1
+            grep -qF 'partial=false fallback=none' "$log" || return 1
+            grep -qF 'n116_evidence case=n116_04 forged_source=source-digest-mismatch forged_output=output-digest-mismatch' "$log" || return 1
+          }
+          log="$RUNNER_TEMP/n116-four.txt"
+          cargo test -p solo-cli --test media_worker_host_smoke --locked n116_ -- --nocapture --test-threads=1 >"$log" 2>&1 || { cat "$log"; exit 1; }
+          cat "$log"
+          check_n116 "$log" || { echo 'authentic N116 4/4 run rejected'; exit 1; }
+          echo 'n116_gate authentic=accepted'
+          probe="$RUNNER_TEMP/n116-probe.txt"
+          cp "$log" "$probe"
+          sed -i '/n116_03_active_svg_and_hidden_obligation_refuse_whole/d' "$probe"
+          if check_n116 "$probe"; then echo 'missing case accepted'; exit 1; fi
+          cp "$log" "$probe"
+          sed -i 's/n116_02_safe_vector_semantics_and_cross_host_digest /n116_02_safe_vector_semantics_and_cross_host_digest ... FAILED /' "$probe"
+          if check_n116 "$probe"; then echo 'failed case accepted'; exit 1; fi
+          cp "$log" "$probe"
+          sed -i 's/n116_04_svg_forgery_and_deliberate_red_oracle /n116_04_svg_forgery_and_deliberate_red_oracle ... ignored /' "$probe"
+          if check_n116 "$probe"; then echo 'ignored case accepted'; exit 1; fi
+          cp "$log" "$probe"
+          grep -F 'test n116::n116_01_mixed_five_formats_real_host' "$log" >>"$probe"
+          if check_n116 "$probe"; then echo 'duplicate case accepted'; exit 1; fi
+          cp "$log" "$probe"
+          sed -i 's/4 passed; 0 failed; 0 ignored/3 passed; 1 filtered out; 0 ignored/' "$probe"
+          if check_n116 "$probe"; then echo 'three-of-four accepted'; exit 1; fi
+          cp "$log" "$probe"
+          sed -i 's/0403e0677a174ccafe18191a8a9f1c5a30993477bb074f49078b005f513caaba/2222222222222222222222222222222222222222222222222222222222222222/' "$probe"
+          if check_n116 "$probe"; then echo 'wrong digest accepted'; exit 1; fi
+          echo 'n116_gate mutations=rejected-all'
+      # The same mandatory N116 gate on native Windows 2025, with the same fixed-string checks,
+      # the same exact count and the same six mutated-log probes.
+      - name: V3 five-format SVG inspection gate (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $required = @(
+            'n116_01_mixed_five_formats_real_host',
+            'n116_02_safe_vector_semantics_and_cross_host_digest',
+            'n116_03_active_svg_and_hidden_obligation_refuse_whole',
+            'n116_04_svg_forgery_and_deliberate_red_oracle')
+          $tokens = @(
+            'n116_evidence case=n116_01 formats=png,jpeg,webp,gif,svg',
+            'avif=avif-unsupported-v3 partial=false publication=false',
+            'rich_canonical_sha256=0403e0677a174ccafe18191a8a9f1c5a30993477bb074f49078b005f513caaba',
+            'icon_canonical_sha256=ce9ea48a3d7bc41673f969727c49eb5dd111d27451d27adab403faf3fa3362d5',
+            'n116_evidence case=n116_03',
+            'partial=false fallback=none',
+            'n116_evidence case=n116_04 forged_source=source-digest-mismatch forged_output=output-digest-mismatch')
+          function Test-N116Log {
+            param([string]$Path)
+            $text = Get-Content -LiteralPath $Path -Raw
+            foreach ($name in $required) {
+              if (-not $text.Contains('test n116::' + $name + ' ')) { return $false }
+            }
+            if (([regex]::Matches($text, '(?m)^test n116::n116_0[1-4]_[A-Za-z0-9_]*( |$)')).Count -ne 4) { return $false }
+            if (-not $text.Contains('test result: ok. 4 passed; 0 failed; 0 ignored')) { return $false }
+            if ($text.Contains('... FAILED') -or $text.Contains('... ignored') -or $text.Contains('test result: FAILED')) { return $false }
+            foreach ($token in $tokens) {
+              if (-not $text.Contains($token)) { return $false }
+            }
+            return $true
+          }
+          $log = Join-Path $env:RUNNER_TEMP 'n116-four.txt'
+          cargo test -p solo-cli --test media_worker_host_smoke --locked n116_ -- --nocapture --test-threads=1 *>&1 | Tee-Object -FilePath $log
+          if ($LASTEXITCODE -ne 0) { throw 'N116 suite did not exit zero' }
+          Get-Content -LiteralPath $log
+          if (-not (Test-N116Log -Path $log)) { throw 'authentic N116 4/4 run rejected' }
+          Write-Output 'n116_gate authentic=accepted'
+          $probe = Join-Path $env:RUNNER_TEMP 'n116-probe.txt'
+          (Get-Content -LiteralPath $log | Where-Object { -not $_.Contains('n116_03_active_svg_and_hidden_obligation_refuse_whole') }) | Set-Content -LiteralPath $probe
+          if (Test-N116Log -Path $probe) { throw 'missing case accepted' }
+          (Get-Content -LiteralPath $log) | ForEach-Object { $_.Replace('n116_02_safe_vector_semantics_and_cross_host_digest ', 'n116_02_safe_vector_semantics_and_cross_host_digest ... FAILED ') } | Set-Content -LiteralPath $probe
+          if (Test-N116Log -Path $probe) { throw 'failed case accepted' }
+          (Get-Content -LiteralPath $log) | ForEach-Object { $_.Replace('n116_04_svg_forgery_and_deliberate_red_oracle ', 'n116_04_svg_forgery_and_deliberate_red_oracle ... ignored ') } | Set-Content -LiteralPath $probe
+          if (Test-N116Log -Path $probe) { throw 'ignored case accepted' }
+          (Get-Content -LiteralPath $log) + 'test n116::n116_01_mixed_five_formats_real_host ... ok' | Set-Content -LiteralPath $probe
+          if (Test-N116Log -Path $probe) { throw 'duplicate case accepted' }
+          (Get-Content -LiteralPath $log) | ForEach-Object { $_.Replace('4 passed; 0 failed; 0 ignored', '3 passed; 1 filtered out; 0 ignored') } | Set-Content -LiteralPath $probe
+          if (Test-N116Log -Path $probe) { throw 'three-of-four accepted' }
+          (Get-Content -LiteralPath $log) | ForEach-Object { $_.Replace('0403e0677a174ccafe18191a8a9f1c5a30993477bb074f49078b005f513caaba', '2222222222222222222222222222222222222222222222222222222222222222') } | Set-Content -LiteralPath $probe
+          if (Test-N116Log -Path $probe) { throw 'wrong digest accepted' }
+          Write-Output 'n116_gate mutations=rejected-all'
+      - name: Deliberate RED oracle sensitivity
+        shell: bash
+        run: |
+          set -euo pipefail
+          if SOLO_N116_RED_ORACLE=wrong cargo test -p solo-cli --test media_worker_host_smoke --locked n116_04 >"$RUNNER_TEMP/n116-red.txt" 2>&1; then
+            echo 'RED probe unexpectedly passed'; cat "$RUNNER_TEMP/n116-red.txt"; exit 1
+          fi
+          grep -q 'canonical sha-256 oracle' "$RUNNER_TEMP/n116-red.txt"
+          cargo test -p solo-cli --test media_worker_host_smoke --locked n116_04 >"$RUNNER_TEMP/n116-green.txt" 2>&1 || { cat "$RUNNER_TEMP/n116-green.txt"; exit 1; }
+          grep -q 'test result: ok\. 1 passed; 0 failed; 0 ignored' "$RUNNER_TEMP/n116-green.txt"
       # Mandatory `SOLO-WO-105 R01` Windows canaries. These four cases drive the real production
       # `CreateProcessW` / attribute-list / Job Object / minimal-environment path, so a Windows job is
       # the only place such facts exist. The gate fails when a required case is absent, filtered,
@@ -841,7 +962,7 @@ jobs:
           cat "$RUNNER_TEMP/arch-real.txt"
           grep -q 'architecture=legal packages=4' "$RUNNER_TEMP/arch-real.txt" \
             || { echo "::error::unexpected package set in real-tree report"; exit 1; }
-          grep -q 'edges=70' "$RUNNER_TEMP/arch-real.txt" \
+          grep -q 'edges=81' "$RUNNER_TEMP/arch-real.txt" \
             || { echo "::error::approved edge count changed: $(grep -o 'edges=[0-9]*' "$RUNNER_TEMP/arch-real.txt" | head -n 1)"; exit 1; }
 
       - name: Architecture checker on the real checkout (Windows)
@@ -853,7 +974,7 @@ jobs:
           if ($code -ne 0) { throw "real-tree architecture check refused (exit $code)" }
           $text = Get-Content "$env:RUNNER_TEMP/arch-real.txt" -Raw
           if ($text -notmatch 'architecture=legal packages=4') { throw "unexpected package set in real-tree report" }
-          if ($text -notmatch 'edges=70') {
+          if ($text -notmatch 'edges=81') {
             $measured = [regex]::Match($text, 'edges=[0-9]+').Value
             throw "approved edge count changed: $measured"
           }

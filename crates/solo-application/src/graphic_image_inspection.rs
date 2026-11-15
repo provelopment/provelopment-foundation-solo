@@ -2330,3 +2330,828 @@ mod v2_tests {
         );
     }
 }
+
+// ---------------------------------------------------------------------------------------------
+// `SOLO-WO-116 R01` — the additive V3 SVG policy surface.
+//
+// These constants belong to the inward-owned V3 contract. They are declared here, next to the V1
+// and V2 policy, so the confined adapter's codec bounds can never drift from the parent policy that
+// enforces them. They grant no publication authority and admit no new format on their own.
+// ---------------------------------------------------------------------------------------------
+
+/// The canonical MIME of a confirmed SVG vector document.
+pub const IMAGE_MIME_SVG_V3: &str = "image/svg+xml";
+
+/// The canonical MIME of an AVIF image. AVIF is **refused** by the V3 policy in this order.
+pub const IMAGE_MIME_AVIF_V3: &str = "image/avif";
+
+/// Maximum accepted original SVG source, matching the approved 20 MiB media ceiling.
+pub const MAX_SVG_SOURCE_BYTES_V3: u64 = MAX_IMAGE_SOURCE_BYTES_V1;
+
+/// Maximum accepted canonical SVG output: 4 MiB of vector text.
+pub const MAX_SVG_CANONICAL_BYTES_V3: usize = 4 * 1024 * 1024;
+
+/// Maximum accepted number of XML elements in one SVG document.
+pub const MAX_SVG_ELEMENTS_V3: usize = 4096;
+
+/// Maximum accepted SVG element nesting depth.
+pub const MAX_SVG_NESTING_V3: usize = 32;
+
+/// Maximum accepted attributes on one SVG element.
+pub const MAX_SVG_ATTRS_PER_ELEMENT_V3: usize = 32;
+
+/// Maximum accepted SVG `id`/`url(#id)`/`href="#id"` reference count.
+pub const MAX_SVG_REFERENCES_V3: usize = 1024;
+
+/// Maximum accepted aggregate SVG path-command count.
+pub const MAX_SVG_PATH_COMMANDS_V3: usize = 40000;
+
+/// Maximum accepted number of SVG `<filter>` elements.
+pub const MAX_SVG_FILTER_ELEMENTS_V3: usize = 64;
+
+/// Maximum accepted primitive operations inside one SVG `<filter>`.
+pub const MAX_SVG_FILTER_OPERATIONS_V3: usize = 8;
+
+// ---------------------------------------------------------------------------------------------
+// `SOLO-WO-116 R02` — the additive V3 five-format inspection contract.
+//
+// V3 admits exactly PNG, JPEG, WebP, GIF and SVG as inspectable formats. AVIF is syntactically
+// admitted by the reference grammar so it can be *named*, but every AVIF obligation is refused with
+// one typed, attributable refusal before any worker is started. V1 (three formats) and V2 (four
+// formats, GIF animation) remain byte-compatible and unchanged.
+// ---------------------------------------------------------------------------------------------
+
+/// Whether a V3 inspection result authorizes publication. Always `false`.
+pub const GRAPHIC_IMAGE_INSPECTION_V3_GRANTS_PUBLICATION_AUTHORITY: bool = false;
+
+/// Whether a V3 inspection result proves whole-site media correctness. Always `false`.
+pub const GRAPHIC_IMAGE_INSPECTION_V3_PROVES_MEDIA_CORRECTNESS: bool = false;
+
+/// The canonical MIME of a confirmed GIF under the V3 contract.
+pub const IMAGE_MIME_GIF_V3: &str = "image/gif";
+
+/// One format the V3 contract can classify.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GraphicImageFormatV3 {
+    /// Portable Network Graphics.
+    Png,
+    /// JPEG.
+    Jpeg,
+    /// WebP.
+    WebP,
+    /// GIF, still or animated.
+    Gif,
+    /// Safe static true-vector SVG.
+    Svg,
+    /// AVIF. Never inspected under this order: always refused.
+    Avif,
+}
+
+impl GraphicImageFormatV3 {
+    /// Every format the reference grammar can name, in canonical order.
+    pub const ALL: [Self; 6] = [
+        Self::Png,
+        Self::Jpeg,
+        Self::WebP,
+        Self::Gif,
+        Self::Svg,
+        Self::Avif,
+    ];
+
+    /// The format an authored `.`-extension declares, or `None` for any other reference.
+    ///
+    /// The decision is textual and comes from the reference, never from file content, and a
+    /// non-Entity namespace is never admitted.
+    #[must_use]
+    pub fn declared_by(reference: &solo_domain::AssetReferenceV1) -> Option<Self> {
+        if reference.namespace() != AssetNamespace::Entity {
+            return None;
+        }
+        let text = reference.reference();
+        let segment = text.rsplit('/').next().unwrap_or(text);
+        let (_, extension) = segment.rsplit_once('.')?;
+        if extension.is_empty() {
+            return None;
+        }
+        Self::ALL
+            .into_iter()
+            .find(|format| format.accepted_extensions().contains(&extension))
+    }
+
+    /// The accepted authored extensions of this format. All are lowercase.
+    #[must_use]
+    pub const fn accepted_extensions(self) -> &'static [&'static str] {
+        match self {
+            Self::Png => &["png"],
+            Self::Jpeg => &["jpg", "jpeg"],
+            Self::WebP => &["webp"],
+            Self::Gif => &["gif"],
+            Self::Svg => &["svg"],
+            Self::Avif => &["avif"],
+        }
+    }
+
+    /// The canonical MIME type of this format.
+    #[must_use]
+    pub const fn canonical_mime(self) -> &'static str {
+        match self {
+            Self::Png => "image/png",
+            Self::Jpeg => "image/jpeg",
+            Self::WebP => "image/webp",
+            Self::Gif => IMAGE_MIME_GIF_V3,
+            Self::Svg => IMAGE_MIME_SVG_V3,
+            Self::Avif => IMAGE_MIME_AVIF_V3,
+        }
+    }
+
+    /// Whether this format is GIF.
+    #[must_use]
+    pub const fn is_gif(self) -> bool {
+        matches!(self, Self::Gif)
+    }
+
+    /// Whether this format is SVG.
+    #[must_use]
+    pub const fn is_svg(self) -> bool {
+        matches!(self, Self::Svg)
+    }
+
+    /// Whether this format is AVIF, which this order always refuses.
+    #[must_use]
+    pub const fn is_avif(self) -> bool {
+        matches!(self, Self::Avif)
+    }
+}
+
+/// One V3 inspection request: the exact bytes plus the authored format declaration.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GraphicImageInspectRequestV3 {
+    bytes: Vec<u8>,
+    format: GraphicImageFormatV3,
+    source_digest: MediaWorkerDigestV1,
+}
+
+impl GraphicImageInspectRequestV3 {
+    /// Builds one request and computes the authoritative source digest at construction.
+    #[must_use]
+    pub fn of(bytes: Vec<u8>, format: GraphicImageFormatV3) -> Self {
+        let source_digest = sha256_media_worker_bytes_v1(&bytes);
+        Self {
+            bytes,
+            format,
+            source_digest,
+        }
+    }
+
+    /// Exactly the bytes to inspect.
+    #[must_use]
+    pub fn bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+
+    /// The authored format declaration.
+    #[must_use]
+    pub const fn declared_format(&self) -> GraphicImageFormatV3 {
+        self.format
+    }
+
+    /// The digest of exactly those bytes.
+    #[must_use]
+    pub const fn source_digest(&self) -> &MediaWorkerDigestV1 {
+        &self.source_digest
+    }
+}
+
+/// The still-image half of one V3 result.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct StillImageEvidenceV3 {
+    /// The exact decoded byte count the parent received and hashed.
+    pub decoded_bytes: u64,
+    /// The parent's digest of exactly those decoded bytes.
+    pub decoded_digest: MediaWorkerDigestV1,
+}
+
+/// The bounded vector half of one V3 result: real SVG text, never a raster.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GraphicVectorEvidenceV3 {
+    /// The confirmed intrinsic width in user units.
+    pub width: u32,
+    /// The confirmed intrinsic height in user units.
+    pub height: u32,
+    /// The number of retained elements.
+    pub elements: usize,
+    /// The maximum element depth.
+    pub depth: usize,
+    /// The number of validated internal references.
+    pub references: usize,
+    /// The aggregate path-command count.
+    pub path_commands: usize,
+    /// The number of filters.
+    pub filters: usize,
+    /// Exactly the canonical SVG text bytes, never rendered.
+    pub canonical: Vec<u8>,
+    /// The parent's digest of exactly the source bytes it sent.
+    pub source_digest: MediaWorkerDigestV1,
+    /// The parent's digest of exactly the canonical bytes it received.
+    pub output_digest: MediaWorkerDigestV1,
+    /// The observed child process identifier.
+    pub worker_pid: u32,
+    /// The measured wall time of the attempt.
+    pub wall_ms: u64,
+    /// Whether the supervisor proved the confinement bounds.
+    pub limits_verified: bool,
+    /// Whether the supervisor proved the reap and cleanup.
+    pub cleanup_verified: bool,
+}
+
+impl GraphicVectorEvidenceV3 {
+    /// The canonical SVG text bytes.
+    #[must_use]
+    pub fn canonical(&self) -> &[u8] {
+        &self.canonical
+    }
+
+    /// The canonical byte length.
+    #[must_use]
+    pub fn canonical_len(&self) -> u64 {
+        self.canonical.len() as u64
+    }
+}
+
+/// One observed V3 result: still plane, GIF timeline, or canonical vector text.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GraphicImageObservationV3 {
+    /// A fully decoded still plane.
+    Still(GraphicImageWorkerObservationV1),
+    /// A complete GIF timeline.
+    Animation(GifAnimationEvidenceV2),
+    /// A complete canonical SVG vector document.
+    Vector(GraphicVectorEvidenceV3),
+}
+
+/// The closed result of one V3 port attempt.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GraphicImageInspectPortOutcomeV3 {
+    /// The worker ran and every parent-side check passed.
+    Inspected(Box<GraphicImageObservationV3>),
+    /// The attempt produced no acceptable observation.
+    Refused(GraphicImageInspectRefusalKindV3),
+}
+
+/// The inspection port the V3 use case drives.
+///
+/// Implementations live in the outer adapter. The inward layer never decodes, never parses hostile
+/// SVG and never starts a process itself.
+pub trait GraphicImageInspectPortV3 {
+    /// Inspects exactly one already-supplied request.
+    fn inspect_v3(
+        &self,
+        request: &GraphicImageInspectRequestV3,
+    ) -> GraphicImageInspectPortOutcomeV3;
+}
+
+/// Every way one V3 obligation can be refused. Each refuses the **whole** candidate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GraphicImageInspectRefusalKindV3 {
+    /// The reference declared no admitted format, or a non-Entity namespace.
+    UnsupportedFormat,
+    /// The reference declared AVIF, which this order refuses before any worker starts.
+    AvifUnsupported,
+    /// The registered favicon role is PNG-only and the declaration was not PNG.
+    FaviconNotPng,
+    /// The supplied source was empty.
+    EmptySource,
+    /// The supplied source exceeded the accepted ceiling.
+    OversizeSource,
+    /// The port produced no acceptable observation.
+    PortRefused,
+    /// The observation class did not match the declared format.
+    FormatMismatch,
+    /// The confirmed MIME did not match the declared format.
+    MimeMismatch,
+    /// The observation's source digest did not match the request.
+    SourceDigestMismatch,
+    /// The worker identity, confinement limits or reap were not proved.
+    UnverifiedWorker,
+    /// The confirmed intrinsic geometry was outside the accepted bounds.
+    DimensionsOutOfRange,
+    /// `width x height` exceeded the accepted pixel ceiling.
+    PixelCountOutOfRange,
+    /// A decoded still plane exceeded the accepted decoded ceiling.
+    DecodedBytesOutOfRange,
+    /// A vector document exceeded the canonical ceiling.
+    SvgOutputOutOfRange,
+    /// The vector facts were internally inconsistent or out of budget.
+    SvgFactsInconsistent,
+    /// A GIF timeline was internally inconsistent.
+    GifTimelineInconsistent,
+}
+
+impl GraphicImageInspectRefusalKindV3 {
+    /// The stable machine-readable token of this refusal.
+    #[must_use]
+    pub const fn token(self) -> &'static str {
+        match self {
+            Self::UnsupportedFormat => "unsupported-format-v3",
+            Self::AvifUnsupported => "avif-unsupported-v3",
+            Self::FaviconNotPng => "favicon-not-png-v3",
+            Self::EmptySource => "empty-source-v3",
+            Self::OversizeSource => "oversize-source-v3",
+            Self::PortRefused => "port-refused-v3",
+            Self::FormatMismatch => "format-mismatch-v3",
+            Self::MimeMismatch => "mime-mismatch-v3",
+            Self::SourceDigestMismatch => "source-digest-mismatch-v3",
+            Self::UnverifiedWorker => "unverified-worker-v3",
+            Self::DimensionsOutOfRange => "dimensions-out-of-range-v3",
+            Self::PixelCountOutOfRange => "pixel-count-out-of-range-v3",
+            Self::DecodedBytesOutOfRange => "decoded-bytes-out-of-range-v3",
+            Self::SvgOutputOutOfRange => "svg-output-out-of-range-v3",
+            Self::SvgFactsInconsistent => "svg-facts-inconsistent-v3",
+            Self::GifTimelineInconsistent => "gif-timeline-inconsistent-v3",
+        }
+    }
+}
+
+/// One typed V3 refusal with the exact obligation that caused it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GraphicImageInspectRefusalV3 {
+    kind: GraphicImageInspectRefusalKindV3,
+    obligation: GraphicAssetObligationV1,
+}
+
+impl GraphicImageInspectRefusalV3 {
+    /// The closed refusal kind.
+    #[must_use]
+    pub const fn kind(&self) -> GraphicImageInspectRefusalKindV3 {
+        self.kind
+    }
+
+    /// The stable token of the kind.
+    #[must_use]
+    pub const fn token(&self) -> &'static str {
+        self.kind.token()
+    }
+
+    /// The authored obligation this refusal answers.
+    #[must_use]
+    pub const fn obligation(&self) -> &GraphicAssetObligationV1 {
+        &self.obligation
+    }
+
+    /// The qualified owner of the refusing obligation.
+    #[must_use]
+    pub const fn owner(&self) -> &solo_domain::QualifiedOwnerV1 {
+        self.obligation.declaring_owner()
+    }
+}
+
+/// Builds one attributable refusal for the obligation that caused it.
+fn refuse_v3(
+    kind: GraphicImageInspectRefusalKindV3,
+    obligation: &GraphicAssetObligationV1,
+) -> GraphicImageInspectionOutcomeV3 {
+    GraphicImageInspectionOutcomeV3::Refused(GraphicImageInspectRefusalV3 {
+        kind,
+        obligation: obligation.clone(),
+    })
+}
+
+/// The typed payload of one inspected V3 image: still plane, GIF timeline or vector text.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GraphicImagePayloadV3 {
+    /// A decoded still plane.
+    Still(StillImageEvidenceV3),
+    /// A GIF animation or still GIF.
+    Animation(GifAnimationEvidenceV2),
+    /// A canonical SVG vector document.
+    Vector(GraphicVectorEvidenceV3),
+}
+
+/// One inspected image of a V3 candidate. Still inert: it authorizes nothing.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GraphicImageInspectionV3 {
+    obligation: GraphicAssetObligationV1,
+    logical_path: String,
+    format: GraphicImageFormatV3,
+    mime: &'static str,
+    source_digest: MediaWorkerDigestV1,
+    width: u32,
+    height: u32,
+    pixels: u64,
+    payload: GraphicImagePayloadV3,
+    worker_pid: u32,
+    wall_ms: u64,
+}
+
+impl GraphicImageInspectionV3 {
+    /// The authored obligation this result answers, unchanged.
+    #[must_use]
+    pub const fn obligation(&self) -> &GraphicAssetObligationV1 {
+        &self.obligation
+    }
+
+    /// The confined logical path the source bytes came from.
+    #[must_use]
+    pub fn logical_path(&self) -> &str {
+        &self.logical_path
+    }
+
+    /// The confirmed format.
+    #[must_use]
+    pub const fn format(&self) -> GraphicImageFormatV3 {
+        self.format
+    }
+
+    /// The canonical MIME of the confirmed format.
+    #[must_use]
+    pub const fn mime(&self) -> &'static str {
+        self.mime
+    }
+
+    /// The SHA-256 computed over exactly the source bytes sent.
+    #[must_use]
+    pub const fn source_digest(&self) -> &MediaWorkerDigestV1 {
+        &self.source_digest
+    }
+
+    /// The confirmed intrinsic width.
+    #[must_use]
+    pub const fn width(&self) -> u32 {
+        self.width
+    }
+
+    /// The confirmed intrinsic height.
+    #[must_use]
+    pub const fn height(&self) -> u32 {
+        self.height
+    }
+
+    /// The confirmed `width x height` product.
+    #[must_use]
+    pub const fn pixels(&self) -> u64 {
+        self.pixels
+    }
+
+    /// The typed payload: exactly one of the three result classes.
+    #[must_use]
+    pub const fn payload(&self) -> &GraphicImagePayloadV3 {
+        &self.payload
+    }
+
+    /// The GIF evidence, when this result is an animation.
+    #[must_use]
+    pub const fn animation(&self) -> Option<&GifAnimationEvidenceV2> {
+        match &self.payload {
+            GraphicImagePayloadV3::Animation(evidence) => Some(evidence),
+            _ => None,
+        }
+    }
+
+    /// The vector evidence, when this result is an SVG document.
+    #[must_use]
+    pub const fn vector(&self) -> Option<&GraphicVectorEvidenceV3> {
+        match &self.payload {
+            GraphicImagePayloadV3::Vector(evidence) => Some(evidence),
+            _ => None,
+        }
+    }
+
+    /// Whether this result is a raster payload.
+    #[must_use]
+    pub const fn is_raster(&self) -> bool {
+        !matches!(self.payload, GraphicImagePayloadV3::Vector(_))
+    }
+
+    /// The worker process identifier the parent observed.
+    #[must_use]
+    pub const fn worker_pid(&self) -> u32 {
+        self.worker_pid
+    }
+
+    /// The measured wall time of this attempt.
+    #[must_use]
+    pub const fn wall_ms(&self) -> u64 {
+        self.wall_ms
+    }
+
+    /// Whether this result authorizes publication. Always `false`.
+    #[must_use]
+    pub const fn grants_publication_authority(&self) -> bool {
+        GRAPHIC_IMAGE_INSPECTION_V3_GRANTS_PUBLICATION_AUTHORITY
+    }
+}
+
+/// The complete inspected set of one whole V3 candidate. Complete or absent.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct GraphicImageInspectionSetV3 {
+    inspections: Vec<GraphicImageInspectionV3>,
+}
+
+impl GraphicImageInspectionSetV3 {
+    /// Every inspection, in inventory order.
+    #[must_use]
+    pub fn inspections(&self) -> &[GraphicImageInspectionV3] {
+        &self.inspections
+    }
+
+    /// How many independently declared obligations were inspected.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.inspections.len()
+    }
+
+    /// Whether the candidate declared no graphic obligation at all.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.inspections.is_empty()
+    }
+
+    /// Whether this set authorizes publication. Always `false`.
+    #[must_use]
+    pub const fn grants_publication_authority(&self) -> bool {
+        GRAPHIC_IMAGE_INSPECTION_V3_GRANTS_PUBLICATION_AUTHORITY
+    }
+
+    /// Whether this set is a global publishable snapshot. Always `false`.
+    #[must_use]
+    pub const fn proves_whole_publication(&self) -> bool {
+        false
+    }
+}
+
+/// The closed result of one whole-candidate V3 inspection.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GraphicImageInspectionOutcomeV3 {
+    /// Every declared obligation was inspected.
+    Complete(GraphicImageInspectionSetV3),
+    /// Exactly one typed refusal; no partial set exists.
+    Refused(GraphicImageInspectRefusalV3),
+}
+
+/// Whether one registered property role admits this V3 format.
+///
+/// `graphic.favicon` stays **PNG-only**, so an `icon.svg` favicon is refused even though the
+/// grammar admits the `.svg` extension. The role, never the filename or an inference, decides.
+#[must_use]
+pub const fn role_admits_format_v3(role: PropertyKey, format: GraphicImageFormatV3) -> bool {
+    match role {
+        PropertyKey::GraphicFavicon => matches!(format, GraphicImageFormatV3::Png),
+        _ => true,
+    }
+}
+
+/// Whether one authored side is inside the accepted intrinsic bounds.
+fn side_in_bounds_v3(side: u32) -> bool {
+    (1..=MAX_IMAGE_SIDE_V1).contains(&side)
+}
+
+/// Validates one still observation against the request that produced it.
+fn validate_still_v3(
+    observation: &GraphicImageWorkerObservationV1,
+    request: &GraphicImageInspectRequestV3,
+) -> Result<(u32, u32, u64, StillImageEvidenceV3), GraphicImageInspectRefusalKindV3> {
+    use GraphicImageInspectRefusalKindV3 as Kind;
+    let expected = match request.declared_format() {
+        GraphicImageFormatV3::Png => GraphicImageFormatV1::Png,
+        GraphicImageFormatV3::Jpeg => GraphicImageFormatV1::Jpeg,
+        GraphicImageFormatV3::WebP => GraphicImageFormatV1::WebP,
+        _ => return Err(Kind::FormatMismatch),
+    };
+    if observation.confirmed_format != expected
+        || observation.observed_mime != request.declared_format().canonical_mime()
+    {
+        return Err(Kind::FormatMismatch);
+    }
+    if &observation.source_digest != request.source_digest() {
+        return Err(Kind::SourceDigestMismatch);
+    }
+    if observation.worker_pid == 0 || !observation.limits_verified || !observation.cleanup_verified
+    {
+        return Err(Kind::UnverifiedWorker);
+    }
+    if !side_in_bounds_v3(observation.width) || !side_in_bounds_v3(observation.height) {
+        return Err(Kind::DimensionsOutOfRange);
+    }
+    let pixels = u64::from(observation.width) * u64::from(observation.height);
+    if pixels == 0 || pixels > MAX_IMAGE_PIXELS_V1 {
+        return Err(Kind::PixelCountOutOfRange);
+    }
+    if observation.decoded_bytes == 0 || observation.decoded_bytes > MAX_IMAGE_DECODED_BYTES_V1 {
+        return Err(Kind::DecodedBytesOutOfRange);
+    }
+    if observation.decoded_digest.as_bytes() == &[0u8; 32] {
+        return Err(Kind::DecodedBytesOutOfRange);
+    }
+    Ok((
+        observation.width,
+        observation.height,
+        pixels,
+        StillImageEvidenceV3 {
+            decoded_bytes: observation.decoded_bytes,
+            decoded_digest: observation.decoded_digest,
+        },
+    ))
+}
+
+/// Validates one GIF timeline against the request that produced it.
+fn validate_animation_v3(
+    evidence: &GifAnimationEvidenceV2,
+    request: &GraphicImageInspectRequestV3,
+) -> Result<(u32, u32, u64), GraphicImageInspectRefusalKindV3> {
+    use GraphicImageInspectRefusalKindV3 as Kind;
+    if evidence.mime != request.declared_format().canonical_mime() {
+        return Err(Kind::MimeMismatch);
+    }
+    if &evidence.source_digest != request.source_digest() {
+        return Err(Kind::SourceDigestMismatch);
+    }
+    if evidence.worker_pid == 0 || !evidence.limits_verified || !evidence.cleanup_verified {
+        return Err(Kind::UnverifiedWorker);
+    }
+    let width = u32::from(evidence.width);
+    let height = u32::from(evidence.height);
+    if !side_in_bounds_v3(width) || !side_in_bounds_v3(height) {
+        return Err(Kind::DimensionsOutOfRange);
+    }
+    let pixels = u64::from(width) * u64::from(height);
+    if pixels == 0 || pixels > MAX_IMAGE_PIXELS_V1 {
+        return Err(Kind::PixelCountOutOfRange);
+    }
+    if evidence.frames.is_empty() {
+        return Err(Kind::GifTimelineInconsistent);
+    }
+    Ok((width, height, pixels))
+}
+
+/// Validates one vector observation against the request that produced it.
+fn validate_vector_v3(
+    evidence: &GraphicVectorEvidenceV3,
+    request: &GraphicImageInspectRequestV3,
+) -> Result<(u32, u32, u64), GraphicImageInspectRefusalKindV3> {
+    use GraphicImageInspectRefusalKindV3 as Kind;
+    if !request.declared_format().is_svg() {
+        return Err(Kind::FormatMismatch);
+    }
+    if &evidence.source_digest != request.source_digest() {
+        return Err(Kind::SourceDigestMismatch);
+    }
+    if evidence.worker_pid == 0 || !evidence.limits_verified || !evidence.cleanup_verified {
+        return Err(Kind::UnverifiedWorker);
+    }
+    if !side_in_bounds_v3(evidence.width) || !side_in_bounds_v3(evidence.height) {
+        return Err(Kind::DimensionsOutOfRange);
+    }
+    let pixels = u64::from(evidence.width) * u64::from(evidence.height);
+    if pixels == 0 || pixels > MAX_IMAGE_PIXELS_V1 {
+        return Err(Kind::PixelCountOutOfRange);
+    }
+    if evidence.canonical.is_empty() || evidence.canonical_len() > MAX_SVG_CANONICAL_BYTES_V3 as u64
+    {
+        return Err(Kind::SvgOutputOutOfRange);
+    }
+    if evidence.output_digest.as_bytes() == &[0u8; 32]
+        || evidence.output_digest != sha256_media_worker_bytes_v1(&evidence.canonical)
+    {
+        return Err(Kind::SvgFactsInconsistent);
+    }
+    if evidence.elements == 0
+        || evidence.elements > MAX_SVG_ELEMENTS_V3
+        || evidence.depth == 0
+        || evidence.depth > MAX_SVG_NESTING_V3
+        || evidence.references > MAX_SVG_REFERENCES_V3
+        || evidence.path_commands > MAX_SVG_PATH_COMMANDS_V3
+        || evidence.filters > MAX_SVG_FILTER_ELEMENTS_V3
+    {
+        return Err(Kind::SvgFactsInconsistent);
+    }
+    Ok((evidence.width, evidence.height, pixels))
+}
+
+/// Inspects one whole V3 candidate: every declared obligation, or one attributable refusal.
+///
+/// The order is fixed and each step precedes the next: format classification, then the AVIF
+/// refusal (before any worker), then the registered role policy, then source bounds, then one port
+/// attempt, then independent parent validation. A single refusal discards every earlier success, so
+/// there is never a usable partial set.
+#[must_use]
+pub fn inspect_graphic_image_source_set_v3(
+    source_set: &GraphicAssetSourceSetV1,
+    port: &impl GraphicImageInspectPortV3,
+) -> GraphicImageInspectionOutcomeV3 {
+    let evidence = source_set.evidence();
+    let mut inspections: Vec<GraphicImageInspectionV3> = Vec::with_capacity(evidence.len());
+
+    for item in evidence {
+        let obligation = item.obligation();
+        let Some(format) = GraphicImageFormatV3::declared_by(obligation.reference()) else {
+            return refuse_v3(
+                GraphicImageInspectRefusalKindV3::UnsupportedFormat,
+                obligation,
+            );
+        };
+        // AVIF is named by the grammar and refused here, before any worker or decode exists.
+        if format.is_avif() {
+            return refuse_v3(
+                GraphicImageInspectRefusalKindV3::AvifUnsupported,
+                obligation,
+            );
+        }
+        if !role_admits_format_v3(obligation.role(), format) {
+            return refuse_v3(GraphicImageInspectRefusalKindV3::FaviconNotPng, obligation);
+        }
+
+        let bytes = item.bytes();
+        let length = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
+        if bytes.is_empty() {
+            return refuse_v3(GraphicImageInspectRefusalKindV3::EmptySource, obligation);
+        }
+        if length > MAX_IMAGE_SOURCE_BYTES_V1 {
+            return refuse_v3(GraphicImageInspectRefusalKindV3::OversizeSource, obligation);
+        }
+
+        let request = GraphicImageInspectRequestV3::of(bytes.to_vec(), format);
+        let observation = match port.inspect_v3(&request) {
+            GraphicImageInspectPortOutcomeV3::Inspected(observation) => *observation,
+            GraphicImageInspectPortOutcomeV3::Refused(kind) => {
+                return refuse_v3(kind, obligation);
+            }
+        };
+
+        let (width, height, pixels, payload, worker_pid, wall_ms) = match observation {
+            GraphicImageObservationV3::Still(observation) => {
+                if format.is_gif() || format.is_svg() {
+                    return refuse_v3(GraphicImageInspectRefusalKindV3::FormatMismatch, obligation);
+                }
+                let (width, height, pixels, still) = match validate_still_v3(&observation, &request)
+                {
+                    Ok(checked) => checked,
+                    Err(kind) => return refuse_v3(kind, obligation),
+                };
+                let worker_pid = observation.worker_pid;
+                let wall_ms = observation.wall_ms;
+                (
+                    width,
+                    height,
+                    pixels,
+                    GraphicImagePayloadV3::Still(still),
+                    worker_pid,
+                    wall_ms,
+                )
+            }
+            GraphicImageObservationV3::Animation(evidence) => {
+                if !format.is_gif() {
+                    return refuse_v3(GraphicImageInspectRefusalKindV3::FormatMismatch, obligation);
+                }
+                let (width, height, pixels) = match validate_animation_v3(&evidence, &request) {
+                    Ok(checked) => checked,
+                    Err(kind) => return refuse_v3(kind, obligation),
+                };
+                let worker_pid = evidence.worker_pid;
+                let wall_ms = evidence.wall_ms;
+                (
+                    width,
+                    height,
+                    pixels,
+                    GraphicImagePayloadV3::Animation(evidence),
+                    worker_pid,
+                    wall_ms,
+                )
+            }
+            GraphicImageObservationV3::Vector(evidence) => {
+                if !format.is_svg() {
+                    return refuse_v3(GraphicImageInspectRefusalKindV3::FormatMismatch, obligation);
+                }
+                let (width, height, pixels) = match validate_vector_v3(&evidence, &request) {
+                    Ok(checked) => checked,
+                    Err(kind) => return refuse_v3(kind, obligation),
+                };
+                let worker_pid = evidence.worker_pid;
+                let wall_ms = evidence.wall_ms;
+                (
+                    width,
+                    height,
+                    pixels,
+                    GraphicImagePayloadV3::Vector(evidence),
+                    worker_pid,
+                    wall_ms,
+                )
+            }
+        };
+
+        inspections.push(GraphicImageInspectionV3 {
+            obligation: obligation.clone(),
+            logical_path: item.logical_path().to_owned(),
+            format,
+            mime: format.canonical_mime(),
+            source_digest: *request.source_digest(),
+            width,
+            height,
+            pixels,
+            payload,
+            worker_pid,
+            wall_ms,
+        });
+    }
+
+    GraphicImageInspectionOutcomeV3::Complete(GraphicImageInspectionSetV3 { inspections })
+}
