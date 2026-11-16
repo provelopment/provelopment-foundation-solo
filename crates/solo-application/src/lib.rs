@@ -12,11 +12,37 @@
 
 #![forbid(unsafe_code)]
 
+/// The exact domain vocabulary the visibility preflight's closed signature speaks.
+///
+/// `SOLO-WO-118 R20` — [`graphic_visibility_preflight`] takes one already validated
+/// `GraphicCascadeInputV1`, its exact mixed plan, one fully qualified representation and the
+/// graph-bound `RepresentationVisibilityLedgerV1`. A composition root that must *name* those
+/// exact types (today: the native host-test seam) therefore needs this vocabulary, and this
+/// module is the one bounded place it comes from. Nothing here is re-implemented, wrapped or
+/// widened: every name is the domain's own item, re-exported unchanged, and this crate still
+/// depends only on the pure domain crate plus the standard library.
+pub mod preflight_domain {
+    pub use solo_domain::{
+        ApprovedPlatformAssetV1, ApprovedPlatformGraphicBindingV1, AssetNamespace,
+        AssetReferenceV1, EfsLevel, EfsOwnershipDraft, EfsOwnershipGraph, EntityIdV1, Exposure,
+        FacetDraft, FacetIdV1, GraphicCascadeInputV1, GraphicSlotSelectionV1, LocaleKeyV1,
+        OwnerGraphicSelectionsV1, PageDraft, PageIdV1, PageVisibilityDeclarationV1,
+        PlatformAssetMediaClassV1, PlatformGraphicBaselineRecordV1, PlatformGraphicBaselineV1,
+        PropertyKey, QualifiedOwnerV1, RepresentationVisibilityEntryV1,
+        RepresentationVisibilityLedgerV1, RepresentationVisibilityOriginV1,
+        RepresentationVisibilityRefusalKindV1, RepresentationVisibilityRefusalV1,
+        RepresentationVisibilityTokenRefusalKindV1, RepresentationVisibilityTokenRefusalV1,
+        RepresentationVisibilityV1, SiteDraft, SiteIdV1, build_representation_visibility_ledger_v1,
+        validate_declared_properties_v1,
+    };
+}
+
 mod bootstrap_preflight;
 mod graphic_asset_inventory;
 mod graphic_asset_read;
 mod graphic_delivery_preparation;
 mod graphic_image_inspection;
+mod graphic_visibility_preflight;
 mod media_worker;
 mod platform_asset_catalogue;
 mod platform_asset_read;
@@ -92,6 +118,13 @@ pub use graphic_image_inspection::{
     GraphicImageInspectionSetV3, GraphicImageInspectionV3, GraphicImageObservationV3,
     GraphicImagePayloadV3, GraphicVectorEvidenceV3, IMAGE_MIME_GIF_V3, StillImageEvidenceV3,
     inspect_graphic_image_source_set_v3, role_admits_format_v3,
+};
+pub use graphic_visibility_preflight::{
+    GRAPHIC_VISIBILITY_PREFLIGHT_GRANTS_PUBLICATION_AUTHORITY_V1,
+    GRAPHIC_VISIBILITY_PREFLIGHT_ROUTES_ANY_URL_V1, GraphicVisibilityPreflightEntryV1,
+    GraphicVisibilityPreflightOutcomeV1, GraphicVisibilityPreflightRefusalKindV1,
+    GraphicVisibilityPreflightRefusalV1, GraphicVisibilityPreflightRequestV1,
+    GraphicVisibilityPreflightV1, prepare_graphic_visibility_preflight_v1,
 };
 pub use media_worker::{
     MEDIA_WORKER_GRANTS_PUBLICATION_AUTHORITY_V1, MEDIA_WORKER_MAX_DECODED_BYTES_V1,

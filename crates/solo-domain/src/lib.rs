@@ -34,6 +34,7 @@ mod efs_ownership;
 mod entity_id;
 mod property_registry;
 mod property_resolution;
+mod representation_visibility;
 mod source_locator;
 mod source_selection;
 
@@ -75,6 +76,14 @@ pub use property_resolution::{
     ResolvedGraphicRoleV1, ResolvedPropertiesV1, ResolvedPropertyGraphV1, ResolvedPropertyV1,
     ValidatedPropertyInputV1, project_public_graphic_slots_v1, project_public_properties_v1,
     require_matching_owner_membership_v1, resolve_all_owners_v1, validate_declared_properties_v1,
+};
+pub use representation_visibility::{
+    MAX_VISIBILITY_PAGE_DECLARATIONS_V1, MAX_VISIBILITY_REPRESENTATION_OVERRIDES_V1,
+    PageVisibilityDeclarationV1, RepresentationVisibilityEntryV1, RepresentationVisibilityLedgerV1,
+    RepresentationVisibilityOriginV1, RepresentationVisibilityRefusalKindV1,
+    RepresentationVisibilityRefusalV1, RepresentationVisibilityTokenRefusalKindV1,
+    RepresentationVisibilityTokenRefusalV1, RepresentationVisibilityV1,
+    build_representation_visibility_ledger_v1,
 };
 pub use source_locator::{
     FILESYSTEM_IDENTITY_PROVEN, MAX_LOCATOR_BYTES, MAX_LOCATOR_SEGMENTS, MAX_SEGMENT_BYTES,

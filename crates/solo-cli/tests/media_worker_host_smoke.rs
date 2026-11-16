@@ -12038,3 +12038,1167 @@ mod n130 {
         );
     }
 }
+mod n131 {
+    use std::fs;
+    use std::path::{Path, PathBuf};
+
+    use solo_adapters::{
+        ConfinedGraphicInspectAdapterV4, PlatformRootCapabilityV1, TestMixedDeclarationV1,
+        TestMixedFormatV1, TestOwnerV1, TestPackageSeamV1, TestPreparedPackageV1,
+        parse_platform_asset_catalogue_v1, prepare_unpublished_graphic_package_from_roots_v1,
+    };
+    use solo_application::preflight_domain::{
+        ApprovedPlatformAssetV1, ApprovedPlatformGraphicBindingV1, AssetNamespace,
+        AssetReferenceV1, EfsLevel, EfsOwnershipDraft, EfsOwnershipGraph, EntityIdV1, Exposure,
+        FacetDraft, FacetIdV1, GraphicCascadeInputV1, GraphicSlotSelectionV1, LocaleKeyV1,
+        OwnerGraphicSelectionsV1, PageDraft, PageIdV1, PageVisibilityDeclarationV1,
+        PlatformAssetMediaClassV1, PlatformGraphicBaselineRecordV1, PlatformGraphicBaselineV1,
+        PropertyKey, QualifiedOwnerV1, RepresentationVisibilityLedgerV1,
+        RepresentationVisibilityOriginV1, RepresentationVisibilityRefusalKindV1,
+        RepresentationVisibilityTokenRefusalKindV1, RepresentationVisibilityV1, SiteDraft,
+        SiteIdV1, build_representation_visibility_ledger_v1, validate_declared_properties_v1,
+    };
+    use solo_application::{
+        GraphicPackageLimitsV1, GraphicVisibilityPreflightOutcomeV1,
+        GraphicVisibilityPreflightRefusalKindV1, GraphicVisibilityPreflightRequestV1,
+        GraphicVisibilityPreflightV1, MixedGraphicPlanV1, PlatformAssetCatalogueV1,
+        PlatformRootProvenanceV1, PlatformRootSelectionV1, PlatformSourceRequestV1,
+        PrepublicationDisplayEligibilityV1, collect_mixed_graphic_obligations_v1,
+        prepare_graphic_visibility_preflight_v1, sha256_media_worker_bytes_v1,
+    };
+
+    use super::BIN;
+    use super::n116::{Root, png, webp};
+
+    /// The accepted approved library version and the independent catalogue pin.
+    const VERSION: &str = "1.0.0";
+    const CATALOGUE_SHA256: &str =
+        "ad8ea718b50641206cc4f4fe13e866ad266366a7aa11ef799c83ae8187858fc7";
+
+    /// One real approved Platform identifier.
+    const HOME_ID: &str = "icons/icon-home.svg";
+
+    /// The tracked product tree, used only as the copy source for a scratch Platform root.
+    fn product_root() -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../platform")
+    }
+
+    /// The filesystem a scratch root is created on; on Linux it must be the verified fixture one.
+    fn scratch_parent() -> PathBuf {
+        #[cfg(target_os = "linux")]
+        {
+            match std::env::var_os("SOLO_TEST_SOURCE_FS_ROOT") {
+                Some(root) if !root.is_empty() => PathBuf::from(root),
+                _ => panic!(
+                    "SOLO_TEST_SOURCE_FS_ROOT must name the R03 snapshot fixture filesystem; \
+                     refusing to run the real visibility preflight gate on an unverified filesystem"
+                ),
+            }
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            std::env::temp_dir()
+        }
+    }
+
+    /// Copies one directory tree of regular files without dereferencing links.
+    fn copy_tree(from: &Path, to: &Path) {
+        fs::create_dir_all(to).expect("create a scratch directory");
+        for entry in fs::read_dir(from).expect("read a product directory") {
+            let entry = entry.expect("a product directory entry");
+            let file_type = entry.file_type().expect("a product file type");
+            assert!(
+                !file_type.is_symlink(),
+                "the tracked product tree holds no link"
+            );
+            let target = to.join(entry.file_name());
+            if file_type.is_dir() {
+                copy_tree(&entry.path(), &target);
+            } else {
+                assert!(file_type.is_file(), "the product tree holds regular files");
+                fs::copy(entry.path(), &target).expect("copy one product file");
+            }
+        }
+    }
+
+    /// A disposable Platform root holding one copy of the approved product library.
+    struct PlatformRoot {
+        base: PathBuf,
+        platform: PathBuf,
+    }
+
+    impl PlatformRoot {
+        fn new(label: &str) -> Self {
+            let base =
+                scratch_parent().join(format!("solo-n131-platform-{}-{label}", std::process::id()));
+            let _ = fs::remove_dir_all(&base);
+            let platform = base.join("platform");
+            copy_tree(&product_root(), &platform);
+            Self { base, platform }
+        }
+
+        fn capability(&self) -> PlatformRootCapabilityV1 {
+            PlatformRootCapabilityV1::adopt_bootstrap_path(
+                &self.platform,
+                PlatformRootProvenanceV1::OperatorDesignatedPlatformRoot,
+            )
+            .expect("the scratch Platform root is adoptable")
+        }
+    }
+
+    impl Drop for PlatformRoot {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.base);
+        }
+    }
+
+    /// The parsed approved catalogue together with the exact bytes it was parsed from.
+    struct Catalogue {
+        model: PlatformAssetCatalogueV1,
+        bytes: Vec<u8>,
+    }
+
+    impl Catalogue {
+        fn load() -> Self {
+            let bytes = fs::read(product_root().join("assets/catalogue-1.0.0.json"))
+                .expect("the installed catalogue is present");
+            assert_eq!(
+                sha256_media_worker_bytes_v1(&bytes).to_hex(),
+                CATALOGUE_SHA256,
+                "the installed catalogue is the approved one"
+            );
+            let model = parse_platform_asset_catalogue_v1(&bytes, VERSION)
+                .expect("the strict R12 parser accepts the installed catalogue");
+            Self { model, bytes }
+        }
+
+        fn digest(&self, id: &str) -> String {
+            self.model
+                .entries()
+                .iter()
+                .find(|entry| entry.id() == id)
+                .map_or_else(
+                    || panic!("{id} is an approved identifier"),
+                    |entry| entry.sha256().to_hex(),
+                )
+        }
+
+        fn request(&self) -> PlatformSourceRequestV1<'_> {
+            PlatformSourceRequestV1 {
+                selection: PlatformRootSelectionV1::adopt(
+                    PlatformRootProvenanceV1::OperatorDesignatedPlatformRoot,
+                ),
+                selected_version: VERSION,
+                catalogue: &self.model,
+                catalogue_bytes: &self.bytes,
+            }
+        }
+    }
+
+    /// The one Entity of every fixture graph.
+    fn entity() -> EntityIdV1 {
+        EntityIdV1::parse("example").expect("a canonical Entity identifier")
+    }
+
+    /// The one Facet of every fixture graph.
+    fn facet() -> FacetIdV1 {
+        FacetIdV1::parse("main").expect("a canonical Facet identifier")
+    }
+
+    /// One canonical Site identifier.
+    fn site_of(name: &str) -> SiteIdV1 {
+        SiteIdV1::parse(name).expect("a canonical Site identifier")
+    }
+
+    /// One canonical Page identifier.
+    fn page_of(name: &str) -> PageIdV1 {
+        PageIdV1::parse(name).expect("a canonical Page identifier")
+    }
+
+    /// One canonical full region-qualified locale key.
+    fn locale_of(name: &str) -> LocaleKeyV1 {
+        LocaleKeyV1::from_already_canonical(name).expect("a canonical full locale")
+    }
+
+    /// The fixture graph: two sibling Sites, one with two Pages and two representations.
+    ///
+    /// `bali` owns `home` (`en-001`, `de-DE`) and `about` (`en-001`); `ubud` owns its own `home`
+    /// (`en-001`). The two `home` Pages therefore share an identifier across Sites, which is what
+    /// the isolation row of N131_01 and the "public sibling" row of N131_05 exist to prove.
+    /// `with_ubud = false` builds the same Entity with only the `bali` Site, which is how a
+    /// genuinely partial or foreign ledger is produced for N131_03.
+    fn graph_of(entity_name: &str, with_ubud: bool) -> EfsOwnershipGraph {
+        let mut bali_home = PageDraft::new(page_of("home"));
+        bali_home.add_representation(locale_of("en-001"));
+        bali_home.add_representation(locale_of("de-DE"));
+        let mut bali_about = PageDraft::new(page_of("about"));
+        bali_about.add_representation(locale_of("en-001"));
+        let mut bali = SiteDraft::new(site_of("bali"));
+        bali.add_page(bali_home);
+        bali.add_page(bali_about);
+        let mut main = FacetDraft::new(facet());
+        main.add_site(bali);
+        if with_ubud {
+            let mut ubud_home = PageDraft::new(page_of("home"));
+            ubud_home.add_representation(locale_of("en-001"));
+            let mut ubud = SiteDraft::new(site_of("ubud"));
+            ubud.add_page(ubud_home);
+            main.add_site(ubud);
+        }
+        let mut draft =
+            EfsOwnershipDraft::new(EntityIdV1::parse(entity_name).expect("a canonical Entity"));
+        draft.add_facet(main);
+        draft.build().expect("the fixture graph is valid")
+    }
+
+    /// The exact Page owner of one Site/Page pair inside a named Entity.
+    fn page_owner_in(entity_name: &str, site: &str, page: &str) -> QualifiedOwnerV1 {
+        QualifiedOwnerV1::page(
+            EntityIdV1::parse(entity_name).expect("a canonical Entity"),
+            facet(),
+            site_of(site),
+            page_of(page),
+        )
+    }
+
+    /// The exact representation owner of one Site/Page/locale triple inside a named Entity.
+    fn rep_owner_in(entity_name: &str, site: &str, page: &str, locale: &str) -> QualifiedOwnerV1 {
+        QualifiedOwnerV1::representation(
+            EntityIdV1::parse(entity_name).expect("a canonical Entity"),
+            facet(),
+            site_of(site),
+            page_of(page),
+            locale_of(locale),
+        )
+    }
+
+    /// The exact Page owner of one Site/Page pair.
+    fn page_owner(site: &str, page: &str) -> QualifiedOwnerV1 {
+        page_owner_in("example", site, page)
+    }
+
+    /// The exact representation owner of one Site/Page/locale triple.
+    fn rep_owner(site: &str, page: &str, locale: &str) -> QualifiedOwnerV1 {
+        rep_owner_in("example", site, page, locale)
+    }
+
+    /// The complete declaration set of [`graph_of`], covering every one of its Pages.
+    ///
+    /// It materialises exactly the four accepted rows of `ARCHITECTURE.md` §3.2A:
+    /// `bali/home` omits its default and overrides `de-DE`; `bali/about` is `unlisted` with a
+    /// `public` override; `ubud/home` is `unlisted` with no override.
+    fn declarations_of(entity_name: &str, with_ubud: bool) -> Vec<PageVisibilityDeclarationV1> {
+        let mut declarations = vec![
+            PageVisibilityDeclarationV1::new(page_owner_in(entity_name, "bali", "home"), None)
+                .and_then(|declaration| {
+                    declaration
+                        .with_override(locale_of("de-DE"), RepresentationVisibilityV1::Unlisted)
+                })
+                .expect("the bali home declaration is valid"),
+            PageVisibilityDeclarationV1::new(
+                page_owner_in(entity_name, "bali", "about"),
+                Some(RepresentationVisibilityV1::Unlisted),
+            )
+            .and_then(|declaration| {
+                declaration.with_override(locale_of("en-001"), RepresentationVisibilityV1::Public)
+            })
+            .expect("the about declaration is valid"),
+        ];
+        if with_ubud {
+            declarations.push(
+                PageVisibilityDeclarationV1::new(
+                    page_owner_in(entity_name, "ubud", "home"),
+                    Some(RepresentationVisibilityV1::Unlisted),
+                )
+                .expect("the ubud home declaration is valid"),
+            );
+        }
+        declarations
+    }
+
+    /// The complete ledger of [`graph_of`] under [`declarations_of`].
+    fn ledger() -> RepresentationVisibilityLedgerV1 {
+        build_representation_visibility_ledger_v1(
+            &graph_of("example", true),
+            &declarations_of("example", true),
+        )
+        .expect("the fixture ledger is complete")
+    }
+
+    /// One validated R17 candidate, its exact plan and its scoped representation target.
+    struct Candidate {
+        input: GraphicCascadeInputV1,
+        plan: MixedGraphicPlanV1,
+        target: QualifiedOwnerV1,
+    }
+
+    /// One authored slot selection at the target representation.
+    fn selection(
+        role: &str,
+        namespace: AssetNamespace,
+        reference: &str,
+        exposure: Exposure,
+    ) -> GraphicSlotSelectionV1 {
+        let role = PropertyKey::from_name(&format!("graphic.{role}"))
+            .expect("a registered graphic role token");
+        let reference =
+            AssetReferenceV1::parse(namespace, reference).expect("a portable asset reference");
+        GraphicSlotSelectionV1::append(role, "primary", reference, exposure)
+            .expect("a valid graphic slot selection")
+    }
+
+    /// Builds one real validated candidate over [`graph_of`], exactly like the accepted R19 fixture.
+    ///
+    /// The Platform binding is the verified approved one; a `registration` names one root default
+    /// for `graphic.logo` at `primary` and the digest the caller asserts is approved.
+    fn candidate(
+        registration: Option<(&str, &str)>,
+        selections: Vec<GraphicSlotSelectionV1>,
+        target: QualifiedOwnerV1,
+    ) -> Candidate {
+        candidate_on(true, registration, selections, target)
+    }
+
+    /// The same candidate over a graph with or without the sibling `ubud` Site.
+    fn candidate_on(
+        with_ubud: bool,
+        registration: Option<(&str, &str)>,
+        selections: Vec<GraphicSlotSelectionV1>,
+        target: QualifiedOwnerV1,
+    ) -> Candidate {
+        let graph = graph_of("example", with_ubud);
+        let asset_id = registration.map_or(HOME_ID, |(id, _)| id);
+        let asset_digest =
+            registration.map_or_else(|| "0".repeat(64), |(_, digest)| digest.to_owned());
+        let class = if asset_id.ends_with(".png") {
+            PlatformAssetMediaClassV1::Png
+        } else {
+            PlatformAssetMediaClassV1::Svg
+        };
+        let asset = ApprovedPlatformAssetV1::new(asset_id, &asset_digest, class)
+            .expect("a valid approved asset");
+        let binding = ApprovedPlatformGraphicBindingV1::new(VERSION, CATALOGUE_SHA256, vec![asset])
+            .expect("a valid approved binding");
+        let baseline = match registration {
+            None => PlatformGraphicBaselineV1::empty(binding),
+            Some((id, digest)) => {
+                let reference =
+                    AssetReferenceV1::parse(AssetNamespace::Platform, id).expect("a valid id");
+                let record = PlatformGraphicBaselineRecordV1::new(
+                    PropertyKey::GraphicLogo,
+                    "primary",
+                    reference,
+                    digest,
+                )
+                .expect("a valid baseline record");
+                PlatformGraphicBaselineV1::new(binding, vec![record])
+                    .expect("a valid platform baseline")
+            }
+        };
+        let validated = validate_declared_properties_v1(&graph, Vec::new())
+            .expect("the graph validates with no authored envelope");
+        let block = OwnerGraphicSelectionsV1::new(target.clone(), selections)
+            .expect("a valid selection block");
+        let input = GraphicCascadeInputV1::new(validated, baseline, vec![block])
+            .expect("a valid graphic cascade candidate");
+        let plan = collect_mixed_graphic_obligations_v1(&input)
+            .expect("the candidate carries one closed obligation plan");
+        Candidate {
+            input,
+            plan,
+            target,
+        }
+    }
+
+    /// Runs the one visibility preflight over the real roots and the real confined workers.
+    fn preflight(
+        entity_root: &Root,
+        platform: &PlatformRoot,
+        catalogue: &Catalogue,
+        candidate: &Candidate,
+        ledger: &RepresentationVisibilityLedgerV1,
+    ) -> GraphicVisibilityPreflightOutcomeV1 {
+        let request = GraphicVisibilityPreflightRequestV1 {
+            input: &candidate.input,
+            plan: &candidate.plan,
+            target: &candidate.target,
+            ledger,
+            limits: GraphicPackageLimitsV1::hard(),
+            platform: catalogue.request(),
+        };
+        let adapter = ConfinedGraphicInspectAdapterV4::new(Path::new(BIN));
+        prepare_graphic_visibility_preflight_v1(
+            &request,
+            &entity_root.capability(),
+            &platform.capability(),
+            &adapter,
+            &adapter,
+        )
+    }
+
+    /// Asserts the preflight prepared a result, naming the real refusal otherwise.
+    fn prepared<'a>(
+        outcome: &'a GraphicVisibilityPreflightOutcomeV1,
+        context: &str,
+    ) -> &'a GraphicVisibilityPreflightV1 {
+        assert!(
+            outcome.refusal().is_none(),
+            "{context}: the visibility binding refused: {:?}",
+            outcome.refusal()
+        );
+        assert!(
+            outcome.package_refusal().is_none(),
+            "{context}: the package refused: {:?}",
+            outcome.package_refusal()
+        );
+        assert!(
+            outcome.source_refusal().is_none(),
+            "{context}: the candidate sources refused: {:?}",
+            outcome.source_refusal()
+        );
+        outcome
+            .prepared()
+            .unwrap_or_else(|| panic!("{context}: the preflight prepared a result"))
+    }
+
+    /// One entry of the prepared view by exact role token.
+    fn view_entry<'a>(
+        view: &'a GraphicVisibilityPreflightV1,
+        role: &str,
+    ) -> &'a solo_application::GraphicVisibilityPreflightEntryV1 {
+        let wanted = PropertyKey::from_name(&format!("graphic.{role}"))
+            .expect("a registered graphic role token");
+        view.entries()
+            .iter()
+            .find(|entry| entry.role() == wanted)
+            .unwrap_or_else(|| panic!("the preflight staged a {role} entry"))
+    }
+
+    /// `N131_01` — the four accepted Page/representation rows, over a complete graph ledger.
+    ///
+    /// The ledger is pure: no root, no worker and no package is involved, so this case proves
+    /// exactly the visibility matrix, its provenance, its complete coverage and the isolation of
+    /// two same-named Pages in sibling Sites.
+    #[test]
+    fn n131_01_four_case_page_and_representation_visibility_matrix() {
+        let graph = graph_of("example", true);
+        let ledger =
+            build_representation_visibility_ledger_v1(&graph, &declarations_of("example", true))
+                .expect("the complete declaration set builds one ledger");
+
+        // Complete coverage of the graph's representation membership, in stable graph order.
+        assert_eq!(
+            ledger.len(),
+            4,
+            "every representation is governed exactly once"
+        );
+        assert_eq!(ledger.entity_id(), &entity());
+        assert!(ledger.covers_page(&page_owner("bali", "home")));
+        assert!(ledger.covers_page(&page_owner("bali", "about")));
+        assert!(ledger.covers_page(&page_owner("ubud", "home")));
+        assert!(
+            !ledger.covers_page(&page_owner("bali", "missing")),
+            "a Page the graph does not own is never covered"
+        );
+        assert!(
+            !ledger.covers_page(&rep_owner("bali", "home", "en-001")),
+            "only an exact Page owner is a Page cover"
+        );
+
+        // Row 1: omitted Page default + omitted override => public.
+        let row1 = ledger
+            .for_owner(&rep_owner("bali", "home", "en-001"))
+            .expect("the public home representation is governed");
+        assert_eq!(row1.effective(), RepresentationVisibilityV1::Public);
+        assert_eq!(row1.origin(), RepresentationVisibilityOriginV1::PageDefault);
+        assert!(row1.is_discoverable_intent());
+
+        // Row 2: public Page + explicit unlisted override => unlisted (the override wins).
+        let row2 = ledger
+            .for_owner(&rep_owner("bali", "home", "de-DE"))
+            .expect("the German representation is governed");
+        assert_eq!(row2.effective(), RepresentationVisibilityV1::Unlisted);
+        assert_eq!(
+            row2.origin(),
+            RepresentationVisibilityOriginV1::RepresentationOverride
+        );
+
+        // Row 3: explicit unlisted Page + omitted override => unlisted (the Page default).
+        let row3 = ledger
+            .for_owner(&rep_owner("ubud", "home", "en-001"))
+            .expect("the sibling home representation is governed");
+        assert_eq!(row3.effective(), RepresentationVisibilityV1::Unlisted);
+        assert_eq!(row3.origin(), RepresentationVisibilityOriginV1::PageDefault);
+
+        // Row 4: explicit unlisted Page + explicit public override => public (the override wins).
+        let row4 = ledger
+            .for_owner(&rep_owner("bali", "about", "en-001"))
+            .expect("the about representation is governed");
+        assert_eq!(row4.effective(), RepresentationVisibilityV1::Public);
+        assert_eq!(
+            row4.origin(),
+            RepresentationVisibilityOriginV1::RepresentationOverride
+        );
+
+        // The same Page identifier in a sibling Site is a different Page with its own state.
+        assert_ne!(row1.owner(), row3.owner());
+        assert_eq!(row1.effective().token(), "public");
+        assert_eq!(row3.effective().token(), "unlisted");
+
+        // The strict token parser admits exactly the two manifest states.
+        assert_eq!(
+            RepresentationVisibilityV1::parse_token("public").expect("public is admitted"),
+            RepresentationVisibilityV1::Public
+        );
+        assert_eq!(
+            RepresentationVisibilityV1::parse_token("unlisted").expect("unlisted is admitted"),
+            RepresentationVisibilityV1::Unlisted
+        );
+
+        println!(
+            "n131_evidence case=01 rows=4 default=public override=win complete=true \
+             row1={} row2={} row3={} row4={} sibling_isolated=true origin_page_default=2 \
+             origin_override=2 entries={} publication=false route=false",
+            row1.effective().token(),
+            row2.effective().token(),
+            row3.effective().token(),
+            row4.effective().token(),
+            ledger.len()
+        );
+    }
+
+    /// `N131_02` — unlisted intent versus a property `internal` exposure, and no third state.
+    ///
+    /// An `unlisted` representation is *not* private: it keeps its exact typed identity, it is
+    /// simply never automatically discoverable. `internal` is refused as a representation token
+    /// while an `internal` property winner is still validated and still never exported.
+    #[test]
+    fn n131_02_unlisted_intent_is_not_privacy_and_internal_is_not_a_representation_state() {
+        let png_bytes = png();
+        let webp_bytes = webp();
+        let entity_root = Root::new(
+            "n131-visibility",
+            &[
+                ("icon-favicon.png", png_bytes.as_slice()),
+                ("social.webp", webp_bytes.as_slice()),
+            ],
+        );
+        let platform = PlatformRoot::new("n131-visibility");
+        let catalogue = Catalogue::load();
+        let home_digest = catalogue.digest(HOME_ID);
+        let ledger = ledger();
+
+        // One public logo from the approved library, one public favicon, and one `internal`
+        // social preview: the internal value is authored, validated and inspected, never exported.
+        let candidate = candidate(
+            Some((HOME_ID, home_digest.as_str())),
+            vec![
+                selection("logo", AssetNamespace::Platform, HOME_ID, Exposure::Public),
+                selection(
+                    "favicon",
+                    AssetNamespace::Entity,
+                    "icon-favicon.png",
+                    Exposure::Public,
+                ),
+                selection(
+                    "social-preview",
+                    AssetNamespace::Entity,
+                    "social.webp",
+                    Exposure::Internal,
+                ),
+            ],
+            rep_owner("bali", "home", "en-001"),
+        );
+        let outcome = preflight(&entity_root, &platform, &catalogue, &candidate, &ledger);
+        let view = prepared(&outcome, "n131_02 public preflight");
+
+        assert_eq!(view.visibility(), RepresentationVisibilityV1::Public);
+        assert!(view.is_discoverable_intent());
+        assert_eq!(view.robots_intent(), "index,follow");
+        assert_eq!(view.len(), 2, "the internal winner is never exported");
+        let roles: Vec<&str> = view
+            .entries()
+            .iter()
+            .map(|entry| entry.role().name())
+            .collect();
+        assert!(roles.contains(&"graphic.logo"));
+        assert!(roles.contains(&"graphic.favicon"));
+        assert!(
+            !roles.contains(&"graphic.social-preview"),
+            "an internal property value never enters the preflight view"
+        );
+        assert!(!view.grants_publication_authority());
+        assert!(!view.routes_any_url());
+
+        // The unlisted sibling is governed, discoverable=false and noindex,nofollow — and it is
+        // not secret: its exact typed owner identity is still available to the caller.
+        let unlisted = ledger
+            .for_owner(&rep_owner("ubud", "home", "en-001"))
+            .expect("the unlisted sibling is governed");
+        assert_eq!(unlisted.effective(), RepresentationVisibilityV1::Unlisted);
+        assert!(!unlisted.is_discoverable_intent());
+        assert_eq!(unlisted.robots_intent(), "noindex,nofollow");
+        assert_eq!(unlisted.owner().level(), EfsLevel::Representation);
+        assert_eq!(
+            unlisted.owner().locale().map(|key| key.as_str()),
+            Some("en-001")
+        );
+
+        // `internal` is a property exposure and is refused as a representation token, three ways.
+        for token in ["internal", "private", "hidden"] {
+            let refusal =
+                RepresentationVisibilityV1::parse_token(token).expect_err("refused as a token");
+            assert_eq!(
+                refusal.kind(),
+                RepresentationVisibilityTokenRefusalKindV1::NonManifestExposure
+            );
+            assert_eq!(refusal.detail(), "non-manifest-exposure");
+        }
+        assert_eq!(
+            RepresentationVisibilityV1::parse_token("")
+                .expect_err("empty is refused")
+                .kind(),
+            RepresentationVisibilityTokenRefusalKindV1::Empty
+        );
+        for mixed in ["Public", "UNLISTED", "Unlisted"] {
+            assert_eq!(
+                RepresentationVisibilityV1::parse_token(mixed)
+                    .expect_err("mixed case is refused")
+                    .kind(),
+                RepresentationVisibilityTokenRefusalKindV1::MixedCase
+            );
+        }
+        assert_eq!(
+            RepresentationVisibilityV1::parse_token("maybe")
+                .expect_err("unknown is refused")
+                .kind(),
+            RepresentationVisibilityTokenRefusalKindV1::Unknown
+        );
+
+        // No staged identity is an address: no scheme and no absolute path anywhere.
+        for entry in view.entries() {
+            assert!(entry.content_key().starts_with("sha256/"));
+            assert!(!entry.content_key().contains("://"));
+            assert!(!entry.content_key().starts_with('/'));
+            assert!(!entry.slot().contains("://"));
+        }
+
+        println!(
+            "n131_evidence case=02 visibility=public entries={} unlisted_discoverable=false \
+             robots=noindex,nofollow internal_representation=refused internal_hidden=true \
+             unlisted_not_private=true publication=false route=false",
+            view.len()
+        );
+    }
+
+    /// `N131_03` — identity and authority refusals, every one of them before any read.
+    ///
+    /// The ledger half is pure domain. The preflight half runs against an **empty** Entity root and
+    /// a catalogue-only Platform root: if the binding were proved after acquisition, these rows
+    /// would surface as `entity-read-refused`/`platform-read-refused` instead of the visibility
+    /// refusals they must produce. `target-not-in-ledger` is a defensive arm: with the membership
+    /// binding proved first, a complete ledger governs every representation of a validated
+    /// candidate, so no fixture can reach it without first failing a stronger check.
+    #[test]
+    fn n131_03_identity_and_authority_refusals_precede_every_read() {
+        let complete = graph_of("example", true);
+        let build = |declarations: &[PageVisibilityDeclarationV1]| {
+            build_representation_visibility_ledger_v1(&complete, declarations)
+        };
+
+        // A representation can never carry a Page declaration.
+        assert_eq!(
+            PageVisibilityDeclarationV1::new(rep_owner("bali", "home", "en-001"), None)
+                .expect_err("a representation is not a Page")
+                .kind(),
+            RepresentationVisibilityRefusalKindV1::PageOwnerNotAPage
+        );
+
+        // A duplicate Page declaration, and a Page of the graph with no declaration.
+        let mut duplicate = declarations_of("example", true);
+        duplicate.push(
+            PageVisibilityDeclarationV1::new(page_owner("bali", "home"), None)
+                .expect("a valid Page declaration"),
+        );
+        assert_eq!(
+            build(&duplicate).expect_err("duplicate").kind(),
+            RepresentationVisibilityRefusalKindV1::DuplicatePageDeclaration
+        );
+        assert_eq!(
+            build(&declarations_of("example", false))
+                .expect_err("missing")
+                .kind(),
+            RepresentationVisibilityRefusalKindV1::MissingPageDeclaration
+        );
+
+        // A wrong Entity, a wrong Facet, a wrong Site and a Page the Site does not own.
+        assert_eq!(
+            build(&declarations_of("other", true))
+                .expect_err("entity")
+                .kind(),
+            RepresentationVisibilityRefusalKindV1::UnknownEntity
+        );
+        let mut wrong_facet = declarations_of("example", true);
+        wrong_facet.push(
+            PageVisibilityDeclarationV1::new(
+                QualifiedOwnerV1::page(
+                    entity(),
+                    FacetIdV1::parse("other").expect("a canonical Facet"),
+                    site_of("bali"),
+                    page_of("home"),
+                ),
+                None,
+            )
+            .expect("a valid Page declaration"),
+        );
+        assert_eq!(
+            build(&wrong_facet).expect_err("facet").kind(),
+            RepresentationVisibilityRefusalKindV1::WrongFacet
+        );
+        let mut wrong_site = declarations_of("example", true);
+        wrong_site.push(
+            PageVisibilityDeclarationV1::new(page_owner("nowhere", "home"), None)
+                .expect("a valid Page declaration"),
+        );
+        assert_eq!(
+            build(&wrong_site).expect_err("site").kind(),
+            RepresentationVisibilityRefusalKindV1::WrongSite
+        );
+        let mut unknown_page = declarations_of("example", true);
+        unknown_page.push(
+            PageVisibilityDeclarationV1::new(page_owner("bali", "nowhere"), None)
+                .expect("a valid Page declaration"),
+        );
+        assert_eq!(
+            build(&unknown_page).expect_err("page").kind(),
+            RepresentationVisibilityRefusalKindV1::UnknownPage
+        );
+
+        // An override outside its own Page, and one representation overridden twice.
+        let mut foreign = declarations_of("example", true);
+        foreign[0] = PageVisibilityDeclarationV1::new(page_owner("bali", "home"), None)
+            .and_then(|declaration| {
+                declaration.with_override(locale_of("fr-FR"), RepresentationVisibilityV1::Unlisted)
+            })
+            .expect("a valid Page declaration");
+        assert_eq!(
+            build(&foreign).expect_err("representation").kind(),
+            RepresentationVisibilityRefusalKindV1::ForeignRepresentation
+        );
+        assert_eq!(
+            PageVisibilityDeclarationV1::new(page_owner("bali", "home"), None)
+                .and_then(|declaration| {
+                    declaration
+                        .with_override(locale_of("de-DE"), RepresentationVisibilityV1::Unlisted)
+                })
+                .and_then(|declaration| {
+                    declaration
+                        .with_override(locale_of("de-DE"), RepresentationVisibilityV1::Public)
+                })
+                .expect_err("duplicate override")
+                .kind(),
+            RepresentationVisibilityRefusalKindV1::DuplicateRepresentationOverride
+        );
+
+        // ---- application: the binding is proved before any root is opened ---------------------
+        // Empty Entity root: a read would refuse, so a visibility refusal proves "before read".
+        let entity_root = Root::new("n131-refusals", &[]);
+        let platform = PlatformRoot::new("n131-refusals");
+        let catalogue = Catalogue::load();
+        let complete_ledger = ledger();
+
+        // A Page is not a representation target.
+        let page_target = candidate(None, Vec::new(), page_owner("bali", "home"));
+        let outcome = preflight(
+            &entity_root,
+            &platform,
+            &catalogue,
+            &page_target,
+            &complete_ledger,
+        );
+        assert_eq!(
+            outcome.refusal().expect("a refused binding").kind(),
+            GraphicVisibilityPreflightRefusalKindV1::TargetNotRepresentation
+        );
+        assert!(outcome.prepared().is_none(), "nothing was staged");
+
+        // A ledger from another Entity is refused outright.
+        let foreign_ledger = build_representation_visibility_ledger_v1(
+            &graph_of("other", true),
+            &declarations_of("other", true),
+        )
+        .expect("the foreign ledger is itself complete");
+        let member = candidate(None, Vec::new(), rep_owner("bali", "home", "en-001"));
+        let outcome = preflight(
+            &entity_root,
+            &platform,
+            &catalogue,
+            &member,
+            &foreign_ledger,
+        );
+        assert_eq!(
+            outcome.refusal().expect("a refused binding").kind(),
+            GraphicVisibilityPreflightRefusalKindV1::LedgerForeignEntity
+        );
+
+        // A ledger that omits a Site the candidate declared is refused as partial.
+        let partial_ledger = build_representation_visibility_ledger_v1(
+            &graph_of("example", false),
+            &declarations_of("example", false),
+        )
+        .expect("the partial ledger is complete for its own smaller graph");
+        let outcome = preflight(
+            &entity_root,
+            &platform,
+            &catalogue,
+            &member,
+            &partial_ledger,
+        );
+        assert_eq!(
+            outcome.refusal().expect("a refused binding").kind(),
+            GraphicVisibilityPreflightRefusalKindV1::LedgerPartial
+        );
+
+        println!(
+            "n131_evidence case=03 domain_refusals=9 foreign_ledger=refused \
+             partial_ledger=refused target_not_representation=refused before_read=true \
+             empty_root=true entries=0 publication=false route=false"
+        );
+    }
+
+    /// `N131_04` — one real public-intent preflight over the installed library and one Entity source.
+    #[test]
+    fn n131_04_real_public_intent_preflight_binds_the_accepted_package() {
+        let png_bytes = png();
+        let webp_bytes = webp();
+        let entity_root = Root::new(
+            "n131-public",
+            &[
+                ("icon-favicon.png", png_bytes.as_slice()),
+                ("social.webp", webp_bytes.as_slice()),
+            ],
+        );
+        let platform = PlatformRoot::new("n131-public");
+        let catalogue = Catalogue::load();
+        let home_digest = catalogue.digest(HOME_ID);
+        let ledger = ledger();
+
+        let candidate = candidate(
+            Some((HOME_ID, home_digest.as_str())),
+            vec![
+                selection("logo", AssetNamespace::Platform, HOME_ID, Exposure::Public),
+                selection(
+                    "favicon",
+                    AssetNamespace::Entity,
+                    "icon-favicon.png",
+                    Exposure::Public,
+                ),
+                selection(
+                    "social-preview",
+                    AssetNamespace::Entity,
+                    "social.webp",
+                    Exposure::Public,
+                ),
+            ],
+            rep_owner("bali", "home", "en-001"),
+        );
+        let outcome = preflight(&entity_root, &platform, &catalogue, &candidate, &ledger);
+        let view = prepared(&outcome, "n131_04 public preflight");
+
+        assert_eq!(view.visibility(), RepresentationVisibilityV1::Public);
+        assert_eq!(view.origin(), RepresentationVisibilityOriginV1::PageDefault);
+        assert!(view.is_discoverable_intent());
+        assert_eq!(view.robots_intent(), "index,follow");
+        assert_eq!(view.len(), 3, "three winning public slots were staged");
+
+        // The approved Platform asset stays a vector, pinned to the catalogue digest, and its
+        // canonical output is a different, content-addressed identity.
+        let logo = view_entry(view, "logo");
+        assert_eq!(logo.namespace(), AssetNamespace::Platform);
+        assert_eq!(logo.mime(), "image/svg+xml");
+        assert_eq!(logo.source_sha256(), home_digest.as_str());
+        assert_ne!(
+            logo.output_sha256(),
+            logo.source_sha256(),
+            "canonicalisation produces new bytes, never a pass-through"
+        );
+        assert_eq!(
+            logo.content_key(),
+            format!("sha256/{}.svg", logo.output_sha256())
+        );
+
+        // The Entity rasters are byte-exact pass-through of the inspected sources.
+        let favicon = view_entry(view, "favicon");
+        assert_eq!(favicon.namespace(), AssetNamespace::Entity);
+        assert_eq!(favicon.mime(), "image/png");
+        assert_eq!(favicon.source_sha256(), favicon.output_sha256());
+        assert_eq!(
+            favicon.content_key(),
+            format!("sha256/{}.png", favicon.output_sha256())
+        );
+        let social = view_entry(view, "social-preview");
+        assert_eq!(social.namespace(), AssetNamespace::Entity);
+        assert_eq!(social.mime(), "image/webp");
+        assert_eq!(social.source_sha256(), social.output_sha256());
+        assert_eq!(
+            social.content_key(),
+            format!("sha256/{}.webp", social.output_sha256())
+        );
+
+        // The staged total is the exact sum of the three payloads.
+        assert_eq!(
+            view.total_bytes(),
+            logo.output_bytes() + favicon.output_bytes() + social.output_bytes()
+        );
+
+        // Authority: none, on either the result or the outcome.
+        assert!(!view.grants_publication_authority());
+        assert!(!view.routes_any_url());
+        assert!(!view.grants_release_authority());
+        assert!(!view.publishes_derived_output());
+        assert!(!outcome.grants_publication_authority());
+        assert!(!outcome.routes_any_url());
+
+        println!(
+            "n131_evidence case=04 visibility=public origin=page-default entries={} svg_vector=true \
+             source_pin=true content_addressed=true catalogue_sha={CATALOGUE_SHA256} \
+             output_sha={} raster_output_sha={} webp_output_sha={} publication=false route=false",
+            view.len(),
+            logo.output_sha256(),
+            favicon.output_sha256(),
+            social.output_sha256()
+        );
+    }
+
+    /// `N131_05` — whole-candidate validation, unlisted privacy intent and legacy parity.
+    #[test]
+    fn n131_05_whole_candidate_privacy_and_legacy_parity() {
+        let png_bytes = png();
+        let webp_bytes = webp();
+        let entity_root = Root::new(
+            "n131-whole",
+            &[
+                ("icon-favicon.png", png_bytes.as_slice()),
+                ("social.webp", webp_bytes.as_slice()),
+            ],
+        );
+        let platform = PlatformRoot::new("n131-whole");
+        let catalogue = Catalogue::load();
+        let home_digest = catalogue.digest(HOME_ID);
+
+        let selections = || {
+            vec![
+                selection("logo", AssetNamespace::Platform, HOME_ID, Exposure::Public),
+                selection(
+                    "favicon",
+                    AssetNamespace::Entity,
+                    "icon-favicon.png",
+                    Exposure::Public,
+                ),
+                selection(
+                    "social-preview",
+                    AssetNamespace::Entity,
+                    "social.webp",
+                    Exposure::Public,
+                ),
+            ]
+        };
+        let target = rep_owner("bali", "home", "en-001");
+        let public_candidate = candidate(
+            Some((HOME_ID, home_digest.as_str())),
+            selections(),
+            target.clone(),
+        );
+
+        // ---- the public preflight is the accepted package, unchanged -------------------------
+        let public_view = prepared(
+            &preflight(
+                &entity_root,
+                &platform,
+                &catalogue,
+                &public_candidate,
+                &ledger(),
+            ),
+            "n131_05 public preflight",
+        )
+        .clone();
+        assert_eq!(public_view.len(), 3);
+
+        // Legacy parity: the untouched R19 seam over the same sources produces the same keys.
+        let legacy_declarations = [
+            TestMixedDeclarationV1 {
+                owner: TestOwnerV1::Representation,
+                role: "logo",
+                slot: "primary",
+                namespace: "platform",
+                reference: HOME_ID,
+                supersede: false,
+                exposure: "public",
+            },
+            TestMixedDeclarationV1 {
+                owner: TestOwnerV1::Representation,
+                role: "favicon",
+                slot: "primary",
+                namespace: "entity",
+                reference: "icon-favicon.png",
+                supersede: false,
+                exposure: "public",
+            },
+            TestMixedDeclarationV1 {
+                owner: TestOwnerV1::Representation,
+                role: "social-preview",
+                slot: "primary",
+                namespace: "entity",
+                reference: "social.webp",
+                supersede: false,
+                exposure: "public",
+            },
+        ];
+        let seam = TestPackageSeamV1 {
+            registration: Some((HOME_ID, home_digest.as_str())),
+            format: TestMixedFormatV1::SlotAware,
+            declarations: &legacy_declarations,
+            foreign_plan: None,
+            eligibility: PrepublicationDisplayEligibilityV1::Public,
+            limits: GraphicPackageLimitsV1::hard(),
+        };
+        let legacy: TestPreparedPackageV1 = prepare_unpublished_graphic_package_from_roots_v1(
+            &entity_root.capability(),
+            &platform.capability(),
+            &seam,
+            catalogue.request(),
+            Path::new(BIN),
+        );
+        assert!(
+            legacy.construction_refusal().is_none(),
+            "the legacy seam built the candidate"
+        );
+        assert!(
+            legacy.package_refusal().is_none(),
+            "the legacy seam prepared the package"
+        );
+        assert!(
+            legacy.source_refusal().is_none(),
+            "the legacy sources were accepted"
+        );
+        let mut legacy_keys: Vec<&str> = legacy
+            .entries()
+            .iter()
+            .map(|entry| entry.content_key.as_str())
+            .collect();
+        let mut preflight_keys: Vec<&str> = public_view
+            .entries()
+            .iter()
+            .map(|entry| entry.content_key())
+            .collect();
+        legacy_keys.sort_unstable();
+        preflight_keys.sort_unstable();
+        assert_eq!(
+            legacy_keys, preflight_keys,
+            "the wrapper reuses the accepted package identity for identity"
+        );
+
+        // ---- an unlisted target stages nothing, and a public sibling does not replace it ------
+        let mut unlisted_declarations = declarations_of("example", true);
+        unlisted_declarations[0] =
+            PageVisibilityDeclarationV1::new(page_owner("bali", "home"), None)
+                .and_then(|declaration| {
+                    declaration
+                        .with_override(locale_of("en-001"), RepresentationVisibilityV1::Unlisted)
+                })
+                .and_then(|declaration| {
+                    declaration
+                        .with_override(locale_of("de-DE"), RepresentationVisibilityV1::Public)
+                })
+                .expect("a valid Page declaration");
+        unlisted_declarations[2] =
+            PageVisibilityDeclarationV1::new(page_owner("ubud", "home"), None)
+                .expect("a valid Page declaration");
+        let unlisted_ledger = build_representation_visibility_ledger_v1(
+            &graph_of("example", true),
+            &unlisted_declarations,
+        )
+        .expect("the unlisted ledger is complete");
+        assert_eq!(
+            unlisted_ledger
+                .for_owner(&target)
+                .expect("the target is governed")
+                .effective(),
+            RepresentationVisibilityV1::Unlisted
+        );
+        assert_eq!(
+            unlisted_ledger
+                .for_owner(&rep_owner("ubud", "home", "en-001"))
+                .expect("the sibling is governed")
+                .effective(),
+            RepresentationVisibilityV1::Public
+        );
+        let unlisted_view = prepared(
+            &preflight(
+                &entity_root,
+                &platform,
+                &catalogue,
+                &public_candidate,
+                &unlisted_ledger,
+            ),
+            "n131_05 unlisted preflight",
+        )
+        .clone();
+        assert_eq!(
+            unlisted_view.visibility(),
+            RepresentationVisibilityV1::Unlisted
+        );
+        assert!(!unlisted_view.is_discoverable_intent());
+        assert_eq!(unlisted_view.robots_intent(), "noindex,nofollow");
+        assert_eq!(
+            unlisted_view.len(),
+            0,
+            "an unlisted representation stages no discoverable payload"
+        );
+        assert_eq!(unlisted_view.total_bytes(), 0);
+        assert!(!unlisted_view.grants_publication_authority());
+        assert!(!unlisted_view.routes_any_url());
+
+        // ---- a late invalid source refuses the whole candidate with zero partial --------------
+        let broken = candidate(
+            Some((HOME_ID, home_digest.as_str())),
+            vec![
+                selection("logo", AssetNamespace::Platform, HOME_ID, Exposure::Public),
+                selection(
+                    "favicon",
+                    AssetNamespace::Entity,
+                    "icon-missing.png",
+                    Exposure::Public,
+                ),
+            ],
+            target,
+        );
+        let refusal = preflight(
+            &entity_root,
+            &platform,
+            &catalogue,
+            &broken,
+            &unlisted_ledger,
+        );
+        assert!(
+            refusal.source_refusal().is_some(),
+            "a missing accepted source refuses the whole candidate"
+        );
+        assert!(
+            refusal.prepared().is_none(),
+            "no partial preflight survives"
+        );
+        assert!(refusal.package_refusal().is_none());
+
+        println!(
+            "n131_evidence case=05 unlisted_entries={} unlisted_discoverable=false \
+             robots=noindex,nofollow sibling_public_not_selected=true late_source_refusal=whole \
+             zero_partial=true legacy_parity=true public_entries={} output_sha={} \
+             favicon_output_sha={} publication=false route=false",
+            unlisted_view.len(),
+            public_view.len(),
+            view_entry(&public_view, "logo").output_sha256(),
+            view_entry(&public_view, "favicon").output_sha256()
+        );
+    }
+}

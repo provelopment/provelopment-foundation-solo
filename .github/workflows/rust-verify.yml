@@ -1820,6 +1820,135 @@ jobs:
           Set-Content -LiteralPath $probe -NoNewline -Value $authority
           if (Test-N130 $probe) { throw 'forged authority or partial-package claim accepted' }
           Write-Output 'n130_gate mutation=rejected'
+      # The same five-case N131 matrix and authentic/mutation gate on the native Windows host.
+      - name: Representation visibility preflight N131 gate (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $tokens = @(
+            'test n131::n131_01_four_case_page_and_representation_visibility_matrix ',
+            'test n131::n131_02_unlisted_intent_is_not_privacy_and_internal_is_not_a_representation_state ',
+            'test n131::n131_03_identity_and_authority_refusals_precede_every_read ',
+            'test n131::n131_04_real_public_intent_preflight_binds_the_accepted_package ',
+            'test n131::n131_05_whole_candidate_privacy_and_legacy_parity ',
+            'test result: ok. 5 passed; 0 failed; 0 ignored',
+            'n131_evidence case=01',
+            'n131_evidence case=02',
+            'n131_evidence case=03',
+            'n131_evidence case=04',
+            'n131_evidence case=05',
+            'rows=4 default=public override=win',
+            'sibling_isolated=true',
+            'unlisted_discoverable=false',
+            'robots=noindex,nofollow',
+            'internal_representation=refused',
+            'internal_hidden=true',
+            'foreign_ledger=refused',
+            'partial_ledger=refused',
+            'before_read=true',
+            'svg_vector=true',
+            'source_pin=true',
+            'zero_partial=true',
+            'legacy_parity=true',
+            'catalogue_sha=ad8ea718b50641206cc4f4fe13e866ad266366a7aa11ef799c83ae8187858fc7',
+            'publication=false',
+            'route=false')
+          function Test-N131([string] $path) {
+            $text = Get-Content -Raw -LiteralPath $path
+            foreach ($token in $tokens) { if (-not $text.Contains($token)) { return $false } }
+            if (([regex]::Matches($text, 'n131_evidence case=')).Count -ne 5) { return $false }
+            if (([regex]::Matches($text, '^test n131::n131_0[0-9]_[A-Za-z0-9_]*( |$)', 'Multiline')).Count -ne 5) { return $false }
+            if (([regex]::Matches($text, 'output_sha=[0-9a-f]{64}')).Count -lt 4) { return $false }
+            if (([regex]::Matches($text, 'output_sha=0{64}')).Count -gt 0) { return $false }
+            if (([regex]::Matches($text, 'unlisted_entries=[1-9]')).Count -gt 0) { return $false }
+            if ($text.Contains('... FAILED')) { return $false }
+            if ($text.Contains('... ignored')) { return $false }
+            if ($text.Contains('test result: FAILED')) { return $false }
+            return $true
+          }
+          $log = Join-Path $env:RUNNER_TEMP 'n131-five.txt'
+          cargo test -p solo-cli --test media_worker_host_smoke --locked n131_ -- --nocapture --test-threads=1 2>&1 | Tee-Object -FilePath $log
+          if ($LASTEXITCODE -ne 0) { throw 'n131 five-case run failed' }
+          if (-not (Test-N131 $log)) { throw 'authentic N131 5/5 run rejected' }
+          Write-Output 'n131_gate authentic=accepted'
+          $probe = Join-Path $env:RUNNER_TEMP 'n131-probe.txt'
+          $authentic = Get-Content -Raw -LiteralPath $log
+          $missing = [regex]::Replace($authentic, '(?m)^.*n131_05_whole_candidate_privacy_and_legacy_parity.*$\r?\n', '')
+          Set-Content -LiteralPath $probe -NoNewline -Value $missing
+          if (Test-N131 $probe) { throw 'missing N131 case accepted' }
+          $discoverable = $authentic.Replace('unlisted_discoverable=false', 'unlisted_discoverable=true')
+          Set-Content -LiteralPath $probe -NoNewline -Value $discoverable
+          if (Test-N131 $probe) { throw 'forced discoverable claim accepted' }
+          $authority = $authentic.Replace('publication=false', 'publication=true').Replace('route=false', 'route=true')
+          Set-Content -LiteralPath $probe -NoNewline -Value $authority
+          if (Test-N131 $probe) { throw 'forged authority claim accepted' }
+          $partial = $authentic.Replace('zero_partial=true', 'zero_partial=false').Replace('source_pin=true', 'source_pin=false')
+          Set-Content -LiteralPath $probe -NoNewline -Value $partial
+          if (Test-N131 $probe) { throw 'forged partial-set or source-pin claim accepted' }
+          Write-Output 'n131_gate mutation=rejected'
+
+      # Mandatory `SOLO-WO-118 R20` N131 gate: the typed Page/representation visibility preflight
+      # bound to the unchanged unpublished graphic package. The five focused cases run on the real
+      # graph, the real roots and the real confined workers; the gate then requires the instrumented
+      # log to reject four directly altered copies of itself.
+      - name: Representation visibility preflight N131 gate (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          check_n131() {
+            local log="$1"
+            for name in n131_01_four_case_page_and_representation_visibility_matrix n131_02_unlisted_intent_is_not_privacy_and_internal_is_not_a_representation_state n131_03_identity_and_authority_refusals_precede_every_read n131_04_real_public_intent_preflight_binds_the_accepted_package n131_05_whole_candidate_privacy_and_legacy_parity; do
+              grep -qF "test n131::$name " "$log" || return 1
+            done
+            [ "$(grep -Ec '^test n131::n131_0[0-9]_[A-Za-z0-9_]*( |$)' "$log")" -eq 5 ] || return 1
+            grep -qF 'test result: ok. 5 passed; 0 failed; 0 ignored' "$log" || return 1
+            ! grep -qF '... FAILED' "$log" || return 1
+            ! grep -qF '... ignored' "$log" || return 1
+            ! grep -qF 'test result: FAILED' "$log" || return 1
+            for case in 01 02 03 04 05; do
+              [ "$(grep -cF "n131_evidence case=$case" "$log")" -eq 1 ] || return 1
+            done
+            grep -qF 'rows=4 default=public override=win' "$log" || return 1
+            grep -qF 'sibling_isolated=true' "$log" || return 1
+            grep -qF 'unlisted_discoverable=false' "$log" || return 1
+            grep -qF 'robots=noindex,nofollow' "$log" || return 1
+            grep -qF 'internal_representation=refused' "$log" || return 1
+            grep -qF 'internal_hidden=true' "$log" || return 1
+            grep -qF 'foreign_ledger=refused' "$log" || return 1
+            grep -qF 'partial_ledger=refused' "$log" || return 1
+            grep -qF 'before_read=true' "$log" || return 1
+            grep -qF 'svg_vector=true' "$log" || return 1
+            grep -qF 'source_pin=true' "$log" || return 1
+            grep -qF 'zero_partial=true' "$log" || return 1
+            grep -qF 'legacy_parity=true' "$log" || return 1
+            grep -qF 'catalogue_sha=ad8ea718b50641206cc4f4fe13e866ad266366a7aa11ef799c83ae8187858fc7' "$log" || return 1
+            grep -qF 'publication=false' "$log" || return 1
+            grep -qF 'route=false' "$log" || return 1
+            [ "$(grep -Eo 'output_sha=[0-9a-f]{64}' "$log" | wc -l)" -ge 4 ] || return 1
+            ! grep -qE 'output_sha=0{64}' "$log" || return 1
+            ! grep -qE 'unlisted_entries=[1-9]' "$log" || return 1
+          }
+          log="$RUNNER_TEMP/n131-five.txt"
+          cargo test -p solo-cli --test media_worker_host_smoke --locked n131_ -- --nocapture --test-threads=1 >"$log" 2>&1 || { cat "$log"; exit 1; }
+          cat "$log"
+          check_n131 "$log" || { echo 'authentic N131 5/5 run rejected'; exit 1; }
+          echo 'n131_gate authentic=accepted'
+          probe="$RUNNER_TEMP/n131-probe.txt"
+          cp "$log" "$probe"
+          sed -i '/n131_05_whole_candidate_privacy_and_legacy_parity/d' "$probe"
+          if check_n131 "$probe"; then echo 'missing N131 case accepted'; exit 1; fi
+          cp "$log" "$probe"
+          sed -i 's/unlisted_discoverable=false/unlisted_discoverable=true/' "$probe"
+          if check_n131 "$probe"; then echo 'forced discoverable claim accepted'; exit 1; fi
+          cp "$log" "$probe"
+          sed -i 's/publication=false/publication=true/; s/route=false/route=true/' "$probe"
+          if check_n131 "$probe"; then echo 'forged authority claim accepted'; exit 1; fi
+          cp "$log" "$probe"
+          sed -i 's/zero_partial=true/zero_partial=false/; s/source_pin=true/source_pin=false/' "$probe"
+          if check_n131 "$probe"; then echo 'forged partial-set or source-pin claim accepted'; exit 1; fi
+          echo 'n131_gate mutation=rejected'
+
       # Mandatory `SOLO-WO-118 R11` N124 gate: the V4 six-format whole-candidate composition on this
       # host, including the associated-alpha AVIF class beside the five legacy formats. The same
       # verifier must reject four altered copies of the real log before printing its verdict.
