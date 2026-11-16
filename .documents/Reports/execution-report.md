@@ -1,147 +1,161 @@
 # Execution Report
 
-**Work order:** `SOLO-WO-118 R15` — install the exact Owner-approved Foundation 81-icon Platform library `1.0.0` and prove its separate confined source reader.
-**Required outcome:** `R03C-OWNER-APPROVED-81-TABLER-PLATFORM-1_0_0-INSTALLED-SEPARATE-CONFINED-SOURCE-N127-TWO-HOST-V1`.
+**Work order:** `SOLO-WO-118 R16` — complete the R15 N127 proof, adopt the Owner's Platform-first graphic cascade target, and account for all Foundation artwork.
+**Required bounded outcome:** `R03C-R15-N127-POST-INSTALL-GREEN-FOUNDATION-142-ASSET-LEDGER-OWNER-GRAPHIC-CASCADE-TARGET-V1`.
 
-**status=STOPPED**
+```
+status=COMPLETE
+r15_two_host_n127_unblocked=true
+owner_81_assets_approved=true
+platform_library_source_installed=true
+platform_source_read_verified=true
+foundation_donor_asset_inventory_paths=142/142
+foundation_canonical_assets_accounted=101/101
+additional_assets_delivered=false
+graphic_baseline_target_owner_approved=true
+graphic_baseline_cascade_implemented=false
+publication_authority=false
+derived_output_publication=false
+release_authority=false
+r03c_open=true
+stage03_open=true
+```
 
-**owner_81_assets_approved=true** · **platform_library_source_installed=true** · **platform_source_read_verified=true** (four N127 cases, both native hosts) · **publication_authority=false** · **derived_output_publication=false** · **release_authority=false** · **stage03_open=true**
+**One evidence nuance, disclosed up front.** Ubuntu's dedicated N127 gate executed all four mutation probes and none was accepted — a rejection is exactly what keeps that step green, and the guard that would `exit 1` on an accepted forgery sits in the same executed script — but the Ubuntu step never prints the literal verdict line `n127_gate mutation=rejected`, because the R15-authored workflow step omits that final `echo` (`.github/workflows/rust-verify.yml:1450` carries `authentic=accepted`; only the Windows step at lines 1504/1514/1516 carries both verdicts). That file is **explicitly outside the R16 allowlist**, so it was not repaired here. Windows emits both verdicts explicitly. The substantive requirement — mutated evidence rejected on both hosts — is therefore met on both; only the Ubuntu label is missing, and the one-line addition is the first item of §9's next action.
 
-**Stop reason, in one sentence:** two **pre-existing, order-protected** test bodies assert that no product `platform/` tree may exist, so the workspace test step — the mandatory first gate — cannot pass in the very state R15 authorizes; §3 of this order forbids editing those bodies and §2.4/§8 require a STOP rather than a green claim when a gate cannot be met inside the ledger.
+## 1. What R16 proves
 
-## 1. What is proven, and what is not
+- The R15 product library's **two-host N127 proof now exists at one SHA**: four N127 cases 4/4 on Ubuntu and on Windows, **81 genuine confined SVG children per host**, the pinned aggregate, and an authentic/mutation gate on both hosts.
+- All three technical CI jobs succeeded at `a8e770f7de22049b89a7f31e353090be24e69cf4`, attempt 1: Ubuntu `133149298969`, Windows `133149299183`, independent AVIF oracle `133149299224`.
+- The two obsolete historical absence assertions are repaired by one shared, test-only predicate; **every other assertion in those bodies is unchanged**, and nothing else in the Rust tree moved.
+- All **142** publicly available Foundation artwork paths at the pinned donor commit are accounted for: 101 canonical (81 approved + 20 pending), 41 mirrors/test fixtures, 125 distinct blobs, 13 duplicate groups, with raw SHA-256 for all 101 canonical files.
+- The Owner's Platform-first cascade is recorded as an explicit **FUTURE TARGET, NOT IMPLEMENTED**, with the open schema questions listed rather than guessed.
+- Nothing was published, derived, released, deployed, merged or closed; no product byte, catalogue, reader, decoder, workflow, dependency, lockfile or policy changed.
 
-Proven on both native hosts at one exact technical SHA (`8b340976836f86b79dea36be8c9db9d8576997dd`):
-
-- The exact Owner-approved 81-icon product library is installed at `platform/assets/` with **84 files**, byte-exact donor-identical Git blobs and raw bytes.
-- The Owner decision record exists and names the exact reviewed blobs.
-- The new inward Platform contract and the new separate native Platform reader compile, are architecture-legal, and their four N127 cases **all pass** — including 81 genuine confined SVG children per host, the hostile refusal matrix, the native confinement negatives and the late-failure zero-partial case.
-- The independent AVIF reference oracle is green at the same SHA.
-
-Not proven, and therefore not claimed:
-
-- **The dedicated N127 gate steps never executed.** They are ordered after the workspace test step, which failed on the two protected assertions, so both N127 gate steps and every later step were skipped. There is **no `n127_gate authentic=accepted` / `n127_gate mutation=rejected`** evidence at this SHA, and no `n127_evidence`/`n127_row` lines either, because the workspace step runs without `--nocapture`. The pass verdicts quoted in §5 are the real harness lines.
-- No three-success technical run exists at one SHA, so R15's completion condition is unmet.
-
-## 2. Transaction and exact changed-path ledger
+## 2. Transaction and exact changed paths
 
 | Step | SHA | Validation |
 |---|---|---|
-| baseline | `main` R22 `248661f3f2bdd62e786d37e5e82a961afcc687cd`; technical T22.1 `5e26672e4f68f26967b9b98ab6d70383db34ccdb` | one `origin`, one worktree, four WIP files, empty stash, both trees clean, 30 remote heads |
-| **A23** (`main`, ACTIVE only) | `3e2497e920fa547e7dea3d706cbbaa9734ef737a`, tree `19506f4b47dbc5dfa4ad8ac6ee6c21523e972532`, parent `248661f3` | ACTIVE blob `86ae97341b9ee39b5953bb548965c1dfef43e946` identical in worktree, index, commit and `origin/main` |
-| **T23.0** (branch, ACTIVE only) | `502892fa0dc6f37fe462e78ade425f2b7a509a47`, parent `5e26672e` | same ACTIVE blob; `git diff --name-only T22.1..T23.0` = ACTIVE only |
-| **T23.1** (branch, the R15 implementation) | `bc277bf38d515c486d8233eb35a7707213e91d16` | 94 paths: 84 product files + 10 ledger files (`.gitattributes`, owner-decision record, two new application files, two new adapter files, two new test targets, `mod n127`, two CI gates) |
-| **T23.2** (branch, one repair) | `0da55e28202ad5c7d36604a3d6306805a36c05bd` | one file: a missing catalogue reports `CatalogueUnavailable`, not a missing asset |
-| **T23.3** (branch, two test repairs) | `8b340976836f86b79dea36be8c9db9d8576997dd` | one file, `mod n127` only: an empty root reports `CatalogueUnavailable`; the withheld filename is proved a non-member rather than an unsafe spelling |
-| **R23** (`main`, report only) | this commit (SHA in the Owner handoff) | parent `3e2497e9`, exactly one path |
+| baseline | main R23 `40c8ee1aaf472435ec5c4a267994c7005b6fa62b`; technical T23.3 `8b340976836f86b79dea36be8c9db9d8576997dd` | one `origin`, one worktree, four WIP files, empty stash, both trees clean, 30 remote heads, no product tree on `main` |
+| **A24** (main, ACTIVE only) | `31376f0b045d94ad34db90c15d86b46e962e573a`, tree `eafe94d34876b5e15825d5b482a9eb3dfdc45caa`, parent `40c8ee1a` | ACTIVE blob `82286af85c3a7b81fa0002b2bb1f58a53f657d78` identical in worktree, index, commit and `origin/main` |
+| **T24.0** (branch, ACTIVE only) | `e2f13f39a32b6fe0a0b24a52e73a1e7ea257fff8`, parent `8b340976` | same blob; `git diff T23.3..T24.0` = ACTIVE only |
+| **T24** (branch, the R16 changes) | `a8e770f7de22049b89a7f31e353090be24e69cf4`, tree `c7637e6be56fecbae68bc31dc86c9c5176d61c77`, parent `e2f13f39` | exactly four paths: `crates/solo-cli/tests/media_worker_host_smoke.rs` (+151/−13), `.documents/Architecture/ARCHITECTURE.md` (+15), two new report files (+3180 / +100) |
+| **R24** (main, report only) | this commit (SHA in the Owner handoff) | parent `31376f0b`, exactly one path |
 
-`.gitattributes` gained exactly one line after the accepted R14 rule, with no other change: `platform/assets/** -text` (blob `b22f49ab…` → `b3462a6…`, 442 → 467 bytes). No existing fixture, R14 candidate or review sheet, sanitizer, decoder, reader, worker, domain source, manifest, `Cargo.lock`, `deny.toml`, architecture policy or earlier gate body was modified. Every red run below is retained; nothing was reset, cleaned or force-pushed.
+`git diff --name-only T24.0..T24 -- platform/assets .gitattributes .github` is **empty**: the 84 product files, the catalogue, the MIT notice, the provenance record, the owner decision, the donor fixtures and the attribute rule are byte-unchanged. No `.github/`, crate source, domain, dependency, lockfile or policy file was touched, and no `#[ignore]`, `continue-on-error`, `--skip` or output spoofing was introduced.
 
-## 3. The installed library: 84 files, byte-exact
+## 3. The two repaired assertions
 
-Installed from the pinned Git blobs only — never by `cp -r`, a glob or donor traversal — after parsing the pinned candidate catalogue and matching it one-to-one to the 81 review-sheet rows and the 81 review fixtures (order and membership verified):
+Both obsolete loops (`n125_04_real_entity_reader_still_refuses_platform_and_no_unapproved_library` and `n126_02_pinned_mit_provenance_and_r12_catalogue_review_only`) previously required that `../../platform` and `../../platform/assets` **not exist** — a statement about the pre-install state. They now call one shared, test-only predicate, `assert_absent_or_exact_approved_platform_library`, which accepts only two states:
 
-| Content | Count | Identity |
-|---|---|---|
-| `platform/assets/icons/<name>.svg` | **81** | each raw SHA-256 equals its catalogue digest, each byte sequence equals the reviewed donor fixture, all LF, `currentColor` preserved in the source |
-| `platform/assets/catalogue-1.0.0.json` | 1 | byte copy of the R14 candidate, blob `a02db160…`, 65 397 bytes, SHA-256 `ad8ea718b50641206cc4f4fe13e866ad266366a7aa11ef799c83ae8187858fc7` |
-| `platform/assets/licensing/TABLER-ICONS-MIT.txt` | 1 | blob `3e82379d…`, 1 073 bytes, SHA-256 `b740a1d4…` |
-| `platform/assets/licensing/icon-provenance.json` | 1 | blob `a74d2344…`, 25 274 bytes, SHA-256 `e0f0ea62…` |
+- **not installed** — neither `platform/` nor `platform/assets/` exists (a *half-created* tree is refused); or
+- **installed** — the enumerated relative path set under `platform/assets/` equals **exactly** the approved catalogue's 81 identifiers plus `catalogue-1.0.0.json`, `licensing/TABLER-ICONS-MIT.txt` and `licensing/icon-provenance.json` (84 files), with no extra file, no unexpected directory and no symlink or reparse point; the installed catalogue is **byte-identical** to the approved candidate document and hashes to `ad8ea718…`; it re-parses at `1.0.0` with the same 81 identifiers in the same order; and both licensing documents keep their pinned SHA-256.
 
-`icon-services.svg`, `icon-status-info.svg` and `icon-volunteer.svg` are absent from the product tree and from the catalogue. `git check-attr text eol --` resolves **`text: unset` for all 84 product paths**; the accepted fixture rule is intact and unrelated paths keep their earlier attributes. The unchanged R12 strict parser accepts the installed catalogue with the version supplied independently, yielding exactly 81 entries.
+Every other assertion in both bodies is untouched: the Entity reader still proves `PlatformUnverified`, the R12 binding still proves `PlatformSourceUnavailable`, zero-alias-fallback and no-publication-authority stand, and `../../content/platform` must still be absent. Neither test was deleted, renamed, filtered or ignored.
 
-`.documents/Reports/platform-library-1.0.0-owner-decision.md` records the Owner's "approved, proceed" authorization for exactly the 81 reviewed assets identified by the candidate blob `a02db160…` and the review-sheet blob `edb8468d…`, with the MIT and provenance conditions, the explicit exclusions and the disabled authority gates. It is a factual record, not a licence instrument; the historical review-sheet checkboxes are untouched.
+**Local fast proof, executed before pushing** (temporary harness, removed before the commit; the committed file contains only the helper and the two call sites):
 
+```text
+t24_predicate_proof absent=accepted half=refused exact=accepted extra=refused \
+  missing_catalogue=refused wrong_catalogue=refused alias=refused symlink=refused
+```
 
-## 4. The new separate Platform source seam
-
-**Inward** (`crates/solo-application/src/platform_asset_read.rs`, additive): `PlatformAssetLibraryReadPortV1` with exactly two readings (the catalogue document, and one exact identifier's own bytes); a typed `PlatformAssetRefV1` that accepts only `icons/<portable>.svg` and refuses any `Entity`-namespace reference; an explicit `PlatformRootSelectionV1` token; and `read_pinned_platform_sources_v1`, which
-
-1. refuses an unselected version **before reading anything**;
-2. hashes the transferred catalogue bytes **in the application** and refuses unless they are `ad8ea718…`, additionally cross-checking the typed model against those exact bytes per identifier and digest so an inconsistent model cannot smuggle an unapproved digest;
-3. requires exactly 81 declared entries and the approved version;
-4. hashes every source in the application and compares it with the catalogue's digest for that exact identifier **before** any worker could run;
-5. refuses duplicates, unknown identifiers, oversize sources, ambiguous identities and any late failure, discarding every earlier record.
-
-Every authority accessor is a constant `false`; the set reports `source_namespace() == Platform` only.
-
-**Outward** (`crates/solo-adapters/src/platform_asset_read.rs`, additive): `PlatformRootCapabilityV1` owns its **own** adopted `source_read_native::RootHandle` for the operator-designated `platform/` root and resolves exactly four leaf shapes (`assets/catalogue-1.0.0.json`, `assets/icons/<name>.svg`, `assets/licensing/TABLER-ICONS-MIT.txt`, `assets/licensing/icon-provenance.json`) by single validated segments through the accepted `open_leaf`/`read_bounded`/`recheck` mechanism — no `Path::join` on authored text, no `canonicalize`, no `stat`-as-proof, no second reader, no `std::fs::read` in the port. Identity, length, link count and timestamps must agree across the transfer, links must be exactly one, and a host without the immutable-transfer mechanism refuses rather than copying. `inspect_pinned_platform_icon_sources_v1` composes that gate with the **already accepted** `solo-cli` SVG child, one real process per approved asset, validating 24×24 vector geometry and the distinct source and canonical digests.
+An unauthorised extra product file, a missing pinned catalogue, a changed catalogue byte, a reinstated withheld alias filename and a symlinked leaf are all refused; the real approved tree and the historical absent state are both accepted.
 
 
-## 5. N127 on both native hosts — all four cases pass; the gates did not run
+## 4. N127 on both native hosts — the R15 gate, now executed
 
-Run `43816931677` at `8b340976836f86b79dea36be8c9db9d8576997dd`, attempt 1:
+Technical run **`43822728379`**, attempt 1, at `a8e770f7de22049b89a7f31e353090be24e69cf4`.
 
 | Job | ID | Conclusion |
 |---|---|---|
-| `verify (ubuntu-24.04)` | `133131005793` | failure (two protected assertions only) |
-| `verify (windows-2025)` | `133131005880` | failure (the same two) |
-| `avif-reference-oracle` | `133131005598` | **success** |
+| `verify (ubuntu-24.04)` | `133149298969` | **success** |
+| `verify (windows-2025)` | `133149299183` | **success** |
+| `avif-reference-oracle` | `133149299224` | **success** |
 
-Inside the workspace suite, on **both** hosts:
+Inside the workspace suite on both hosts: `test n127::n127_01 … ok`, `n127_02 … ok`, `n127_03 … ok`, `n127_04 … ok` (4/4). The dedicated gates then re-ran the four cases with `--nocapture` and emitted:
 
 ```text
-test n127::n127_01_owner_approved_platform_81_real_confined_svg_sources ... ok
-test n127::n127_02_version_catalogue_licence_and_scope_refusal_matrix ... ok
-test n127::n127_03_separate_native_root_symlink_hardlink_and_changed_source_refused ... ok
-test n127::n127_04_late_hidden_platform_failure_zero_partial_and_no_namespace_alias ... ok
+n127_evidence case=01 approved=81 read=81 real_children=81 version=1.0.0 exact_sha=true \
+  aggregate=3c34fe9919341862a5a70a87d205fbfc942741dec5f3996514d3edd0aeb1aaca \
+  publication=false source_root=platform entity_fallback=false derived_output=false release_authority=false
+n127_evidence case=02 refusals=21 pin_refused=true licence_refused=true provenance_refused=true \
+  entity_fallback=false publication=false entity_source_reader_refuses_platform=true \
+  platform_source_binding_refused=true
+n127_evidence case=03 confinement=true hardlink_refused=true unsafe_refused=true \
+  native_mechanism=linux-openat2-beneath-otmpfile-excl-ficlone-immutable-clone natives=11 publication=false
+n127_evidence case=03 confinement=true hardlink_refused=true unsafe_refused=true \
+  native_mechanism=windows-ntcreatefile-obj-dont-reparse-file-id-info natives=10 publication=false
+n127_evidence case=04 late_refused=true zero_partial=true private_path_absent=true fallback=false \
+  publication=false standalone_set_complete=true wrong_root_refused=true namespace_alias_refused=true
 ```
 
-Case 01 copied the tracked library into a scratch Platform root on the verified filesystem (Linux: the disposable Btrfs mount; Windows: the runner temporary directory), read all 81 sources through the new capability, hashed each in the application, launched **81 genuine confined SVG children** and compared the resulting aggregate with `3c34fe9919341862a5a70a87d205fbfc942741dec5f3996514d3edd0aeb1aaca`. Cases 02–04 executed the eighteen-scenario refusal matrix, the native confinement negatives (hardlink alias, symlink leaf where host privilege permits, directory leaf, absent leaf, unsafe identifiers, file-as-root, oversize source, replaced root and, on Linux, the unverified-filesystem refusal) and the late-corruption zero-partial case. Earlier red runs show those cases failing only on my own wrong expectation for a missing catalogue, which T23.2 and T23.3 repaired.
+- **Ubuntu**: the clone path plus the tmpfs no-reflink refusal (`natives=11`), `n127_gate authentic=accepted`, and all four mutation probes executed and rejected.
+- **Windows**: `natives=10` (the reparse-point refusal is exercised where the runner's privilege allows it and a privilege decline is recorded honestly), `n127_gate authentic=accepted` **and** `n127_gate mutation=rejected`.
+- Each host launched **81 real confined SVG children** with the R14 aggregate and re-proved the 84-file product tree, the catalogue pin, the 21-scenario refusal matrix and the late-corruption zero-partial case on its own native filesystem.
+- `N093`–`N126` gates all ran green in the same run, including `n125_gate mutation=rejected`, `n126_gate authentic=accepted` and `n126_gate mutation=rejected` on both hosts.
+- Architecture measured `packages=4 targets=38 files=74 edges=93` on both hosts — unchanged from R15, as the ledger-only change implies.
 
-**Architecture** on the technical branch is legal and was re-measured, not assumed: `packages=4 targets=38 files=74 edges=93` (the previous 36/70/93 plus the two authorized modules and two authorized test targets; no edge changed). The refusal self-test passes all 29 cases. `cargo fmt`, strict Clippy, the safe-code boundary, `cargo-deny` with a fresh advisory refresh, the release/reproducibility stages and every N093–N126 case except the two protected assertions are unaffected; no dependency, lockfile, policy or `continue-on-error` was touched.
+## 5. The complete Foundation artwork ledger
 
-## 6. The blocker, precisely
+`.documents/Reports/foundation-donor-full-artwork-inventory.json` — 142 source records, 184 479 bytes, SHA-256 `6d6199cf63f486a95c38395b449f2f68363d6da45cd1f18c49212d391b6a903e`; paired with `.documents/Reports/foundation-donor-full-artwork-and-cascade-decision.md`.
 
-Two accepted, order-protected test bodies assert that the product tree must **not** exist, which is exactly the state R15 is ordered to create:
+| Category | Paths | Rights state | Delivery |
+|---|---:|---|---|
+| Foundation icon library | 84 | 81 `owner-approved-exact-81`, 3 `review-required` | 81 installed; `icon-services.svg` and the two byte-identical aliases pending |
+| Foundation role placeholders | 10 | `review-required` | not installed; no per-file licence record |
+| Foundation platform marks | 7 | `third-party-conditional` | not installed; donor record is PARKED / not approved with P-1…P-4 open |
+| EFS demonstration mirrors | 4 | `mirror-non-authoritative` | no delivery; Entity-owned demo identity |
+| German spoke mirrors | 10 | `mirror-non-authoritative` | no delivery; duplicates of the canonical placeholders |
+| Test fixtures | 27 | `test-only` | no delivery; never a runtime library |
 
-| Test | File:line | Assertion |
-|---|---|---|
-| `n125_04_real_entity_reader_still_refuses_platform_and_no_unapproved_library` | `crates/solo-cli/tests/media_worker_host_smoke.rs:8241` | `!manifest.join("../../platform").exists()` and the same for `../../platform/assets` |
-| `n126_02_pinned_mit_provenance_and_r12_catalogue_review_only` | `crates/solo-cli/tests/media_worker_host_smoke.rs:8677` | the identical two-path absence loop |
+Verified, not assumed: 142 media paths at the pinned commit; 101 canonical and 41 mirror/test; 125 distinct blobs with 13 duplicate groups; every one of the 81 approved donor raw SHA-256 values equals its catalogue declaration; exactly three donor icons are absent from the approved catalogue; every canonical file was fetched at the pinned commit, size-matched against the tree and **sniffed by magic bytes** (98 `image/svg+xml`, 2 `image/png`, 1 `image/jpeg`, zero unrecognised) rather than classified by filename. The 20 outstanding sources are enumerated individually in the decision report with their sizes, digests, role meaning and the exact condition that must be satisfied before any of them may be delivered. No pending byte was installed, and the approved `1.0.0` catalogue is unchanged.
 
-Both are statements about the **R12/R14 state** ("no product Platform tree is introduced by this order"), not about the readers they also prove: N125_04's real assertions — the Entity reader refusing a Platform obligation and the R12 `PlatformSource` binding refusing — still hold and are separately re-proved by N127_04 and N127_02. Their load-bearing content is unaffected; only the absence loop is now false by design.
 
-§3 of the order says **never change** any existing N093–N126 test body, while §1 and §4 require installing `platform/assets/`. Those two requirements cannot both be satisfied, so the order cannot complete inside its own ledger. Nothing was weakened to paper over this: the two bodies are untouched in every commit, and the failure is left visible in three retained red runs.
+## 6. Owner amendment recorded in the architecture
 
-**Smallest necessary new decision (Owner/Architect, not self-issued).** Authorize one bounded amendment in a new order, choosing either:
+`.documents/Architecture/ARCHITECTURE.md` gains one clearly labelled subsection, **§6.2I.1 "Owner amendment — Platform-first graphic cascade (FUTURE TARGET, NOT IMPLEMENTED)"**, appended after the original §6.2I text and cross-referencing §3.3A and §6.2G. It states that the original "no automatic platform fallback" wording, §3.3A's zero-fallback rule and today's additive `property_resolution` **remain as coded**, and records the Owner's target semantics for the next order:
 
-- **(a) preferred** — replace the two-path absence loop in each of those two bodies with an assertion that *either* no product `platform/` tree exists *or* it is exactly the approved library (84 files, pinned catalogue SHA-256, no withheld name), which keeps both tests load-bearing under R15; or
-- **(b)** delete the two absence loops (two small blocks each) and keep everything else in those bodies byte-identical; or
-- **(c)** re-scope the installation to a path those bodies do not name — not recommended, because it moves the approved product root away from `platform/assets/` and would need the whole R12/R15 naming chain revisited.
+1. the version-pinned Platform library is a **root layer**, not an EFS node, a Facet, an Entity or a publisher; each default must name an exact role/slot and one approved catalogue ID, registration is explicit and deterministic, and an unregistered role has **no** default;
+2. a descendant's explicit, validated **supersede/replace** for the same role/slot wins; the nearest valid superseding declaration prevails; conflicting same-owner selections still refuse; location, SEO and contact inheritance are untouched;
+3. suppression and bad input are final — a missing, invalid, private/ineligible or wrong-class closer selection refuses the **whole candidate** and never resurrects a default; internal/unlisted omissions never cause implicit reappearance;
+4. collections may append, supersede one **uniquely identified slot** or suppress-and-repopulate, never silently overwrite, and internal provenance records namespace, owner, slot, source SHA and supersession chain;
+5. no automatic baseline is activated before the migration contract and a dedicated two-host suite prove the nine required cases.
 
-With (a) or (b) the technical branch needs one commit and one fresh run; the N127 gate steps would then execute for the first time, and the four `n127_evidence` lines plus `n127_gate authentic=accepted` / `n127_gate mutation=rejected` would become available for the completion claim.
+Three questions are recorded as **open** rather than guessed: the registration schema (role-keyed table versus per-role catalogue fields), the slot-identifier grammar, and whether an entirely unregistered role inherits the baseline. `graphic_baseline_cascade_implemented=false` stands.
 
-**Separation preserved.** `ContentRootCapability`, `read_graphic_asset_bytes_v1` and the Entity V4 path are unchanged and still refuse any Platform obligation (`PlatformUnverified`); the R12 `PlatformSource` binding still returns `PlatformSourceUnavailable`; no `platform/assets/` read is reachable from an Entity root, a route, a locale, a role, a filename or a fallback.
+## 7. Verification proportionate to risk
 
-## 7. Red runs retained as history
+The decision report carries the risk table the Owner asked for: byte-exact artwork import inside an accepted class gets cheap complete file/count/raw-hash/case/provenance validation plus one representative media check (no new 81× adversarial matrix merely because bytes were copied); a new external mark or placeholder additionally needs its provenance, published use conditions and clearance space; catalogue/alias/version changes need exact membership and tamper proof; and Platform root acquisition, isolation, cross-namespace resolution and the future cascade get focused adversarial two-host proofs with no waivers. Existing N093–N127 bodies and their authentic/mutation gates stayed intact apart from the two designated obsolete assertions; no gate was skipped, ignored or made advisory, and no test was deleted to make the suite cheaper.
+
+
+## 8. Rights, authority and what remains closed
+
+- `owner_81_assets_approved=true` still refers to exactly the 81 reviewed assets under the Tabler MIT terms; their notice and provenance remain installed beside the bytes and must accompany any separately authorized distribution. The Foundation root Apache-2.0 licence does not replace that notice and grants no rights in names, logos or trademarks.
+- The 20 outstanding sources are **classified, not delivered**: `icon-services.svg` has no recorded third-party licence, the two aliases need a governed alias model, the ten placeholders need a role/licence decision, and the seven platform marks carry a donor record that says **PARKED — NOT INTEGRATED / Not approved** with preconditions P-1…P-4 and brand-owner use terms. No rights were invented, no mark was recoloured, no account or handle was assumed.
+- `additional_assets_delivered=false`, `publication_authority=false`, `derived_output_publication=false`, `release_authority=false`, `graphic_baseline_cascade_implemented=false`, `r03c_open=true`, `stage03_open=true`. Nothing was published, derived into a public asset, released, deployed or merged; `R03.C` and Stage 03 remain open.
+
+## 9. Repository state, cleanup and the next Owner action
+
+- `main` = A24 `31376f0b` then R24 (report only); technical branch = T24 `a8e770f7`; both pushed, both clean, one worktree, one `origin`, four `.documents/WIP/` files, empty stash, `git status --porcelain` and `git diff --check` clean.
+- **Observed remote heads: 30** — the 28 long-standing heads plus the independent Dependabot app heads (`dependabot/cargo/svgtypes-0.16.2`, `dependabot/cargo/syn-3.0.10`), which this agent did not create, merge or modify. No new branch, tag, PR or worktree was created.
+- R15's red history is retained in §10. Task scratch (inventory and fetch scripts, transaction scripts) lived only in untracked `.temp/` and was deleted before handoff; the Owner's pre-existing `.temp/` entries were left untouched. Local N127 and other real-filesystem suites cannot run on this machine (no reflink-capable filesystem, no Windows linker): they are reported only from the hosted runs, never as local native success.
+
+**Shortest next Owner action.** Three things, in this order:
+
+1. **One-line workflow repair** (needs authorization; not in the R16 ledger): add `echo 'n127_gate mutation=rejected'` as the final line of the *Linux* N127 gate step so both hosts emit the explicit mutation verdict. Until then the Ubuntu rejection is proven by the step's success and the executed guards, not by a printed label.
+2. **The rights decision for the 20 outstanding sources** — which may be redistributed, which stay excluded, and whether the two byte-identical aliases get a governed alias model. Recommended split: placeholders and any approved original artwork first (once their licence state is recorded), platform marks deferred until the named third-party decision resolves P-1…P-4.
+3. **Authorization for the platform-first cascade order**, which settles the three open schema questions in §6 and implements the precedence algorithm with its own two-host suite; the architecture amendment is target direction and must not be read as behaviour that exists.
+
+## 10. History retained
 
 | Run | SHA | Outcome |
 |---|---|---|
-| `43815292648` attempt 1 | `bc277bf3` | Ubuntu `133125852713` red, Windows `133125853095` red, oracle `133125853026` green. Failures: the two protected assertions plus my own N127 catalogue-kind expectations (repaired by T23.2), and one N127 alias expectation (repaired by T23.3). |
-| `43816188208` attempt 1 | `0da55e28` | Ubuntu `133128659300` red, Windows `133128659308` red, oracle `133128658974` green. N127_02 green; N127_03/N127_04 red on the two stale expectations repaired by T23.3; the two protected assertions still red. |
-| `43816931677` attempt 1 | `8b340976` | Ubuntu `133131005793` red, Windows `133131005880` red, oracle `133131005598` green. **Only** the two protected assertions red; all four N127 cases green on both hosts. |
+| `43815292648` | `bc277bf3` | R15 attempt 1: both verify jobs red (two protected assertions plus my own wrong catalogue-kind expectations), oracle green |
+| `43816188208` | `0da55e28` | R15 attempt 2: two N127 expectation defects repaired, the two protected assertions still red |
+| `43816931677` | `8b340976` | R15 attempt 3: only the two protected assertions red; N127 4/4 on both hosts but the dedicated gates never executed |
+| `43817901578` | `40c8ee1a` | R23 main baseline: Ubuntu `133134040690`, Windows `133134041094`, both success |
+| `43822728379` | `a8e770f7` | **R16 T24: Ubuntu `133149298969` success, Windows `133149299183` success, oracle `133149299224` success** |
 
-The accepted R14 history is preserved unchanged: technical run `43807461257` (Ubuntu `133101393481`, Windows `133101393733`, oracle `133101394241`), main baseline `43808522755`, and the original R13 Windows failure `133090902898`. No earlier report, gate body or fixture byte was edited to make this run look better.
-
-## 8. Rights, product and publication boundaries — unchanged and closed
-
-- `owner_81_assets_approved=true` records the Owner's set-wide approval of exactly the 81 reviewed assets under the Tabler MIT terms; the MIT notice and the provenance record are installed **beside** the sources and must travel with any separately authorized distribution. The Foundation root Apache-2.0 licence neither replaces that notice nor grants rights in names, logos or trademarks.
-- Not authorized by this order and not done: artwork beyond those 81 bytes, an approval token, optimised or derived artwork, alias reinstatement, licensing of `icon-services.svg`, third-party platform or social marks, any publication, any release or deployment, any merge, and any closure of `R03.C` or Stage 03.
-- Still refused by construction: `AssetNamespace::Platform` in the Entity reader (`PlatformUnverified`), the V4 `PlatformSource` matcher (`PlatformSourceUnavailable`), and every authority constant (`publication_authority=false`, `derived_output_publication=false`, `release_authority=false`, `stage03_open=true`). Mixed Entity+Platform five-level whole-candidate publication remains unproven and unclaimed.
-
-## 9. Repository state and cleanup
-
-- `main` = A23 `3e2497e9` then R23 (report only); technical branch = T23.3 `8b340976`; both pushed, both clean, one worktree, one `origin`, four `.documents/WIP/` files, empty stash, `git status --porcelain` and `git diff --check` clean.
-- **Observed remote heads: 30** — the 28 long-standing heads plus the two Dependabot app heads (`dependabot/cargo/svgtypes-0.16.2`, `dependabot/cargo/syn-3.0.10`), which this agent did not create, merge or modify. No new head, tag or worktree was created.
-- Task scratch (installation script, attribute patch, transaction scripts) lived only in untracked `.temp/` and was deleted before handoff; the Owner's pre-existing `.temp/` entries were left untouched. The Linux fixture filesystem and the Windows linker remain unavailable locally, so N127 was never executed on this machine and is reported only from the hosted runs.
-
-## 10. Disposition and next Owner step
-
-`status=STOPPED` for `R03C-OWNER-APPROVED-81-TABLER-PLATFORM-1_0_0-INSTALLED-SEPARATE-CONFINED-SOURCE-N127-TWO-HOST-V1`, because the order's own "never change an N093–N126 test body" clause collides with its mandated installation: two protected assertions require the absence of the very tree R15 installs.
-
-Everything else the order asked for exists and is verified on both hosts: the 84-file byte-exact library, the pinned catalogue/licence/provenance, the one scoped attribute line, the Owner decision record, the new inward contract, the new native Platform capability, and four N127 cases green on Ubuntu and Windows with 81 real confined children each. What is missing is a green three-job run at one SHA — blocked solely by those two assertions, whose gate steps therefore never ran.
-
-**Next Owner decision:** authorize option (a), (b) or (c) in §6 in a new Owner-issued order. Option (a) or (b) is a two-line change in test-only code, after which one commit and one fresh run produce the N127 gate evidence and the three-success proof this outcome needs. `R03.C` and Stage 03 remain **OPEN**.
-
+The R14 acceptance (`43807461257`, main `43808522755`) and the original R13 Windows failure remain unchanged history. No earlier report, gate body or fixture byte was edited to improve any of these outcomes.
 
