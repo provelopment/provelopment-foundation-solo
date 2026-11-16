@@ -1316,6 +1316,103 @@ jobs:
           (Get-Content -LiteralPath $log) | ForEach-Object { $_.Replace('duplicate_keys=refused', 'duplicate_keys=accepted').Replace('zero_partial=true', 'zero_partial=false') } | Set-Content -LiteralPath $probe
           if (Test-N125Log -Path $probe) { throw 'corrupted refusal evidence accepted' }
           Write-Output 'n125_gate mutation=rejected'
+      # Mandatory `SOLO-WO-118 R13` N126 gate: the pinned Foundation donor icon packet reviewed
+      # through 81 genuine confined SVG children. Review-only fixtures: no Platform read, no
+      # publication authority, no approval. The same verifier must reject four altered copies.
+      - name: Foundation donor icon packet N126 gate (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          check_n126() {
+            local log="$1"
+            for name in n126_01_exact_eighty_one_tabler_donor_vectors_real_confined_workers n126_02_pinned_mit_provenance_and_r12_catalogue_review_only n126_03_forged_source_alias_missing_notice_and_platform_authority_refused; do
+              grep -qF "test n126::$name " "$log" || return 1
+            done
+            [ "$(grep -Ec '^test n126::n126_0[0-9]_[A-Za-z0-9_]*( |$)' "$log")" -eq 3 ] || return 1
+            grep -qF 'test result: ok. 3 passed; 0 failed; 0 ignored' "$log" || return 1
+            ! grep -qF '... FAILED' "$log" || return 1
+            ! grep -qF '... ignored' "$log" || return 1
+            ! grep -qF 'test result: FAILED' "$log" || return 1
+            [ "$(grep -cF 'n126_evidence case=01' "$log")" -eq 1 ] || return 1
+            [ "$(grep -cF 'n126_evidence case=02' "$log")" -eq 1 ] || return 1
+            [ "$(grep -cF 'n126_evidence case=03' "$log")" -eq 1 ] || return 1
+            [ "$(grep -cF 'n126_row id=icons/' "$log")" -eq 81 ] || return 1
+            grep -qF 'originals=81 inspected=81 real_children=81 geometry=24x24 donor_pinned=true source_scope=review-fixture publication=false' "$log" || return 1
+            grep -qF 'aggregate=3c34fe9919341862a5a70a87d205fbfc942741dec5f3996514d3edd0aeb1aaca' "$log" || return 1
+            grep -qF 'entries=81 mit_covered=81 originals_withheld=1 duplicate_aliases_withheld=2 review_only=true platform_read=false publication=false' "$log" || return 1
+            grep -qF 'forgeries_refused=true alias_digest_refused=true licence_missing_refused=true donor_drift_refused=true platform_unavailable=true zero_authority=true' "$log" || return 1
+            grep -qF 'donor_commit=fa599973a88ff77f6a8e012f3266c3c139b52c17' "$log" || return 1
+            grep -qF 'mit_sha=b740a1d46122672da62833e97f7e7c8a13fa85cbc7445b584b297cc00dde93db' "$log" || return 1
+          }
+          log="$RUNNER_TEMP/n126-three.txt"
+          cargo test -p solo-cli --test media_worker_host_smoke --locked n126_ -- --nocapture --test-threads=1 >"$log" 2>&1 || { cat "$log"; exit 1; }
+          cat "$log"
+          check_n126 "$log" || { echo 'authentic N126 3/3 run rejected'; exit 1; }
+          echo 'n126_gate authentic=accepted'
+          probe="$RUNNER_TEMP/n126-probe.txt"
+          cp "$log" "$probe"
+          sed -i '/n126_03_forged_source_alias_missing_notice_and_platform_authority_refused/d' "$probe"
+          if check_n126 "$probe"; then echo 'missing N126 case accepted'; exit 1; fi
+          cp "$log" "$probe"
+          sed -i 's/originals=81 inspected=81/originals=80 inspected=80/; s/real_children=81/real_children=80/' "$probe"
+          if check_n126 "$probe"; then echo 'false 80-asset count accepted'; exit 1; fi
+          cp "$log" "$probe"
+          sed -i 's/publication=false/publication=true/g; s/platform_read=false/platform_read=true/g' "$probe"
+          if check_n126 "$probe"; then echo 'forged publication flag accepted'; exit 1; fi
+          cp "$log" "$probe"
+          sed -i 's/mit_sha=b740a1d46122672da62833e97f7e7c8a13fa85cbc7445b584b297cc00dde93db/mit_sha=0000000000000000000000000000000000000000000000000000000000000000/' "$probe"
+          if check_n126 "$probe"; then echo 'corrupted licence evidence accepted'; exit 1; fi
+          echo 'n126_gate mutation=rejected'
+      - name: Foundation donor icon packet N126 gate (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $required = @(
+            'n126_01_exact_eighty_one_tabler_donor_vectors_real_confined_workers',
+            'n126_02_pinned_mit_provenance_and_r12_catalogue_review_only',
+            'n126_03_forged_source_alias_missing_notice_and_platform_authority_refused')
+          $tokens = @(
+            'originals=81 inspected=81 real_children=81 geometry=24x24 donor_pinned=true source_scope=review-fixture publication=false',
+            'aggregate=3c34fe9919341862a5a70a87d205fbfc942741dec5f3996514d3edd0aeb1aaca',
+            'entries=81 mit_covered=81 originals_withheld=1 duplicate_aliases_withheld=2 review_only=true platform_read=false publication=false',
+            'forgeries_refused=true alias_digest_refused=true licence_missing_refused=true donor_drift_refused=true platform_unavailable=true zero_authority=true',
+            'donor_commit=fa599973a88ff77f6a8e012f3266c3c139b52c17',
+            'mit_sha=b740a1d46122672da62833e97f7e7c8a13fa85cbc7445b584b297cc00dde93db')
+          function Test-N126Log {
+            param([string]$Path)
+            $text = Get-Content -LiteralPath $Path -Raw
+            foreach ($name in $required) {
+              if (-not $text.Contains('test n126::' + $name + ' ')) { return $false }
+            }
+            if (([regex]::Matches($text, '(?m)^test n126::n126_0[0-9]_[A-Za-z0-9_]*( |$)')).Count -ne 3) { return $false }
+            if (-not $text.Contains('test result: ok. 3 passed; 0 failed; 0 ignored')) { return $false }
+            if ($text.Contains('... FAILED') -or $text.Contains('... ignored') -or $text.Contains('test result: FAILED')) { return $false }
+            foreach ($marker in @('n126_evidence case=01', 'n126_evidence case=02', 'n126_evidence case=03')) {
+              if (([regex]::Matches($text, [regex]::Escape($marker))).Count -ne 1) { return $false }
+            }
+            if (([regex]::Matches($text, 'n126_row id=icons/')).Count -ne 81) { return $false }
+            foreach ($token in $tokens) {
+              if (-not $text.Contains($token)) { return $false }
+            }
+            return $true
+          }
+          $log = Join-Path $env:RUNNER_TEMP 'n126-three.txt'
+          cargo test -p solo-cli --test media_worker_host_smoke --locked n126_ -- --nocapture --test-threads=1 *>&1 | Tee-Object -FilePath $log
+          if ($LASTEXITCODE -ne 0) { throw 'the N126 suite did not exit zero' }
+          Get-Content -LiteralPath $log
+          if (-not (Test-N126Log -Path $log)) { throw 'authentic N126 3/3 run rejected' }
+          Write-Output 'n126_gate authentic=accepted'
+          $probe = Join-Path $env:RUNNER_TEMP 'n126-probe.txt'
+          (Get-Content -LiteralPath $log | Where-Object { -not $_.Contains('n126_03_forged_source_alias_missing_notice_and_platform_authority_refused') }) | Set-Content -LiteralPath $probe
+          if (Test-N126Log -Path $probe) { throw 'missing N126 case accepted' }
+          (Get-Content -LiteralPath $log) | ForEach-Object { $_.Replace('originals=81 inspected=81', 'originals=80 inspected=80').Replace('real_children=81', 'real_children=80') } | Set-Content -LiteralPath $probe
+          if (Test-N126Log -Path $probe) { throw 'false 80-asset count accepted' }
+          (Get-Content -LiteralPath $log) | ForEach-Object { $_.Replace('publication=false', 'publication=true').Replace('platform_read=false', 'platform_read=true') } | Set-Content -LiteralPath $probe
+          if (Test-N126Log -Path $probe) { throw 'forged publication flag accepted' }
+          (Get-Content -LiteralPath $log) | ForEach-Object { $_.Replace('mit_sha=b740a1d46122672da62833e97f7e7c8a13fa85cbc7445b584b297cc00dde93db', 'mit_sha=0000000000000000000000000000000000000000000000000000000000000000') } | Set-Content -LiteralPath $probe
+          if (Test-N126Log -Path $probe) { throw 'corrupted licence evidence accepted' }
+          Write-Output 'n126_gate mutation=rejected'
       # Mandatory `SOLO-WO-118 R11` N124 gate: the V4 six-format whole-candidate composition on this
       # host, including the associated-alpha AVIF class beside the five legacy formats. The same
       # verifier must reject four altered copies of the real log before printing its verdict.

@@ -8254,3 +8254,577 @@ mod n125 {
         );
     }
 }
+
+/// `SOLO-WO-118 R13`: the pinned Foundation donor icon packet, reviewed through real confined SVG
+/// workers.
+///
+/// The 81 fixtures under `tests/fixtures/foundation-donor-icons/icons/` are **verbatim** donor bytes
+/// (each file's Git blob equals the donor's own blob at `fa599973a88ff77f6a8e012f3266c3c139b52c17`).
+/// They are **review-only test data**: `source_scope=review-fixture`, never a Platform source, never
+/// an installed `platform/assets/` library, and never an assertion of rights.
+mod n126 {
+    use std::path::{Path, PathBuf};
+
+    use serde_json::Value;
+    use solo_adapters::inspect_svg_bytes_with_executable_v1;
+    use solo_adapters::parse_platform_asset_catalogue_v1;
+    use solo_application::{
+        PLATFORM_ASSET_LIBRARY_VERSION_V1, PlatformAssetCatalogueV1,
+        PlatformCatalogueBindingScopeV1, PlatformCatalogueBindingV1,
+        PlatformCatalogueMatchRefusalV1, PlatformCatalogueRefusalV1,
+        bind_catalogue_to_v4_evidence_v1, sha256_media_worker_bytes_v1,
+    };
+
+    use super::BIN;
+
+    /// The immutable donor source commit and its root tree; never a mutable branch.
+    const DONOR_COMMIT: &str = "fa599973a88ff77f6a8e012f3266c3c139b52c17";
+    const DONOR_TREE: &str = "89b57a92869d2e293d33527589f3f4680938f9b2";
+
+    /// The pinned MIT notice and machine provenance, by Git blob and by SHA-256 of the bytes.
+    const MIT_BLOB: &str = "3e82379dab3fe93d9ee22251949604ed63ddea39";
+    const MIT_SHA256: &str = "b740a1d46122672da62833e97f7e7c8a13fa85cbc7445b584b297cc00dde93db";
+    const MIT_BYTES: usize = 1_073;
+    const PROVENANCE_BLOB: &str = "a74d234417d5bb63ff05e2b64f93d757864f3d46";
+    const PROVENANCE_SHA256: &str =
+        "e0f0ea621c11140cf581d86aaab0b73421d0202114092a4e58dc3321ff1a325b";
+    const PROVENANCE_BYTES: usize = 25_274;
+
+    /// The three donor files this packet deliberately withholds.
+    const WITHHELD_ALIASES: [&str; 2] = ["icon-status-info.svg", "icon-volunteer.svg"];
+    const WITHHELD_ORIGINAL: &str = "icon-services.svg";
+
+    /// The donor's own reconciliation counts and this packet's selection size.
+    const DONOR_RECORDS: usize = 84;
+    const DONOR_MIT_RECORDS: usize = 83;
+    const DONOR_ORIGINAL_RECORDS: usize = 1;
+    const SELECTED: usize = 81;
+
+    /// One review-only fixture packet: the pinned sources plus their provenance records.
+    struct Packet {
+        fixtures: PathBuf,
+        catalogue: PlatformAssetCatalogueV1,
+    }
+
+    fn fixtures_root() -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/foundation-donor-icons")
+    }
+
+    fn candidate_json_path() -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../.documents/Reports/platform-library-1.0.0-foundation-candidate.json")
+    }
+
+    fn read(path: &Path) -> Vec<u8> {
+        std::fs::read(path)
+            .unwrap_or_else(|error| panic!("{} is unreadable: {error}", path.display()))
+    }
+
+    impl Packet {
+        fn load() -> Self {
+            let bytes = read(&candidate_json_path());
+            let catalogue =
+                parse_platform_asset_catalogue_v1(&bytes, PLATFORM_ASSET_LIBRARY_VERSION_V1)
+                    .expect("the review-only candidate catalogue satisfies the R12 contract");
+            Self {
+                fixtures: fixtures_root(),
+                catalogue,
+            }
+        }
+
+        fn source_path(&self, asset_id: &str) -> PathBuf {
+            let name = asset_id
+                .strip_prefix("icons/")
+                .expect("every review identifier is an icons/<file> path");
+            self.fixtures.join("icons").join(name)
+        }
+
+        fn entry_count(&self) -> usize {
+            self.catalogue.len()
+        }
+
+        fn provenance(&self) -> Value {
+            let bytes = read(&self.fixtures.join("licensing/icon-provenance.json"));
+            assert_eq!(
+                sha256_media_worker_bytes_v1(&bytes).to_hex(),
+                PROVENANCE_SHA256,
+                "the pinned donor provenance bytes are unchanged"
+            );
+            assert_eq!(bytes.len(), PROVENANCE_BYTES);
+            serde_json::from_slice(&bytes).expect("the pinned provenance record is valid JSON")
+        }
+
+        fn notice(&self) -> Vec<u8> {
+            let bytes = read(&self.fixtures.join("licensing/TABLER-ICONS-MIT.txt"));
+            assert_eq!(
+                sha256_media_worker_bytes_v1(&bytes).to_hex(),
+                MIT_SHA256,
+                "the pinned Tabler MIT notice is unchanged"
+            );
+            assert_eq!(bytes.len(), MIT_BYTES);
+            bytes
+        }
+    }
+
+    /// The closed reason one proposed asset cannot enter the review packet.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    enum SelectionRefusal {
+        WithheldOriginal,
+        WithheldDuplicateAlias,
+        DuplicateDigestAlias,
+        NotMitCovered,
+        SourceDigestDrift,
+        LicenceNoticeMissing,
+        DonorMetadataDrift,
+        NotSelected,
+    }
+
+    /// The packet's own selection rule, applied to an in-memory proposal only.
+    fn review_selection_refusal(
+        packet: &Packet,
+        asset_id: &str,
+        source_sha256: &str,
+        licence: &str,
+        notice_present: bool,
+        donor_version: &str,
+    ) -> Option<SelectionRefusal> {
+        let Some(name) = asset_id.strip_prefix("icons/") else {
+            return Some(SelectionRefusal::NotSelected);
+        };
+        if name == WITHHELD_ORIGINAL {
+            return Some(SelectionRefusal::WithheldOriginal);
+        }
+        if WITHHELD_ALIASES.contains(&name) {
+            return Some(SelectionRefusal::WithheldDuplicateAlias);
+        }
+        if !notice_present {
+            return Some(SelectionRefusal::LicenceNoticeMissing);
+        }
+        if licence != "MIT" {
+            return Some(SelectionRefusal::NotMitCovered);
+        }
+        if donor_version != "3.46.0" {
+            return Some(SelectionRefusal::DonorMetadataDrift);
+        }
+        let Some(entry) = packet.catalogue.exact_entry(asset_id) else {
+            return Some(SelectionRefusal::NotSelected);
+        };
+        if entry.sha256().to_hex() != source_sha256 {
+            return Some(SelectionRefusal::SourceDigestDrift);
+        }
+        let aliases = packet
+            .catalogue
+            .entries()
+            .iter()
+            .filter(|candidate| candidate.sha256().to_hex() == source_sha256)
+            .count();
+        if aliases > 1 {
+            return Some(SelectionRefusal::DuplicateDigestAlias);
+        }
+        None
+    }
+
+    /// The aggregate digest of one review run: `id`, source SHA and canonical SHA per record.
+    fn aggregate_digest(records: &mut [(String, String, String)]) -> String {
+        records.sort();
+        let mut text = String::new();
+        for (id, source, canonical) in records.iter() {
+            text.push_str(id);
+            text.push('\t');
+            text.push_str(source);
+            text.push('\t');
+            text.push_str(canonical);
+            text.push('\n');
+        }
+        sha256_media_worker_bytes_v1(text.as_bytes()).to_hex()
+    }
+
+    #[test]
+    fn n126_01_exact_eighty_one_tabler_donor_vectors_real_confined_workers() {
+        let packet = Packet::load();
+        assert_eq!(packet.entry_count(), SELECTED, "81 review entries");
+        let mut records: Vec<(String, String, String)> = Vec::new();
+        let mut pids: usize = 0;
+        let mut source_digests: Vec<String> = Vec::new();
+
+        for entry in packet.catalogue.entries() {
+            let id = entry.id().to_owned();
+            let bytes = read(&packet.source_path(&id));
+            let source_sha = sha256_media_worker_bytes_v1(&bytes).to_hex();
+            assert_eq!(
+                source_sha,
+                entry.sha256().to_hex(),
+                "{id}: the original source bytes match the catalogue entry"
+            );
+            assert_eq!(entry.mime(), "image/svg+xml", "{id}: canonical MIME");
+            assert_eq!(
+                (entry.width(), entry.height()),
+                (24, 24),
+                "{id}: declared geometry"
+            );
+
+            let observation = inspect_svg_bytes_with_executable_v1(Path::new(BIN), &bytes)
+                .unwrap_or_else(|refusal| {
+                    panic!("{id}: the strict SVG sanitizer refused the donor vector: {refusal:?}")
+                });
+            assert_eq!(observation.width(), 24, "{id}: worker width");
+            assert_eq!(observation.height(), 24, "{id}: worker height");
+            assert_eq!(
+                observation.source_digest().to_hex(),
+                source_sha,
+                "{id}: the worker hashed the unmodified donor bytes"
+            );
+            assert!(
+                !observation.canonical().is_empty() && observation.canonical().len() <= 64 * 1024,
+                "{id}: the canonical output is nonempty and bounded"
+            );
+            let canonical_sha = sha256_media_worker_bytes_v1(observation.canonical()).to_hex();
+            assert_eq!(
+                observation.output_digest().to_hex(),
+                canonical_sha,
+                "{id}: the worker's own output digest describes its canonical bytes"
+            );
+            assert!(
+                !observation
+                    .canonical()
+                    .windows(12)
+                    .any(|window| window == b"currentColor"),
+                "{id}: the canonical output resolves currentColor"
+            );
+            assert!(
+                observation.worker_pid() != 0,
+                "{id}: a real child reported a PID"
+            );
+            assert!(observation.limits_verified() && observation.cleanup_verified());
+            pids += 1;
+            source_digests.push(source_sha.clone());
+            println!(
+                "n126_row id={id} source_sha={source_sha} canonical_sha={canonical_sha} \
+                 elements={} depth={} references={} path_commands={} filters={} pid_nonzero=true",
+                observation.elements(),
+                observation.depth(),
+                observation.references(),
+                observation.path_commands(),
+                observation.filters()
+            );
+            records.push((id, source_sha, canonical_sha));
+        }
+
+        assert_eq!(records.len(), SELECTED, "81 inspected originals");
+        assert_eq!(pids, SELECTED, "81 genuine confined child invocations");
+        source_digests.sort();
+        source_digests.dedup();
+        assert_eq!(source_digests.len(), SELECTED, "81 distinct source digests");
+        let aggregate = aggregate_digest(&mut records);
+        assert_eq!(
+            aggregate, PINNED_AGGREGATE_SHA256,
+            "the aggregate review digest is the pinned cross-host value"
+        );
+
+        println!(
+            "n126_evidence case=01 originals=81 inspected=81 real_children=81 geometry=24x24 \
+             donor_pinned=true source_scope=review-fixture publication=false \
+             donor_commit={DONOR_COMMIT} aggregate={aggregate}"
+        );
+    }
+
+    /// The pinned aggregate of sorted `id + source SHA + canonical SHA` review records.
+    ///
+    /// Measured from the real 81-child local run and re-proved on both native CI hosts; a changing
+    /// value means the donor bytes, the sanitizer or the catalogue changed.
+    const PINNED_AGGREGATE_SHA256: &str =
+        "3c34fe9919341862a5a70a87d205fbfc942741dec5f3996514d3edd0aeb1aaca";
+
+    #[test]
+    fn n126_02_pinned_mit_provenance_and_r12_catalogue_review_only() {
+        let packet = Packet::load();
+        assert_eq!(
+            packet.catalogue.version(),
+            PLATFORM_ASSET_LIBRARY_VERSION_V1
+        );
+        assert_eq!(packet.entry_count(), SELECTED);
+        assert!(!packet.catalogue.grants_publication_authority());
+        assert!(!packet.catalogue.rights_reviewed());
+        assert!(!packet.catalogue.platform_source_readable());
+        assert!(!packet.catalogue.proves_media_correctness());
+
+        // The pinned metadata is byte-exact: SHA-256 and byte count both fixed.
+        let notice = packet.notice();
+        let text = String::from_utf8(notice).expect("the MIT notice is UTF-8");
+        assert!(text.contains("MIT License"));
+        assert!(text.contains("Copyright (c) 2020-2026 Paweł Kuna"));
+        assert!(text.contains("Permission is hereby granted, free of charge"));
+        assert_eq!(MIT_BLOB.len(), 40);
+        assert_eq!(PROVENANCE_BLOB.len(), 40);
+
+        // Ascending identifiers, unique digests, and MIT-only coverage with the pinned evidence.
+        let mut previous = String::new();
+        let mut digests: Vec<String> = Vec::new();
+        for entry in packet.catalogue.entries() {
+            let id = entry.id().to_owned();
+            assert!(id > previous, "identifiers ascend deterministically: {id}");
+            previous = id;
+            assert_eq!(entry.mime(), "image/svg+xml");
+            assert_eq!((entry.width(), entry.height()), (24, 24));
+            assert_eq!(entry.licence().expression(), "MIT");
+            assert_eq!(entry.licence().rights_holder(), "Paweł Kuna");
+            assert!(!entry.licence().rights_reviewed());
+            assert!(entry.licence().evidence().contains(DONOR_COMMIT));
+            assert!(entry.licence().evidence().contains(MIT_BLOB));
+            assert!(entry.provenance().evidence().contains(DONOR_COMMIT));
+            assert!(
+                entry
+                    .provenance()
+                    .evidence()
+                    .contains("exact donor Git blob")
+            );
+            assert!(entry.provenance().source().contains("Tabler Icons v3.46.0"));
+            digests.push(entry.sha256().to_hex());
+        }
+        digests.sort();
+        digests.dedup();
+        assert_eq!(digests.len(), SELECTED, "81 unique source digests");
+
+        // The donor's own record reconciles 84 files: 83 MIT plus one original.
+        let provenance = packet.provenance();
+        let records = provenance["icons"]
+            .as_array()
+            .expect("the provenance record lists its icons");
+        assert_eq!(records.len(), DONOR_RECORDS);
+        let mut mit = 0;
+        let mut original = 0;
+        let mut by_name = std::collections::BTreeMap::new();
+        for record in records {
+            let name = record["canonical_filename"]
+                .as_str()
+                .expect("a canonical filename");
+            let licence = record["license"].as_str().expect("a licence");
+            if licence == "MIT" {
+                mit += 1;
+                assert_eq!(record["source_library"].as_str(), Some("Tabler Icons"));
+                assert_eq!(record["source_version"].as_str(), Some("3.46.0"));
+            } else {
+                assert!(licence.starts_with("Provelopment original"));
+                original += 1;
+            }
+            by_name.insert(name.to_owned(), record.clone());
+        }
+        assert_eq!(mit, DONOR_MIT_RECORDS, "83 MIT records");
+        assert_eq!(original, DONOR_ORIGINAL_RECORDS, "1 original record");
+
+        // Every selected entry names its authoritative `source_icon_name`.
+        for entry in packet.catalogue.entries() {
+            let name = entry.id().trim_start_matches("icons/");
+            let record = by_name
+                .get(name)
+                .expect("every selected asset has a donor record");
+            let source_icon = record["source_icon_name"].as_str().expect("a source name");
+            assert!(
+                entry.provenance().source().ends_with(source_icon),
+                "{name}: the entry names its authoritative source icon {source_icon}"
+            );
+            assert_eq!(record["license"].as_str(), Some("MIT"));
+        }
+
+        // The declared duplicate pair and the original are withheld by decision.
+        let reuse = provenance["intentional_source_reuse"]
+            .as_array()
+            .expect("the declared intentional reuse list");
+        assert_eq!(reuse.len(), 1, "exactly one declared duplicate pair");
+        let mut reuse_names: Vec<String> = reuse[0]["canonical_filenames"]
+            .as_array()
+            .expect("the pair")
+            .iter()
+            .map(|value| value.as_str().expect("a filename").to_owned())
+            .collect();
+        reuse_names.sort();
+        assert_eq!(reuse_names, vec!["icon-clients.svg", "icon-volunteer.svg"]);
+
+        for withheld in WITHHELD_ALIASES.iter().copied().chain([WITHHELD_ORIGINAL]) {
+            assert!(
+                packet
+                    .catalogue
+                    .exact_entry(&format!("icons/{withheld}"))
+                    .is_none(),
+                "{withheld} is withheld from the candidate"
+            );
+            assert!(
+                !packet.fixtures.join("icons").join(withheld).exists(),
+                "{withheld} is not imported as a review fixture"
+            );
+            assert!(
+                by_name.contains_key(withheld),
+                "{withheld} stays in the donor record"
+            );
+        }
+
+        // No invented approval key, no product Platform tree, no Platform source.
+        let document = String::from_utf8(read(&candidate_json_path()))
+            .expect("the candidate document is UTF-8");
+        for forbidden in [
+            "\"approved\"",
+            "\"rightsReviewed\"",
+            "\"published\"",
+            "\"installed\"",
+        ] {
+            assert!(
+                !document.contains(forbidden),
+                "the candidate carries no invented trust key {forbidden}"
+            );
+        }
+        let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
+        for relative in ["../../platform", "../../platform/assets"] {
+            assert!(
+                !manifest.join(relative).exists(),
+                "no product Platform source tree may exist: {relative}"
+            );
+        }
+        assert_eq!(
+            bind_catalogue_to_v4_evidence_v1(
+                &packet.catalogue,
+                &[],
+                PlatformCatalogueBindingScopeV1::PlatformSource
+            ),
+            PlatformCatalogueBindingV1::Refused {
+                position: 0,
+                kind: PlatformCatalogueMatchRefusalV1::PlatformSourceUnavailable,
+            }
+        );
+
+        println!(
+            "n126_evidence case=02 entries=81 mit_covered=81 originals_withheld=1 \
+             duplicate_aliases_withheld=2 review_only=true platform_read=false publication=false \
+             donor_commit={DONOR_COMMIT} donor_tree={DONOR_TREE} mit_sha={MIT_SHA256} \
+             provenance_sha={PROVENANCE_SHA256}"
+        );
+    }
+
+    #[test]
+    fn n126_03_forged_source_alias_missing_notice_and_platform_authority_refused() {
+        let packet = Packet::load();
+        let first = packet.catalogue.entries()[0].id().to_owned();
+        let honest_bytes = read(&packet.source_path(&first));
+        let honest_sha = sha256_media_worker_bytes_v1(&honest_bytes).to_hex();
+
+        // 1. An in-memory tamper of one selected fixture's bytes is detected against the catalogue.
+        let mut tampered = honest_bytes.clone();
+        let last = tampered.len() - 1;
+        tampered[last] ^= 0x01;
+        let tampered_sha = sha256_media_worker_bytes_v1(&tampered).to_hex();
+        assert_ne!(
+            tampered_sha, honest_sha,
+            "the tamper really changes the bytes"
+        );
+        assert_eq!(
+            review_selection_refusal(&packet, &first, &tampered_sha, "MIT", true, "3.46.0"),
+            Some(SelectionRefusal::SourceDigestDrift),
+            "a tampered fixture cannot keep its catalogue identity"
+        );
+        assert_eq!(
+            review_selection_refusal(&packet, &first, &honest_sha, "MIT", true, "3.46.0"),
+            None,
+            "the honest bytes remain reviewable"
+        );
+
+        // 2. Reinserting a withheld alias with its byte-identical digest must refuse at the parser.
+        let document = read(&candidate_json_path());
+        let mut value: Value = serde_json::from_slice(&document).expect("the candidate document");
+        let assets = value["assets"].as_array_mut().expect("the assets array");
+        let mut alias = assets[0].clone();
+        alias["id"] = Value::String("icons/icon-status-info.svg".to_owned());
+        assets.push(alias);
+        let reinserted = serde_json::to_vec(&value).expect("serialised forgery");
+        assert_eq!(
+            parse_platform_asset_catalogue_v1(&reinserted, PLATFORM_ASSET_LIBRARY_VERSION_V1).err(),
+            Some(PlatformCatalogueRefusalV1::DuplicateDigest),
+            "a duplicate alias digest is refused by the closed catalogue invariant"
+        );
+        assert_eq!(
+            review_selection_refusal(
+                &packet,
+                "icons/icon-status-info.svg",
+                &honest_sha,
+                "MIT",
+                true,
+                "3.46.0"
+            ),
+            Some(SelectionRefusal::WithheldDuplicateAlias)
+        );
+
+        // 3. The unreviewed original and an absent social mark are refused by the selection rule.
+        assert_eq!(
+            review_selection_refusal(
+                &packet,
+                &format!("icons/{WITHHELD_ORIGINAL}"),
+                &honest_sha,
+                "Provelopment original artwork",
+                true,
+                "3.46.0"
+            ),
+            Some(SelectionRefusal::WithheldOriginal),
+            "no repository licence may be inferred for the original artwork"
+        );
+        assert_eq!(
+            review_selection_refusal(
+                &packet,
+                "icons/icon-social-facebook.svg",
+                &honest_sha,
+                "MIT",
+                true,
+                "3.46.0"
+            ),
+            Some(SelectionRefusal::NotSelected),
+            "an asset outside the reviewed selection cannot be smuggled in"
+        );
+
+        // 4. A packet without its MIT notice, or with drifted donor metadata, is refused.
+        assert_eq!(
+            review_selection_refusal(&packet, &first, &honest_sha, "MIT", false, "3.46.0"),
+            Some(SelectionRefusal::LicenceNoticeMissing)
+        );
+        assert_eq!(
+            review_selection_refusal(&packet, &first, &honest_sha, "MIT", true, "3.47.0"),
+            Some(SelectionRefusal::DonorMetadataDrift)
+        );
+        assert_eq!(
+            review_selection_refusal(&packet, &first, &honest_sha, "Apache-2.0", true, "3.46.0"),
+            Some(SelectionRefusal::NotMitCovered),
+            "the root Apache grant never covers the donated icons"
+        );
+
+        // 5. A different selected version, or a wrong notice byte, cannot be smuggled past the pin.
+        assert_eq!(
+            parse_platform_asset_catalogue_v1(&document, "1.0.1").err(),
+            Some(PlatformCatalogueRefusalV1::VersionMismatch)
+        );
+        let mut notice = packet.notice();
+        notice[0] ^= 0x01;
+        assert_ne!(
+            sha256_media_worker_bytes_v1(&notice).to_hex(),
+            MIT_SHA256,
+            "a corrupted notice is detectable by its pinned digest"
+        );
+
+        // 6. The real Platform call site stays refused, so zero authority is conferred.
+        assert_eq!(
+            bind_catalogue_to_v4_evidence_v1(
+                &packet.catalogue,
+                &[],
+                PlatformCatalogueBindingScopeV1::PlatformSource
+            ),
+            PlatformCatalogueBindingV1::Refused {
+                position: 0,
+                kind: PlatformCatalogueMatchRefusalV1::PlatformSourceUnavailable,
+            }
+        );
+        assert!(!packet.catalogue.grants_publication_authority());
+        assert!(!packet.catalogue.rights_reviewed());
+        assert!(!packet.catalogue.platform_source_readable());
+
+        println!(
+            "n126_evidence case=03 forgeries_refused=true alias_digest_refused=true \
+             licence_missing_refused=true donor_drift_refused=true platform_unavailable=true \
+             zero_authority=true review_only=true platform_read=false publication=false"
+        );
+    }
+}
