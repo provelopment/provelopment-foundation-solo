@@ -11776,7 +11776,8 @@ mod n130 {
         assert!(forged.entries().is_empty());
         assert!(forged.payload_manifest().is_empty());
 
-        // An unapproved Platform identifier is refused by the verified approved binding.
+        // An unapproved Platform identifier is refused before any payload exists: the registration
+        // claims a digest that is not the approved asset, so the package refuses the whole attempt.
         let unapproved_digest = "0".repeat(64);
         let unapproved = prepare(
             &entity,
@@ -11788,12 +11789,19 @@ mod n130 {
                 PrepublicationDisplayEligibilityV1::Public,
             ),
         );
+        let unapproved_kind = unapproved
+            .package_refusal()
+            .expect("an unapproved Platform registration is refused");
         assert_eq!(
-            unapproved.source_refusal(),
-            Some("binding-refused"),
-            "an unapproved Platform identifier never becomes a package source"
+            unapproved_kind, "unapproved-platform-source",
+            "the refusal names the unapproved Platform source"
+        );
+        assert!(
+            unapproved.source_refusal().is_none(),
+            "the read itself succeeded"
         );
         assert!(unapproved.entries().is_empty());
+        assert!(unapproved.payload_manifest().is_empty());
 
         // Truly identical final bytes share one immutable payload; different bytes never coalesce.
         let identical = prepare(
@@ -11868,7 +11876,7 @@ mod n130 {
 
         println!(
             "n130_evidence case=03 foreign_plan=plan-does-not-match-input forged_media={forged_kind} \
-             unapproved_id=binding-refused entries=4 payloads=3 dedup=identical_bytes_only \
+             unapproved_id={unapproved_kind} entries=4 payloads=3 dedup=identical_bytes_only \
              collision=refused_by_derivation immutable=true product_tree_unchanged=true \
              output_sha={} catalogue_sha={CATALOGUE_SHA256} publication=false route=false",
             logo.output_sha256

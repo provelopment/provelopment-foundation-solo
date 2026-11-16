@@ -40,7 +40,10 @@ use crate::graphic_image_inspection::{
     PlatformSourceRequestV1, inspect_mixed_graphic_candidate_staged_v1,
 };
 use crate::media_worker::{MediaWorkerDigestV1, MediaWorkerPortV1, sha256_media_worker_bytes_v1};
-use crate::platform_asset_read::PlatformAssetLibraryReadPortV1;
+use crate::platform_asset_read::{
+    APPROVED_PLATFORM_CATALOGUE_SHA256_V1, APPROVED_PLATFORM_LIBRARY_VERSION_V1,
+    PlatformAssetLibraryReadPortV1,
+};
 
 /// Whether holding or exporting a package authorizes publication of any kind. Always `false`.
 pub const GRAPHIC_PACKAGE_GRANTS_PUBLICATION_AUTHORITY_V1: bool = false;
@@ -185,6 +188,8 @@ pub enum GraphicPackageRefusalKindV1 {
     ContentCollision,
     /// A selected entry was not public, so exporting it would leak a private value.
     PrivateLeakage,
+    /// A root-layer Platform registration is not the approved asset it claims to be.
+    UnapprovedPlatformSource,
     /// A staged payload failed its own digest or length recheck.
     StageRecheckFailed,
 }
@@ -205,6 +210,7 @@ impl GraphicPackageRefusalKindV1 {
             Self::InvalidLimits => "invalid-limits",
             Self::ContentCollision => "content-collision",
             Self::PrivateLeakage => "private-leakage",
+            Self::UnapprovedPlatformSource => "unapproved-platform-source",
             Self::StageRecheckFailed => "stage-recheck-failed",
         }
     }
@@ -698,6 +704,23 @@ fn select_package_records(
                     GraphicPackageRefusalKindV1::InspectionFromAnotherCandidate,
                 )
             })?;
+
+            // A root-layer Platform default must be exactly the approved asset it claims: same
+            // identifier, same approved digest, same pinned catalogue and library version. A
+            // registration that names an unapproved or modified asset never becomes a payload.
+            if matches!(source.kind(), GraphicSourceKindV1::PlatformRootDefault) {
+                let approved = source.binding().is_some_and(|binding| {
+                    binding.asset_id() == source.reference()
+                        && binding.asset_sha256() == inspection.source_digest().to_hex()
+                        && binding.catalogue_sha256() == APPROVED_PLATFORM_CATALOGUE_SHA256_V1
+                        && binding.library_version() == APPROVED_PLATFORM_LIBRARY_VERSION_V1
+                });
+                if !approved {
+                    return Err(GraphicPackageRefusalV1::of(
+                        GraphicPackageRefusalKindV1::UnapprovedPlatformSource,
+                    ));
+                }
+            }
 
             let staged_digest = sha256_media_worker_bytes_v1(bytes);
             if &staged_digest != inspection.source_digest() {
