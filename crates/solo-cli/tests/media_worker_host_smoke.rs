@@ -11056,3 +11056,977 @@ mod n129 {
         );
     }
 }
+
+// `SOLO-WO-118 R19` — N130: the unpublished, immutable graphic delivery-preparation package.
+//
+// Four focused cases on the real two roots and the real confined workers. They prove the transition
+// boundaries where public/private and immutable bytes meet: an eligible winning slot becomes an exact
+// immutable payload, a private or non-eligible case materialises nothing, a substituted or forged
+// input refuses the whole candidate, and the same input produces the same package twice.
+mod n130 {
+    use std::fs;
+    use std::path::{Path, PathBuf};
+
+    use solo_adapters::{
+        PlatformRootCapabilityV1, TestMixedDeclarationV1, TestMixedFormatV1, TestOwnerV1,
+        TestPackageSeamV1, TestPreparedPackageV1, parse_platform_asset_catalogue_v1,
+        prepare_unpublished_graphic_package_from_roots_v1, test_mixed_candidate_v1,
+    };
+    use solo_application::{
+        GraphicPackageLimitsV1, PlatformAssetCatalogueV1, PlatformRootProvenanceV1,
+        PlatformRootSelectionV1, PlatformSourceRequestV1, PrepublicationDisplayEligibilityV1,
+        sha256_media_worker_bytes_v1,
+    };
+
+    use super::BIN;
+    use super::n116::{Root, png, rich_svg, webp};
+
+    /// The accepted approved library version and the independent catalogue pin.
+    const VERSION: &str = "1.0.0";
+    const CATALOGUE_SHA256: &str =
+        "ad8ea718b50641206cc4f4fe13e866ad266366a7aa11ef799c83ae8187858fc7";
+
+    /// One real approved Platform identifier and the exact logical path it reads from.
+    const HOME_ID: &str = "icons/icon-home.svg";
+    const HOME_LOGICAL: &str = "icons/icon-home.svg";
+
+    /// The tracked product tree, used only as the copy source for a scratch Platform root.
+    fn product_root() -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../platform")
+    }
+
+    /// The filesystem a scratch root is created on; on Linux it must be the verified fixture one.
+    fn scratch_parent() -> PathBuf {
+        #[cfg(target_os = "linux")]
+        {
+            match std::env::var_os("SOLO_TEST_SOURCE_FS_ROOT") {
+                Some(root) if !root.is_empty() => PathBuf::from(root),
+                _ => panic!(
+                    "SOLO_TEST_SOURCE_FS_ROOT must name the R03 snapshot fixture filesystem; \
+                     refusing to run the real delivery-preparation gate on an unverified filesystem"
+                ),
+            }
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            std::env::temp_dir()
+        }
+    }
+    /// Copies one directory tree of regular files without dereferencing links.
+    fn copy_tree(from: &Path, to: &Path) {
+        fs::create_dir_all(to).expect("create a scratch directory");
+        for entry in fs::read_dir(from).expect("read a product directory") {
+            let entry = entry.expect("a product directory entry");
+            let file_type = entry.file_type().expect("a product file type");
+            assert!(
+                !file_type.is_symlink(),
+                "the tracked product tree holds no link"
+            );
+            let target = to.join(entry.file_name());
+            if file_type.is_dir() {
+                copy_tree(&entry.path(), &target);
+            } else {
+                assert!(file_type.is_file(), "the product tree holds regular files");
+                fs::copy(entry.path(), &target).expect("copy one product file");
+            }
+        }
+    }
+
+    /// A disposable Platform root holding one copy of the approved product library.
+    struct PlatformRoot {
+        base: PathBuf,
+        platform: PathBuf,
+    }
+
+    impl PlatformRoot {
+        fn new(label: &str) -> Self {
+            let base =
+                scratch_parent().join(format!("solo-n130-platform-{}-{label}", std::process::id()));
+            let _ = fs::remove_dir_all(&base);
+            let platform = base.join("platform");
+            copy_tree(&product_root(), &platform);
+            Self { base, platform }
+        }
+
+        fn capability(&self) -> PlatformRootCapabilityV1 {
+            PlatformRootCapabilityV1::adopt_bootstrap_path(
+                &self.platform,
+                PlatformRootProvenanceV1::OperatorDesignatedPlatformRoot,
+            )
+            .expect("the scratch Platform root is adoptable")
+        }
+    }
+
+    impl Drop for PlatformRoot {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.base);
+        }
+    }
+
+    /// The parsed approved catalogue together with the exact bytes it was parsed from.
+    struct Catalogue {
+        model: PlatformAssetCatalogueV1,
+        bytes: Vec<u8>,
+    }
+
+    impl Catalogue {
+        fn load() -> Self {
+            let bytes = fs::read(product_root().join("assets/catalogue-1.0.0.json"))
+                .expect("the installed catalogue is present");
+            assert_eq!(
+                sha256_media_worker_bytes_v1(&bytes).to_hex(),
+                CATALOGUE_SHA256,
+                "the installed catalogue is the approved one"
+            );
+            let model = parse_platform_asset_catalogue_v1(&bytes, VERSION)
+                .expect("the strict R12 parser accepts the installed catalogue");
+            Self { model, bytes }
+        }
+
+        fn digest(&self, id: &str) -> String {
+            self.model
+                .entries()
+                .iter()
+                .find(|entry| entry.id() == id)
+                .map_or_else(
+                    || panic!("{id} is an approved identifier"),
+                    |entry| entry.sha256().to_hex(),
+                )
+        }
+
+        fn request(&self) -> PlatformSourceRequestV1<'_> {
+            PlatformSourceRequestV1 {
+                selection: PlatformRootSelectionV1::adopt(
+                    PlatformRootProvenanceV1::OperatorDesignatedPlatformRoot,
+                ),
+                selected_version: VERSION,
+                catalogue: &self.model,
+                catalogue_bytes: &self.bytes,
+            }
+        }
+    }
+    /// One authored mixed declaration.
+    fn declared(
+        owner: TestOwnerV1,
+        role: &'static str,
+        reference: &'static str,
+        namespace: &'static str,
+        supersede: bool,
+        exposure: &'static str,
+    ) -> TestMixedDeclarationV1 {
+        TestMixedDeclarationV1 {
+            owner,
+            role,
+            slot: "primary",
+            namespace,
+            reference,
+            supersede,
+            exposure,
+        }
+    }
+
+    /// Runs the one composed preparation path over the real roots.
+    fn prepare(
+        entity: &Root,
+        platform: &PlatformRoot,
+        catalogue: &Catalogue,
+        seam: &TestPackageSeamV1<'_>,
+    ) -> TestPreparedPackageV1 {
+        prepare_unpublished_graphic_package_from_roots_v1(
+            &entity.capability(),
+            &platform.capability(),
+            seam,
+            catalogue.request(),
+            Path::new(BIN),
+        )
+    }
+
+    /// A slot-aware seam with the documented hard limits and one display case.
+    fn seam<'a>(
+        declarations: &'a [TestMixedDeclarationV1],
+        registration: Option<(&'static str, &'a str)>,
+        eligibility: PrepublicationDisplayEligibilityV1,
+    ) -> TestPackageSeamV1<'a> {
+        TestPackageSeamV1 {
+            registration,
+            format: TestMixedFormatV1::SlotAware,
+            declarations,
+            foreign_plan: None,
+            eligibility,
+            limits: GraphicPackageLimitsV1::hard(),
+        }
+    }
+
+    /// Asserts the attempt prepared a package, naming the real refusal otherwise.
+    fn prepared<'a>(
+        outcome: &'a TestPreparedPackageV1,
+        context: &str,
+    ) -> &'a TestPreparedPackageV1 {
+        assert!(
+            outcome.construction_refusal().is_none(),
+            "{context}: the candidate was refused: {:?}",
+            outcome.construction_refusal()
+        );
+        assert!(
+            outcome.package_refusal().is_none(),
+            "{context}: the package was refused: {:?}",
+            outcome.package_refusal()
+        );
+        assert!(
+            outcome.source_refusal().is_none(),
+            "{context}: the candidate sources were refused: {:?}",
+            outcome.source_refusal()
+        );
+        outcome
+    }
+
+    /// Every content key must be a bounded, lowercase, derived identity — never a path or a URL.
+    fn assert_key_grammar(outcome: &TestPreparedPackageV1) {
+        for entry in outcome.entries() {
+            let key = &entry.content_key;
+            assert!(
+                key.starts_with("sha256/"),
+                "a content key is a derived identity: {key}"
+            );
+            assert!(key.len() <= 96, "a content key stays bounded: {key}");
+            assert!(key.is_ascii(), "a content key is ASCII: {key}");
+            assert!(!key.contains(".."), "no traversal component: {key}");
+            assert!(!key.contains("://"), "no scheme, no URL: {key}");
+            assert!(!key.starts_with('/'), "no absolute path: {key}");
+            assert!(!key.contains('\\'), "no host path separator: {key}");
+            let digest = key
+                .strip_prefix("sha256/")
+                .and_then(|rest| rest.split('.').next())
+                .expect("a content key carries a digest");
+            assert_eq!(digest.len(), 64, "a content key is a full SHA-256: {key}");
+            assert!(
+                digest
+                    .bytes()
+                    .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)),
+                "a content key digest is lowercase hex: {key}"
+            );
+            assert_eq!(
+                digest, entry.output_sha256,
+                "the key derives from the exact output digest"
+            );
+        }
+    }
+
+    /// The tracked product files a package must never touch.
+    fn product_digests() -> Vec<(String, String)> {
+        let mut digests = Vec::new();
+        for relative in [
+            "assets/catalogue-1.0.0.json",
+            "assets/icons/icon-home.svg",
+            "assets/licensing/TABLER-ICONS-MIT.txt",
+        ] {
+            let path = product_root().join(relative);
+            let bytes = fs::read(&path).expect("the tracked product file is readable");
+            digests.push((
+                relative.to_owned(),
+                sha256_media_worker_bytes_v1(&bytes).to_hex(),
+            ));
+        }
+        digests
+    }
+
+    /// One entry by exact role name.
+    fn entry_of<'a>(
+        outcome: &'a TestPreparedPackageV1,
+        role: &str,
+    ) -> &'a solo_adapters::TestPreparedEntryV1 {
+        outcome
+            .entries()
+            .iter()
+            .find(|entry| entry.role == role)
+            .unwrap_or_else(|| panic!("the package carries a {role} entry"))
+    }
+    /// `N130_01` — a real mixed candidate: an approved Platform root default becomes a canonical
+    /// vector payload, the Entity raster winners become byte-exact pass-through payloads, and a
+    /// nearer authored supersession governs its own slot.
+    #[test]
+    fn n130_01_public_intent_package_is_exact_and_unpublished() {
+        let png_bytes = png();
+        let webp_bytes = webp();
+        let entity = Root::new(
+            "n130-package",
+            &[
+                ("logo.png", png_bytes.as_slice()),
+                ("banner.webp", webp_bytes.as_slice()),
+            ],
+        );
+        let platform = PlatformRoot::new("n130-package");
+        let catalogue = Catalogue::load();
+        let home_digest = catalogue.digest(HOME_ID);
+
+        // One approved Platform root registration for `graphic.logo`, an Entity favicon, an Entity
+        // social preview, and a Facet-then-Site `background` chain whose closer Site value wins.
+        let declarations = [
+            declared(
+                TestOwnerV1::Entity,
+                "favicon",
+                "logo.png",
+                "entity",
+                false,
+                "public",
+            ),
+            declared(
+                TestOwnerV1::Entity,
+                "social-preview",
+                "banner.webp",
+                "entity",
+                false,
+                "public",
+            ),
+            declared(
+                TestOwnerV1::Facet,
+                "background",
+                "banner.webp",
+                "entity",
+                false,
+                "public",
+            ),
+            declared(
+                TestOwnerV1::Site,
+                "background",
+                "logo.png",
+                "entity",
+                true,
+                "public",
+            ),
+        ];
+        let outcome = prepare(
+            &entity,
+            &platform,
+            &catalogue,
+            &seam(
+                &declarations,
+                Some((HOME_ID, &home_digest)),
+                PrepublicationDisplayEligibilityV1::Public,
+            ),
+        );
+        prepared(&outcome, "N130_01");
+
+        assert_eq!(
+            outcome.target_level(),
+            4,
+            "the representation owner is scoped"
+        );
+        assert_eq!(outcome.entries().len(), 4, "four eligible winning slots");
+        assert_eq!(outcome.eligibility(), "public");
+        assert!(
+            !outcome.publication_authority(),
+            "a package publishes nothing"
+        );
+        assert!(!outcome.routes_any_url(), "a package routes nothing");
+        assert_key_grammar(&outcome);
+
+        // The Platform default stays a vector: the canonical text, not the donor file and not a raster.
+        let logo = entry_of(&outcome, "graphic.logo");
+        assert_eq!(logo.mime, "image/svg+xml");
+        assert_eq!(logo.format, "svg");
+        assert_eq!(
+            logo.source_sha256, home_digest,
+            "the source is the approved catalogue asset"
+        );
+        assert_ne!(
+            logo.source_sha256, logo.output_sha256,
+            "the canonical vector output is not the donor source digest"
+        );
+        let text = std::str::from_utf8(&logo.payload).expect("the canonical vector is UTF-8 text");
+        assert!(
+            text.contains("<svg") && text.contains("viewBox"),
+            "the payload is a real vector document"
+        );
+        assert!(
+            !text.contains("<script") && !text.contains("xlink:href=\"http"),
+            "the accepted canonical vector carries no script and no external reference"
+        );
+        assert_eq!(
+            sha256_media_worker_bytes_v1(&logo.payload).to_hex(),
+            logo.output_sha256,
+            "the staged vector bytes hash to the recorded output digest"
+        );
+
+        // The raster winners are byte-for-byte pass-through of the accepted Entity sources.
+        let favicon = entry_of(&outcome, "graphic.favicon");
+        assert_eq!(favicon.format, "png");
+        assert_eq!(favicon.mime, "image/png");
+        assert_eq!(favicon.payload, png_bytes);
+        assert_eq!(favicon.source_sha256, favicon.output_sha256);
+        let preview = entry_of(&outcome, "graphic.social-preview");
+        assert_eq!(preview.format, "webp");
+        assert_eq!(preview.mime, "image/webp");
+        assert_eq!(preview.payload, webp_bytes);
+
+        // The nearer Site supersession governs `background`, so only its reference is staged.
+        let background = entry_of(&outcome, "graphic.background");
+        assert_eq!(background.slot, "primary");
+        assert_eq!(background.payload, png_bytes, "the closer Site value wins");
+
+        assert_eq!(
+            outcome.payload_manifest().len(),
+            3,
+            "logo.png is staged once"
+        );
+        assert_eq!(
+            outcome.total_bytes(),
+            favicon.payload.len() as u64 + preview.payload.len() as u64 + logo.payload.len() as u64
+        );
+        assert!(
+            outcome.discoverable(),
+            "an eligible case may advertise itself"
+        );
+
+        println!(
+            "n130_evidence case=01 entries=4 payloads=3 svg_vector=true canonical_sha_matched=true \
+             content_addressed=true platform_path={HOME_LOGICAL} platform_sha={} \
+             output_sha={} favicon_sha={} preview_sha={} winner_background=logo.png lineage=2 \
+             catalogue_sha={CATALOGUE_SHA256} publication=false route=false",
+            logo.source_sha256, logo.output_sha256, favicon.output_sha256, preview.output_sha256
+        );
+    }
+    /// `N130_02` — the privacy boundary: a private winner never falls back to a public Platform
+    /// default, a non-eligible display case yields nothing discoverable, and a late invalid source
+    /// still refuses the whole candidate with zero staged records.
+    #[test]
+    fn n130_02_privacy_boundary_and_late_refusal_are_whole() {
+        let png_bytes = png();
+        let webp_bytes = webp();
+        let mark_bytes = rich_svg().into_bytes();
+        let entity = Root::new(
+            "n130-privacy",
+            &[
+                ("logo.png", png_bytes.as_slice()),
+                ("banner.webp", webp_bytes.as_slice()),
+                ("mark.svg", mark_bytes.as_slice()),
+            ],
+        );
+        let platform = PlatformRoot::new("n130-privacy");
+        let catalogue = Catalogue::load();
+        let home_digest = catalogue.digest(HOME_ID);
+
+        // The approved public Platform default is superseded by a closer `internal` Entity value: the
+        // private value wins, so the role contributes nothing and the root default never resurfaces.
+        let declarations = [
+            declared(
+                TestOwnerV1::Entity,
+                "logo",
+                "mark.svg",
+                "entity",
+                true,
+                "internal",
+            ),
+            declared(
+                TestOwnerV1::Entity,
+                "favicon",
+                "logo.png",
+                "entity",
+                false,
+                "public",
+            ),
+            declared(
+                TestOwnerV1::Facet,
+                "banner",
+                "banner.webp",
+                "entity",
+                false,
+                "public",
+            ),
+        ];
+        let public = prepare(
+            &entity,
+            &platform,
+            &catalogue,
+            &seam(
+                &declarations,
+                Some((HOME_ID, &home_digest)),
+                PrepublicationDisplayEligibilityV1::Public,
+            ),
+        );
+        prepared(&public, "N130_02 public");
+        assert_eq!(
+            public.entries().len(),
+            2,
+            "only the two public winners are eligible: {:?}",
+            public
+                .entries()
+                .iter()
+                .map(|entry| entry.role.as_str())
+                .collect::<Vec<_>>()
+        );
+        assert!(
+            public
+                .entries()
+                .iter()
+                .all(|entry| entry.role != "graphic.logo"),
+            "an internal winner exposes nothing and never resurrects the Platform default"
+        );
+        assert!(
+            public
+                .provenance()
+                .iter()
+                .all(|(_, _, source, _)| source != &home_digest),
+            "the superseded root default is inspected but never staged"
+        );
+        for entry in public.entries() {
+            assert!(
+                !entry.slot.contains('/') && !entry.role.contains(".."),
+                "no private path or owner text reaches an entry"
+            );
+            assert!(
+                !entry.content_key.contains("internal") && !entry.content_key.contains("entity"),
+                "a content key carries no owner or exposure text"
+            );
+        }
+        // The very same fully valid candidate under the unlisted and internal display cases produces
+        // no discoverable general-purpose entry at all — and still had to pass every real check.
+        for eligibility in [
+            PrepublicationDisplayEligibilityV1::Unlisted,
+            PrepublicationDisplayEligibilityV1::Internal,
+        ] {
+            let hidden = prepare(
+                &entity,
+                &platform,
+                &catalogue,
+                &seam(&declarations, Some((HOME_ID, &home_digest)), eligibility),
+            );
+            prepared(&hidden, "N130_02 hidden");
+            assert!(
+                hidden.entries().is_empty(),
+                "{} yields nothing",
+                eligibility.as_str()
+            );
+            assert!(hidden.payload_manifest().is_empty());
+            assert_eq!(hidden.total_bytes(), 0);
+            assert!(!hidden.discoverable(), "no discovery entry is invented");
+            assert!(!hidden.publication_authority());
+            assert!(!hidden.routes_any_url());
+        }
+
+        // A late invalid source — a WebP declared for the PNG-only favicon role at the closest owner —
+        // refuses the whole candidate after the earlier obligations already succeeded.
+        let late = prepare(
+            &entity,
+            &platform,
+            &catalogue,
+            &seam(
+                &[
+                    declared(
+                        TestOwnerV1::Entity,
+                        "favicon",
+                        "logo.png",
+                        "entity",
+                        false,
+                        "public",
+                    ),
+                    declared(
+                        TestOwnerV1::Entity,
+                        "banner",
+                        "banner.webp",
+                        "entity",
+                        false,
+                        "public",
+                    ),
+                    declared(
+                        TestOwnerV1::Representation,
+                        "favicon",
+                        "banner.webp",
+                        "entity",
+                        true,
+                        "public",
+                    ),
+                ],
+                Some((HOME_ID, &home_digest)),
+                PrepublicationDisplayEligibilityV1::Public,
+            ),
+        );
+        let refusal = late
+            .source_refusal()
+            .expect("the invalid late obligation refuses the whole candidate");
+        assert!(late.package_refusal().is_none());
+        assert!(late.entries().is_empty(), "no partial record survives");
+        assert!(late.payload_manifest().is_empty(), "no payload is staged");
+        assert_eq!(late.total_bytes(), 0);
+        assert!(!late.discoverable());
+
+        println!(
+            "n130_evidence case=02 entries=2 internal_hidden=true superseded_not_resurrected=true \
+             unlisted_discovery=false late_refusal=whole late_kind={refusal} zero_partial=true \
+             output_sha={} catalogue_sha={CATALOGUE_SHA256} publication=false route=false",
+            entry_of(&public, "graphic.favicon").output_sha256
+        );
+    }
+    /// `N130_03` — identity and immutability: a foreign plan, a forged media claim and an unapproved
+    /// Platform identifier are all refused with zero records, identical bytes deduplicate safely, and
+    /// neither the tracked product tree nor a source file can be overwritten.
+    #[test]
+    fn n130_03_identity_substitution_and_immutable_collision() {
+        let before = product_digests();
+        let png_bytes = png();
+        let webp_bytes = webp();
+        let donor_svg = fs::read(product_root().join("assets/icons/icon-home.svg"))
+            .expect("the tracked donor icon is readable");
+        let entity = Root::new(
+            "n130-identity",
+            &[
+                ("logo.png", png_bytes.as_slice()),
+                ("banner.webp", webp_bytes.as_slice()),
+                ("trap.png", webp_bytes.as_slice()),
+            ],
+        );
+        let platform = PlatformRoot::new("n130-identity");
+        let catalogue = Catalogue::load();
+        let home_digest = catalogue.digest(HOME_ID);
+        let base = [
+            declared(
+                TestOwnerV1::Entity,
+                "favicon",
+                "logo.png",
+                "entity",
+                false,
+                "public",
+            ),
+            declared(
+                TestOwnerV1::Entity,
+                "social-preview",
+                "logo.png",
+                "entity",
+                false,
+                "public",
+            ),
+            declared(
+                TestOwnerV1::Entity,
+                "banner",
+                "banner.webp",
+                "entity",
+                false,
+                "public",
+            ),
+        ];
+
+        // A plan belonging to a different candidate must be refused before any source is touched.
+        let other = test_mixed_candidate_v1(
+            Some((HOME_ID, &home_digest)),
+            TestMixedFormatV1::SlotAware,
+            &[
+                declared(
+                    TestOwnerV1::Entity,
+                    "favicon",
+                    "logo.png",
+                    "entity",
+                    false,
+                    "public",
+                ),
+                declared(
+                    TestOwnerV1::Site,
+                    "logo",
+                    "logo.png",
+                    "entity",
+                    true,
+                    "public",
+                ),
+            ],
+        );
+        assert_eq!(other.refusal(), None, "the other candidate is itself valid");
+        let foreign_plan = other.plan();
+        let foreign = prepare(
+            &entity,
+            &platform,
+            &catalogue,
+            &TestPackageSeamV1 {
+                registration: Some((HOME_ID, &home_digest)),
+                format: TestMixedFormatV1::SlotAware,
+                declarations: &base,
+                foreign_plan: Some(foreign_plan),
+                eligibility: PrepublicationDisplayEligibilityV1::Public,
+                limits: GraphicPackageLimitsV1::hard(),
+            },
+        );
+        assert_eq!(
+            foreign.package_refusal(),
+            Some("plan-does-not-match-input"),
+            "a foreign plan is refused by identity, not by a filename"
+        );
+        assert!(foreign.source_refusal().is_none(), "no source was acquired");
+        assert!(foreign.entries().is_empty());
+        assert!(foreign.payload_manifest().is_empty());
+
+        // A forged media claim is caught by the accepted inspector before any output exists.
+        let forged = prepare(
+            &entity,
+            &platform,
+            &catalogue,
+            &seam(
+                &[declared(
+                    TestOwnerV1::Entity,
+                    "favicon",
+                    "trap.png",
+                    "entity",
+                    false,
+                    "public",
+                )],
+                Some((HOME_ID, &home_digest)),
+                PrepublicationDisplayEligibilityV1::Public,
+            ),
+        );
+        let forged_kind = forged
+            .source_refusal()
+            .expect("a .png name over WebP bytes is refused");
+        assert!(forged.entries().is_empty());
+        assert!(forged.payload_manifest().is_empty());
+
+        // An unapproved Platform identifier is refused by the verified approved binding.
+        let unapproved_digest = "0".repeat(64);
+        let unapproved = prepare(
+            &entity,
+            &platform,
+            &catalogue,
+            &seam(
+                &base,
+                Some((HOME_ID, unapproved_digest.as_str())),
+                PrepublicationDisplayEligibilityV1::Public,
+            ),
+        );
+        assert_eq!(
+            unapproved.source_refusal(),
+            Some("binding-refused"),
+            "an unapproved Platform identifier never becomes a package source"
+        );
+        assert!(unapproved.entries().is_empty());
+
+        // Truly identical final bytes share one immutable payload; different bytes never coalesce.
+        let identical = prepare(
+            &entity,
+            &platform,
+            &catalogue,
+            &seam(
+                &base,
+                Some((HOME_ID, &home_digest)),
+                PrepublicationDisplayEligibilityV1::Public,
+            ),
+        );
+        prepared(&identical, "N130_03 identical");
+        assert_eq!(
+            identical.entries().len(),
+            4,
+            "logo, favicon, preview, banner"
+        );
+        assert_eq!(
+            identical.payload_manifest().len(),
+            3,
+            "logo.png is stored once for two slots"
+        );
+        let favicon = entry_of(&identical, "graphic.favicon");
+        let preview = entry_of(&identical, "graphic.social-preview");
+        let banner = entry_of(&identical, "graphic.banner");
+        let logo = entry_of(&identical, "graphic.logo");
+        assert_eq!(favicon.content_key, preview.content_key, "true dedup");
+        assert_eq!(favicon.output_sha256, preview.output_sha256);
+        assert_ne!(
+            favicon.content_key, banner.content_key,
+            "different bytes differ"
+        );
+        assert_ne!(
+            favicon.content_key, logo.content_key,
+            "different formats differ"
+        );
+        assert_key_grammar(&identical);
+        assert_eq!(
+            logo.source_sha256, home_digest,
+            "the source digest is confirmed independently"
+        );
+        assert_ne!(
+            logo.output_sha256, home_digest,
+            "the canonical output digest is its own identity"
+        );
+        assert_ne!(
+            logo.payload, donor_svg,
+            "the staged vector is the canonical text, not the donor file"
+        );
+
+        // A test-owned copy proves the exact bytes survive a round trip, and that staging one output
+        // on disk leaves every tracked product file byte-identical.
+        let stage = scratch_parent().join(format!("solo-n130-stage-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&stage);
+        fs::create_dir_all(&stage).expect("a disposable task-owned staging directory");
+        let staged_path = stage.join("payload.svg");
+        fs::write(&staged_path, &logo.payload).expect("stage one package payload");
+        let reread = fs::read(&staged_path).expect("re-read the staged payload");
+        assert_eq!(reread, logo.payload, "the staged bytes are exact");
+        assert_eq!(
+            sha256_media_worker_bytes_v1(&reread).to_hex(),
+            logo.output_sha256
+        );
+        let _ = fs::remove_dir_all(&stage);
+
+        let after = product_digests();
+        assert_eq!(
+            before, after,
+            "no package output may overwrite a product file or the catalogue"
+        );
+
+        println!(
+            "n130_evidence case=03 foreign_plan=plan-does-not-match-input forged_media={forged_kind} \
+             unapproved_id=binding-refused entries=4 payloads=3 dedup=identical_bytes_only \
+             collision=refused_by_derivation immutable=true product_tree_unchanged=true \
+             output_sha={} catalogue_sha={CATALOGUE_SHA256} publication=false route=false",
+            logo.output_sha256
+        );
+    }
+    /// `N130_04` — determinism and authority: the same validated input produces the same package
+    /// twice, quota and limit failures refuse atomically, the legacy entrypoint stays unchanged, and
+    /// nothing activates a default, a route or a publication.
+    #[test]
+    fn n130_04_deterministic_package_limits_and_authority() {
+        let png_bytes = png();
+        let webp_bytes = webp();
+        let entity = Root::new(
+            "n130-deterministic",
+            &[
+                ("logo.png", png_bytes.as_slice()),
+                ("banner.webp", webp_bytes.as_slice()),
+            ],
+        );
+        let platform = PlatformRoot::new("n130-deterministic");
+        let catalogue = Catalogue::load();
+        let home_digest = catalogue.digest(HOME_ID);
+        let declarations = [
+            declared(
+                TestOwnerV1::Entity,
+                "favicon",
+                "logo.png",
+                "entity",
+                false,
+                "public",
+            ),
+            declared(
+                TestOwnerV1::Entity,
+                "banner",
+                "banner.webp",
+                "entity",
+                false,
+                "public",
+            ),
+            declared(
+                TestOwnerV1::Entity,
+                "social-preview",
+                "logo.png",
+                "entity",
+                false,
+                "public",
+            ),
+        ];
+        let request = seam(
+            &declarations,
+            Some((HOME_ID, &home_digest)),
+            PrepublicationDisplayEligibilityV1::Public,
+        );
+
+        // The same fully validated input twice: byte-identical entries, payloads and ordering.
+        let first = prepare(&entity, &platform, &catalogue, &request);
+        prepared(&first, "N130_04 first");
+        let second = prepare(&entity, &platform, &catalogue, &request);
+        prepared(&second, "N130_04 second");
+        assert_eq!(first, second, "the package is deterministic");
+        assert_eq!(first.entries().len(), 4);
+        assert_eq!(first.payload_manifest(), second.payload_manifest());
+        assert_eq!(first.total_bytes(), second.total_bytes());
+
+        // A tightened total-byte bound refuses the whole package, never a truncated prefix.
+        let tight = GraphicPackageLimitsV1::new(8, 64).expect("a bounded tightened limit");
+        let over_bytes = prepare(
+            &entity,
+            &platform,
+            &catalogue,
+            &TestPackageSeamV1 {
+                registration: Some((HOME_ID, &home_digest)),
+                format: TestMixedFormatV1::SlotAware,
+                declarations: &declarations,
+                foreign_plan: None,
+                eligibility: PrepublicationDisplayEligibilityV1::Public,
+                limits: tight,
+            },
+        );
+        assert_eq!(over_bytes.package_refusal(), Some("quota-exceeded"));
+        assert!(over_bytes.entries().is_empty(), "no partial package");
+        assert!(over_bytes.payload_manifest().is_empty());
+
+        // A tightened entry bound refuses at the fourth entry, still with zero records.
+        let narrow = GraphicPackageLimitsV1::new(2, 8 * 1024 * 1024).expect("a bounded entry cap");
+        let over_entries = prepare(
+            &entity,
+            &platform,
+            &catalogue,
+            &TestPackageSeamV1 {
+                registration: Some((HOME_ID, &home_digest)),
+                format: TestMixedFormatV1::SlotAware,
+                declarations: &declarations,
+                foreign_plan: None,
+                eligibility: PrepublicationDisplayEligibilityV1::Public,
+                limits: narrow,
+            },
+        );
+        assert_eq!(over_entries.package_refusal(), Some("quota-exceeded"));
+        assert!(over_entries.entries().is_empty(), "no partial package");
+
+        // The documented hard maxima cannot be exceeded by a request.
+        assert_eq!(
+            GraphicPackageLimitsV1::new(0, 1024).map_err(|refusal| refusal.detail()),
+            Err("invalid-limits")
+        );
+        assert_eq!(
+            GraphicPackageLimitsV1::new(999, 1024).map_err(|refusal| refusal.detail()),
+            Err("invalid-limits")
+        );
+        assert_eq!(
+            GraphicPackageLimitsV1::new(4, 64 * 1024 * 1024).map_err(|refusal| refusal.detail()),
+            Err("invalid-limits")
+        );
+
+        // The accepted legacy envelope stays exactly as it was: one public value, no slot identity, and
+        // therefore no slot-aware package record and no invented default.
+        let parity = prepare(
+            &entity,
+            &platform,
+            &catalogue,
+            &TestPackageSeamV1 {
+                registration: None,
+                format: TestMixedFormatV1::LegacyEnvelope,
+                declarations: &[declared(
+                    TestOwnerV1::Entity,
+                    "favicon",
+                    "logo.png",
+                    "entity",
+                    false,
+                    "public",
+                )],
+                foreign_plan: None,
+                eligibility: PrepublicationDisplayEligibilityV1::Public,
+                limits: GraphicPackageLimitsV1::hard(),
+            },
+        );
+        prepared(&parity, "N130_04 parity");
+        assert!(
+            parity.entries().is_empty(),
+            "a parity candidate carries no slot identity to package"
+        );
+        assert!(parity.payload_manifest().is_empty());
+        assert_eq!(parity.total_bytes(), 0);
+        assert!(!parity.discoverable(), "no automatic default is activated");
+        assert!(!parity.publication_authority());
+        assert!(!parity.routes_any_url());
+
+        // The eligible package itself still asserts no authority of any kind.
+        assert!(!first.publication_authority());
+        assert!(!first.routes_any_url());
+        assert_eq!(first.eligibility(), "public");
+
+        println!(
+            "n130_evidence case=04 deterministic=true limits_bounded=true quota=atomic \
+             legacy_parity=true slot_identity_absent=true discoverable=false publication=false \
+             route=false output_sha={} catalogue_sha={CATALOGUE_SHA256}",
+            entry_of(&first, "graphic.favicon").output_sha256
+        );
+    }
+}

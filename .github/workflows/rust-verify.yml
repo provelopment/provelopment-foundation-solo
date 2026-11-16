@@ -1705,6 +1705,121 @@ jobs:
           Set-Content -LiteralPath $probe -NoNewline -Value $altered
           if (Test-N129 $probe) { throw 'altered catalogue pin or obligation count accepted' }
           Write-Output 'n129_gate mutation=rejected'
+      # Mandatory `SOLO-WO-118 R19` N130 gate: the unpublished immutable delivery-preparation package.
+      # The four focused cases run over the real roots and the real confined workers; the gate then
+      # requires the instrumented log to reject four altered copies of itself.
+      - name: Unpublished graphic package N130 gate (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          check_n130() {
+            local log="$1"
+            for name in n130_01_public_intent_package_is_exact_and_unpublished n130_02_privacy_boundary_and_late_refusal_are_whole n130_03_identity_substitution_and_immutable_collision n130_04_deterministic_package_limits_and_authority; do
+              grep -qF "test n130::$name " "$log" || return 1
+            done
+            [ "$(grep -Ec '^test n130::n130_0[0-9]_[A-Za-z0-9_]*( |$)' "$log")" -eq 4 ] || return 1
+            grep -qF 'test result: ok. 4 passed; 0 failed; 0 ignored' "$log" || return 1
+            ! grep -qF '... FAILED' "$log" || return 1
+            ! grep -qF '... ignored' "$log" || return 1
+            ! grep -qF 'test result: FAILED' "$log" || return 1
+            for case in 01 02 03 04; do
+              [ "$(grep -cF "n130_evidence case=$case" "$log")" -eq 1 ] || return 1
+            done
+            grep -qF 'svg_vector=true' "$log" || return 1
+            grep -qF 'canonical_sha_matched=true' "$log" || return 1
+            grep -qF 'content_addressed=true' "$log" || return 1
+            grep -qF 'internal_hidden=true' "$log" || return 1
+            grep -qF 'unlisted_discovery=false' "$log" || return 1
+            grep -qF 'late_refusal=whole' "$log" || return 1
+            grep -qF 'zero_partial=true' "$log" || return 1
+            grep -qF 'immutable=true' "$log" || return 1
+            grep -qF 'product_tree_unchanged=true' "$log" || return 1
+            grep -qF 'legacy_parity=true' "$log" || return 1
+            grep -qF 'catalogue_sha=ad8ea718b50641206cc4f4fe13e866ad266366a7aa11ef799c83ae8187858fc7' "$log" || return 1
+            grep -qF 'publication=false' "$log" || return 1
+            grep -qF 'route=false' "$log" || return 1
+            [ "$(grep -Eo 'output_sha=[0-9a-f]{64}' "$log" | wc -l)" -ge 4 ] || return 1
+            ! grep -qE 'output_sha=0{64}' "$log" || return 1
+          }
+          log="$RUNNER_TEMP/n130-four.txt"
+          cargo test -p solo-cli --test media_worker_host_smoke --locked n130_ -- --nocapture --test-threads=1 >"$log" 2>&1 || { cat "$log"; exit 1; }
+          cat "$log"
+          check_n130 "$log" || { echo 'authentic N130 4/4 run rejected'; exit 1; }
+          echo 'n130_gate authentic=accepted'
+          probe="$RUNNER_TEMP/n130-probe.txt"
+          cp "$log" "$probe"
+          sed -i '/n130_04_deterministic_package_limits_and_authority/d' "$probe"
+          if check_n130 "$probe"; then echo 'missing N130 case accepted'; exit 1; fi
+          cp "$log" "$probe"
+          sed -i 's/internal_hidden=true/internal_hidden=false/; s/unlisted_discovery=false/unlisted_discovery=true/' "$probe"
+          if check_n130 "$probe"; then echo 'forged privacy claim accepted'; exit 1; fi
+          cp "$log" "$probe"
+          sed -E -i 's/output_sha=[0-9a-f]{64}/output_sha=0000000000000000000000000000000000000000000000000000000000000000/g' "$probe"
+          if check_n130 "$probe"; then echo 'forged output digest accepted'; exit 1; fi
+          cp "$log" "$probe"
+          sed -i 's/publication=false/publication=true/g; s/zero_partial=true/zero_partial=false/g' "$probe"
+          if check_n130 "$probe"; then echo 'forged authority or partial-package claim accepted'; exit 1; fi
+          echo 'n130_gate mutation=rejected'
+      # The same four-case N130 matrix and authentic/mutation gate on the native Windows host.
+      - name: Unpublished graphic package N130 gate (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $tokens = @(
+            'test n130::n130_01_public_intent_package_is_exact_and_unpublished ',
+            'test n130::n130_02_privacy_boundary_and_late_refusal_are_whole ',
+            'test n130::n130_03_identity_substitution_and_immutable_collision ',
+            'test n130::n130_04_deterministic_package_limits_and_authority ',
+            'test result: ok. 4 passed; 0 failed; 0 ignored',
+            'n130_evidence case=01',
+            'n130_evidence case=02',
+            'n130_evidence case=03',
+            'n130_evidence case=04',
+            'svg_vector=true',
+            'canonical_sha_matched=true',
+            'content_addressed=true',
+            'internal_hidden=true',
+            'unlisted_discovery=false',
+            'late_refusal=whole',
+            'zero_partial=true',
+            'immutable=true',
+            'product_tree_unchanged=true',
+            'legacy_parity=true',
+            'catalogue_sha=ad8ea718b50641206cc4f4fe13e866ad266366a7aa11ef799c83ae8187858fc7',
+            'publication=false',
+            'route=false')
+          function Test-N130([string] $path) {
+            $text = Get-Content -Raw -LiteralPath $path
+            foreach ($token in $tokens) { if (-not $text.Contains($token)) { return $false } }
+            if (([regex]::Matches($text, 'n130_evidence case=')).Count -lt 4) { return $false }
+            if (([regex]::Matches($text, 'output_sha=[0-9a-f]{64}')).Count -lt 4) { return $false }
+            if (([regex]::Matches($text, 'output_sha=0{64}')).Count -gt 0) { return $false }
+            if ($text.Contains('... FAILED')) { return $false }
+            if ($text.Contains('... ignored')) { return $false }
+            if ($text.Contains('test result: FAILED')) { return $false }
+            return $true
+          }
+          $log = Join-Path $env:RUNNER_TEMP 'n130-four.txt'
+          cargo test -p solo-cli --test media_worker_host_smoke --locked n130_ -- --nocapture --test-threads=1 2>&1 | Tee-Object -FilePath $log
+          if ($LASTEXITCODE -ne 0) { throw 'n130 four-case run failed' }
+          if (-not (Test-N130 $log)) { throw 'authentic N130 4/4 run rejected' }
+          Write-Output 'n130_gate authentic=accepted'
+          $probe = Join-Path $env:RUNNER_TEMP 'n130-probe.txt'
+          $authentic = Get-Content -Raw -LiteralPath $log
+          $missing = [regex]::Replace($authentic, '(?m)^.*n130_04_deterministic_package_limits_and_authority.*$\r?\n', '')
+          Set-Content -LiteralPath $probe -NoNewline -Value $missing
+          if (Test-N130 $probe) { throw 'missing N130 case accepted' }
+          $privacy = $authentic.Replace('internal_hidden=true', 'internal_hidden=false').Replace('unlisted_discovery=false', 'unlisted_discovery=true')
+          Set-Content -LiteralPath $probe -NoNewline -Value $privacy
+          if (Test-N130 $probe) { throw 'forged privacy claim accepted' }
+          $digest = [regex]::Replace($authentic, 'output_sha=[0-9a-f]{64}', 'output_sha=' + ('0' * 64))
+          Set-Content -LiteralPath $probe -NoNewline -Value $digest
+          if (Test-N130 $probe) { throw 'forged output digest accepted' }
+          $authority = $authentic.Replace('publication=false', 'publication=true').Replace('zero_partial=true', 'zero_partial=false')
+          Set-Content -LiteralPath $probe -NoNewline -Value $authority
+          if (Test-N130 $probe) { throw 'forged authority or partial-package claim accepted' }
+          Write-Output 'n130_gate mutation=rejected'
       # Mandatory `SOLO-WO-118 R11` N124 gate: the V4 six-format whole-candidate composition on this
       # host, including the associated-alpha AVIF class beside the five legacy formats. The same
       # verifier must reject four altered copies of the real log before printing its verdict.

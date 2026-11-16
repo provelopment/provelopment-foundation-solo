@@ -15,6 +15,7 @@
 mod bootstrap_preflight;
 mod graphic_asset_inventory;
 mod graphic_asset_read;
+mod graphic_delivery_preparation;
 mod graphic_image_inspection;
 mod media_worker;
 mod platform_asset_catalogue;
@@ -40,6 +41,15 @@ pub use graphic_asset_read::{
     GraphicAssetReadPort, GraphicAssetReadRefusalKind, GraphicAssetReadRefusalV1,
     GraphicAssetReadSetOutcomeV1, GraphicAssetSourceEvidenceV1, GraphicAssetSourceSetV1,
     MAX_GRAPHIC_SOURCE_BYTES, read_graphic_asset_bytes_v1,
+};
+pub use graphic_delivery_preparation::{
+    GRAPHIC_PACKAGE_GRANTS_PUBLICATION_AUTHORITY_V1, GRAPHIC_PACKAGE_ROUTES_ANY_URL_V1,
+    GraphicDeliveryPackageOutcomeV1, GraphicDeliveryPackageV1, GraphicPackageEntryV1,
+    GraphicPackageLimitsV1, GraphicPackagePayloadV1, GraphicPackageRefusalKindV1,
+    GraphicPackageRefusalV1, GraphicPackageRequestV1, MAX_PACKAGE_CONTENT_KEY_BYTES_V1,
+    MAX_PACKAGE_ENTRIES_V1, MAX_PACKAGE_TOTAL_BYTES_V1, PACKAGE_KEY_PREFIX_V1,
+    PrepublicationDisplayEligibilityV1, PublicGraphicPackageEntryV1, PublicGraphicPackageV1,
+    prepare_mixed_graphic_package_v1,
 };
 pub use graphic_image_inspection::{
     AvifEvidenceV4, AvifPlaneEvidenceV4, GRAPHIC_IMAGE_INSPECTION_V4_GRANTS_PUBLICATION_AUTHORITY,

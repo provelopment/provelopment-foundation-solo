@@ -110,6 +110,10 @@ pub use graphic_image_inspection::{
     SvgWorkerModeV1, SvgWorkerObservationV1, SvgWorkerRefusalV1, SvgWorkerTestModeV1,
     inspect_svg_bytes_with_executable_v1, inspect_svg_bytes_with_test_mode_v1,
 };
+pub use graphic_image_inspection::{
+    TestPackageSeamV1, TestPreparedEntryV1, TestPreparedPackageV1,
+    prepare_unpublished_graphic_package_from_roots_v1,
+};
 pub use graphic_svg_inspection::{
     MAX_SVG_ATTRS_V1, MAX_SVG_CANONICAL_BYTES_V1, MAX_SVG_ELEMENTS_V1, MAX_SVG_FILTER_ELEMENTS_V1,
     MAX_SVG_FILTER_OPERATIONS_V1, MAX_SVG_NESTING_V1, MAX_SVG_PATH_COMMANDS_V1,

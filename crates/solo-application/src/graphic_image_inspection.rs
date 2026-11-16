@@ -4200,6 +4200,26 @@ where
     L: GraphicImageInspectPortV3,
     A: MediaWorkerPortV1,
 {
+    match inspect_mixed_graphic_candidate_staged_v1(plan, entity, platform, request, legacy, avif) {
+        Ok((set, _staged)) => MixedGraphicCandidateOutcomeV1::Complete(set),
+        Err(outcome) => outcome,
+    }
+}
+
+pub(crate) fn inspect_mixed_graphic_candidate_staged_v1<E, P, L, A>(
+    plan: &MixedGraphicPlanV1,
+    entity: &E,
+    platform: &P,
+    request: PlatformSourceRequestV1<'_>,
+    legacy: &L,
+    avif: &A,
+) -> Result<(GraphicMixedInspectionSetV1, Vec<Vec<u8>>), MixedGraphicCandidateOutcomeV1>
+where
+    E: GraphicAssetReadPort + ?Sized,
+    P: PlatformAssetLibraryReadPortV1 + ?Sized,
+    L: GraphicImageInspectPortV3,
+    A: MediaWorkerPortV1,
+{
     // 1. Entity-namespace acquisition through the accepted Entity gate.
     let entity_inventory = plan.entity_inventory_v1();
     let entity_set: Option<GraphicAssetSourceSetV1> = if entity_inventory.is_empty() {
@@ -4208,7 +4228,7 @@ where
         match read_graphic_asset_bytes_v1(&entity_inventory, entity) {
             GraphicAssetReadSetOutcomeV1::Complete(set) => Some(set),
             GraphicAssetReadSetOutcomeV1::Refused(refusal) => {
-                return MixedGraphicCandidateOutcomeV1::EntityReadRefused(refusal);
+                return Err(MixedGraphicCandidateOutcomeV1::EntityReadRefused(refusal));
             }
         }
     };
@@ -4233,7 +4253,7 @@ where
             match PlatformAssetRefV1::from_identifier(id) {
                 Ok(reference) => requests.push(reference),
                 Err(refusal) => {
-                    return MixedGraphicCandidateOutcomeV1::PlatformReadRefused(refusal);
+                    return Err(MixedGraphicCandidateOutcomeV1::PlatformReadRefused(refusal));
                 }
             }
         }
@@ -4246,7 +4266,7 @@ where
         ) {
             PlatformLibraryReadOutcomeV1::Complete(set) => Some(set),
             PlatformLibraryReadOutcomeV1::Refused(refusal) => {
-                return MixedGraphicCandidateOutcomeV1::PlatformReadRefused(refusal);
+                return Err(MixedGraphicCandidateOutcomeV1::PlatformReadRefused(refusal));
             }
         }
     };
@@ -4260,11 +4280,14 @@ where
             set,
         )
     {
-        return MixedGraphicCandidateOutcomeV1::BindingRefused(refusal);
+        return Err(MixedGraphicCandidateOutcomeV1::BindingRefused(refusal));
     }
 
     // 4. Whole-plan inspection, in plan order, over the acquired bytes only.
     let mut inspections: Vec<GraphicMixedInspectionV1> = Vec::with_capacity(plan.len());
+    // The exact bytes already acquired from the immutable confined transfer, in plan order, so
+    // the preparation step can stage an output without ever re-opening a source by path.
+    let mut staged: Vec<Vec<u8>> = Vec::with_capacity(plan.len());
     let mut entity_position = 0_usize;
     for obligation in plan.obligations() {
         // A root-layer registration has no authored EFS obligation to record as the accepted AVIF
@@ -4274,10 +4297,12 @@ where
             && format_of_reference(obligation.reference())
                 .is_some_and(GraphicImageFormatV3::is_avif)
         {
-            return MixedGraphicCandidateOutcomeV1::InspectRefused(MixedGraphicInspectRefusalV1 {
-                kind: MixedGraphicInspectRefusalKindV1::RootRegistrationAvifUnsupported,
-                obligation: Box::new(obligation.clone()),
-            });
+            return Err(MixedGraphicCandidateOutcomeV1::InspectRefused(
+                MixedGraphicInspectRefusalV1 {
+                    kind: MixedGraphicInspectRefusalKindV1::RootRegistrationAvifUnsupported,
+                    obligation: Box::new(obligation.clone()),
+                },
+            ));
         }
 
         let acquired = match obligation.namespace() {
@@ -4300,10 +4325,12 @@ where
                 }),
         };
         let Some((bytes, logical_path)) = acquired else {
-            return MixedGraphicCandidateOutcomeV1::InspectRefused(MixedGraphicInspectRefusalV1 {
-                kind: MixedGraphicInspectRefusalKindV1::BindingDoesNotCoverObligation,
-                obligation: Box::new(obligation.clone()),
-            });
+            return Err(MixedGraphicCandidateOutcomeV1::InspectRefused(
+                MixedGraphicInspectRefusalV1 {
+                    kind: MixedGraphicInspectRefusalKindV1::BindingDoesNotCoverObligation,
+                    obligation: Box::new(obligation.clone()),
+                },
+            ));
         };
 
         let carrier = obligation.authored_obligation_v1();
@@ -4317,12 +4344,12 @@ where
         ) {
             Ok(facts) => facts,
             Err(kind) => {
-                return MixedGraphicCandidateOutcomeV1::InspectRefused(
+                return Err(MixedGraphicCandidateOutcomeV1::InspectRefused(
                     MixedGraphicInspectRefusalV1 {
                         kind: MixedGraphicInspectRefusalKindV1::Image(kind),
                         obligation: Box::new(obligation.clone()),
                     },
-                );
+                ));
             }
         };
 
@@ -4340,7 +4367,8 @@ where
             worker_pid: facts.worker_pid,
             wall_ms: facts.wall_ms,
         });
+        staged.push(bytes);
     }
 
-    MixedGraphicCandidateOutcomeV1::Complete(GraphicMixedInspectionSetV1 { inspections })
+    Ok((GraphicMixedInspectionSetV1 { inspections }, staged))
 }

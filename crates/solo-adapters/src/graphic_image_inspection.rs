@@ -1615,6 +1615,54 @@ pub fn test_mixed_candidate_v1(
     format: TestMixedFormatV1,
     declarations: &[TestMixedDeclarationV1],
 ) -> TestMixedCandidateV1 {
+    match build_test_candidate_v1(registration, format, declarations) {
+        Ok(built) => TestMixedCandidateV1 {
+            plan: built.plan,
+            refusal: None,
+            slot_aware: built.slot_aware,
+            winners: built.winners,
+            logo_lineage: built.logo_lineage,
+            banner_suppressed: built.banner_suppressed,
+        },
+        Err(token) => TestMixedCandidateV1 {
+            plan: solo_application::MixedGraphicPlanV1::empty(),
+            refusal: Some(token),
+            slot_aware: format == TestMixedFormatV1::SlotAware,
+            winners: Vec::new(),
+            logo_lineage: 0,
+            banner_suppressed: false,
+        },
+    }
+}
+
+/// The real validated candidate the host tests can build, kept opaque to the caller.
+///
+/// `SOLO-WO-118 R19` needs the accepted `GraphicCascadeInputV1` itself plus its scoped owner so the
+/// real delivery-preparation path can run. The candidate stays here, inside the adapter crate: the
+/// `solo-cli` test crate never names a domain type and never constructs one.
+pub struct TestBuiltCandidateV1 {
+    /// The validated R17 candidate.
+    pub input: solo_domain::GraphicCascadeInputV1,
+    /// The one representation owner the package is scoped to.
+    pub target: solo_domain::QualifiedOwnerV1,
+    /// The whole-graph mixed plan.
+    pub plan: solo_application::MixedGraphicPlanV1,
+    /// Whether the candidate opted into R17 slot awareness.
+    pub slot_aware: bool,
+    /// The representation's winning `(role, reference)` pairs.
+    pub winners: Vec<(String, String)>,
+    /// The `graphic.logo` winner's lineage length.
+    pub logo_lineage: usize,
+    /// Whether `graphic.banner` carries a recorded suppression.
+    pub banner_suppressed: bool,
+}
+
+/// Builds one real validated candidate, or the stable token of its first refusal.
+fn build_test_candidate_v1(
+    registration: Option<(&'static str, &str)>,
+    format: TestMixedFormatV1,
+    declarations: &[TestMixedDeclarationV1],
+) -> Result<TestBuiltCandidateV1, &'static str> {
     use solo_application::collect_mixed_graphic_obligations_v1;
     use solo_domain::{ApprovedPlatformAssetV1, ApprovedPlatformGraphicBindingV1};
     use solo_domain::{
@@ -1624,15 +1672,6 @@ pub fn test_mixed_candidate_v1(
         PlatformAssetMediaClassV1, PlatformGraphicBaselineRecordV1, PlatformGraphicBaselineV1,
         PropertyDeclarationV1, PropertyKey, PropertyValueV1, SiteDraft, SiteIdV1,
         validate_declared_properties_v1,
-    };
-
-    let refused = |token: &'static str| TestMixedCandidateV1 {
-        plan: solo_application::MixedGraphicPlanV1::empty(),
-        refusal: Some(token),
-        slot_aware: format == TestMixedFormatV1::SlotAware,
-        winners: Vec::new(),
-        logo_lineage: 0,
-        banner_suppressed: false,
     };
 
     let entity = EntityIdV1::parse("example").expect("a canonical Entity identifier");
@@ -1649,7 +1688,7 @@ pub fn test_mixed_candidate_v1(
     draft.add_facet(facet);
     let graph = match draft.build() {
         Ok(graph) => graph,
-        Err(_) => return refused("graph-invalid"),
+        Err(_) => return Err("graph-invalid"),
     };
 
     // The verified approved binding: one asset when a registration is requested, otherwise a
@@ -1664,7 +1703,7 @@ pub fn test_mixed_candidate_v1(
     };
     let asset = match ApprovedPlatformAssetV1::new(asset_id, &asset_digest, class) {
         Ok(asset) => asset,
-        Err(_) => return refused("binding-invalid"),
+        Err(_) => return Err("binding-invalid"),
     };
     let binding = match ApprovedPlatformGraphicBindingV1::new(
         "1.0.0",
@@ -1672,7 +1711,7 @@ pub fn test_mixed_candidate_v1(
         vec![asset],
     ) {
         Ok(binding) => binding,
-        Err(_) => return refused("binding-invalid"),
+        Err(_) => return Err("binding-invalid"),
     };
     let baseline = match registration {
         None => PlatformGraphicBaselineV1::empty(binding),
@@ -1682,7 +1721,7 @@ pub fn test_mixed_candidate_v1(
                 id,
             ) {
                 Ok(reference) => reference,
-                Err(_) => return refused("registration-invalid"),
+                Err(_) => return Err("registration-invalid"),
             };
             let record = match PlatformGraphicBaselineRecordV1::new(
                 PropertyKey::GraphicLogo,
@@ -1691,11 +1730,11 @@ pub fn test_mixed_candidate_v1(
                 digest,
             ) {
                 Ok(record) => record,
-                Err(refusal) => return refused(refusal.detail()),
+                Err(refusal) => return Err(refusal.detail()),
             };
             match PlatformGraphicBaselineV1::new(binding, vec![record]) {
                 Ok(baseline) => baseline,
-                Err(refusal) => return refused(refusal.detail()),
+                Err(refusal) => return Err(refusal.detail()),
             }
         }
     };
@@ -1727,18 +1766,18 @@ pub fn test_mixed_candidate_v1(
             let mut selections = Vec::new();
             for entry in &entries {
                 let Some(role) = role_of(entry.role) else {
-                    return refused("role-invalid");
+                    return Err("role-invalid");
                 };
                 let Some(namespace) = namespace_of(entry.namespace) else {
-                    return refused("namespace-invalid");
+                    return Err("namespace-invalid");
                 };
                 let Ok(reference) =
                     solo_domain::AssetReferenceV1::parse(namespace, entry.reference)
                 else {
-                    return refused("reference-invalid");
+                    return Err("reference-invalid");
                 };
                 let Some(exposure) = exposure_of(entry.exposure) else {
-                    return refused("exposure-invalid");
+                    return Err("exposure-invalid");
                 };
                 let selection = if entry.supersede {
                     GraphicSlotSelectionV1::supersede(role, entry.slot, reference, exposure)
@@ -1747,12 +1786,12 @@ pub fn test_mixed_candidate_v1(
                 };
                 match selection {
                     Ok(selection) => selections.push(selection),
-                    Err(refusal) => return refused(refusal.detail()),
+                    Err(refusal) => return Err(refusal.detail()),
                 }
             }
             match OwnerGraphicSelectionsV1::new(owner.owner_v1(), selections) {
                 Ok(block) => blocks.push(block),
-                Err(refusal) => return refused(refusal.detail()),
+                Err(refusal) => return Err(refusal.detail()),
             }
         }
         if wants_envelope {
@@ -1760,23 +1799,23 @@ pub fn test_mixed_candidate_v1(
                 let mut per_role: Vec<(PropertyKey, Vec<AuthoredPropertyValueV1>)> = Vec::new();
                 for entry in &entries {
                     let Some(role) = role_of(entry.role) else {
-                        return refused("role-invalid");
+                        return Err("role-invalid");
                     };
                     let Some(namespace) = namespace_of(entry.namespace) else {
-                        return refused("namespace-invalid");
+                        return Err("namespace-invalid");
                     };
                     let Ok(reference) =
                         solo_domain::AssetReferenceV1::parse(namespace, entry.reference)
                     else {
-                        return refused("reference-invalid");
+                        return Err("reference-invalid");
                     };
                     let Some(exposure) = exposure_of(entry.exposure) else {
-                        return refused("exposure-invalid");
+                        return Err("exposure-invalid");
                     };
                     let Ok(authored) =
                         AuthoredPropertyValueV1::new(PropertyValueV1::graphic(reference), exposure)
                     else {
-                        return refused("authored-invalid");
+                        return Err("authored-invalid");
                     };
                     match per_role.iter_mut().find(|(key, _)| *key == role) {
                         Some((_, values)) => values.push(authored),
@@ -1797,7 +1836,7 @@ pub fn test_mixed_candidate_v1(
                     .collect();
                 match DeclaredOwnerPropertiesV1::new(owner.owner_v1(), entries_v1) {
                     Ok(set) => declared.push(set),
-                    Err(refusal) => return refused(refusal.detail()),
+                    Err(refusal) => return Err(refusal.detail()),
                 }
             }
         }
@@ -1805,24 +1844,24 @@ pub fn test_mixed_candidate_v1(
 
     let validated = match validate_declared_properties_v1(&graph, declared) {
         Ok(validated) => validated,
-        Err(refusal) => return refused(refusal.detail()),
+        Err(refusal) => return Err(refusal.detail()),
     };
     let input = match GraphicCascadeInputV1::new(validated, baseline, blocks) {
         Ok(input) => input,
-        Err(refusal) => return refused(refusal.detail()),
+        Err(refusal) => return Err(refusal.detail()),
     };
     let slot_aware = input.is_slot_aware();
     let plan = match collect_mixed_graphic_obligations_v1(&input) {
         Ok(plan) => plan,
-        Err(refusal) => return refused(refusal.detail()),
+        Err(refusal) => return Err(refusal.detail()),
     };
     let resolved = match input.resolve_graphic_cascade_all_v1() {
         Ok(resolved) => resolved,
-        Err(failure) => return refused(failure.detail()),
+        Err(failure) => return Err(failure.detail()),
     };
     let target = TestOwnerV1::Representation.owner_v1();
     let Some(record) = resolved.for_owner(&target) else {
-        return refused("resolution-incomplete");
+        return Err("resolution-incomplete");
     };
     let mut winners: Vec<(String, String)> = Vec::new();
     let mut logo_lineage = 0_usize;
@@ -1841,14 +1880,15 @@ pub fn test_mixed_candidate_v1(
             banner_suppressed = true;
         }
     }
-    TestMixedCandidateV1 {
+    Ok(TestBuiltCandidateV1 {
+        input,
+        target,
         plan,
-        refusal: None,
         slot_aware,
         winners,
         logo_lineage,
         banner_suppressed,
-    }
+    })
 }
 
 /// Maps one host-test role token to the registered graphic role.
@@ -3608,6 +3648,298 @@ pub fn inspect_entity_graphic_images_v4(
         solo_application::GraphicImageInspectionOutcomeV4::Refused(refusal) => {
             EntityImageOutcomeV4::Refused(refusal)
         }
+    }
+}
+
+/// The authored shape one `SOLO-WO-118 R19` host-test package request uses.
+///
+/// It is a **test seam**, not a product surface: it builds the same real candidate the R18 seam
+/// builds, then runs the real delivery-preparation path over the two real roots. It cannot create a
+/// route, a server or a published asset.
+pub struct TestPackageSeamV1<'a> {
+    /// The optional root-layer Platform registration.
+    pub registration: Option<(&'static str, &'a str)>,
+    /// The authored format of the candidate.
+    pub format: TestMixedFormatV1,
+    /// The authored declarations.
+    pub declarations: &'a [TestMixedDeclarationV1],
+    /// A deliberately foreign plan, to prove the identity binding refuses it.
+    pub foreign_plan: Option<&'a solo_application::MixedGraphicPlanV1>,
+    /// The test-only prepublication display eligibility case.
+    pub eligibility: solo_application::PrepublicationDisplayEligibilityV1,
+    /// The bounded package limits.
+    pub limits: solo_application::GraphicPackageLimitsV1,
+}
+
+/// One prepared entry as the host tests see it: outward facts plus its exact bytes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestPreparedEntryV1 {
+    /// The deterministic content-addressed key.
+    pub content_key: String,
+    /// The graphic role name.
+    pub role: String,
+    /// The named slot.
+    pub slot: String,
+    /// The confirmed MIME type.
+    pub mime: &'static str,
+    /// The stable format token.
+    pub format: &'static str,
+    /// The accepted intrinsic width.
+    pub width: u32,
+    /// The accepted intrinsic height.
+    pub height: u32,
+    /// The exact output digest.
+    pub output_sha256: String,
+    /// The exact source digest that passed inspection.
+    pub source_sha256: String,
+    /// Exactly the staged output bytes.
+    pub payload: Vec<u8>,
+}
+
+/// The closed result of one host-test package attempt, as plain values.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestPreparedPackageV1 {
+    construction_refusal: Option<&'static str>,
+    package_refusal: Option<&'static str>,
+    source_refusal: Option<&'static str>,
+    entries: Vec<TestPreparedEntryV1>,
+    payload_manifest: Vec<(String, u64, String)>,
+    total_bytes: u64,
+    discoverable: bool,
+    publication_authority: bool,
+    routes_any_url: bool,
+    target_level: usize,
+    eligibility: &'static str,
+}
+
+impl TestPreparedPackageV1 {
+    /// The stable token of a candidate-construction refusal.
+    #[must_use]
+    pub const fn construction_refusal(&self) -> Option<&'static str> {
+        self.construction_refusal
+    }
+
+    /// The closed package refusal token.
+    #[must_use]
+    pub const fn package_refusal(&self) -> Option<&'static str> {
+        self.package_refusal
+    }
+
+    /// The unchanged mixed-driver refusal token.
+    #[must_use]
+    pub const fn source_refusal(&self) -> Option<&'static str> {
+        self.source_refusal
+    }
+
+    /// Every prepared entry, in selection order.
+    #[must_use]
+    pub fn entries(&self) -> &[TestPreparedEntryV1] {
+        &self.entries
+    }
+
+    /// The deduplicated payload manifest as `(content key, byte length, digest)`.
+    #[must_use]
+    pub fn payload_manifest(&self) -> &[(String, u64, String)] {
+        &self.payload_manifest
+    }
+
+    /// The exact aggregate payload bytes.
+    #[must_use]
+    pub const fn total_bytes(&self) -> u64 {
+        self.total_bytes
+    }
+
+    /// Whether the outward view may advertise itself as a discovery source.
+    #[must_use]
+    pub const fn discoverable(&self) -> bool {
+        self.discoverable
+    }
+
+    /// Whether holding this package grants publication authority. Always `false`.
+    #[must_use]
+    pub const fn publication_authority(&self) -> bool {
+        self.publication_authority
+    }
+
+    /// Whether this package assigns a routable address. Always `false`.
+    #[must_use]
+    pub const fn routes_any_url(&self) -> bool {
+        self.routes_any_url
+    }
+
+    /// The EFS depth of the scoped owner (evidence that an explicit owner was used).
+    #[must_use]
+    pub const fn target_level(&self) -> usize {
+        self.target_level
+    }
+
+    /// The applied display eligibility token.
+    #[must_use]
+    pub const fn eligibility(&self) -> &'static str {
+        self.eligibility
+    }
+
+    /// The exact `(role, slot, source digest, output digest)` provenance of every entry.
+    #[must_use]
+    pub fn provenance(&self) -> Vec<(String, String, String, String)> {
+        self.entries
+            .iter()
+            .map(|entry| {
+                (
+                    entry.role.clone(),
+                    entry.slot.clone(),
+                    entry.source_sha256.clone(),
+                    entry.output_sha256.clone(),
+                )
+            })
+            .collect()
+    }
+}
+
+/// `SOLO-WO-118 R19` — builds one unpublished package from the two real roots.
+///
+/// It composes only already-accepted parts: the validated R17 candidate, the closed mixed plan, the
+/// accepted two-root acquisition and confined workers, and the closed delivery-preparation rules. It
+/// writes nothing outside memory and grants no authority.
+#[must_use]
+pub fn prepare_unpublished_graphic_package_from_roots_v1(
+    entity_root: &ContentRootCapability,
+    platform_root: &crate::platform_asset_read::PlatformRootCapabilityV1,
+    seam: &TestPackageSeamV1<'_>,
+    request: solo_application::PlatformSourceRequestV1<'_>,
+    executable: &Path,
+) -> TestPreparedPackageV1 {
+    let refused = |token: &'static str| TestPreparedPackageV1 {
+        construction_refusal: Some(token),
+        package_refusal: None,
+        source_refusal: None,
+        entries: Vec::new(),
+        payload_manifest: Vec::new(),
+        total_bytes: 0,
+        discoverable: false,
+        publication_authority: false,
+        routes_any_url: false,
+        target_level: 0,
+        eligibility: seam.eligibility.as_str(),
+    };
+
+    let built = match build_test_candidate_v1(seam.registration, seam.format, seam.declarations) {
+        Ok(built) => built,
+        Err(token) => return refused(token),
+    };
+    let plan = seam.foreign_plan.unwrap_or(&built.plan);
+    let package_request = solo_application::GraphicPackageRequestV1 {
+        input: &built.input,
+        plan,
+        target: &built.target,
+        eligibility: seam.eligibility,
+        limits: seam.limits,
+        platform: request,
+    };
+    let adapter = ConfinedGraphicInspectAdapterV4::new(executable);
+    let outcome = solo_application::prepare_mixed_graphic_package_v1(
+        &package_request,
+        entity_root,
+        platform_root,
+        &adapter,
+        &adapter,
+    );
+    let target_level = built.target.level_index();
+
+    let assembled = match &outcome {
+        solo_application::GraphicDeliveryPackageOutcomeV1::Prepared(package) => {
+            let view = package.public_intent();
+            let entries: Vec<TestPreparedEntryV1> = package
+                .entries()
+                .iter()
+                .map(|entry| TestPreparedEntryV1 {
+                    content_key: entry.content_key().to_owned(),
+                    role: entry.role().name().to_owned(),
+                    slot: entry.slot().to_owned(),
+                    mime: entry.mime(),
+                    format: format_token_v3(entry.format()),
+                    width: entry.width(),
+                    height: entry.height(),
+                    output_sha256: entry.output_sha256().to_hex(),
+                    source_sha256: entry.source_sha256().to_hex(),
+                    payload: package
+                        .payload(entry.content_key())
+                        .map_or_else(Vec::new, |payload| payload.bytes().to_vec()),
+                })
+                .collect();
+            let manifest: Vec<(String, u64, String)> = package
+                .payloads()
+                .iter()
+                .map(|payload| {
+                    (
+                        payload.content_key().to_owned(),
+                        payload.len(),
+                        payload.sha256().to_hex(),
+                    )
+                })
+                .collect();
+            TestPreparedPackageV1 {
+                construction_refusal: None,
+                package_refusal: None,
+                source_refusal: None,
+                entries,
+                payload_manifest: manifest,
+                total_bytes: package.total_bytes(),
+                discoverable: view.discoverable(),
+                publication_authority: view.publication_authority(),
+                routes_any_url: outcome.routes_any_url(),
+                target_level,
+                eligibility: seam.eligibility.as_str(),
+            }
+        }
+        solo_application::GraphicDeliveryPackageOutcomeV1::Refused(refusal) => {
+            TestPreparedPackageV1 {
+                package_refusal: Some(refusal.detail()),
+                routes_any_url: outcome.routes_any_url(),
+                target_level,
+                ..refused("refused")
+            }
+        }
+        solo_application::GraphicDeliveryPackageOutcomeV1::SourceRefused(driver) => {
+            TestPreparedPackageV1 {
+                source_refusal: Some(source_refusal_token(driver)),
+                routes_any_url: outcome.routes_any_url(),
+                target_level,
+                ..refused("source-refused")
+            }
+        }
+    };
+    TestPreparedPackageV1 {
+        construction_refusal: None,
+        ..assembled
+    }
+}
+
+/// The stable token of one unchanged mixed-driver refusal.
+fn source_refusal_token(
+    outcome: &solo_application::MixedGraphicCandidateOutcomeV1,
+) -> &'static str {
+    use solo_application::MixedGraphicCandidateOutcomeV1 as Outcome;
+    match outcome {
+        Outcome::Complete(_) => "complete",
+        Outcome::PlanRefused(_) => "plan-refused",
+        Outcome::EntityReadRefused(_) => "entity-read-refused",
+        Outcome::PlatformReadRefused(_) => "platform-read-refused",
+        Outcome::BindingRefused(_) => "binding-refused",
+        Outcome::InspectRefused(refusal) => refusal.kind().detail(),
+    }
+}
+
+/// The stable token of one confirmed image format.
+const fn format_token_v3(format: solo_application::GraphicImageFormatV3) -> &'static str {
+    use solo_application::GraphicImageFormatV3 as Format;
+    match format {
+        Format::Png => "png",
+        Format::Jpeg => "jpeg",
+        Format::WebP => "webp",
+        Format::Gif => "gif",
+        Format::Svg => "svg",
+        Format::Avif => "avif",
     }
 }
 
