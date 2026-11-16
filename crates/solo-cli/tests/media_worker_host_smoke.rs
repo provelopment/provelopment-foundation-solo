@@ -18,6 +18,153 @@ use std::time::{Duration, Instant};
 /// Cargo's exact binding for the compiled binary under test: never a `PATH` lookup.
 const BIN: &str = env!("CARGO_BIN_EXE_solo-cli");
 
+/// The approved Platform library candidate document, relative to this crate.
+const APPROVED_PLATFORM_CANDIDATE: &str =
+    "../../.documents/Reports/platform-library-1.0.0-foundation-candidate.json";
+
+/// The approved catalogue's canonical LF SHA-256.
+const APPROVED_PLATFORM_CATALOGUE_SHA256: &str =
+    "ad8ea718b50641206cc4f4fe13e866ad266366a7aa11ef799c83ae8187858fc7";
+
+/// The approved product tree's exact file count.
+const APPROVED_PLATFORM_PRODUCT_FILES: usize = 84;
+
+/// `SOLO-WO-118 R16` — the shared, test-only product-library predicate.
+///
+/// Two accepted tests asserted, in the pre-install state, that no product `platform/` tree may
+/// exist. Once the Owner approved the library, that assertion became a statement about history
+/// rather than about safety, and it is replaced here by the state-independent invariant:
+///
+/// * nothing installed — the historical pre-install tree is accepted, but a *half-created* tree
+///   (a `platform/` without `platform/assets/`, or the reverse) is not;
+/// * installed — the product tree must be **exactly** the approved library: the enumerated
+///   relative path set equals the approved catalogue's 81 identifiers plus the catalogue, the MIT
+///   notice and the provenance record, with no extra file, no unexpected directory and no link;
+///   the installed catalogue is byte-identical to the approved candidate document and hashes to
+///   the pinned digest; and the two licensing documents keep their pinned bytes.
+///
+/// The enumeration never follows a symlink or reparse point, and every diagnostic is path-free
+/// beyond the caller's own root name. This predicate grants no publication, no media correctness
+/// and no rights: it only decides whether the product tree is absent or exactly the approved one.
+fn assert_absent_or_exact_approved_platform_library(manifest: &std::path::Path) {
+    use std::collections::BTreeSet;
+    use std::path::Path;
+
+    let platform = manifest.join("../../platform");
+    let assets = platform.join("assets");
+    if !platform.exists() && !assets.exists() {
+        return;
+    }
+    assert!(
+        platform.is_dir() && assets.is_dir(),
+        "a half-created product tree is not the absent pre-install state"
+    );
+
+    fn walk(base: &Path, current: &Path, out: &mut BTreeSet<String>) {
+        for entry in std::fs::read_dir(current).expect("the product tree is enumerable") {
+            let entry = entry.expect("a product directory entry");
+            let path = entry.path();
+            let file_type = entry
+                .file_type()
+                .expect("a product entry metadata, never following a link");
+            assert!(
+                !file_type.is_symlink(),
+                "the product tree must contain no link"
+            );
+            if file_type.is_dir() {
+                walk(base, &path, out);
+            } else {
+                assert!(
+                    file_type.is_file(),
+                    "the product tree holds only regular files and directories"
+                );
+                out.insert(
+                    path.strip_prefix(base)
+                        .expect("a relative product path")
+                        .to_string_lossy()
+                        .replace('\\', "/"),
+                );
+            }
+        }
+    }
+
+    let mut actual = BTreeSet::new();
+    walk(&assets, &assets, &mut actual);
+
+    let candidate = std::fs::read(manifest.join(APPROVED_PLATFORM_CANDIDATE))
+        .expect("the approved candidate catalogue is readable");
+    let catalogue = solo_adapters::parse_platform_asset_catalogue_v1(&candidate, "1.0.0")
+        .expect("the approved candidate catalogue satisfies the R12 contract");
+
+    let mut expected: BTreeSet<String> = BTreeSet::new();
+    for entry in catalogue.entries() {
+        expected.insert(entry.id().to_owned());
+    }
+    expected.insert("catalogue-1.0.0.json".to_owned());
+    expected.insert("licensing/TABLER-ICONS-MIT.txt".to_owned());
+    expected.insert("licensing/icon-provenance.json".to_owned());
+    assert_eq!(
+        expected.len(),
+        APPROVED_PLATFORM_PRODUCT_FILES,
+        "the approved library declares exactly 84 product files"
+    );
+    assert_eq!(
+        actual, expected,
+        "the installed product tree is exactly the approved library"
+    );
+    assert_eq!(actual.len(), APPROVED_PLATFORM_PRODUCT_FILES);
+
+    let installed = std::fs::read(assets.join("catalogue-1.0.0.json"))
+        .expect("the installed catalogue is readable");
+    assert_eq!(
+        installed, candidate,
+        "the installed catalogue is byte-identical to the approved candidate document"
+    );
+    assert_eq!(
+        solo_application::sha256_media_worker_bytes_v1(&installed).to_hex(),
+        APPROVED_PLATFORM_CATALOGUE_SHA256,
+        "the installed catalogue keeps its pinned digest"
+    );
+    let reparsed = solo_adapters::parse_platform_asset_catalogue_v1(&installed, "1.0.0")
+        .expect("the installed catalogue is parseable at the approved version");
+    assert_eq!(
+        reparsed.len(),
+        81,
+        "the installed catalogue declares 81 entries"
+    );
+    assert_eq!(
+        reparsed
+            .entries()
+            .iter()
+            .map(|e| e.id())
+            .collect::<Vec<_>>(),
+        catalogue
+            .entries()
+            .iter()
+            .map(|e| e.id())
+            .collect::<Vec<_>>(),
+        "the installed catalogue membership and order are the approved ones"
+    );
+
+    for (relative, digest) in [
+        (
+            "licensing/TABLER-ICONS-MIT.txt",
+            "b740a1d46122672da62833e97f7e7c8a13fa85cbc7445b584b297cc00dde93db",
+        ),
+        (
+            "licensing/icon-provenance.json",
+            "e0f0ea621c11140cf581d86aaab0b73421d0202114092a4e58dc3321ff1a325b",
+        ),
+    ] {
+        let bytes = std::fs::read(assets.join(relative)).expect("a retained licensing document");
+        assert_eq!(
+            solo_application::sha256_media_worker_bytes_v1(&bytes).to_hex(),
+            digest,
+            "the retained licensing document keeps its pinned bytes"
+        );
+    }
+}
+
 /// A finite budget for one case, comfortably inside the workflow's own step timeout.
 const CASE_TIMEOUT_MS: u64 = 20_000;
 
@@ -8235,14 +8382,9 @@ mod n125 {
             "the real Platform call site cannot be served in R12"
         );
 
-        // No product Platform tree or catalogue is introduced by this order.
+        // Absent, or exactly the Owner-approved product library: never a half-created tree.
         let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
-        for relative in ["../../platform", "../../platform/assets"] {
-            assert!(
-                !manifest.join(relative).exists(),
-                "no product Platform source tree may exist: {relative}"
-            );
-        }
+        super::assert_absent_or_exact_approved_platform_library(manifest);
         assert!(
             !manifest.join("../../content/platform").exists(),
             "no alternate Platform route may exist inside the Entity source tree"
@@ -8673,12 +8815,8 @@ mod n126 {
             );
         }
         let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
-        for relative in ["../../platform", "../../platform/assets"] {
-            assert!(
-                !manifest.join(relative).exists(),
-                "no product Platform source tree may exist: {relative}"
-            );
-        }
+        // Absent, or exactly the Owner-approved product library: never a half-created tree.
+        super::assert_absent_or_exact_approved_platform_library(manifest);
         assert_eq!(
             bind_catalogue_to_v4_evidence_v1(
                 &packet.catalogue,
