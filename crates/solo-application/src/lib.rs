@@ -19,6 +19,7 @@ mod graphic_image_inspection;
 mod media_worker;
 mod platform_asset_catalogue;
 mod platform_asset_read;
+mod platform_graphic_baseline;
 mod property_resolution;
 mod source_read;
 
@@ -114,6 +115,11 @@ pub use platform_asset_read::{
     PlatformRootSelectionV1, read_pinned_platform_sources_v1,
 };
 
+pub use platform_graphic_baseline::{
+    PLATFORM_GRAPHIC_BASELINE_GRANTS_PUBLICATION_AUTHORITY_V1,
+    PlatformGraphicBaselineRefusalKindV1, PlatformGraphicBaselineRefusalV1,
+    approved_platform_graphic_binding_v1,
+};
 pub use property_resolution::{
     PROPERTY_CANDIDATE_GRANTS_PUBLICATION_AUTHORITY, PropertyResolutionCandidateV1,
     PropertyResolutionRequestV1, resolve_declared_properties_v1,

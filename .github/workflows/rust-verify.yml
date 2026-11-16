@@ -1462,6 +1462,7 @@ jobs:
           sed -i 's/aggregate=3c34fe9919341862a5a70a87d205fbfc942741dec5f3996514d3edd0aeb1aaca/aggregate=0000000000000000000000000000000000000000000000000000000000000000/' "$probe"
           sed -i 's/zero_partial=true/zero_partial=false/' "$probe"
           if check_n127 "$probe"; then echo 'corrupted aggregate or partial-set claim accepted'; exit 1; fi
+          echo 'n127_gate mutation=rejected'
       - name: Owner-approved Platform library N127 gate (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
@@ -1515,6 +1516,98 @@ jobs:
 
           echo 'n127_gate mutation=rejected'
 
+      # Mandatory `SOLO-WO-118 R17` N128 gate: the governed Platform-first graphic cascade. The risk
+      # is cascade precedence, privacy and source identity, not re-decoding 81 validated icons, so
+      # this focused matrix runs the seven N128 cases and then requires the instrumented log to
+      # reject four altered copies of itself before printing its verdict.
+      - name: Governed Platform graphic cascade N128 gate (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          log="$RUNNER_TEMP/n128-matrix.txt"
+          cargo test -p solo-domain --test property_resolution --locked n128_domain -- --nocapture 2>&1 | tee "$log"
+          cargo test -p solo-application --test platform_graphic_baseline --locked n128_07 -- --nocapture 2>&1 | tee -a "$log"
+          check_n128() {
+            local file="$1"
+            for token in \
+              'test result: ok. 6 passed; 0 failed; 0 ignored' \
+              'test result: ok. 1 passed; 0 failed; 0 ignored' \
+              'n128_evidence case=01 root=visible_at_entity=true descends=5' \
+              'n128_evidence case=02 nearer=win still_nearer=win lineage=3' \
+              'n128_evidence case=03 root_suppress=cleared descendant_suppress=final' \
+              'n128_evidence case=04 slot_replaced=1 others_preserved=2 order=stable max=4' \
+              'n128_evidence case=05 unregistered=absent wrong_role=refused' \
+              'n128_evidence case=06 internal_hidden=true no_public_reappearance=true' \
+              'n128_evidence case=07 binding=exact read=2 digest_matched=true' \
+              'publication_authority=false'; do
+              grep -qF "$token" "$file" || return 1
+            done
+            [ "$(grep -cF 'n128_evidence case=' "$file")" -ge 7 ] || return 1
+            ! grep -qF '... FAILED' "$file" || return 1
+            ! grep -qF 'test result: FAILED' "$file" || return 1
+          }
+          check_n128 "$log" || { echo 'authentic N128 run rejected'; exit 1; }
+          echo 'n128_gate authentic=accepted'
+          probe="$RUNNER_TEMP/n128-probe.txt"
+          cp "$log" "$probe"
+          sed -i 's/case=02 nearer=win still_nearer=win lineage=3/case=02 nearer=win still_nearer=win lineage=1/' "$probe"
+          if check_n128 "$probe"; then echo 'forged precedence lineage accepted'; exit 1; fi
+          cp "$log" "$probe"
+          sed -i 's/case=06 internal_hidden=true/case=06 internal_hidden=false/; s/publication_authority=false/publication_authority=true/' "$probe"
+          if check_n128 "$probe"; then echo 'forged privacy or publication claim accepted'; exit 1; fi
+          cp "$log" "$probe"
+          sed -i '/n128_evidence case=04 /d' "$probe"
+          if check_n128 "$probe"; then echo 'missing case accepted'; exit 1; fi
+          cp "$log" "$probe"
+          sed -i 's/test result: ok. 6 passed/test result: ok. 5 passed/' "$probe"
+          if check_n128 "$probe"; then echo 'partial run accepted'; exit 1; fi
+          echo 'n128_gate mutation=rejected'
+      # The same focused N128 matrix and authentic/mutation gate on the native Windows host.
+      - name: Governed Platform graphic cascade N128 gate (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $log = Join-Path $env:RUNNER_TEMP 'n128-matrix.txt'
+          cargo test -p solo-domain --test property_resolution --locked n128_domain -- --nocapture 2>&1 | Tee-Object -FilePath $log
+          if ($LASTEXITCODE -ne 0) { throw 'n128 domain matrix failed' }
+          cargo test -p solo-application --test platform_graphic_baseline --locked n128_07 -- --nocapture 2>&1 | Tee-Object -FilePath $log -Append
+          if ($LASTEXITCODE -ne 0) { throw 'n128 binding case failed' }
+          $tokens = @(
+            'test result: ok. 6 passed; 0 failed; 0 ignored',
+            'test result: ok. 1 passed; 0 failed; 0 ignored',
+            'n128_evidence case=01 root=visible_at_entity=true descends=5',
+            'n128_evidence case=02 nearer=win still_nearer=win lineage=3',
+            'n128_evidence case=03 root_suppress=cleared descendant_suppress=final',
+            'n128_evidence case=04 slot_replaced=1 others_preserved=2 order=stable max=4',
+            'n128_evidence case=05 unregistered=absent wrong_role=refused',
+            'n128_evidence case=06 internal_hidden=true no_public_reappearance=true',
+            'n128_evidence case=07 binding=exact read=2 digest_matched=true',
+            'publication_authority=false')
+          function Test-N128([string] $path) {
+            $text = Get-Content -Raw -LiteralPath $path
+            foreach ($token in $tokens) { if (-not $text.Contains($token)) { return $false } }
+            if (([regex]::Matches($text, 'n128_evidence case=')).Count -lt 7) { return $false }
+            if ($text.Contains('... FAILED')) { return $false }
+            if ($text.Contains('test result: FAILED')) { return $false }
+            return $true
+          }
+          if (-not (Test-N128 $log)) { throw 'authentic N128 run rejected' }
+          Write-Output 'n128_gate authentic=accepted'
+          $probe = Join-Path $env:RUNNER_TEMP 'n128-probe.txt'
+          $authentic = Get-Content -Raw -LiteralPath $log
+          Set-Content -LiteralPath $probe -NoNewline -Value $authentic.Replace('lineage=3', 'lineage=1')
+          if (Test-N128 $probe) { throw 'forged precedence lineage accepted' }
+          $forgedPrivacy = $authentic.Replace('internal_hidden=true', 'internal_hidden=false').Replace('publication_authority=false', 'publication_authority=true')
+          Set-Content -LiteralPath $probe -NoNewline -Value $forgedPrivacy
+          if (Test-N128 $probe) { throw 'forged privacy or publication claim accepted' }
+          $missingCase = [regex]::Replace($authentic, '(?m)^.*n128_evidence case=04.*$\r?\n', '')
+          Set-Content -LiteralPath $probe -NoNewline -Value $missingCase
+          if (Test-N128 $probe) { throw 'missing case accepted' }
+          Set-Content -LiteralPath $probe -NoNewline -Value $authentic.Replace('test result: ok. 6 passed', 'test result: ok. 5 passed')
+          if (Test-N128 $probe) { throw 'partial run accepted' }
+          Write-Output 'n128_gate mutation=rejected'
       # Mandatory `SOLO-WO-118 R11` N124 gate: the V4 six-format whole-candidate composition on this
       # host, including the associated-alpha AVIF class beside the five legacy formats. The same
       # verifier must reject four altered copies of the real log before printing its verdict.

@@ -28,8 +28,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::efs_ownership::EfsOwnershipGraph;
 use crate::property_registry::{
-    DeclaredOwnerPropertiesV1, Exposure, FactIdV1, Inheritance, LocationExtensionRequestV1,
-    PropertyKey, PropertyValueV1, QualifiedOwnerV1,
+    AssetNamespace, AssetReferenceV1, DeclaredOwnerPropertiesV1, Exposure, FactIdV1, Inheritance,
+    LocationExtensionRequestV1, PropertyKey, PropertyValueV1, QualifiedOwnerV1,
 };
 
 /// A refused property resolution.
@@ -1125,5 +1125,1837 @@ pub fn project_public_properties_v1(resolved: &ResolvedPropertiesV1) -> PublicPr
     PublicPropertyProjectionV1 {
         owner: resolved.owner().clone(),
         properties,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// `SOLO-WO-118 R17` — §6.2I.2 governed Platform-first graphic cascade
+// ---------------------------------------------------------------------------
+//
+// This is an **additive, opt-in** slice. Nothing above this line changes: the legacy
+// additive resolver, its refusals, its provenance and its public projection keep their
+// exact semantics, so a project that adopts nothing resolves byte-identically. Only a
+// caller that supplies a non-empty registration table or an explicit slot selection
+// enters slot-aware resolution.
+//
+// The three decisions this slice keeps separate:
+//
+// 1. **Registration is configuration, never inference.** A role/slot default exists only
+//    because an exact record in [`PlatformGraphicBaselineV1`] names it, and that record is
+//    eligible only when a verified approved-catalogue binding proves the exact identifier,
+//    digest and media class. No filename, count, sort order, route, role name or asset
+//    presence can create a default.
+// 2. **A closer explicit supersession wins; nothing else does.** A slot changes only
+//    through an authored [`GraphicSlotOperationV1::Supersede`] (replace) or
+//    [`GraphicSlotOperationV1::Append`] (fill an empty slot). An invalid closer selection
+//    refuses the whole candidate rather than reviving the root default.
+// 3. **Suppression is final within its scope.** `suppress` discards inherited and
+//    root-layer contributions for its key, then permits valid explicitly authored local
+//    values; it never re-establishes a default by itself.
+
+/// The only slot a singular graphic role may occupy.
+pub const GRAPHIC_PRIMARY_SLOT_V1: &str = "primary";
+
+/// Maximum length of one graphic slot identifier, in ASCII bytes.
+pub const MAX_GRAPHIC_SLOT_BYTES_V1: usize = 63;
+
+/// Maximum number of registered Platform graphic baseline records.
+pub const MAX_PLATFORM_BASELINE_RECORDS_V1: usize = 64;
+
+/// Maximum number of approved Platform assets one verified binding may carry.
+pub const MAX_APPROVED_PLATFORM_ASSETS_V1: usize = 128;
+
+/// Maximum number of slot selections one owner may author.
+pub const MAX_OWNER_GRAPHIC_SELECTIONS_V1: usize = 16;
+
+/// Maximum number of supersession lineage steps: the root layer plus five EFS levels.
+pub const MAX_GRAPHIC_LINEAGE_STEPS_V1: usize = 6;
+
+/// A successful graphic cascade grants **no** publication authority.
+pub const GRAPHIC_CASCADE_GRANTS_PUBLICATION_AUTHORITY_V1: bool = false;
+
+/// A refused graphic-cascade operation or input.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum GraphicCascadeRefusalKind {
+    /// A slot identifier violated the closed grammar.
+    InvalidSlotIdentifier,
+    /// A non-`primary` slot was named for a singular graphic role.
+    SlotNotPermittedForRole,
+    /// The registration table repeated one role/slot pair.
+    DuplicateBaselineRecord,
+    /// A baseline record named a non-graphic property key.
+    BaselineRoleNotGraphic,
+    /// A baseline reference was not in the Platform namespace.
+    BaselineNamespaceAlias,
+    /// A baseline reference named an asset the verified binding does not approve.
+    BaselineAssetUnapproved,
+    /// A baseline record's declared digest disagreed with the approved catalogue digest.
+    BaselineDigestMismatch,
+    /// The registration's library version or catalogue pin disagreed with the binding.
+    BaselineBindingMismatch,
+    /// A baseline asset's media class is not permitted for that graphic role.
+    BaselineRoleFormatMismatch,
+    /// The registration table exceeded its bound.
+    BaselineTableOversize,
+    /// One owner named the same role/slot twice.
+    DuplicateGraphicSelection,
+    /// A legacy unqualified graphic value was authored in slot-aware mode.
+    UnqualifiedGraphicEntry,
+    /// A role carried more slots than its registered capacity.
+    SlotCapacityExceeded,
+    /// An `append` targeted a slot that is already occupied.
+    SlotAlreadyFilled,
+    /// A graphic selection named an owner outside the validated graph.
+    SelectionOwnerUnknown,
+    /// The requested owner is not a node of the one validated Entity graph.
+    UnknownOwner,
+    /// The resolved state described something the validated graph cannot contain.
+    InconsistentGraph,
+}
+
+impl GraphicCascadeRefusalKind {
+    /// Stable, safe diagnostic token for this refusal reason.
+    #[must_use]
+    pub const fn detail(self) -> &'static str {
+        match self {
+            Self::InvalidSlotIdentifier => "invalid-slot-identifier",
+            Self::SlotNotPermittedForRole => "slot-not-permitted-for-role",
+            Self::DuplicateBaselineRecord => "duplicate-baseline-record",
+            Self::BaselineRoleNotGraphic => "baseline-role-not-graphic",
+            Self::BaselineNamespaceAlias => "baseline-namespace-alias",
+            Self::BaselineAssetUnapproved => "baseline-asset-unapproved",
+            Self::BaselineDigestMismatch => "baseline-digest-mismatch",
+            Self::BaselineBindingMismatch => "baseline-binding-mismatch",
+            Self::BaselineRoleFormatMismatch => "baseline-role-format-mismatch",
+            Self::BaselineTableOversize => "baseline-table-oversize",
+            Self::DuplicateGraphicSelection => "duplicate-graphic-selection",
+            Self::UnqualifiedGraphicEntry => "unqualified-graphic-entry",
+            Self::SlotCapacityExceeded => "slot-capacity-exceeded",
+            Self::SlotAlreadyFilled => "slot-already-filled",
+            Self::SelectionOwnerUnknown => "selection-owner-unknown",
+            Self::UnknownOwner => "unknown-owner",
+            Self::InconsistentGraph => "inconsistent-graph",
+        }
+    }
+}
+
+/// One refused graphic-cascade operation or input.
+///
+/// The diagnostic carries only the closed reason, the offending registered key and (when the
+/// failure belongs to an authored selection) the qualified owner. It never carries an authored
+/// reference, a filesystem path, a media byte or a private provenance record.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GraphicCascadeRefusalV1 {
+    kind: GraphicCascadeRefusalKind,
+    key: Option<PropertyKey>,
+    owner: Option<Box<QualifiedOwnerV1>>,
+}
+
+impl GraphicCascadeRefusalV1 {
+    /// Builds one refusal from its closed reason.
+    #[must_use]
+    pub const fn of(kind: GraphicCascadeRefusalKind) -> Self {
+        Self {
+            kind,
+            key: None,
+            owner: None,
+        }
+    }
+
+    /// Records the role whose registration or selection failed.
+    #[must_use]
+    pub const fn with_key(mut self, key: PropertyKey) -> Self {
+        self.key = Some(key);
+        self
+    }
+
+    /// Records the owner whose selection failed.
+    #[must_use]
+    pub fn with_owner(mut self, owner: &QualifiedOwnerV1) -> Self {
+        self.owner = Some(Box::new(owner.clone()));
+        self
+    }
+
+    /// The closed refusal reason.
+    #[must_use]
+    pub const fn kind(&self) -> GraphicCascadeRefusalKind {
+        self.kind
+    }
+
+    /// The offending registered key, when the failure belongs to one.
+    #[must_use]
+    pub const fn key(&self) -> Option<PropertyKey> {
+        self.key
+    }
+
+    /// The stable, safe detail token.
+    #[must_use]
+    pub const fn detail(&self) -> &'static str {
+        self.kind.detail()
+    }
+}
+
+impl fmt::Display for GraphicCascadeRefusalV1 {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "graphic-cascade-refused: {}", self.detail())
+    }
+}
+
+impl std::error::Error for GraphicCascadeRefusalV1 {}
+
+/// One validated graphic slot identifier.
+///
+/// The grammar is closed and lowercase only: 1–63 ASCII bytes, first byte `a`–`z`, remaining
+/// bytes `a`–`z`, `0`–`9` or `-`, with no leading, trailing or adjacent hyphen. Because
+/// uppercase never parses, two spellings can never differ only by case, so a case collision is
+/// impossible rather than merely detected.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct GraphicSlotIdV1(String);
+
+impl GraphicSlotIdV1 {
+    /// Validates one authored slot identifier.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`GraphicCascadeRefusalKind::InvalidSlotIdentifier`] for an empty, overlong,
+    /// non-ASCII, uppercase or badly hyphenated identifier.
+    pub fn parse(text: &str) -> Result<Self, GraphicCascadeRefusalV1> {
+        let refused =
+            || GraphicCascadeRefusalV1::of(GraphicCascadeRefusalKind::InvalidSlotIdentifier);
+        if text.is_empty() || text.len() > MAX_GRAPHIC_SLOT_BYTES_V1 || !text.is_ascii() {
+            return Err(refused());
+        }
+        let bytes = text.as_bytes();
+        if !bytes[0].is_ascii_lowercase() {
+            return Err(refused());
+        }
+        for (position, byte) in bytes.iter().enumerate() {
+            if !(byte.is_ascii_lowercase() || byte.is_ascii_digit() || *byte == b'-') {
+                return Err(refused());
+            }
+            if *byte == b'-' {
+                let at_edge = position == 0 || position + 1 == bytes.len();
+                if at_edge || bytes[position - 1] == b'-' {
+                    return Err(refused());
+                }
+            }
+        }
+        Ok(Self(text.to_owned()))
+    }
+
+    /// The canonical primary slot.
+    #[must_use]
+    pub fn primary() -> Self {
+        Self(GRAPHIC_PRIMARY_SLOT_V1.to_owned())
+    }
+
+    /// The validated identifier.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    /// Whether this is the primary slot.
+    #[must_use]
+    pub fn is_primary(&self) -> bool {
+        self.0 == GRAPHIC_PRIMARY_SLOT_V1
+    }
+}
+
+impl fmt::Display for GraphicSlotIdV1 {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&self.0)
+    }
+}
+
+/// The closed media classes an approved Platform asset may carry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum PlatformAssetMediaClassV1 {
+    /// A static SVG document.
+    Svg,
+    /// A PNG raster image.
+    Png,
+    /// A JPEG raster image.
+    Jpeg,
+    /// A WebP raster image.
+    Webp,
+    /// An AVIF raster image.
+    Avif,
+    /// A GIF image.
+    Gif,
+}
+
+impl PlatformAssetMediaClassV1 {
+    /// The class of one lowercase extension, when the extension is a registered class.
+    #[must_use]
+    pub fn from_extension(extension: &str) -> Option<Self> {
+        match extension {
+            "svg" => Some(Self::Svg),
+            "png" => Some(Self::Png),
+            "jpg" | "jpeg" => Some(Self::Jpeg),
+            "webp" => Some(Self::Webp),
+            "avif" => Some(Self::Avif),
+            "gif" => Some(Self::Gif),
+            _ => None,
+        }
+    }
+
+    /// The stable class token.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Svg => "svg",
+            Self::Png => "png",
+            Self::Jpeg => "jpeg",
+            Self::Webp => "webp",
+            Self::Avif => "avif",
+            Self::Gif => "gif",
+        }
+    }
+
+    /// Whether this class is permitted for one graphic role.
+    ///
+    /// This mirrors the registry's own value/key contract: `graphic.favicon` is PNG only, and
+    /// every other graphic role accepts the admitted image classes.
+    #[must_use]
+    pub const fn permitted_for(self, key: PropertyKey) -> bool {
+        match key {
+            PropertyKey::GraphicFavicon => matches!(self, Self::Png),
+            _ => true,
+        }
+    }
+}
+
+/// One asset the verified approved Platform catalogue proves.
+///
+/// Holding one proves only that these three facts were established inward from the transferred
+/// catalogue bytes: the exact identifier, its declared SHA-256 and its media class. It proves no
+/// media validity, no read, no route and no publication authority.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ApprovedPlatformAssetV1 {
+    id: String,
+    sha256: String,
+    media_class: PlatformAssetMediaClassV1,
+}
+
+impl ApprovedPlatformAssetV1 {
+    /// Builds one verified asset record from already established facts.
+    ///
+    /// The identifier must be a valid Platform-namespace asset reference, its own extension must
+    /// agree with `media_class`, and the digest must be 64 lowercase hexadecimal characters.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`GraphicCascadeRefusalKind::BaselineNamespaceAlias`],
+    /// [`GraphicCascadeRefusalKind::BaselineAssetUnapproved`] or
+    /// [`GraphicCascadeRefusalKind::BaselineRoleFormatMismatch`].
+    pub fn new(
+        id: &str,
+        sha256: &str,
+        media_class: PlatformAssetMediaClassV1,
+    ) -> Result<Self, GraphicCascadeRefusalV1> {
+        let reference = AssetReferenceV1::parse(AssetNamespace::Platform, id).map_err(|_| {
+            GraphicCascadeRefusalV1::of(GraphicCascadeRefusalKind::BaselineNamespaceAlias)
+        })?;
+        if !is_lowercase_hex_digest(sha256) {
+            return Err(GraphicCascadeRefusalV1::of(
+                GraphicCascadeRefusalKind::BaselineAssetUnapproved,
+            ));
+        }
+        let extension = reference_extension(&reference).ok_or_else(|| {
+            GraphicCascadeRefusalV1::of(GraphicCascadeRefusalKind::BaselineAssetUnapproved)
+        })?;
+        if PlatformAssetMediaClassV1::from_extension(extension) != Some(media_class) {
+            return Err(GraphicCascadeRefusalV1::of(
+                GraphicCascadeRefusalKind::BaselineRoleFormatMismatch,
+            ));
+        }
+        Ok(Self {
+            id: id.to_owned(),
+            sha256: sha256.to_owned(),
+            media_class,
+        })
+    }
+
+    /// The exact catalogue identifier.
+    #[must_use]
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
+    /// The declared SHA-256 of the asset's own bytes.
+    #[must_use]
+    pub fn sha256(&self) -> &str {
+        &self.sha256
+    }
+
+    /// The asset's media class.
+    #[must_use]
+    pub const fn media_class(&self) -> PlatformAssetMediaClassV1 {
+        self.media_class
+    }
+}
+
+/// The verified approved Platform catalogue a registration may bind to.
+///
+/// This value is built only by an application boundary that independently verified the
+/// transferred catalogue bytes against the accepted pin and that observed at least one accepted
+/// confined source read. It is an inward-bound *fact set*, never a lookup registry: nothing here
+/// discovers files, consults a route or grants publication.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ApprovedPlatformGraphicBindingV1 {
+    library_version: String,
+    catalogue_sha256: String,
+    assets: Vec<ApprovedPlatformAssetV1>,
+}
+
+impl ApprovedPlatformGraphicBindingV1 {
+    /// Binds one verified library version, catalogue digest and approved asset set.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`GraphicCascadeRefusalKind::BaselineBindingMismatch`] for an empty or malformed
+    /// version or digest, [`GraphicCascadeRefusalKind::BaselineAssetUnapproved`] for an empty or
+    /// duplicate asset set, and [`GraphicCascadeRefusalKind::BaselineTableOversize`] when the set
+    /// exceeds [`MAX_APPROVED_PLATFORM_ASSETS_V1`].
+    pub fn new(
+        library_version: &str,
+        catalogue_sha256: &str,
+        assets: Vec<ApprovedPlatformAssetV1>,
+    ) -> Result<Self, GraphicCascadeRefusalV1> {
+        let refused =
+            || GraphicCascadeRefusalV1::of(GraphicCascadeRefusalKind::BaselineBindingMismatch);
+        if library_version.is_empty()
+            || library_version.len() > 16
+            || !library_version
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || byte == b'.')
+            || !is_lowercase_hex_digest(catalogue_sha256)
+        {
+            return Err(refused());
+        }
+        if assets.is_empty() {
+            return Err(GraphicCascadeRefusalV1::of(
+                GraphicCascadeRefusalKind::BaselineAssetUnapproved,
+            ));
+        }
+        if assets.len() > MAX_APPROVED_PLATFORM_ASSETS_V1 {
+            return Err(GraphicCascadeRefusalV1::of(
+                GraphicCascadeRefusalKind::BaselineTableOversize,
+            ));
+        }
+        for (position, asset) in assets.iter().enumerate() {
+            if assets[..position]
+                .iter()
+                .any(|seen| seen.id() == asset.id())
+            {
+                return Err(GraphicCascadeRefusalV1::of(
+                    GraphicCascadeRefusalKind::BaselineAssetUnapproved,
+                ));
+            }
+        }
+        Ok(Self {
+            library_version: library_version.to_owned(),
+            catalogue_sha256: catalogue_sha256.to_owned(),
+            assets,
+        })
+    }
+
+    /// The verified library version.
+    #[must_use]
+    pub fn library_version(&self) -> &str {
+        &self.library_version
+    }
+
+    /// The verified catalogue SHA-256.
+    #[must_use]
+    pub fn catalogue_sha256(&self) -> &str {
+        &self.catalogue_sha256
+    }
+
+    /// Every verified approved asset, in catalogue order.
+    #[must_use]
+    pub fn assets(&self) -> &[ApprovedPlatformAssetV1] {
+        &self.assets
+    }
+
+    /// The one approved asset with this exact identifier, never a near match.
+    #[must_use]
+    pub fn exact(&self, id: &str) -> Option<&ApprovedPlatformAssetV1> {
+        self.assets.iter().find(|asset| asset.id() == id)
+    }
+}
+
+/// The lowercase extension of one validated reference.
+fn reference_extension(reference: &AssetReferenceV1) -> Option<&str> {
+    reference.reference().rsplit_once('.').map(|(_, tail)| tail)
+}
+
+/// Whether one digest is exactly 64 lowercase hexadecimal characters.
+fn is_lowercase_hex_digest(text: &str) -> bool {
+    text.len() == 64
+        && text
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+/// One registered Platform graphic baseline record.
+///
+/// A record is trusted installation configuration: it states that this exact role and slot takes
+/// this exact approved Platform asset as its root-layer default. It is never inferred from a
+/// filename, a count, a sort order, a route, a role name or an asset's presence.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PlatformGraphicBaselineRecordV1 {
+    key: PropertyKey,
+    slot: GraphicSlotIdV1,
+    reference: AssetReferenceV1,
+    asset_sha256: String,
+}
+
+impl PlatformGraphicBaselineRecordV1 {
+    /// Builds one record without yet binding it to a verified catalogue.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`GraphicCascadeRefusalKind::BaselineRoleNotGraphic`] for a non-graphic key,
+    /// [`GraphicCascadeRefusalKind::BaselineNamespaceAlias`] for a non-Platform reference,
+    /// [`GraphicCascadeRefusalKind::SlotNotPermittedForRole`] for a non-`primary` slot on a
+    /// singular role, and [`GraphicCascadeRefusalKind::BaselineAssetUnapproved`] for a malformed
+    /// digest.
+    pub fn new(
+        key: PropertyKey,
+        slot: &str,
+        reference: AssetReferenceV1,
+        asset_sha256: &str,
+    ) -> Result<Self, GraphicCascadeRefusalV1> {
+        if !key.is_graphic() {
+            return Err(GraphicCascadeRefusalV1::of(
+                GraphicCascadeRefusalKind::BaselineRoleNotGraphic,
+            )
+            .with_key(key));
+        }
+        if reference.namespace() != AssetNamespace::Platform {
+            return Err(GraphicCascadeRefusalV1::of(
+                GraphicCascadeRefusalKind::BaselineNamespaceAlias,
+            )
+            .with_key(key));
+        }
+        let slot = GraphicSlotIdV1::parse(slot).map_err(|refusal| refusal.with_key(key))?;
+        if key.max_effective() == 1 && !slot.is_primary() {
+            return Err(GraphicCascadeRefusalV1::of(
+                GraphicCascadeRefusalKind::SlotNotPermittedForRole,
+            )
+            .with_key(key));
+        }
+        if !is_lowercase_hex_digest(asset_sha256) {
+            return Err(GraphicCascadeRefusalV1::of(
+                GraphicCascadeRefusalKind::BaselineAssetUnapproved,
+            )
+            .with_key(key));
+        }
+        Ok(Self {
+            key,
+            slot,
+            reference,
+            asset_sha256: asset_sha256.to_owned(),
+        })
+    }
+
+    /// The registered graphic role.
+    #[must_use]
+    pub const fn key(&self) -> PropertyKey {
+        self.key
+    }
+
+    /// The registered slot.
+    #[must_use]
+    pub const fn slot(&self) -> &GraphicSlotIdV1 {
+        &self.slot
+    }
+
+    /// The exact approved Platform reference.
+    #[must_use]
+    pub const fn reference(&self) -> &AssetReferenceV1 {
+        &self.reference
+    }
+
+    /// The declared digest of the referenced asset's own bytes.
+    #[must_use]
+    pub fn asset_sha256(&self) -> &str {
+        &self.asset_sha256
+    }
+}
+
+/// The closed registration table of Platform graphic role/slot defaults.
+///
+/// The table is **separate** from the immutable `1.0.0` catalogue document: it adds no catalogue
+/// field, changes no catalogue entry and cannot be derived from the installed product tree. It may
+/// legitimately be **empty**, in which case no product default exists for any role and the cascade
+/// carries only authored selections.
+///
+/// A record becomes eligible only when the verified binding proves the same library version, the
+/// same catalogue digest and the exact approved identifier with the declared digest and a media
+/// class the role permits.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PlatformGraphicBaselineV1 {
+    binding: ApprovedPlatformGraphicBindingV1,
+    records: Vec<PlatformGraphicBaselineRecordV1>,
+}
+
+impl PlatformGraphicBaselineV1 {
+    /// Binds a registration table to the verified approved catalogue.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`GraphicCascadeRefusalKind::BaselineTableOversize`] beyond
+    /// [`MAX_PLATFORM_BASELINE_RECORDS_V1`], [`GraphicCascadeRefusalKind::DuplicateBaselineRecord`]
+    /// for a repeated role/slot pair, [`GraphicCascadeRefusalKind::SlotCapacityExceeded`] for more
+    /// slots than the role permits, [`GraphicCascadeRefusalKind::BaselineAssetUnapproved`] for an
+    /// unapproved identifier, [`GraphicCascadeRefusalKind::BaselineDigestMismatch`] for a digest
+    /// that is not the catalogue's own, and
+    /// [`GraphicCascadeRefusalKind::BaselineRoleFormatMismatch`] for a media class the role does
+    /// not permit.
+    pub fn new(
+        binding: ApprovedPlatformGraphicBindingV1,
+        records: Vec<PlatformGraphicBaselineRecordV1>,
+    ) -> Result<Self, GraphicCascadeRefusalV1> {
+        if records.len() > MAX_PLATFORM_BASELINE_RECORDS_V1 {
+            return Err(GraphicCascadeRefusalV1::of(
+                GraphicCascadeRefusalKind::BaselineTableOversize,
+            ));
+        }
+        for (position, record) in records.iter().enumerate() {
+            if records[..position]
+                .iter()
+                .any(|seen| seen.key == record.key && seen.slot == record.slot)
+            {
+                return Err(GraphicCascadeRefusalV1::of(
+                    GraphicCascadeRefusalKind::DuplicateBaselineRecord,
+                )
+                .with_key(record.key));
+            }
+            let permitted = if record.key.max_effective() == 1 {
+                1
+            } else {
+                record.key.max_effective()
+            };
+            if records[..=position]
+                .iter()
+                .filter(|seen| seen.key == record.key)
+                .count()
+                > permitted
+            {
+                return Err(GraphicCascadeRefusalV1::of(
+                    GraphicCascadeRefusalKind::SlotCapacityExceeded,
+                )
+                .with_key(record.key));
+            }
+            let asset = binding.exact(record.reference.reference()).ok_or_else(|| {
+                GraphicCascadeRefusalV1::of(GraphicCascadeRefusalKind::BaselineAssetUnapproved)
+                    .with_key(record.key)
+            })?;
+            if asset.sha256() != record.asset_sha256 {
+                return Err(GraphicCascadeRefusalV1::of(
+                    GraphicCascadeRefusalKind::BaselineDigestMismatch,
+                )
+                .with_key(record.key));
+            }
+            if !asset.media_class().permitted_for(record.key) {
+                return Err(GraphicCascadeRefusalV1::of(
+                    GraphicCascadeRefusalKind::BaselineRoleFormatMismatch,
+                )
+                .with_key(record.key));
+            }
+        }
+        Ok(Self { binding, records })
+    }
+
+    /// An empty table bound to the verified catalogue: no product default exists.
+    #[must_use]
+    pub fn empty(binding: ApprovedPlatformGraphicBindingV1) -> Self {
+        Self {
+            binding,
+            records: Vec::new(),
+        }
+    }
+
+    /// The verified binding this table was validated against.
+    #[must_use]
+    pub const fn binding(&self) -> &ApprovedPlatformGraphicBindingV1 {
+        &self.binding
+    }
+
+    /// Every registered record, in authored registration order.
+    #[must_use]
+    pub fn records(&self) -> &[PlatformGraphicBaselineRecordV1] {
+        &self.records
+    }
+
+    /// Whether no default is registered at all.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.records.is_empty()
+    }
+
+    /// The record registered for one exact role/slot pair.
+    #[must_use]
+    pub fn registration(
+        &self,
+        key: PropertyKey,
+        slot: &GraphicSlotIdV1,
+    ) -> Option<&PlatformGraphicBaselineRecordV1> {
+        self.records
+            .iter()
+            .find(|record| record.key == key && record.slot == *slot)
+    }
+}
+
+/// The two closed slot operations an author may state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum GraphicSlotOperationV1 {
+    /// Replace whatever occupies the slot, including a root-layer default.
+    Supersede,
+    /// Fill the slot only when it is empty; the legacy additive conflict still refuses.
+    Append,
+}
+
+impl GraphicSlotOperationV1 {
+    /// The stable operation token.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Supersede => "supersede",
+            Self::Append => "append",
+        }
+    }
+}
+
+/// One explicitly authored graphic slot selection.
+///
+/// A selection is *slot-qualified by construction*, so nothing ever has to guess which slot a
+/// value belongs to. `Supersede` is the only operation that displaces an inherited or root-layer
+/// value; `Append` keeps the accepted additive meaning and therefore refuses when the slot is
+/// already occupied.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GraphicSlotSelectionV1 {
+    key: PropertyKey,
+    slot: GraphicSlotIdV1,
+    operation: GraphicSlotOperationV1,
+    reference: AssetReferenceV1,
+    exposure: Exposure,
+}
+
+impl GraphicSlotSelectionV1 {
+    /// Builds one validated selection.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`GraphicCascadeRefusalKind::BaselineRoleNotGraphic`] for a non-graphic key,
+    /// [`GraphicCascadeRefusalKind::InvalidSlotIdentifier`] for a bad slot and
+    /// [`GraphicCascadeRefusalKind::SlotNotPermittedForRole`] for a non-`primary` slot on a
+    /// singular role.
+    pub fn new(
+        key: PropertyKey,
+        slot: &str,
+        operation: GraphicSlotOperationV1,
+        reference: AssetReferenceV1,
+        exposure: Exposure,
+    ) -> Result<Self, GraphicCascadeRefusalV1> {
+        if !key.is_graphic() {
+            return Err(GraphicCascadeRefusalV1::of(
+                GraphicCascadeRefusalKind::BaselineRoleNotGraphic,
+            )
+            .with_key(key));
+        }
+        let slot = GraphicSlotIdV1::parse(slot).map_err(|refusal| refusal.with_key(key))?;
+        if key.max_effective() == 1 && !slot.is_primary() {
+            return Err(GraphicCascadeRefusalV1::of(
+                GraphicCascadeRefusalKind::SlotNotPermittedForRole,
+            )
+            .with_key(key));
+        }
+        Ok(Self {
+            key,
+            slot,
+            operation,
+            reference,
+            exposure,
+        })
+    }
+
+    /// An explicitly superseding selection for one named role/slot.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::new`].
+    pub fn supersede(
+        key: PropertyKey,
+        slot: &str,
+        reference: AssetReferenceV1,
+        exposure: Exposure,
+    ) -> Result<Self, GraphicCascadeRefusalV1> {
+        Self::new(
+            key,
+            slot,
+            GraphicSlotOperationV1::Supersede,
+            reference,
+            exposure,
+        )
+    }
+
+    /// An additive selection for one named role/slot.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::new`].
+    pub fn append(
+        key: PropertyKey,
+        slot: &str,
+        reference: AssetReferenceV1,
+        exposure: Exposure,
+    ) -> Result<Self, GraphicCascadeRefusalV1> {
+        Self::new(
+            key,
+            slot,
+            GraphicSlotOperationV1::Append,
+            reference,
+            exposure,
+        )
+    }
+
+    /// The selected role.
+    #[must_use]
+    pub const fn key(&self) -> PropertyKey {
+        self.key
+    }
+
+    /// The named slot.
+    #[must_use]
+    pub const fn slot(&self) -> &GraphicSlotIdV1 {
+        &self.slot
+    }
+
+    /// The authored operation.
+    #[must_use]
+    pub const fn operation(&self) -> GraphicSlotOperationV1 {
+        self.operation
+    }
+
+    /// The selected authored reference.
+    #[must_use]
+    pub const fn reference(&self) -> &AssetReferenceV1 {
+        &self.reference
+    }
+
+    /// The authored exposure of this selection.
+    #[must_use]
+    pub const fn exposure(&self) -> Exposure {
+        self.exposure
+    }
+}
+
+/// One owner's validated graphic slot selections.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OwnerGraphicSelectionsV1 {
+    owner: QualifiedOwnerV1,
+    selections: Vec<GraphicSlotSelectionV1>,
+}
+
+impl OwnerGraphicSelectionsV1 {
+    /// Validates one owner's selection block.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`GraphicCascadeRefusalKind::DuplicateGraphicSelection`] for a repeated role/slot
+    /// pair, [`GraphicCascadeRefusalKind::SlotCapacityExceeded`] past the role's slot capacity and
+    /// [`GraphicCascadeRefusalKind::BaselineTableOversize`] beyond
+    /// [`MAX_OWNER_GRAPHIC_SELECTIONS_V1`].
+    pub fn new(
+        owner: QualifiedOwnerV1,
+        selections: Vec<GraphicSlotSelectionV1>,
+    ) -> Result<Self, GraphicCascadeRefusalV1> {
+        if selections.len() > MAX_OWNER_GRAPHIC_SELECTIONS_V1 {
+            return Err(GraphicCascadeRefusalV1::of(
+                GraphicCascadeRefusalKind::BaselineTableOversize,
+            )
+            .with_owner(&owner));
+        }
+        for (position, selection) in selections.iter().enumerate() {
+            if selections[..position]
+                .iter()
+                .any(|seen| seen.key == selection.key && seen.slot == selection.slot)
+            {
+                return Err(GraphicCascadeRefusalV1::of(
+                    GraphicCascadeRefusalKind::DuplicateGraphicSelection,
+                )
+                .with_key(selection.key)
+                .with_owner(&owner));
+            }
+            let permitted = if selection.key.max_effective() == 1 {
+                1
+            } else {
+                selection.key.max_effective()
+            };
+            if selections[..=position]
+                .iter()
+                .filter(|seen| seen.key == selection.key)
+                .count()
+                > permitted
+            {
+                return Err(GraphicCascadeRefusalV1::of(
+                    GraphicCascadeRefusalKind::SlotCapacityExceeded,
+                )
+                .with_key(selection.key)
+                .with_owner(&owner));
+            }
+        }
+        Ok(Self { owner, selections })
+    }
+
+    /// The owner these selections belong to.
+    #[must_use]
+    pub const fn owner(&self) -> &QualifiedOwnerV1 {
+        &self.owner
+    }
+
+    /// The selections in authored order.
+    #[must_use]
+    pub fn selections(&self) -> &[GraphicSlotSelectionV1] {
+        &self.selections
+    }
+
+    /// The selections authored for one role, in authored order.
+    fn for_key(&self, key: PropertyKey) -> impl Iterator<Item = &GraphicSlotSelectionV1> {
+        self.selections
+            .iter()
+            .filter(move |selection| selection.key == key)
+    }
+}
+
+/// The closed kind of one effective graphic source.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum GraphicSourceKindV1 {
+    /// A root-layer registered default from the approved Platform library.
+    PlatformRootDefault,
+    /// An authored selection at one EFS owner.
+    AuthoredSelection,
+}
+
+impl GraphicSourceKindV1 {
+    /// The stable source-kind token.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::PlatformRootDefault => "platform-root-default",
+            Self::AuthoredSelection => "authored-selection",
+        }
+    }
+}
+
+/// The catalogue binding of one root-layer default.
+///
+/// This is internal provenance only: it records which approved library version, catalogue digest,
+/// identifier and asset digest supplied the default. It is never publicly projected.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GraphicPlatformBindingV1 {
+    library_version: String,
+    catalogue_sha256: String,
+    asset_id: String,
+    asset_sha256: String,
+}
+
+impl GraphicPlatformBindingV1 {
+    /// The approved library version the default came from.
+    #[must_use]
+    pub fn library_version(&self) -> &str {
+        &self.library_version
+    }
+
+    /// The verified catalogue digest.
+    #[must_use]
+    pub fn catalogue_sha256(&self) -> &str {
+        &self.catalogue_sha256
+    }
+
+    /// The exact catalogue identifier.
+    #[must_use]
+    pub fn asset_id(&self) -> &str {
+        &self.asset_id
+    }
+
+    /// The asset's own declared digest.
+    #[must_use]
+    pub fn asset_sha256(&self) -> &str {
+        &self.asset_sha256
+    }
+}
+
+/// One effective graphic source with its complete internal provenance.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GraphicSourceV1 {
+    kind: GraphicSourceKindV1,
+    namespace: AssetNamespace,
+    reference: String,
+    exposure: Exposure,
+    binding: Option<GraphicPlatformBindingV1>,
+}
+
+impl GraphicSourceV1 {
+    /// The closed source kind.
+    #[must_use]
+    pub const fn kind(&self) -> GraphicSourceKindV1 {
+        self.kind
+    }
+
+    /// The namespace the winning source lives in.
+    #[must_use]
+    pub const fn namespace(&self) -> AssetNamespace {
+        self.namespace
+    }
+
+    /// The winning portable relative reference.
+    #[must_use]
+    pub fn reference(&self) -> &str {
+        &self.reference
+    }
+
+    /// The winning source's authored exposure.
+    #[must_use]
+    pub const fn exposure(&self) -> Exposure {
+        self.exposure
+    }
+
+    /// The Platform catalogue binding, for a root-layer default only.
+    #[must_use]
+    pub const fn binding(&self) -> Option<&GraphicPlatformBindingV1> {
+        self.binding.as_ref()
+    }
+}
+
+/// The closed operation one lineage step records.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum GraphicLineageOperationV1 {
+    /// The root layer supplied the slot's initial default.
+    Selected,
+    /// An authored selection explicitly superseded the current value.
+    Superseded,
+    /// An authored selection filled an empty slot additively.
+    Appended,
+    /// This owner's `suppress` discarded the inherited and root-layer values for the key.
+    Suppressed,
+}
+
+impl GraphicLineageOperationV1 {
+    /// The stable operation token.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Selected => "selected",
+            Self::Superseded => "superseded",
+            Self::Appended => "appended",
+            Self::Suppressed => "suppressed",
+        }
+    }
+}
+
+/// One ordered step of a slot's supersession lineage.
+///
+/// `owner` is `None` for the Platform root layer, which is a library layer and **not** an EFS node;
+/// a later public projection never receives this record.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GraphicLineageStepV1 {
+    owner: Option<QualifiedOwnerV1>,
+    operation: GraphicLineageOperationV1,
+}
+
+impl GraphicLineageStepV1 {
+    /// The owner that authored the step, or `None` for the root layer.
+    #[must_use]
+    pub const fn owner(&self) -> Option<&QualifiedOwnerV1> {
+        self.owner.as_ref()
+    }
+
+    /// The recorded operation.
+    #[must_use]
+    pub const fn operation(&self) -> GraphicLineageOperationV1 {
+        self.operation
+    }
+
+    /// Whether this step is the Platform root layer rather than an EFS owner.
+    #[must_use]
+    pub const fn is_platform_root(&self) -> bool {
+        self.owner.is_none()
+    }
+}
+
+/// One effective graphic slot with its winning source and lineage.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GraphicSlotResolutionV1 {
+    slot: GraphicSlotIdV1,
+    source: GraphicSourceV1,
+    lineage: Vec<GraphicLineageStepV1>,
+}
+
+impl GraphicSlotResolutionV1 {
+    /// The slot this value occupies.
+    #[must_use]
+    pub const fn slot(&self) -> &GraphicSlotIdV1 {
+        &self.slot
+    }
+
+    /// The winning source.
+    #[must_use]
+    pub const fn source(&self) -> &GraphicSourceV1 {
+        &self.source
+    }
+
+    /// The ordered lineage from the root layer to the winner.
+    #[must_use]
+    pub fn lineage(&self) -> &[GraphicLineageStepV1] {
+        &self.lineage
+    }
+
+    /// The owner that authored the winning value, or `None` for a root-layer default.
+    #[must_use]
+    pub fn winning_owner(&self) -> Option<&QualifiedOwnerV1> {
+        self.lineage.last().and_then(|step| step.owner())
+    }
+}
+
+/// One resolved graphic role.
+///
+/// Exactly one carrier is populated. In **slot-aware** mode ([`GraphicCascadeInputV1::is_slot_aware`])
+/// `slots` carries the effective per-slot values and `legacy` is empty. In **parity** mode the role
+/// carries the untouched legacy effective values in `legacy` and never invents a slot identity,
+/// which is what makes an adopting project's previous semantics byte-identical.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ResolvedGraphicRoleV1 {
+    key: PropertyKey,
+    slots: Vec<GraphicSlotResolutionV1>,
+    legacy: Vec<ProvenanceValueV1>,
+    suppressed_at: Option<QualifiedOwnerV1>,
+}
+
+impl ResolvedGraphicRoleV1 {
+    /// The resolved role.
+    #[must_use]
+    pub const fn key(&self) -> PropertyKey {
+        self.key
+    }
+
+    /// The effective slot values, in registration-then-authored order.
+    #[must_use]
+    pub fn slots(&self) -> &[GraphicSlotResolutionV1] {
+        &self.slots
+    }
+
+    /// The untouched legacy effective values, in parity mode only.
+    #[must_use]
+    pub fn legacy(&self) -> &[ProvenanceValueV1] {
+        &self.legacy
+    }
+
+    /// The nearest owner whose explicit `suppress` cleared this role's inherited values.
+    #[must_use]
+    pub const fn suppressed_at(&self) -> Option<&QualifiedOwnerV1> {
+        self.suppressed_at.as_ref()
+    }
+
+    /// Whether this role resolved to nothing at all.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.slots.is_empty() && self.legacy.is_empty()
+    }
+
+    /// One effective slot, by exact identifier.
+    #[must_use]
+    pub fn slot(&self, slot: &str) -> Option<&GraphicSlotResolutionV1> {
+        self.slots
+            .iter()
+            .find(|resolution| resolution.slot.as_str() == slot)
+    }
+}
+
+/// The two kinds of refusal a graphic cascade can produce.
+///
+/// A slot-aware candidate still resolves its non-graphic keys through the accepted legacy
+/// algorithm, so a legacy refusal must reach the caller **unchanged** rather than being flattened
+/// into a generic graphic error. Either variant fails the whole candidate.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GraphicCascadeFailureV1 {
+    /// A graphic registration, slot, suppression or resolution failure.
+    Graphic(GraphicCascadeRefusalV1),
+    /// The unchanged legacy resolution refused a key of this candidate.
+    Legacy(PropertyResolutionRefusalV1),
+}
+
+impl GraphicCascadeFailureV1 {
+    /// The graphic refusal, when this failure is one.
+    #[must_use]
+    pub const fn graphic(&self) -> Option<&GraphicCascadeRefusalV1> {
+        match self {
+            Self::Graphic(refusal) => Some(refusal),
+            Self::Legacy(_) => None,
+        }
+    }
+
+    /// The graphic refusal kind, when this failure is one.
+    #[must_use]
+    pub fn graphic_kind(&self) -> Option<GraphicCascadeRefusalKind> {
+        self.graphic().map(GraphicCascadeRefusalV1::kind)
+    }
+
+    /// The stable, safe detail token of either variant.
+    #[must_use]
+    pub const fn detail(&self) -> &'static str {
+        match self {
+            Self::Graphic(refusal) => refusal.detail(),
+            Self::Legacy(refusal) => refusal.detail(),
+        }
+    }
+}
+
+impl From<GraphicCascadeRefusalV1> for GraphicCascadeFailureV1 {
+    fn from(refusal: GraphicCascadeRefusalV1) -> Self {
+        Self::Graphic(refusal)
+    }
+}
+
+impl From<PropertyResolutionRefusalV1> for GraphicCascadeFailureV1 {
+    fn from(refusal: PropertyResolutionRefusalV1) -> Self {
+        Self::Legacy(refusal)
+    }
+}
+
+impl fmt::Display for GraphicCascadeFailureV1 {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "graphic-cascade-failed: {}", self.detail())
+    }
+}
+
+impl std::error::Error for GraphicCascadeFailureV1 {}
+
+/// One owner's resolved graphic roles and unchanged non-graphic values.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ResolvedGraphicOwnerV1 {
+    owner: QualifiedOwnerV1,
+    roles: Vec<ResolvedGraphicRoleV1>,
+    non_graphic: ResolvedPropertiesV1,
+}
+
+impl ResolvedGraphicOwnerV1 {
+    /// The resolved owner.
+    #[must_use]
+    pub const fn owner(&self) -> &QualifiedOwnerV1 {
+        &self.owner
+    }
+
+    /// Every graphic role, in registry order.
+    #[must_use]
+    pub fn roles(&self) -> &[ResolvedGraphicRoleV1] {
+        &self.roles
+    }
+
+    /// One graphic role's resolution.
+    #[must_use]
+    pub fn role(&self, key: PropertyKey) -> Option<&ResolvedGraphicRoleV1> {
+        self.roles.iter().find(|role| role.key == key)
+    }
+
+    /// The unchanged effective non-graphic values (`location`, `seo.*`, `contact.email`).
+    ///
+    /// These are produced by the legacy algorithm itself, so a graphic change can never alter
+    /// location, SEO or contact semantics.
+    #[must_use]
+    pub const fn non_graphic(&self) -> &ResolvedPropertiesV1 {
+        &self.non_graphic
+    }
+}
+
+/// The whole-candidate resolved graphic cascade.
+///
+/// The value exists only when **every** owner of the one Entity resolved without a refusal, so a
+/// single malicious or invalid late declaration leaves the caller with no partial result.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ResolvedGraphicCascadeGraphV1 {
+    owners: Vec<ResolvedGraphicOwnerV1>,
+}
+
+impl ResolvedGraphicCascadeGraphV1 {
+    /// Every resolved owner, parent first.
+    #[must_use]
+    pub fn owners(&self) -> &[ResolvedGraphicOwnerV1] {
+        &self.owners
+    }
+
+    /// One owner's record.
+    #[must_use]
+    pub fn for_owner(&self, owner: &QualifiedOwnerV1) -> Option<&ResolvedGraphicOwnerV1> {
+        self.owners.iter().find(|record| record.owner == *owner)
+    }
+
+    /// How many owners resolved.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.owners.len()
+    }
+
+    /// Whether no owner resolved at all.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.owners.is_empty()
+    }
+}
+
+/// One publicly projectable graphic slot value.
+///
+/// It carries the role, the slot and the portable reference only: never a lineage, a Platform
+/// catalogue binding, an authored owner, a filesystem path, source bytes or an internal record.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PublicGraphicSlotV1 {
+    key: PropertyKey,
+    slot: String,
+    reference: String,
+}
+
+impl PublicGraphicSlotV1 {
+    /// The graphic role.
+    #[must_use]
+    pub const fn key(&self) -> PropertyKey {
+        self.key
+    }
+
+    /// The named slot.
+    #[must_use]
+    pub fn slot(&self) -> &str {
+        &self.slot
+    }
+
+    /// The portable relative asset reference.
+    #[must_use]
+    pub fn reference(&self) -> &str {
+        &self.reference
+    }
+}
+
+/// The public projection of one owner's slot-aware graphic roles.
+///
+/// This is a **filtered view, not delivery**: it creates no route, URL, derived file or release, it
+/// cannot resurrect a suppressed or superseded value, and it never exposes internal provenance. A
+/// role whose winner is `internal` contributes nothing, so a private closer value can never be
+/// replaced by a public root default at projection time.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PublicGraphicProjectionV1 {
+    owner: QualifiedOwnerV1,
+    slots: Vec<PublicGraphicSlotV1>,
+}
+
+impl PublicGraphicProjectionV1 {
+    /// The projected owner.
+    #[must_use]
+    pub const fn owner(&self) -> &QualifiedOwnerV1 {
+        &self.owner
+    }
+
+    /// Every public slot value, in registry then slot order.
+    #[must_use]
+    pub fn slots(&self) -> &[PublicGraphicSlotV1] {
+        &self.slots
+    }
+
+    /// One role's public slot values.
+    #[must_use]
+    pub fn slots_of(&self, key: PropertyKey) -> Vec<&PublicGraphicSlotV1> {
+        self.slots.iter().filter(|slot| slot.key == key).collect()
+    }
+}
+
+/// Projects the public subset of one owner's slot-aware graphic resolution.
+///
+/// Parity-mode records have no slots, so this returns an empty projection for them; a caller in
+/// parity mode keeps using [`project_public_properties_v1`] and obtains byte-identical behaviour.
+#[must_use]
+pub fn project_public_graphic_slots_v1(
+    resolved: &ResolvedGraphicOwnerV1,
+) -> PublicGraphicProjectionV1 {
+    let mut slots = Vec::new();
+    for role in &resolved.roles {
+        for resolution in &role.slots {
+            if !resolution.source.exposure.is_public() {
+                continue;
+            }
+            slots.push(PublicGraphicSlotV1 {
+                key: role.key,
+                slot: resolution.slot.as_str().to_owned(),
+                reference: resolution.source.reference.clone(),
+            });
+        }
+    }
+    PublicGraphicProjectionV1 {
+        owner: resolved.owner.clone(),
+        slots,
+    }
+}
+
+/// One effective slot while the walk is in progress.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SlotStateV1 {
+    slot: GraphicSlotIdV1,
+    source: GraphicSourceV1,
+    lineage: Vec<GraphicLineageStepV1>,
+}
+
+impl SlotStateV1 {
+    /// Copies one finished slot back into a mutable working state.
+    fn from_resolution(resolution: &GraphicSlotResolutionV1) -> Self {
+        Self {
+            slot: resolution.slot.clone(),
+            source: resolution.source.clone(),
+            lineage: resolution.lineage.clone(),
+        }
+    }
+
+    /// Finishes this working state.
+    fn into_resolution(self) -> GraphicSlotResolutionV1 {
+        GraphicSlotResolutionV1 {
+            slot: self.slot,
+            source: self.source,
+            lineage: self.lineage,
+        }
+    }
+}
+
+/// The opt-in graphic-cascade candidate: validated declarations plus registration and selections.
+///
+/// Constructing one validates membership and the registration/selections model. Resolving it
+/// validates the **whole** candidate, so a caller can never obtain a partial success.
+#[derive(Debug, Clone, PartialEq)]
+pub struct GraphicCascadeInputV1 {
+    validated: ValidatedPropertyInputV1,
+    baseline: PlatformGraphicBaselineV1,
+    selections: Vec<OwnerGraphicSelectionsV1>,
+}
+
+impl GraphicCascadeInputV1 {
+    /// Builds one candidate over an already validated declaration set.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`GraphicCascadeRefusalKind::SelectionOwnerUnknown`] for a selection block attached
+    /// to an owner outside the graph and [`GraphicCascadeRefusalKind::DuplicateGraphicSelection`]
+    /// for two blocks for the same owner.
+    pub fn new(
+        validated: ValidatedPropertyInputV1,
+        baseline: PlatformGraphicBaselineV1,
+        selections: Vec<OwnerGraphicSelectionsV1>,
+    ) -> Result<Self, GraphicCascadeRefusalV1> {
+        for (position, block) in selections.iter().enumerate() {
+            if !validated.owners().contains(block.owner()) {
+                return Err(GraphicCascadeRefusalV1::of(
+                    GraphicCascadeRefusalKind::SelectionOwnerUnknown,
+                )
+                .with_owner(block.owner()));
+            }
+            if selections[..position]
+                .iter()
+                .any(|seen| seen.owner() == block.owner())
+            {
+                return Err(GraphicCascadeRefusalV1::of(
+                    GraphicCascadeRefusalKind::DuplicateGraphicSelection,
+                )
+                .with_owner(block.owner()));
+            }
+        }
+        Ok(Self {
+            validated,
+            baseline,
+            selections,
+        })
+    }
+
+    /// The validated declarations this candidate resolves over.
+    #[must_use]
+    pub const fn validated(&self) -> &ValidatedPropertyInputV1 {
+        &self.validated
+    }
+
+    /// The closed registration table.
+    #[must_use]
+    pub const fn baseline(&self) -> &PlatformGraphicBaselineV1 {
+        &self.baseline
+    }
+
+    /// Every authored selection block, in authored order.
+    #[must_use]
+    pub fn selections(&self) -> &[OwnerGraphicSelectionsV1] {
+        &self.selections
+    }
+
+    /// Whether this candidate opts into slot-aware resolution.
+    ///
+    /// A candidate that registers no default and authors no selection is in **parity** mode: it
+    /// reproduces the accepted legacy graphic semantics exactly, which is why installing
+    /// `platform/assets/` can never change an existing project on its own.
+    #[must_use]
+    pub fn is_slot_aware(&self) -> bool {
+        !self.baseline.is_empty() || !self.selections.is_empty()
+    }
+}
+
+impl GraphicCascadeInputV1 {
+    /// Resolves the whole candidate and returns one owner's record.
+    ///
+    /// The whole graph is resolved even when one owner is requested, so a refusal anywhere in the
+    /// candidate fails this call. There is deliberately no partial result.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`GraphicCascadeFailureV1`] for an unknown target, a graphic refusal, or an
+    /// unchanged legacy refusal of any key.
+    pub fn resolve_graphic_cascade_v1(
+        &self,
+        target: &QualifiedOwnerV1,
+    ) -> Result<ResolvedGraphicOwnerV1, GraphicCascadeFailureV1> {
+        if !self.validated.owners().contains(target) {
+            return Err(
+                GraphicCascadeRefusalV1::of(GraphicCascadeRefusalKind::UnknownOwner).into(),
+            );
+        }
+        let graph = self.resolve_graphic_cascade_all_v1()?;
+        graph.for_owner(target).cloned().ok_or_else(|| {
+            GraphicCascadeRefusalV1::of(GraphicCascadeRefusalKind::InconsistentGraph).into()
+        })
+    }
+
+    /// Resolves and validates **every** owner of the one Entity, parent first.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`GraphicCascadeFailureV1`] for any failure anywhere in the candidate: an invalid
+    /// registration, an unauthorised or unqualified selection, a filled slot, an exceeded
+    /// capacity, or the refusal of an unchanged legacy key.
+    pub fn resolve_graphic_cascade_all_v1(
+        &self,
+    ) -> Result<ResolvedGraphicCascadeGraphV1, GraphicCascadeFailureV1> {
+        if !self.is_slot_aware() {
+            return self.resolve_parity_graph();
+        }
+        let positions: BTreeMap<&QualifiedOwnerV1, usize> = self
+            .validated
+            .owners()
+            .iter()
+            .enumerate()
+            .map(|(position, owner)| (owner, position))
+            .collect();
+        let mut resolved: Vec<ResolvedGraphicOwnerV1> =
+            Vec::with_capacity(self.validated.owners().len());
+        for owner in self.validated.owners() {
+            let parent = if owner.level_index() == 0 {
+                None
+            } else {
+                let mut chain = owner.chain();
+                chain.pop();
+                let parent_owner = chain.pop().ok_or_else(|| {
+                    GraphicCascadeRefusalV1::of(GraphicCascadeRefusalKind::InconsistentGraph)
+                })?;
+                let position = positions.get(&parent_owner).copied().ok_or_else(|| {
+                    GraphicCascadeRefusalV1::of(GraphicCascadeRefusalKind::InconsistentGraph)
+                })?;
+                Some(resolved.get(position).ok_or_else(|| {
+                    GraphicCascadeRefusalV1::of(GraphicCascadeRefusalKind::InconsistentGraph)
+                })?)
+            };
+            resolved.push(self.resolve_slot_owner(owner, parent)?);
+        }
+        Ok(ResolvedGraphicCascadeGraphV1 { owners: resolved })
+    }
+
+    /// Resolves the candidate in parity mode: exactly the accepted legacy semantics.
+    ///
+    /// The legacy resolver does all the work, so parity is achieved by construction rather than by
+    /// a parallel re-implementation that could drift.
+    fn resolve_parity_graph(
+        &self,
+    ) -> Result<ResolvedGraphicCascadeGraphV1, GraphicCascadeFailureV1> {
+        let legacy = self.validated.resolve_all()?;
+        let mut owners = Vec::with_capacity(legacy.len());
+        for record in legacy.owners() {
+            let roles = PropertyKey::ALL
+                .into_iter()
+                .filter(|key| key.is_graphic())
+                .map(|key| {
+                    let property = record.property(key);
+                    ResolvedGraphicRoleV1 {
+                        key,
+                        slots: Vec::new(),
+                        legacy: property.map_or_else(Vec::new, |held| held.values().to_vec()),
+                        suppressed_at: property.and_then(|held| {
+                            held.resolution_events()
+                                .iter()
+                                .rev()
+                                .find(|event| event.operation() == ResolutionOperation::Suppressed)
+                                .map(|event| event.owner().clone())
+                        }),
+                    }
+                })
+                .collect();
+            owners.push(ResolvedGraphicOwnerV1 {
+                owner: record.owner().clone(),
+                roles,
+                non_graphic: non_graphic_record(record),
+            });
+        }
+        Ok(ResolvedGraphicCascadeGraphV1 { owners })
+    }
+}
+
+/// The four non-graphic keys of the accepted registry, in registry order.
+const NON_GRAPHIC_KEYS_V1: [PropertyKey; 4] = [
+    PropertyKey::Location,
+    PropertyKey::SeoTitle,
+    PropertyKey::SeoDescription,
+    PropertyKey::ContactEmail,
+];
+
+/// Rebuilds one owner's non-graphic record from its complete legacy resolution.
+fn non_graphic_record(record: &ResolvedPropertiesV1) -> ResolvedPropertiesV1 {
+    let properties = NON_GRAPHIC_KEYS_V1
+        .into_iter()
+        .filter_map(|key| record.property(key).cloned())
+        .collect();
+    ResolvedPropertiesV1 {
+        owner: record.owner().clone(),
+        properties,
+    }
+}
+
+impl GraphicCascadeInputV1 {
+    /// Resolves one owner in slot-aware mode.
+    fn resolve_slot_owner(
+        &self,
+        owner: &QualifiedOwnerV1,
+        parent: Option<&ResolvedGraphicOwnerV1>,
+    ) -> Result<ResolvedGraphicOwnerV1, GraphicCascadeFailureV1> {
+        let declaration = self.validated.declaration_for(owner);
+        let block = self
+            .selections
+            .iter()
+            .find(|candidate| candidate.owner() == owner);
+        let mut roles = Vec::with_capacity(PropertyKey::ALL.len());
+        for key in PropertyKey::ALL.into_iter().filter(|key| key.is_graphic()) {
+            let inherited = parent.and_then(|record| record.role(key));
+            let mut slots: Vec<SlotStateV1> = inherited.map_or_else(Vec::new, |role| {
+                role.slots
+                    .iter()
+                    .map(SlotStateV1::from_resolution)
+                    .collect()
+            });
+            let mut suppressed_at = inherited.and_then(|role| role.suppressed_at.clone());
+
+            // The root layer applies once, at the Entity, before any authored declaration.
+            if owner.level_index() == 0 {
+                for record in self
+                    .baseline
+                    .records()
+                    .iter()
+                    .filter(|record| record.key() == key)
+                {
+                    slots.push(SlotStateV1 {
+                        slot: record.slot().clone(),
+                        source: self.baseline_source(record)?,
+                        lineage: vec![GraphicLineageStepV1 {
+                            owner: None,
+                            operation: GraphicLineageOperationV1::Selected,
+                        }],
+                    });
+                }
+            }
+
+            if let Some(envelope) = declaration.and_then(|declared| declared.declaration(key)) {
+                // Suppression is final within its scope: it clears root-layer and inherited
+                // values and never re-establishes a default by itself.
+                if envelope.inheritance() == Inheritance::Suppress {
+                    slots.clear();
+                    suppressed_at = Some(owner.clone());
+                }
+                // A legacy unqualified graphic value cannot name a slot, so slot-aware mode
+                // refuses it instead of guessing where it belongs.
+                let unqualified = envelope
+                    .current_context()
+                    .values()
+                    .iter()
+                    .any(|authored| authored.value().asset_reference().is_some());
+                if unqualified {
+                    return Err(GraphicCascadeRefusalV1::of(
+                        GraphicCascadeRefusalKind::UnqualifiedGraphicEntry,
+                    )
+                    .with_key(key)
+                    .with_owner(owner)
+                    .into());
+                }
+            }
+
+            if let Some(block) = block {
+                for selection in block.for_key(key) {
+                    self.apply_selection(&mut slots, selection, owner)?;
+                }
+            }
+
+            roles.push(ResolvedGraphicRoleV1 {
+                key,
+                slots: slots
+                    .into_iter()
+                    .map(SlotStateV1::into_resolution)
+                    .collect(),
+                legacy: Vec::new(),
+                suppressed_at,
+            });
+        }
+        let non_graphic = self.resolve_non_graphic(owner, declaration, parent)?;
+        Ok(ResolvedGraphicOwnerV1 {
+            owner: owner.clone(),
+            roles,
+            non_graphic,
+        })
+    }
+}
+
+impl GraphicCascadeInputV1 {
+    /// Applies one authored slot selection to the working slot set.
+    fn apply_selection(
+        &self,
+        slots: &mut Vec<SlotStateV1>,
+        selection: &GraphicSlotSelectionV1,
+        owner: &QualifiedOwnerV1,
+    ) -> Result<(), GraphicCascadeFailureV1> {
+        let capacity = selection.key().max_effective();
+        let existing = slots
+            .iter()
+            .position(|state| state.slot == *selection.slot());
+        let refused = |kind: GraphicCascadeRefusalKind| {
+            GraphicCascadeFailureV1::Graphic(
+                GraphicCascadeRefusalV1::of(kind)
+                    .with_key(selection.key())
+                    .with_owner(owner),
+            )
+        };
+        match selection.operation() {
+            GraphicSlotOperationV1::Supersede => match existing {
+                Some(index) => {
+                    let state = &mut slots[index];
+                    state.source = authored_source(selection);
+                    state.lineage.push(GraphicLineageStepV1 {
+                        owner: Some(owner.clone()),
+                        operation: GraphicLineageOperationV1::Superseded,
+                    });
+                }
+                None => {
+                    if slots.len() >= capacity {
+                        return Err(refused(GraphicCascadeRefusalKind::SlotCapacityExceeded));
+                    }
+                    slots.push(SlotStateV1 {
+                        slot: selection.slot().clone(),
+                        source: authored_source(selection),
+                        lineage: vec![GraphicLineageStepV1 {
+                            owner: Some(owner.clone()),
+                            operation: GraphicLineageOperationV1::Superseded,
+                        }],
+                    });
+                }
+            },
+            GraphicSlotOperationV1::Append => {
+                if existing.is_some() {
+                    return Err(refused(GraphicCascadeRefusalKind::SlotAlreadyFilled));
+                }
+                if slots.len() >= capacity {
+                    return Err(refused(GraphicCascadeRefusalKind::SlotCapacityExceeded));
+                }
+                slots.push(SlotStateV1 {
+                    slot: selection.slot().clone(),
+                    source: authored_source(selection),
+                    lineage: vec![GraphicLineageStepV1 {
+                        owner: Some(owner.clone()),
+                        operation: GraphicLineageOperationV1::Appended,
+                    }],
+                });
+            }
+        }
+        Ok(())
+    }
+}
+
+impl GraphicCascadeInputV1 {
+    /// Builds the winning source of one registered root-layer default.
+    ///
+    /// Every clause is re-proved here, so even a hand-built record cannot smuggle an unapproved
+    /// identifier, a different digest or a media class the role does not permit.
+    fn baseline_source(
+        &self,
+        record: &PlatformGraphicBaselineRecordV1,
+    ) -> Result<GraphicSourceV1, GraphicCascadeFailureV1> {
+        let binding = self.baseline.binding();
+        let asset = binding
+            .exact(record.reference().reference())
+            .ok_or_else(|| {
+                GraphicCascadeRefusalV1::of(GraphicCascadeRefusalKind::BaselineAssetUnapproved)
+                    .with_key(record.key())
+            })?;
+        if asset.sha256() != record.asset_sha256() {
+            return Err(GraphicCascadeRefusalV1::of(
+                GraphicCascadeRefusalKind::BaselineDigestMismatch,
+            )
+            .with_key(record.key())
+            .into());
+        }
+        if !asset.media_class().permitted_for(record.key()) {
+            return Err(GraphicCascadeRefusalV1::of(
+                GraphicCascadeRefusalKind::BaselineRoleFormatMismatch,
+            )
+            .with_key(record.key())
+            .into());
+        }
+        Ok(GraphicSourceV1 {
+            kind: GraphicSourceKindV1::PlatformRootDefault,
+            namespace: AssetNamespace::Platform,
+            reference: record.reference().reference().to_owned(),
+            exposure: Exposure::Public,
+            binding: Some(GraphicPlatformBindingV1 {
+                library_version: binding.library_version().to_owned(),
+                catalogue_sha256: binding.catalogue_sha256().to_owned(),
+                asset_id: asset.id().to_owned(),
+                asset_sha256: asset.sha256().to_owned(),
+            }),
+        })
+    }
+
+    /// Resolves the unchanged non-graphic keys through the accepted legacy algorithm.
+    fn resolve_non_graphic(
+        &self,
+        owner: &QualifiedOwnerV1,
+        declaration: Option<&DeclaredOwnerPropertiesV1>,
+        parent: Option<&ResolvedGraphicOwnerV1>,
+    ) -> Result<ResolvedPropertiesV1, GraphicCascadeFailureV1> {
+        let parent_record = parent.map(ResolvedGraphicOwnerV1::non_graphic);
+        let mut properties = Vec::with_capacity(NON_GRAPHIC_KEYS_V1.len());
+        for key in NON_GRAPHIC_KEYS_V1 {
+            let record =
+                ValidatedPropertyInputV1::resolve_key_from(parent_record, declaration, key, owner)?;
+            properties.push(record);
+        }
+        Ok(ResolvedPropertiesV1 {
+            owner: owner.clone(),
+            properties,
+        })
+    }
+}
+
+/// Builds the winning source of one authored slot selection.
+fn authored_source(selection: &GraphicSlotSelectionV1) -> GraphicSourceV1 {
+    GraphicSourceV1 {
+        kind: GraphicSourceKindV1::AuthoredSelection,
+        namespace: selection.reference().namespace(),
+        reference: selection.reference().reference().to_owned(),
+        exposure: selection.exposure(),
+        binding: None,
     }
 }

@@ -2966,3 +2966,1008 @@ fn r03c1_07_five_registered_graphic_roles_keep_exact_origin() {
         ]
     );
 }
+
+/// `SOLO-WO-118 R17` — focused N128 matrix for the governed Platform-first graphic cascade.
+///
+/// The risk under test is **how a root baseline affects inherited selection, privacy and source
+/// identity**, not whether an already validated SVG can be decoded again. The fixtures therefore use
+/// a small verified approved set with the real approved catalogue digest, synthetic *authored*
+/// references for state transitions, and the real graph helpers above for EFS lineage.
+mod n128_domain {
+    use super::*;
+    use solo_domain::{
+        ApprovedPlatformAssetV1, ApprovedPlatformGraphicBindingV1, GRAPHIC_PRIMARY_SLOT_V1,
+        GraphicCascadeInputV1, GraphicCascadeRefusalKind, GraphicLineageOperationV1,
+        GraphicSlotIdV1, GraphicSlotSelectionV1, GraphicSourceKindV1, OwnerGraphicSelectionsV1,
+        PlatformAssetMediaClassV1, PlatformGraphicBaselineRecordV1, PlatformGraphicBaselineV1,
+        ResolvedGraphicOwnerV1, project_public_graphic_slots_v1,
+    };
+
+    /// The real approved catalogue digest of library `1.0.0`.
+    const CATALOGUE_SHA256: &str =
+        "ad8ea718b50641206cc4f4fe13e866ad266366a7aa11ef799c83ae8187858fc7";
+    /// Real approved digests of four icons of the immutable `1.0.0` catalogue.
+    const HOME_SHA256: &str = "cb742a3b1aa0007ec0c3f26f898e5833c6e67476e136b8eae3c52e2f2c751b5c";
+    const ABOUT_SHA256: &str = "bf4377dff0aaaddf1676a4bb7292f90f1102f19daaca7021331ba6a191317c1c";
+    const CLIENTS_SHA256: &str = "944697c41cc10ebada52ca069d8a6f7da5ddf96a9b6c1c6df653f33933f22053";
+    const SEARCH_SHA256: &str = "57e054b6c1508be40d5eba1ea434b702f5ff55dca04e28e5e3f22472c2f6176d";
+
+    /// The verified approved binding these tests may register defaults against.
+    fn binding() -> ApprovedPlatformGraphicBindingV1 {
+        let assets = vec![
+            ApprovedPlatformAssetV1::new(
+                "icons/icon-home.svg",
+                HOME_SHA256,
+                PlatformAssetMediaClassV1::Svg,
+            )
+            .expect("an approved SVG asset"),
+            ApprovedPlatformAssetV1::new(
+                "icons/icon-about.svg",
+                ABOUT_SHA256,
+                PlatformAssetMediaClassV1::Svg,
+            )
+            .expect("an approved SVG asset"),
+            ApprovedPlatformAssetV1::new(
+                "icons/icon-clients.svg",
+                CLIENTS_SHA256,
+                PlatformAssetMediaClassV1::Svg,
+            )
+            .expect("an approved SVG asset"),
+            ApprovedPlatformAssetV1::new(
+                "icons/icon-search.svg",
+                SEARCH_SHA256,
+                PlatformAssetMediaClassV1::Svg,
+            )
+            .expect("an approved SVG asset"),
+        ];
+        ApprovedPlatformGraphicBindingV1::new("1.0.0", CATALOGUE_SHA256, assets)
+            .expect("a verified binding")
+    }
+
+    /// One registered Platform default for `key` at `slot`.
+    fn record(
+        key: PropertyKey,
+        slot: &str,
+        reference: &str,
+        digest: &str,
+    ) -> PlatformGraphicBaselineRecordV1 {
+        PlatformGraphicBaselineRecordV1::new(
+            key,
+            slot,
+            AssetReferenceV1::parse(AssetNamespace::Platform, reference)
+                .expect("a valid Platform reference"),
+            digest,
+        )
+        .expect("a bound registration record")
+    }
+
+    /// A baseline with one registered `graphic.logo` default at `primary`.
+    fn logo_baseline() -> PlatformGraphicBaselineV1 {
+        PlatformGraphicBaselineV1::new(
+            binding(),
+            vec![record(
+                PropertyKey::GraphicLogo,
+                GRAPHIC_PRIMARY_SLOT_V1,
+                "icons/icon-home.svg",
+                HOME_SHA256,
+            )],
+        )
+        .expect("a valid registration table")
+    }
+
+    /// One authored slot selection, either operation, in the given namespace.
+    fn selection(
+        key: PropertyKey,
+        slot: &str,
+        reference: &str,
+        supersede: bool,
+        exposure: Exposure,
+    ) -> GraphicSlotSelectionV1 {
+        let namespace = if reference.starts_with("icons/") {
+            AssetNamespace::Platform
+        } else {
+            AssetNamespace::Entity
+        };
+        let reference = AssetReferenceV1::parse(namespace, reference).expect("a valid reference");
+        if supersede {
+            GraphicSlotSelectionV1::supersede(key, slot, reference, exposure)
+        } else {
+            GraphicSlotSelectionV1::append(key, slot, reference, exposure)
+        }
+        .expect("a valid slot selection")
+    }
+
+    /// Wraps one owner's selections.
+    fn block(
+        owner: QualifiedOwnerV1,
+        items: Vec<GraphicSlotSelectionV1>,
+    ) -> OwnerGraphicSelectionsV1 {
+        OwnerGraphicSelectionsV1::new(owner, items).expect("a valid selection block")
+    }
+
+    /// The candidate under test.
+    fn input(
+        declarations: Vec<DeclaredOwnerPropertiesV1>,
+        baseline: PlatformGraphicBaselineV1,
+        blocks: Vec<OwnerGraphicSelectionsV1>,
+    ) -> GraphicCascadeInputV1 {
+        let validated = validate_declared_properties_v1(&graph(), declarations)
+            .expect("a valid declaration set");
+        GraphicCascadeInputV1::new(validated, baseline, blocks).expect("a valid candidate")
+    }
+
+    /// The effective reference of one role/slot.
+    fn slot_reference(resolved: &ResolvedGraphicOwnerV1, key: PropertyKey, slot: &str) -> String {
+        resolved
+            .role(key)
+            .and_then(|role| role.slot(slot))
+            .map_or_else(
+                || panic!("{} must resolve slot {slot}", key.name()),
+                |held| held.source().reference().to_owned(),
+            )
+    }
+
+    /// `N128-01` — a registered root default is visible at the Entity and descends unchanged to the
+    /// representation, an unregistered role stays absent, and no non-graphic value moves.
+    #[test]
+    fn n128_01_root_baseline_descends_and_unregistered_roles_stay_absent() {
+        let declarations = vec![declared(
+            site_owner(),
+            vec![(
+                PropertyKey::SeoTitle,
+                inherit(vec![auth(title("Site"), Exposure::Public)]),
+            )],
+        )];
+        let candidate = input(declarations, logo_baseline(), Vec::new());
+        let graph_record = candidate
+            .resolve_graphic_cascade_all_v1()
+            .expect("the candidate resolves");
+
+        for owner in [
+            entity_owner(),
+            facet_owner(),
+            site_owner(),
+            page_owner(),
+            representation_owner(),
+        ] {
+            let record = graph_record
+                .for_owner(&owner)
+                .expect("every owner resolves");
+            assert_eq!(
+                slot_reference(record, PropertyKey::GraphicLogo, "primary"),
+                "icons/icon-home.svg"
+            );
+            for key in [
+                PropertyKey::GraphicFavicon,
+                PropertyKey::GraphicBanner,
+                PropertyKey::GraphicBackground,
+                PropertyKey::GraphicSocialPreview,
+            ] {
+                assert!(
+                    record.role(key).expect("a role record").is_empty(),
+                    "{} must stay absent when nothing is registered for it",
+                    key.name()
+                );
+            }
+        }
+
+        let entity = graph_record.for_owner(&entity_owner()).expect("the Entity");
+        let logo = entity
+            .role(PropertyKey::GraphicLogo)
+            .and_then(|role| role.slot("primary"))
+            .expect("the root default");
+        assert_eq!(
+            logo.source().kind(),
+            GraphicSourceKindV1::PlatformRootDefault
+        );
+        assert_eq!(logo.source().namespace(), AssetNamespace::Platform);
+        assert!(logo.lineage().len() == 1 && logo.lineage()[0].is_platform_root());
+        assert_eq!(
+            logo.lineage()[0].operation(),
+            GraphicLineageOperationV1::Selected
+        );
+        let binding = logo.source().binding().expect("a catalogue binding");
+        assert_eq!(binding.library_version(), "1.0.0");
+        assert_eq!(binding.catalogue_sha256(), CATALOGUE_SHA256);
+        assert_eq!(binding.asset_id(), "icons/icon-home.svg");
+        assert_eq!(binding.asset_sha256(), HOME_SHA256);
+
+        let deepest = graph_record
+            .for_owner(&representation_owner())
+            .expect("the representation");
+        assert_eq!(
+            deepest.non_graphic().values_of(PropertyKey::SeoTitle).len(),
+            1,
+            "the inherited SEO title is untouched by the graphic baseline"
+        );
+        assert_eq!(
+            representation_owner().level_index(),
+            4,
+            "the default reached all five levels"
+        );
+        println!(
+            "n128_evidence case=01 root=visible_at_entity=true descends=5 unregistered_absent=true \
+             non_graphic_unchanged=true binding=1.0.0"
+        );
+    }
+
+    /// `N128-02` — an explicit nearer supersede wins, a still-nearer supersede wins in turn, the
+    /// lineage records the chain, and the legacy additive conflict still refuses without supersede.
+    #[test]
+    fn n128_02_nearer_supersede_wins_then_still_nearer_and_append_conflicts() {
+        let facet_override = block(
+            facet_owner(),
+            vec![selection(
+                PropertyKey::GraphicLogo,
+                "primary",
+                "icons/icon-about.svg",
+                true,
+                Exposure::Public,
+            )],
+        );
+        let site_override = block(
+            site_owner(),
+            vec![selection(
+                PropertyKey::GraphicLogo,
+                "primary",
+                "icons/icon-clients.svg",
+                true,
+                Exposure::Public,
+            )],
+        );
+        let candidate = input(
+            Vec::new(),
+            logo_baseline(),
+            vec![facet_override, site_override],
+        );
+        let graph_record = candidate
+            .resolve_graphic_cascade_all_v1()
+            .expect("the candidate resolves");
+
+        // The Entity still carries the root default.
+        let entity = graph_record.for_owner(&entity_owner()).expect("the Entity");
+        assert_eq!(
+            slot_reference(entity, PropertyKey::GraphicLogo, "primary"),
+            "icons/icon-home.svg"
+        );
+        // The nearer Facet supersedes it, and the still-nearer Site supersedes the Facet.
+        let facet = graph_record.for_owner(&facet_owner()).expect("the Facet");
+        assert_eq!(
+            slot_reference(facet, PropertyKey::GraphicLogo, "primary"),
+            "icons/icon-about.svg"
+        );
+        assert_eq!(
+            facet
+                .role(PropertyKey::GraphicLogo)
+                .and_then(|role| role.slot("primary"))
+                .expect("the slot")
+                .source()
+                .kind(),
+            GraphicSourceKindV1::AuthoredSelection
+        );
+        let site = graph_record.for_owner(&site_owner()).expect("the Site");
+        assert_eq!(
+            slot_reference(site, PropertyKey::GraphicLogo, "primary"),
+            "icons/icon-clients.svg"
+        );
+        let site_slot = site
+            .role(PropertyKey::GraphicLogo)
+            .and_then(|role| role.slot("primary"))
+            .expect("the site slot");
+        let lineage = site_slot.lineage();
+        assert_eq!(lineage.len(), 3, "root, Facet supersede, Site supersede");
+        assert!(lineage[0].is_platform_root());
+        assert_eq!(
+            lineage[1].operation(),
+            GraphicLineageOperationV1::Superseded
+        );
+        assert_eq!(lineage[1].owner(), Some(&facet_owner()));
+        assert_eq!(
+            lineage[2].operation(),
+            GraphicLineageOperationV1::Superseded
+        );
+        assert_eq!(lineage[2].owner(), Some(&site_owner()));
+        assert_eq!(
+            site_slot.winning_owner(),
+            Some(&site_owner()),
+            "the winning owner is the nearest superseder"
+        );
+
+        // A sibling Site with no supersede keeps the nearest ancestor value: the Bali Site's
+        // supersede never leaks into the Jakarta branch.
+        let jakarta = graph_record
+            .for_owner(&jakarta_site_owner())
+            .expect("the sibling");
+        assert_eq!(
+            slot_reference(jakarta, PropertyKey::GraphicLogo, "primary"),
+            "icons/icon-about.svg",
+            "the sibling keeps the Facet value, not the Bali Site supersede"
+        );
+
+        // The legacy additive conflict still refuses when supersede is not authored.
+        let additive_conflict = input(
+            Vec::new(),
+            logo_baseline(),
+            vec![block(
+                entity_owner(),
+                vec![selection(
+                    PropertyKey::GraphicLogo,
+                    "primary",
+                    "icons/icon-search.svg",
+                    false,
+                    Exposure::Public,
+                )],
+            )],
+        );
+        let failure = additive_conflict
+            .resolve_graphic_cascade_all_v1()
+            .expect_err("an append into an occupied slot must refuse");
+        assert_eq!(
+            failure.graphic_kind(),
+            Some(GraphicCascadeRefusalKind::SlotAlreadyFilled)
+        );
+        println!(
+            "n128_evidence case=02 nearer=win still_nearer=win lineage=3 namespace=platform \
+             slot=primary append_conflict=refused sibling_isolated=true"
+        );
+    }
+
+    /// `N128-03` — suppression is final within its scope, a valid local value after suppression is
+    /// eligible, and the literal `none` context never acts as a supersede.
+    #[test]
+    fn n128_03_suppress_is_final_and_none_is_not_a_supersede() {
+        // Root suppression clears the root-layer default for the whole Entity branch.
+        let root_suppress = input(
+            vec![declared(
+                entity_owner(),
+                vec![(PropertyKey::GraphicLogo, suppress(Vec::new()))],
+            )],
+            logo_baseline(),
+            Vec::new(),
+        );
+        let record = root_suppress
+            .resolve_graphic_cascade_all_v1()
+            .expect("the candidate resolves");
+        for owner in [
+            entity_owner(),
+            facet_owner(),
+            site_owner(),
+            representation_owner(),
+        ] {
+            let resolved = record.for_owner(&owner).expect("every owner resolves");
+            assert!(
+                resolved
+                    .role(PropertyKey::GraphicLogo)
+                    .expect("a role")
+                    .is_empty(),
+                "a root suppress must clear the baseline for {}",
+                owner.level_index()
+            );
+        }
+
+        // A descendant suppress is final for its own subtree but does not touch its ancestors.
+        let descendant_suppress = input(
+            vec![declared(
+                facet_owner(),
+                vec![(PropertyKey::GraphicLogo, suppress(Vec::new()))],
+            )],
+            logo_baseline(),
+            Vec::new(),
+        );
+        let record = descendant_suppress
+            .resolve_graphic_cascade_all_v1()
+            .expect("the candidate resolves");
+        assert_eq!(
+            slot_reference(
+                record.for_owner(&entity_owner()).expect("the Entity"),
+                PropertyKey::GraphicLogo,
+                "primary"
+            ),
+            "icons/icon-home.svg",
+            "the ancestor keeps its own value"
+        );
+        assert!(
+            record
+                .for_owner(&site_owner())
+                .expect("the Site")
+                .role(PropertyKey::GraphicLogo)
+                .expect("a role")
+                .is_empty(),
+            "the suppressed subtree keeps nothing"
+        );
+
+        // An explicitly authored local value after suppression is eligible, not a fallthrough.
+        let suppressed_then_local = input(
+            vec![declared(
+                facet_owner(),
+                vec![(PropertyKey::GraphicLogo, suppress(Vec::new()))],
+            )],
+            logo_baseline(),
+            vec![block(
+                facet_owner(),
+                vec![selection(
+                    PropertyKey::GraphicLogo,
+                    "primary",
+                    "logo-local.svg",
+                    true,
+                    Exposure::Public,
+                )],
+            )],
+        );
+        let record = suppressed_then_local
+            .resolve_graphic_cascade_all_v1()
+            .expect("the candidate resolves");
+        let facet = record.for_owner(&facet_owner()).expect("the Facet");
+        assert_eq!(
+            slot_reference(facet, PropertyKey::GraphicLogo, "primary"),
+            "logo-local.svg"
+        );
+        assert_eq!(
+            facet
+                .role(PropertyKey::GraphicLogo)
+                .expect("a role")
+                .suppressed_at(),
+            Some(&facet_owner()),
+            "the suppression is recorded, not silently forgotten"
+        );
+
+        // `currentContext: none` is not a supersede: it neither clears nor replaces.
+        let none_literal = input(
+            vec![declared(
+                site_owner(),
+                vec![(PropertyKey::GraphicLogo, inherit(Vec::new()))],
+            )],
+            logo_baseline(),
+            Vec::new(),
+        );
+        let record = none_literal
+            .resolve_graphic_cascade_all_v1()
+            .expect("the candidate resolves");
+        assert_eq!(
+            slot_reference(
+                record.for_owner(&site_owner()).expect("the Site"),
+                PropertyKey::GraphicLogo,
+                "primary"
+            ),
+            "icons/icon-home.svg",
+            "the literal none inherits the baseline unchanged"
+        );
+        println!(
+            "n128_evidence case=03 root_suppress=cleared descendant_suppress=final \
+             local_after_suppress=eligible none_is_not_supersede=true suppressed_at=recorded"
+        );
+    }
+
+    /// A baseline with two named `graphic.background` slots, in registration order.
+    fn background_baseline() -> PlatformGraphicBaselineV1 {
+        PlatformGraphicBaselineV1::new(
+            binding(),
+            vec![
+                record(
+                    PropertyKey::GraphicBackground,
+                    "surface-main",
+                    "icons/icon-home.svg",
+                    HOME_SHA256,
+                ),
+                record(
+                    PropertyKey::GraphicBackground,
+                    "layer-top",
+                    "icons/icon-search.svg",
+                    SEARCH_SHA256,
+                ),
+            ],
+        )
+        .expect("a valid registration table")
+    }
+
+    /// `N128-04` — a collection supersedes only the named slot it names, appends preserve the other
+    /// slots and their order, the registered maximum holds, and every slot conflict refuses.
+    #[test]
+    fn n128_04_named_slot_collection_supersede_append_and_conflicts() {
+        let candidate = input(
+            Vec::new(),
+            background_baseline(),
+            vec![
+                block(
+                    facet_owner(),
+                    vec![selection(
+                        PropertyKey::GraphicBackground,
+                        "surface-main",
+                        "icons/icon-about.svg",
+                        true,
+                        Exposure::Public,
+                    )],
+                ),
+                block(
+                    site_owner(),
+                    vec![selection(
+                        PropertyKey::GraphicBackground,
+                        "sidebar",
+                        "brand/sidebar.png",
+                        false,
+                        Exposure::Public,
+                    )],
+                ),
+            ],
+        );
+        let record = candidate
+            .resolve_graphic_cascade_all_v1()
+            .expect("the candidate resolves");
+        let site = record.for_owner(&site_owner()).expect("the Site");
+        let slots = site
+            .role(PropertyKey::GraphicBackground)
+            .expect("the role")
+            .slots();
+        assert_eq!(
+            slots
+                .iter()
+                .map(|slot| slot.slot().as_str())
+                .collect::<Vec<_>>(),
+            vec!["surface-main", "layer-top", "sidebar"],
+            "superseding one slot must not reorder or drop the others"
+        );
+        assert_eq!(slots[0].source().reference(), "icons/icon-about.svg");
+        assert_eq!(
+            slots[1].source().reference(),
+            "icons/icon-search.svg",
+            "the untouched slot keeps its root default"
+        );
+        assert_eq!(slots[2].source().namespace(), AssetNamespace::Entity);
+        assert_eq!(
+            slots[2].lineage()[0].operation(),
+            GraphicLineageOperationV1::Appended
+        );
+
+        // An append into an occupied named slot refuses rather than overwriting it.
+        let filled = input(
+            Vec::new(),
+            background_baseline(),
+            vec![block(
+                facet_owner(),
+                vec![selection(
+                    PropertyKey::GraphicBackground,
+                    "layer-top",
+                    "icons/icon-clients.svg",
+                    false,
+                    Exposure::Public,
+                )],
+            )],
+        );
+        assert_eq!(
+            filled
+                .resolve_graphic_cascade_all_v1()
+                .expect_err("an occupied slot must refuse an append")
+                .graphic_kind(),
+            Some(GraphicCascadeRefusalKind::SlotAlreadyFilled)
+        );
+        // A fourth slot is the registered maximum; a fifth refuses deterministically.
+        let over_capacity = input(
+            Vec::new(),
+            background_baseline(),
+            vec![
+                block(
+                    facet_owner(),
+                    vec![
+                        selection(
+                            PropertyKey::GraphicBackground,
+                            "band-a",
+                            "band/a.png",
+                            false,
+                            Exposure::Public,
+                        ),
+                        selection(
+                            PropertyKey::GraphicBackground,
+                            "band-b",
+                            "band/b.png",
+                            false,
+                            Exposure::Public,
+                        ),
+                    ],
+                ),
+                block(
+                    site_owner(),
+                    vec![selection(
+                        PropertyKey::GraphicBackground,
+                        "band-c",
+                        "band/c.png",
+                        false,
+                        Exposure::Public,
+                    )],
+                ),
+            ],
+        );
+        assert_eq!(
+            over_capacity
+                .resolve_graphic_cascade_all_v1()
+                .expect_err("a fifth background slot must refuse")
+                .graphic_kind(),
+            Some(GraphicCascadeRefusalKind::SlotCapacityExceeded)
+        );
+
+        // The same owner naming one slot twice refuses, and so does a duplicated block.
+        let duplicate_slot = OwnerGraphicSelectionsV1::new(
+            facet_owner(),
+            vec![
+                selection(
+                    PropertyKey::GraphicBackground,
+                    "surface-main",
+                    "icons/icon-about.svg",
+                    true,
+                    Exposure::Public,
+                ),
+                selection(
+                    PropertyKey::GraphicBackground,
+                    "surface-main",
+                    "icons/icon-clients.svg",
+                    true,
+                    Exposure::Public,
+                ),
+            ],
+        )
+        .expect_err("a duplicate role/slot pair must refuse");
+        assert_eq!(
+            duplicate_slot.kind(),
+            GraphicCascadeRefusalKind::DuplicateGraphicSelection
+        );
+        let duplicate_block = GraphicCascadeInputV1::new(
+            validate_declared_properties_v1(&graph(), Vec::new()).expect("a valid candidate"),
+            logo_baseline(),
+            vec![
+                block(facet_owner(), Vec::new()),
+                block(facet_owner(), Vec::new()),
+            ],
+        )
+        .expect_err("two blocks for one owner must refuse");
+        assert_eq!(
+            duplicate_block.kind(),
+            GraphicCascadeRefusalKind::DuplicateGraphicSelection
+        );
+
+        // A non-primary slot on a singular role is not a legal slot at all.
+        let wrong_slot = GraphicSlotSelectionV1::supersede(
+            PropertyKey::GraphicLogo,
+            "surface-main",
+            AssetReferenceV1::parse(AssetNamespace::Platform, "icons/icon-home.svg")
+                .expect("a valid reference"),
+            Exposure::Public,
+        )
+        .expect_err("a singular role admits only the primary slot");
+        assert_eq!(
+            wrong_slot.kind(),
+            GraphicCascadeRefusalKind::SlotNotPermittedForRole
+        );
+
+        println!(
+            "n128_evidence case=04 slot_replaced=1 others_preserved=2 order=stable max=4 \
+             append_occupied=refused capacity=refused duplicate_slot=refused wrong_slot=refused"
+        );
+    }
+
+    /// `N128-05` — registration, slot, role, format, digest and namespace identity all refuse, an
+    /// available approved asset never becomes a default by itself, and no filename infers a role.
+    #[test]
+    fn n128_05_registration_and_identity_refusals() {
+        let platform = |reference: &str| {
+            AssetReferenceV1::parse(AssetNamespace::Platform, reference).expect("a valid reference")
+        };
+
+        // A registration for a non-graphic key is meaningless and refused.
+        assert_eq!(
+            PlatformGraphicBaselineRecordV1::new(
+                PropertyKey::SeoTitle,
+                GRAPHIC_PRIMARY_SLOT_V1,
+                platform("icons/icon-home.svg"),
+                HOME_SHA256,
+            )
+            .expect_err("only graphic roles may be registered")
+            .kind(),
+            GraphicCascadeRefusalKind::BaselineRoleNotGraphic
+        );
+        // A baseline record must live in the Platform namespace, never the Entity root.
+        assert_eq!(
+            PlatformGraphicBaselineRecordV1::new(
+                PropertyKey::GraphicLogo,
+                GRAPHIC_PRIMARY_SLOT_V1,
+                AssetReferenceV1::parse(AssetNamespace::Entity, "brand/logo.png")
+                    .expect("a valid reference"),
+                HOME_SHA256,
+            )
+            .expect_err("the Entity root is not a Platform registration")
+            .kind(),
+            GraphicCascadeRefusalKind::BaselineNamespaceAlias
+        );
+        // Availability is not selection: an approved-library filename that is not in the verified
+        // approved set cannot be registered, so `icons/icon-services.svg` can never become a default.
+        assert_eq!(
+            PlatformGraphicBaselineV1::new(
+                binding(),
+                vec![record(
+                    PropertyKey::GraphicLogo,
+                    GRAPHIC_PRIMARY_SLOT_V1,
+                    "icons/icon-services.svg",
+                    HOME_SHA256,
+                )],
+            )
+            .expect_err("an unapproved identifier must refuse")
+            .kind(),
+            GraphicCascadeRefusalKind::BaselineAssetUnapproved
+        );
+        // A digest that disagrees with the verified catalogue refuses.
+        let wrong_digest = record(
+            PropertyKey::GraphicLogo,
+            GRAPHIC_PRIMARY_SLOT_V1,
+            "icons/icon-home.svg",
+            ABOUT_SHA256,
+        );
+        assert_eq!(
+            PlatformGraphicBaselineV1::new(binding(), vec![wrong_digest])
+                .expect_err("a digest that is not the catalogue's own must refuse")
+                .kind(),
+            GraphicCascadeRefusalKind::BaselineDigestMismatch
+        );
+        // `graphic.favicon` is PNG only, so an approved SVG can never fill the favicon role.
+        assert_eq!(
+            PlatformGraphicBaselineV1::new(
+                binding(),
+                vec![record(
+                    PropertyKey::GraphicFavicon,
+                    GRAPHIC_PRIMARY_SLOT_V1,
+                    "icons/icon-home.svg",
+                    HOME_SHA256,
+                )],
+            )
+            .expect_err("an SVG favicon default must refuse")
+            .kind(),
+            GraphicCascadeRefusalKind::BaselineRoleFormatMismatch
+        );
+        // The same role/slot registered twice refuses.
+        assert_eq!(
+            PlatformGraphicBaselineV1::new(
+                binding(),
+                vec![
+                    record(
+                        PropertyKey::GraphicLogo,
+                        GRAPHIC_PRIMARY_SLOT_V1,
+                        "icons/icon-home.svg",
+                        HOME_SHA256,
+                    ),
+                    record(
+                        PropertyKey::GraphicLogo,
+                        GRAPHIC_PRIMARY_SLOT_V1,
+                        "icons/icon-about.svg",
+                        ABOUT_SHA256,
+                    ),
+                ],
+            )
+            .expect_err("a duplicate role/slot registration must refuse")
+            .kind(),
+            GraphicCascadeRefusalKind::DuplicateBaselineRecord
+        );
+
+        // Only lowercase slot identifiers parse; an uppercase or edge-hyphen spelling is refused.
+        for invalid in ["Primary", "surface-", "-surface", "sur--face", ""] {
+            assert!(
+                GraphicSlotIdV1::parse(invalid).is_err(),
+                "{invalid:?} must not parse as a slot identifier"
+            );
+        }
+        assert!(GraphicSlotIdV1::parse("surface-main").is_ok());
+
+        // A selection block for an owner outside the graph refuses.
+        let stray = OwnerGraphicSelectionsV1::new(
+            QualifiedOwnerV1::site(entity_id(), facet("company"), site("elsewhere")),
+            Vec::new(),
+        )
+        .expect("a syntactically valid block");
+        assert_eq!(
+            GraphicCascadeInputV1::new(
+                validate_declared_properties_v1(&graph(), Vec::new()).expect("a valid candidate"),
+                logo_baseline(),
+                vec![stray],
+            )
+            .expect_err("a block for a non-member owner must refuse")
+            .kind(),
+            GraphicCascadeRefusalKind::SelectionOwnerUnknown
+        );
+
+        // Even with four approved assets bound, only the registered role is filled: every other
+        // graphic role stays absent, so neither availability nor a filename infers a role.
+        let candidate = input(Vec::new(), logo_baseline(), Vec::new());
+        let record = candidate
+            .resolve_graphic_cascade_v1(&representation_owner())
+            .expect("the candidate resolves");
+        assert!(
+            record
+                .role(PropertyKey::GraphicFavicon)
+                .expect("a role")
+                .is_empty()
+        );
+        assert!(
+            record
+                .role(PropertyKey::GraphicBanner)
+                .expect("a role")
+                .is_empty()
+        );
+        assert_eq!(
+            record
+                .role(PropertyKey::GraphicLogo)
+                .expect("a role")
+                .slots()
+                .len(),
+            1,
+            "exactly one slot is registered and nothing is inferred beyond it"
+        );
+        println!(
+            "n128_evidence case=05 unregistered=absent wrong_role=refused favicon_svg=refused \
+             digest=refused namespace_alias=refused unapproved_asset=refused duplicate=refused \
+             slot_grammar=closed filename_inference=false"
+        );
+    }
+
+    /// `N128-06` — an internal winner never reappears publicly, a late invalid declaration refuses
+    /// the whole candidate with zero partial result, and a legacy caller stays byte-identical.
+    #[test]
+    fn n128_06_whole_owner_refusal_internal_projection_and_legacy_parity() {
+        // An internal supersede at the Site resolves internally and is never projected publicly.
+        let internal = input(
+            Vec::new(),
+            logo_baseline(),
+            vec![block(
+                site_owner(),
+                vec![selection(
+                    PropertyKey::GraphicLogo,
+                    "primary",
+                    "brand/private-logo.png",
+                    true,
+                    Exposure::Internal,
+                )],
+            )],
+        );
+        let graph_record = internal
+            .resolve_graphic_cascade_all_v1()
+            .expect("the candidate resolves");
+        let site = graph_record.for_owner(&site_owner()).expect("the Site");
+        let slot = site
+            .role(PropertyKey::GraphicLogo)
+            .and_then(|role| role.slot("primary"))
+            .expect("the site slot");
+        assert_eq!(slot.source().exposure(), Exposure::Internal);
+        assert!(
+            project_public_graphic_slots_v1(site)
+                .slots_of(PropertyKey::GraphicLogo)
+                .is_empty(),
+            "an internal winner is never projected"
+        );
+        let entity_projection = project_public_graphic_slots_v1(
+            graph_record.for_owner(&entity_owner()).expect("the Entity"),
+        );
+        assert_eq!(
+            entity_projection.slots_of(PropertyKey::GraphicLogo).len(),
+            1,
+            "an ancestor's public default is unaffected"
+        );
+        let deepest = graph_record
+            .for_owner(&representation_owner())
+            .expect("the representation");
+        assert!(
+            project_public_graphic_slots_v1(deepest)
+                .slots_of(PropertyKey::GraphicLogo)
+                .is_empty(),
+            "the internal winner is inherited and never replaced by the root default"
+        );
+
+        // A malicious late declaration refuses the entire candidate: no owner is returned.
+        let late = input(
+            Vec::new(),
+            logo_baseline(),
+            vec![block(
+                representation_owner(),
+                vec![selection(
+                    PropertyKey::GraphicLogo,
+                    "primary",
+                    "brand/late.png",
+                    false,
+                    Exposure::Public,
+                )],
+            )],
+        );
+        assert!(
+            late.resolve_graphic_cascade_all_v1().is_err(),
+            "a filled slot at the deepest owner must refuse"
+        );
+        assert!(
+            late.resolve_graphic_cascade_v1(&entity_owner()).is_err(),
+            "an early owner cannot be returned from an invalid candidate"
+        );
+
+        // Parity: with no registration and no selection the new path reproduces the legacy graph.
+        let declarations = vec![
+            declared(
+                entity_owner(),
+                vec![(
+                    PropertyKey::GraphicLogo,
+                    inherit(vec![auth(background("brand/root.png"), Exposure::Public)]),
+                )],
+            ),
+            declared(
+                site_owner(),
+                vec![(
+                    PropertyKey::GraphicBackground,
+                    inherit(vec![
+                        auth(background("brand/one.png"), Exposure::Public),
+                        auth(background("brand/two.png"), Exposure::Public),
+                    ]),
+                )],
+            ),
+        ];
+        let validated = validate_declared_properties_v1(&graph(), declarations)
+            .expect("a valid declaration set");
+        let legacy = validated.resolve_all().expect("the legacy graph resolves");
+        let parity = GraphicCascadeInputV1::new(
+            validated.clone(),
+            PlatformGraphicBaselineV1::empty(binding()),
+            Vec::new(),
+        )
+        .expect("a valid candidate");
+        assert!(
+            !parity.is_slot_aware(),
+            "no registration and no selection is parity mode"
+        );
+        let parity_graph = parity
+            .resolve_graphic_cascade_all_v1()
+            .expect("the parity graph resolves");
+        for owner in validated.owners() {
+            let legacy_record = legacy.for_owner(owner).expect("a legacy owner");
+            let parity_record = parity_graph.for_owner(owner).expect("a parity owner");
+            for key in PropertyKey::ALL.into_iter().filter(|key| key.is_graphic()) {
+                let legacy_references = asset_references(legacy_record.values_of(key));
+                let parity_references: Vec<String> = parity_record
+                    .role(key)
+                    .expect("a role record")
+                    .legacy()
+                    .iter()
+                    .filter_map(|value| value.data().asset_reference())
+                    .map(|reference| reference.reference().to_owned())
+                    .collect();
+                assert_eq!(
+                    legacy_references,
+                    parity_references,
+                    "{} at level {} must be byte-identical",
+                    key.name(),
+                    owner.level_index()
+                );
+                assert!(
+                    parity_record
+                        .role(key)
+                        .expect("a role record")
+                        .slots()
+                        .is_empty(),
+                    "parity mode never invents a slot identity"
+                );
+            }
+        }
+
+        // Registering a default cannot change the legacy path's own answer for the same input.
+        let baseline_present =
+            GraphicCascadeInputV1::new(validated.clone(), logo_baseline(), Vec::new())
+                .expect("a valid candidate");
+        assert!(baseline_present.is_slot_aware());
+        let legacy_again = validated
+            .resolve_all()
+            .expect("the legacy graph still resolves");
+        for owner in validated.owners() {
+            let before = legacy.for_owner(owner).expect("a legacy owner");
+            let after = legacy_again.for_owner(owner).expect("a legacy owner");
+            assert_eq!(
+                asset_references(before.values_of(PropertyKey::GraphicLogo)),
+                asset_references(after.values_of(PropertyKey::GraphicLogo)),
+                "an installed registration must not reach the legacy resolver"
+            );
+        }
+        println!(
+            "n128_evidence case=06 internal_hidden=true no_public_reappearance=true \
+             late_refusal=whole zero_partial=true legacy_parity=identical \
+             defaults_without_optin=false"
+        );
+    }
+}

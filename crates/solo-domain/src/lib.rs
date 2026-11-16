@@ -60,10 +60,20 @@ pub use property_registry::{
     PropertyRefusalKind, PropertyValueV1, QualifiedOwnerV1,
 };
 pub use property_resolution::{
-    FieldOriginV1, LocationExtensionCause, PropertyResolutionRefusalKind,
-    PropertyResolutionRefusalV1, ProvenanceValueV1, PublicPropertyProjectionV1, PublicPropertyV1,
-    ResolutionEventV1, ResolutionOperation, ResolvedPropertiesV1, ResolvedPropertyGraphV1,
-    ResolvedPropertyV1, ValidatedPropertyInputV1, project_public_properties_v1,
+    ApprovedPlatformAssetV1, ApprovedPlatformGraphicBindingV1, FieldOriginV1,
+    GRAPHIC_CASCADE_GRANTS_PUBLICATION_AUTHORITY_V1, GRAPHIC_PRIMARY_SLOT_V1,
+    GraphicCascadeFailureV1, GraphicCascadeInputV1, GraphicCascadeRefusalKind,
+    GraphicCascadeRefusalV1, GraphicLineageOperationV1, GraphicLineageStepV1,
+    GraphicPlatformBindingV1, GraphicSlotIdV1, GraphicSlotOperationV1, GraphicSlotResolutionV1,
+    GraphicSlotSelectionV1, GraphicSourceKindV1, GraphicSourceV1, LocationExtensionCause,
+    MAX_APPROVED_PLATFORM_ASSETS_V1, MAX_GRAPHIC_LINEAGE_STEPS_V1, MAX_GRAPHIC_SLOT_BYTES_V1,
+    MAX_OWNER_GRAPHIC_SELECTIONS_V1, MAX_PLATFORM_BASELINE_RECORDS_V1, OwnerGraphicSelectionsV1,
+    PlatformAssetMediaClassV1, PlatformGraphicBaselineRecordV1, PlatformGraphicBaselineV1,
+    PropertyResolutionRefusalKind, PropertyResolutionRefusalV1, ProvenanceValueV1,
+    PublicGraphicProjectionV1, PublicGraphicSlotV1, PublicPropertyProjectionV1, PublicPropertyV1,
+    ResolutionEventV1, ResolutionOperation, ResolvedGraphicCascadeGraphV1, ResolvedGraphicOwnerV1,
+    ResolvedGraphicRoleV1, ResolvedPropertiesV1, ResolvedPropertyGraphV1, ResolvedPropertyV1,
+    ValidatedPropertyInputV1, project_public_graphic_slots_v1, project_public_properties_v1,
     require_matching_owner_membership_v1, resolve_all_owners_v1, validate_declared_properties_v1,
 };
 pub use source_locator::{
