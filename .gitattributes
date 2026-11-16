@@ -18,3 +18,4 @@
 *.woff binary
 *.woff2 binary
 *.zip binary
+crates/solo-cli/tests/fixtures/foundation-donor-icons/** -text
