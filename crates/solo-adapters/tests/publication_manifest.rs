@@ -595,3 +595,667 @@ fn parsing_reads_no_file_and_never_publishes() {
         "this slice must not create a manifest on disk"
     );
 }
+// `SOLO-WO-118 R21` acceptance cases for the manifest-to-visibility bridge.
+//
+// These cases exercise the accepted strict parser and the accepted typed EFS/visibility layers
+// through the bridge only. They open no file, read no root, start no worker and publish nothing.
+
+mod n132_manifest_visibility {
+    use solo_adapters::{
+        DeclaredVisibility, MANIFEST_VISIBILITY_LOCALE_PROFILE, MAX_MANIFEST_BYTES,
+        ManifestEfsScopeV1, ManifestErrorKind, ManifestVisibilityBridgeRefusalKindV1,
+        ManifestVisibilitySnapshotV1, check_manifest_efs_scope_v1, parse_manifest_bytes,
+        parse_manifest_visibility_snapshot_v1,
+    };
+    use solo_application::sha256_media_worker_bytes_v1;
+    use solo_domain::{
+        ApprovedPlatformAssetV1, ApprovedPlatformGraphicBindingV1, EfsOwnershipDraft,
+        EfsOwnershipGraph, EntityIdV1, FacetDraft, FacetIdV1, GraphicCascadeInputV1, LocaleKeyV1,
+        PageDraft, PageIdV1, PageVisibilityDeclarationV1, PlatformAssetMediaClassV1,
+        PlatformGraphicBaselineV1, QualifiedOwnerV1, RepresentationVisibilityOriginV1,
+        RepresentationVisibilityV1, SiteDraft, SiteIdV1, build_representation_visibility_ledger_v1,
+        validate_declared_properties_v1,
+    };
+
+    /// One Entity, one Facet, two sibling Sites that both declare `home`, one extra `about` Page
+    /// and four representations carrying the four accepted visibility combinations.
+    const FOUR_ROWS: &str = r#"{
+  "schemaVersion": "1.0.0",
+  "propertyRegistryVersion": "1.0.0",
+  "platformAssetLibraryVersion": "1.0.0",
+  "base": { "canonical": "https://example.test" },
+  "entity": {
+    "id": "acme",
+    "label": "Acme",
+    "facets": [
+      { "id": "main", "label": "Main", "sites": [
+        { "id": "bali", "label": "Bali", "defaultLocale": "en-001", "pages": [
+          { "id": "home", "label": "Home", "representations": [
+            { "locale": "en-001", "route": { "path": "/en-001/home" },
+              "sourceCandidates": { "json": "pages/bali-home-en-001.json" } },
+            { "locale": "de-DE", "route": { "path": "/de-DE/home" }, "visibility": "unlisted",
+              "sourceCandidates": { "json": "pages/bali-home-de-de.json" } } ] },
+          { "id": "about", "label": "About", "visibilityDefault": "unlisted", "representations": [
+            { "locale": "en-001", "route": { "path": "/en-001/about" }, "visibility": "public",
+              "sourceCandidates": { "json": "pages/bali-about-en-001.json" } } ] } ] },
+        { "id": "ubud", "label": "Ubud", "defaultLocale": "en-001", "pages": [
+          { "id": "home", "label": "Home", "visibilityDefault": "unlisted", "representations": [
+            { "locale": "en-001", "route": { "path": "/en-001/ubud-home" },
+              "sourceCandidates": { "json": "pages/ubud-home-en-001.json" } } ] } ] } ] } ]
+  }
+}"#;
+
+    /// The bridge over the four-row manifest.
+    fn snapshot() -> ManifestVisibilitySnapshotV1 {
+        parse_manifest_visibility_snapshot_v1(FOUR_ROWS.as_bytes())
+            .expect("the four-row manifest converts")
+    }
+
+    /// One exact representation owner inside the fixture Entity.
+    fn owner(site: &str, page: &str, locale: &str) -> QualifiedOwnerV1 {
+        QualifiedOwnerV1::representation(
+            EntityIdV1::parse("acme").expect("canonical Entity"),
+            FacetIdV1::parse("main").expect("canonical Facet"),
+            SiteIdV1::parse(site).expect("canonical Site"),
+            PageIdV1::parse(page).expect("canonical Page"),
+            LocaleKeyV1::from_already_canonical(locale).expect("canonical locale"),
+        )
+    }
+
+    /// One Page owner inside the fixture Entity.
+    fn page_owner(site: &str, page: &str) -> QualifiedOwnerV1 {
+        QualifiedOwnerV1::page(
+            EntityIdV1::parse("acme").expect("canonical Entity"),
+            FacetIdV1::parse("main").expect("canonical Facet"),
+            SiteIdV1::parse(site).expect("canonical Site"),
+            PageIdV1::parse(page).expect("canonical Page"),
+        )
+    }
+
+    /// `N132_01` — exact manifest → one graph → one complete visibility ledger.
+    #[test]
+    fn n132_01_manifest_converts_to_one_complete_visibility_ledger() {
+        let snapshot = snapshot();
+        let ledger = snapshot.ledger();
+
+        // Provenance is the checked digest of the supplied bytes, never a rebuilt value.
+        assert_eq!(
+            snapshot.manifest_sha256(),
+            sha256_media_worker_bytes_v1(FOUR_ROWS.as_bytes()).to_hex()
+        );
+        assert_eq!(snapshot.manifest_sha256().len(), 64);
+        assert_eq!(snapshot.manifest_bytes(), FOUR_ROWS.len());
+        assert_eq!(
+            snapshot.locale_profile(),
+            MANIFEST_VISIBILITY_LOCALE_PROFILE
+        );
+        assert_eq!(snapshot.locale_profile(), "canonical-shaped-base");
+
+        // Complete coverage in stable authored graph order, with the sibling `home` Pages distinct.
+        assert_eq!(snapshot.page_count(), 3);
+        assert_eq!(snapshot.representation_count(), 4);
+        assert_eq!(ledger.len(), 4);
+        let order: Vec<&QualifiedOwnerV1> =
+            ledger.entries().iter().map(|entry| entry.owner()).collect();
+        assert_eq!(order[0], &owner("bali", "home", "en-001"));
+        assert_eq!(order[1], &owner("bali", "home", "de-DE"));
+        assert_eq!(order[2], &owner("bali", "about", "en-001"));
+        assert_eq!(order[3], &owner("ubud", "home", "en-001"));
+        assert_ne!(order[0], order[3]);
+        assert_eq!(order[0].page_id(), order[3].page_id());
+        assert_ne!(order[0].site_id(), order[3].site_id());
+
+        // The four accepted rows, with their exact provenance.
+        let rows = [
+            ("bali", "home", "en-001", "public", "page-default"),
+            (
+                "bali",
+                "home",
+                "de-DE",
+                "unlisted",
+                "representation-override",
+            ),
+            (
+                "bali",
+                "about",
+                "en-001",
+                "public",
+                "representation-override",
+            ),
+            ("ubud", "home", "en-001", "unlisted", "page-default"),
+        ];
+        for (site, page, locale, visibility, origin) in rows {
+            let entry = ledger
+                .for_owner(&owner(site, page, locale))
+                .expect("the bridge governs this representation");
+            assert_eq!(entry.effective().token(), visibility);
+            assert_eq!(entry.origin().token(), origin);
+            assert_eq!(
+                entry.is_discoverable_intent(),
+                visibility == "public",
+                "{site}/{page}/{locale}"
+            );
+            assert_eq!(
+                entry.robots_intent(),
+                if visibility == "public" {
+                    "index,follow"
+                } else {
+                    "noindex,nofollow"
+                }
+            );
+        }
+
+        // The R20 typed constructor over the same graph produces the identical ledger: this bridge
+        // adds no inheritance algorithm, no second interpretation and no extra state.
+        let same_graph = build_representation_visibility_ledger_v1(
+            snapshot.graph(),
+            &[
+                PageVisibilityDeclarationV1::new(
+                    page_owner("bali", "home"),
+                    Some(RepresentationVisibilityV1::Public),
+                )
+                .and_then(|declaration| {
+                    declaration.with_override(
+                        LocaleKeyV1::from_already_canonical("de-DE").expect("canonical"),
+                        RepresentationVisibilityV1::Unlisted,
+                    )
+                })
+                .expect("a valid declaration"),
+                PageVisibilityDeclarationV1::new(
+                    page_owner("bali", "about"),
+                    Some(RepresentationVisibilityV1::Unlisted),
+                )
+                .and_then(|declaration| {
+                    declaration.with_override(
+                        LocaleKeyV1::from_already_canonical("en-001").expect("canonical"),
+                        RepresentationVisibilityV1::Public,
+                    )
+                })
+                .expect("a valid declaration"),
+                PageVisibilityDeclarationV1::new(
+                    page_owner("ubud", "home"),
+                    Some(RepresentationVisibilityV1::Unlisted),
+                )
+                .expect("a valid declaration"),
+            ],
+        )
+        .expect("the same graph and declarations build a ledger");
+        assert_eq!(&same_graph, ledger);
+        assert_eq!(
+            ledger.entries()[1].origin(),
+            RepresentationVisibilityOriginV1::RepresentationOverride
+        );
+
+        // The parsed candidate is retained, unmodified, beside the derived facts.
+        assert_eq!(snapshot.parsed().page_count(), 3);
+        assert_eq!(snapshot.parsed().representation_count(), 4);
+        assert_eq!(
+            snapshot.parsed().base().canonical(),
+            "https://example.test",
+            "the parsed base stays an inert declaration"
+        );
+        let first_page = &snapshot.parsed().entity().facets()[0].sites()[0].pages()[0];
+        assert_eq!(first_page.visibility_default(), DeclaredVisibility::Public);
+        assert_eq!(
+            first_page.representations()[1].visibility(),
+            Some(DeclaredVisibility::Unlisted)
+        );
+        assert_eq!(first_page.representations()[0].visibility(), None);
+
+        // No authority of any kind.
+        assert!(!snapshot.grants_publication_authority());
+        assert!(!snapshot.routes_any_url());
+        assert!(!snapshot.serves_http());
+        assert!(!snapshot.publishes_derived_output());
+        assert!(!snapshot.grants_release_authority());
+        assert!(!snapshot.grants_deployment_authority());
+        assert!(!snapshot.parsed().is_publication_authorized());
+
+        println!(
+            "n132_evidence case=01 rows=4 page_count=3 representations=4 origin_page_default=2 \
+             origin_override=2 sibling_isolated=true manifest_sha_pinned=true manifest_sha={} \
+             locale_profile=restricted publication=false route=false",
+            snapshot.manifest_sha256()
+        );
+    }
+
+    /// Asserts one refusal of the expected kind at a safe ASCII location, with no snapshot.
+    fn refused(bytes: &[u8], expected: ManifestVisibilityBridgeRefusalKindV1) -> String {
+        let refusal = parse_manifest_visibility_snapshot_v1(bytes)
+            .map(|snapshot| {
+                panic!(
+                    "input must be refused, converted with {} pages",
+                    snapshot.page_count()
+                )
+            })
+            .expect_err("the input is refused");
+        assert_eq!(refusal.kind(), expected, "refusal cause");
+        assert_eq!(refusal.code(), "PREFLIGHT_MANIFEST_VISIBILITY_INVALID");
+        assert!(!refusal.location().is_empty(), "a refusal is attributable");
+        assert!(refusal.location().is_ascii(), "locations are fixed ASCII");
+        refusal.location().to_owned()
+    }
+
+    /// `N132_02` — the strict parser is retained and the bridge adds no escape hatch.
+    #[test]
+    fn n132_02_strict_parser_is_retained_and_the_bridge_adds_no_escape() {
+        // Duplicate decoded object keys: the plain spelling plus a JSON unicode escape.
+        let duplicate = FOUR_ROWS.replace(
+            r#""visibility": "unlisted","#,
+            r#""visibility": "unlisted", "\u0076isibility": "public","#,
+        );
+        assert_ne!(duplicate, FOUR_ROWS);
+        refused(
+            duplicate.as_bytes(),
+            ManifestVisibilityBridgeRefusalKindV1::Manifest(ManifestErrorKind::DuplicateKey),
+        );
+
+        // An unknown nested key is not silently ignored.
+        let unknown = FOUR_ROWS.replace(
+            r#""label": "About","#,
+            r#""label": "About", "unexpected": true,"#,
+        );
+        refused(
+            unknown.as_bytes(),
+            ManifestVisibilityBridgeRefusalKindV1::Manifest(ManifestErrorKind::UnknownKey),
+        );
+
+        // `internal` is a property exposure, never a representation visibility.
+        let internal = FOUR_ROWS.replace(
+            r#""visibility": "unlisted","#,
+            r#""visibility": "internal","#,
+        );
+        refused(
+            internal.as_bytes(),
+            ManifestVisibilityBridgeRefusalKindV1::Manifest(ManifestErrorKind::InvalidEnumValue),
+        );
+
+        // Bytes, framing, versions and required keys keep the accepted parser's own causes.
+        let mut invalid_utf8 = FOUR_ROWS.as_bytes().to_vec();
+        invalid_utf8[0] = 0xFF;
+        refused(
+            &invalid_utf8,
+            ManifestVisibilityBridgeRefusalKindV1::Manifest(ManifestErrorKind::InvalidUtf8),
+        );
+
+        let mut with_bom = vec![0xEF, 0xBB, 0xBF];
+        with_bom.extend_from_slice(FOUR_ROWS.as_bytes());
+        refused(
+            &with_bom,
+            ManifestVisibilityBridgeRefusalKindV1::Manifest(ManifestErrorKind::ByteOrderMark),
+        );
+
+        let truncated = &FOUR_ROWS.as_bytes()[..FOUR_ROWS.len() / 2];
+        refused(
+            truncated,
+            ManifestVisibilityBridgeRefusalKindV1::Manifest(ManifestErrorKind::MalformedJson),
+        );
+
+        let mut trailing = FOUR_ROWS.as_bytes().to_vec();
+        trailing.extend_from_slice(b"{}");
+        refused(
+            &trailing,
+            ManifestVisibilityBridgeRefusalKindV1::Manifest(ManifestErrorKind::MalformedJson),
+        );
+
+        let wrong_version = FOUR_ROWS.replace(
+            r#""platformAssetLibraryVersion": "1.0.0""#,
+            r#""platformAssetLibraryVersion": "2.0.0""#,
+        );
+        refused(
+            wrong_version.as_bytes(),
+            ManifestVisibilityBridgeRefusalKindV1::Manifest(ManifestErrorKind::UnsupportedVersion),
+        );
+
+        let missing_root = FOUR_ROWS.replace(
+            r#"  "base": { "canonical": "https://example.test" },
+"#,
+            "",
+        );
+        refused(
+            missing_root.as_bytes(),
+            ManifestVisibilityBridgeRefusalKindV1::Manifest(ManifestErrorKind::MissingKey),
+        );
+
+        let missing_child = FOUR_ROWS.replace(r#" "route": { "path": "/en-001/about" },"#, "");
+        refused(
+            missing_child.as_bytes(),
+            ManifestVisibilityBridgeRefusalKindV1::Manifest(ManifestErrorKind::MissingKey),
+        );
+
+        let oversized = vec![b' '; MAX_MANIFEST_BYTES + 1];
+        refused(
+            &oversized,
+            ManifestVisibilityBridgeRefusalKindV1::Manifest(ManifestErrorKind::TooLarge),
+        );
+
+        // The bridge's own restricted locale profile. The accepted parser still admits these
+        // syntactically, so the restriction is demonstrably the bridge's and not a parser change.
+        for bad in ["de-de", "en", "en-001-u-ca-gregory"] {
+            let bytes = FOUR_ROWS.replace(r#""locale": "de-DE""#, &format!(r#""locale": "{bad}""#));
+            assert_ne!(bytes, FOUR_ROWS);
+            assert!(
+                parse_manifest_bytes(bytes.as_bytes()).is_ok(),
+                "the accepted parser still admits {bad} syntactically"
+            );
+            let location = refused(
+                bytes.as_bytes(),
+                ManifestVisibilityBridgeRefusalKindV1::LocaleProfileRefused,
+            );
+            assert!(location.ends_with(".locale"), "{location}");
+        }
+
+        println!(
+            "n132_evidence case=02 refusals=14 duplicate_decoded_key=refused \
+             unknown_key=refused internal_representation=refused utf8_and_bom=refused \
+             truncated_and_trailing=refused version_and_keys=refused too_large=refused \
+             locale_profile=restricted parser_accepts_locale=true zero_partial=true \
+             publication=false route=false"
+        );
+    }
+
+    /// A candidate over one graph, authoring no graphics at all.
+    fn candidate_over(graph: &solo_domain::EfsOwnershipGraph) -> GraphicCascadeInputV1 {
+        let asset = ApprovedPlatformAssetV1::new(
+            "icons/icon-home.svg",
+            &"0".repeat(64),
+            PlatformAssetMediaClassV1::Svg,
+        )
+        .expect("a valid approved asset");
+        let binding = ApprovedPlatformGraphicBindingV1::new(
+            "1.0.0",
+            "ad8ea718b50641206cc4f4fe13e866ad266366a7aa11ef799c83ae8187858fc7",
+            vec![asset],
+        )
+        .expect("a valid approved binding");
+        let validated =
+            validate_declared_properties_v1(graph, Vec::new()).expect("the graph validates");
+        GraphicCascadeInputV1::new(
+            validated,
+            PlatformGraphicBaselineV1::empty(binding),
+            Vec::new(),
+        )
+        .expect("a valid empty candidate")
+    }
+
+    /// One Page of a fixture graph: its id and its representation locales.
+    type PageShape<'a> = (&'a str, &'a [&'a str]);
+
+    /// One Site of a fixture graph: its id and its Pages.
+    type SiteShape<'a> = (&'a str, &'a [PageShape<'a>]);
+
+    /// One graph of the fixture shape: a named Entity/Facet over the listed Sites and Pages.
+    fn graph_of(entity: &str, facet: &str, sites: &[SiteShape<'_>]) -> EfsOwnershipGraph {
+        let mut facet_draft = FacetDraft::new(FacetIdV1::parse(facet).expect("canonical Facet"));
+        for (site_id, pages) in sites {
+            let mut site_draft = SiteDraft::new(SiteIdV1::parse(site_id).expect("canonical Site"));
+            for (page_id, locales) in *pages {
+                let mut page_draft = PageDraft::new(PageIdV1::parse(page_id).expect("canonical"));
+                for locale in *locales {
+                    page_draft.add_representation(
+                        LocaleKeyV1::from_already_canonical(locale).expect("canonical locale"),
+                    );
+                }
+                site_draft.add_page(page_draft);
+            }
+            facet_draft.add_site(site_draft);
+        }
+        let mut draft =
+            EfsOwnershipDraft::new(EntityIdV1::parse(entity).expect("canonical Entity"));
+        draft.add_facet(facet_draft);
+        draft.build().expect("the variant graph is valid")
+    }
+
+    /// The graph the fixture manifest describes.
+    fn matching_graph() -> EfsOwnershipGraph {
+        graph_of(
+            "acme",
+            "main",
+            &[
+                (
+                    "bali",
+                    &[("home", &["en-001", "de-DE"]), ("about", &["en-001"])],
+                ),
+                ("ubud", &[("home", &["en-001"])]),
+            ],
+        )
+    }
+
+    /// `N132_03` — foreign, partial and sibling scope is refused before anything is read.
+    #[test]
+    fn n132_03_foreign_partial_and_sibling_scope_is_refused() {
+        let snapshot = snapshot();
+
+        // The matching candidate is exactly this manifest's membership.
+        let matching = candidate_over(&matching_graph());
+        assert_eq!(
+            check_manifest_efs_scope_v1(&snapshot, &matching).expect("matching scope"),
+            ManifestEfsScopeV1::ExactEfsMembership
+        );
+        assert_eq!(
+            check_manifest_efs_scope_v1(&snapshot, &matching)
+                .expect("matching scope")
+                .token(),
+            "exact-EFS-membership"
+        );
+
+        // Exactly one dimension changes at a time; every variant refuses.
+        let complete = |site_b: &str| {
+            graph_of(
+                "acme",
+                "main",
+                &[
+                    (
+                        "bali",
+                        &[("home", &["en-001", "de-DE"]), ("about", &["en-001"])],
+                    ),
+                    (site_b, &[("home", &["en-001"])]),
+                ],
+            )
+        };
+        let same = complete("ubud");
+        let sibling = complete("ubud2");
+        let variants: Vec<(&str, EfsOwnershipGraph)> = vec![
+            (
+                "entity",
+                graph_of(
+                    "other",
+                    "main",
+                    &[
+                        (
+                            "bali",
+                            &[("home", &["en-001", "de-DE"]), ("about", &["en-001"])],
+                        ),
+                        ("ubud", &[("home", &["en-001"])]),
+                    ],
+                ),
+            ),
+            (
+                "facet",
+                graph_of(
+                    "acme",
+                    "aux",
+                    &[
+                        (
+                            "bali",
+                            &[("home", &["en-001", "de-DE"]), ("about", &["en-001"])],
+                        ),
+                        ("ubud", &[("home", &["en-001"])]),
+                    ],
+                ),
+            ),
+            ("sibling_site", sibling.clone()),
+            (
+                "missing_page",
+                graph_of(
+                    "acme",
+                    "main",
+                    &[
+                        ("bali", &[("home", &["en-001", "de-DE"])]),
+                        ("ubud", &[("home", &["en-001"])]),
+                    ],
+                ),
+            ),
+            (
+                "extra_page",
+                graph_of(
+                    "acme",
+                    "main",
+                    &[
+                        (
+                            "bali",
+                            &[
+                                ("home", &["en-001", "de-DE"]),
+                                ("about", &["en-001"]),
+                                ("extra", &["en-001"]),
+                            ],
+                        ),
+                        ("ubud", &[("home", &["en-001"])]),
+                    ],
+                ),
+            ),
+            (
+                "representation_locale",
+                graph_of(
+                    "acme",
+                    "main",
+                    &[
+                        (
+                            "bali",
+                            &[("home", &["en-001", "fr-FR"]), ("about", &["en-001"])],
+                        ),
+                        ("ubud", &[("home", &["en-001"])]),
+                    ],
+                ),
+            ),
+            (
+                "missing_representation",
+                graph_of(
+                    "acme",
+                    "main",
+                    &[
+                        ("bali", &[("home", &["en-001"]), ("about", &["en-001"])]),
+                        ("ubud", &[("home", &["en-001"])]),
+                    ],
+                ),
+            ),
+        ];
+        assert_eq!(variants.len(), 7);
+        for (label, graph) in &variants {
+            let candidate = candidate_over(graph);
+            let refusal = check_manifest_efs_scope_v1(&snapshot, &candidate)
+                .expect_err("a mismatched membership is refused");
+            assert_eq!(
+                refusal.kind(),
+                ManifestVisibilityBridgeRefusalKindV1::ScopeMismatch,
+                "{label}"
+            );
+            assert_eq!(refusal.detail(), "scope-mismatch");
+        }
+
+        // Entity identity plus the selected target alone would be insufficient — and is not what
+        // this check compares: the identical graph matches, while the sibling rename shares both
+        // the Entity and the target owner and still refuses.
+        assert_eq!(
+            check_manifest_efs_scope_v1(&snapshot, &candidate_over(&same))
+                .expect("the identical graph matches"),
+            ManifestEfsScopeV1::ExactEfsMembership
+        );
+        let sibling_candidate = candidate_over(&sibling);
+        assert_eq!(
+            sibling_candidate.validated().owners()[0].entity_id(),
+            snapshot.graph().entity(),
+            "the renamed sibling graph shares the Entity"
+        );
+        assert!(
+            sibling_candidate
+                .validated()
+                .owners()
+                .contains(&owner("bali", "home", "en-001")),
+            "the renamed sibling graph still contains the target owner"
+        );
+        assert!(check_manifest_efs_scope_v1(&snapshot, &sibling_candidate).is_err());
+
+        println!(
+            "n132_evidence case=03 scope_exact=true variants=7 foreign_refused=true \
+             sibling_refused=true missing_page_refused=true extra_page_refused=true \
+             locale_change_refused=true entity_only_insufficient=true before_read=true \
+             publication=false route=false"
+        );
+    }
+
+    /// `N132_04` — binding determinism, provenance and nonauthority.
+    #[test]
+    fn n132_04_binding_determinism_provenance_and_nonauthority() {
+        // Identical bytes convert to an identical value, digest, graph and ledger.
+        let first = snapshot();
+        let second = snapshot();
+        assert_eq!(first, second);
+        assert_eq!(first.manifest_sha256(), second.manifest_sha256());
+        assert_eq!(first.graph(), second.graph());
+        assert_eq!(first.ledger(), second.ledger());
+
+        // A label-only change moves the provenance pin and not one visibility fact.
+        let relabelled = FOUR_ROWS.replace(r#""label": "Acme""#, r#""label": "Acme Renamed""#);
+        assert_ne!(relabelled, FOUR_ROWS);
+        let third = parse_manifest_visibility_snapshot_v1(relabelled.as_bytes())
+            .expect("the relabelled manifest converts");
+        assert_ne!(third.manifest_sha256(), first.manifest_sha256());
+        assert_eq!(third.graph(), first.graph());
+        assert_eq!(third.ledger(), first.ledger());
+        assert_eq!(third.ledger().entries().len(), 4);
+
+        // Unlisted is not private: the exact typed identity stays available and the only derived
+        // facts are the closed effective state, its provenance and a robot *intent*.
+        let unlisted = first
+            .ledger()
+            .for_owner(&owner("ubud", "home", "en-001"))
+            .expect("the unlisted representation is governed");
+        assert_eq!(unlisted.effective().token(), "unlisted");
+        assert!(!unlisted.is_discoverable_intent());
+        assert_eq!(unlisted.robots_intent(), "noindex,nofollow");
+        assert_eq!(
+            unlisted.owner().locale().map(|key| key.as_str()),
+            Some("en-001")
+        );
+        assert_eq!(
+            unlisted.owner().page_id().map(|id| id.as_str()),
+            Some("home")
+        );
+
+        // Routes and source candidates stay inert declarations of the unchanged parsed candidate.
+        let parsed = first.parsed();
+        let representation =
+            &parsed.entity().facets()[0].sites()[0].pages()[0].representations()[0];
+        assert_eq!(representation.route().path(), "/en-001/home");
+        assert_eq!(representation.route().case_matching(), None);
+        assert_eq!(
+            representation
+                .source_candidates()
+                .json()
+                .expect("a json candidate")
+                .as_str(),
+            "pages/bali-home-en-001.json"
+        );
+        assert_eq!(parsed.base().canonical(), "https://example.test");
+        assert!(parsed.base().landing().is_none());
+        assert!(!parsed.is_publication_authorized());
+
+        // `internal` is never a representation state: the closed type has exactly two tokens.
+        assert!(RepresentationVisibilityV1::parse_token("internal").is_err());
+        assert_eq!(
+            RepresentationVisibilityV1::parse_token("public").expect("public"),
+            RepresentationVisibilityV1::Public
+        );
+        assert_eq!(
+            RepresentationVisibilityV1::parse_token("unlisted").expect("unlisted"),
+            RepresentationVisibilityV1::Unlisted
+        );
+
+        println!(
+            "n132_evidence case=04 deterministic=true manifest_sha_pinned=true \
+             label_sha_changed=true ledger_stable=true unlisted_not_private=true \
+             routes_inert=true zero_partial=true publication=false route=false"
+        );
+    }
+}

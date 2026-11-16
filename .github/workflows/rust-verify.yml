@@ -1948,6 +1948,133 @@ jobs:
           sed -i 's/zero_partial=true/zero_partial=false/; s/source_pin=true/source_pin=false/' "$probe"
           if check_n131 "$probe"; then echo 'forged partial-set or source-pin claim accepted'; exit 1; fi
           echo 'n131_gate mutation=rejected'
+      # Mandatory `SOLO-WO-118 R21` N132 gate: the strict manifest parser bridged to one EFS graph,
+      # one complete R20 visibility ledger and a narrow EFS-membership scope check. The four focused
+      # cases run on real manifest bytes through the accepted parser; the gate then requires the
+      # instrumented log to reject four directly altered copies of itself.
+      - name: Manifest visibility bridge N132 gate (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          check_n132() {
+            local log="$1"
+            for name in n132_01_manifest_converts_to_one_complete_visibility_ledger n132_02_strict_parser_is_retained_and_the_bridge_adds_no_escape n132_03_foreign_partial_and_sibling_scope_is_refused n132_04_binding_determinism_provenance_and_nonauthority; do
+              grep -qF "test n132_manifest_visibility::$name " "$log" || return 1
+            done
+            [ "$(grep -Ec '^test n132_manifest_visibility::n132_0[0-9]_[A-Za-z0-9_]*( |$)' "$log")" -eq 4 ] || return 1
+            grep -qF 'test result: ok. 4 passed; 0 failed; 0 ignored' "$log" || return 1
+            ! grep -qF '... FAILED' "$log" || return 1
+            ! grep -qF '... ignored' "$log" || return 1
+            ! grep -qF 'test result: FAILED' "$log" || return 1
+            for case in 01 02 03 04; do
+              [ "$(grep -cF "n132_evidence case=$case" "$log")" -eq 1 ] || return 1
+            done
+            grep -qF 'rows=4' "$log" || return 1
+            grep -qF 'sibling_isolated=true' "$log" || return 1
+            grep -qF 'manifest_sha_pinned=true' "$log" || return 1
+            grep -qF 'duplicate_decoded_key=refused' "$log" || return 1
+            grep -qF 'internal_representation=refused' "$log" || return 1
+            grep -qF 'locale_profile=restricted' "$log" || return 1
+            grep -qF 'parser_accepts_locale=true' "$log" || return 1
+            grep -qF 'scope_exact=true' "$log" || return 1
+            grep -qF 'foreign_refused=true' "$log" || return 1
+            grep -qF 'sibling_refused=true' "$log" || return 1
+            grep -qF 'entity_only_insufficient=true' "$log" || return 1
+            grep -qF 'before_read=true' "$log" || return 1
+            grep -qF 'unlisted_not_private=true' "$log" || return 1
+            grep -qF 'ledger_stable=true' "$log" || return 1
+            grep -qF 'zero_partial=true' "$log" || return 1
+            grep -qF 'publication=false' "$log" || return 1
+            grep -qF 'route=false' "$log" || return 1
+            [ "$(grep -Eo 'manifest_sha=[0-9a-f]{64}' "$log" | wc -l)" -eq 1 ] || return 1
+            ! grep -qE 'manifest_sha=0{64}' "$log" || return 1
+          }
+          log="$RUNNER_TEMP/n132-four.txt"
+          cargo test -p solo-adapters --test publication_manifest --locked n132_ -- --nocapture --test-threads=1 >"$log" 2>&1 || { cat "$log"; exit 1; }
+          cat "$log"
+          check_n132 "$log" || { echo 'authentic N132 4/4 run rejected'; exit 1; }
+          echo 'n132_gate authentic=accepted'
+          probe="$RUNNER_TEMP/n132-probe.txt"
+          cp "$log" "$probe"
+          sed -i '/n132_04_binding_determinism_provenance_and_nonauthority/d' "$probe"
+          if check_n132 "$probe"; then echo 'missing N132 case accepted'; exit 1; fi
+          cp "$log" "$probe"
+          sed -i 's/unlisted_not_private=true/unlisted_not_private=false/' "$probe"
+          if check_n132 "$probe"; then echo 'forged unlisted claim accepted'; exit 1; fi
+          cp "$log" "$probe"
+          sed -i 's/scope_exact=true/scope_exact=false/; s/foreign_refused=true/foreign_refused=false/' "$probe"
+          if check_n132 "$probe"; then echo 'forged scope claim accepted'; exit 1; fi
+          cp "$log" "$probe"
+          sed -i 's/publication=false/publication=true/; s/route=false/route=true/; s/zero_partial=true/zero_partial=false/' "$probe"
+          if check_n132 "$probe"; then echo 'forged authority or partial-result claim accepted'; exit 1; fi
+          echo 'n132_gate mutation=rejected'
+
+      # The same four-case N132 matrix and authentic/mutation gate on the native Windows host.
+      - name: Manifest visibility bridge N132 gate (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $tokens = @(
+            'test n132_manifest_visibility::n132_01_manifest_converts_to_one_complete_visibility_ledger ',
+            'test n132_manifest_visibility::n132_02_strict_parser_is_retained_and_the_bridge_adds_no_escape ',
+            'test n132_manifest_visibility::n132_03_foreign_partial_and_sibling_scope_is_refused ',
+            'test n132_manifest_visibility::n132_04_binding_determinism_provenance_and_nonauthority ',
+            'test result: ok. 4 passed; 0 failed; 0 ignored',
+            'n132_evidence case=01',
+            'n132_evidence case=02',
+            'n132_evidence case=03',
+            'n132_evidence case=04',
+            'rows=4',
+            'sibling_isolated=true',
+            'manifest_sha_pinned=true',
+            'duplicate_decoded_key=refused',
+            'internal_representation=refused',
+            'locale_profile=restricted',
+            'parser_accepts_locale=true',
+            'scope_exact=true',
+            'foreign_refused=true',
+            'sibling_refused=true',
+            'entity_only_insufficient=true',
+            'before_read=true',
+            'unlisted_not_private=true',
+            'ledger_stable=true',
+            'zero_partial=true',
+            'publication=false',
+            'route=false')
+          function Test-N132([string] $path) {
+            $text = Get-Content -Raw -LiteralPath $path
+            foreach ($token in $tokens) { if (-not $text.Contains($token)) { return $false } }
+            if (([regex]::Matches($text, 'n132_evidence case=')).Count -ne 4) { return $false }
+            if (([regex]::Matches($text, '^test n132_manifest_visibility::n132_0[0-9]_[A-Za-z0-9_]*( |$)', 'Multiline')).Count -ne 4) { return $false }
+            if (([regex]::Matches($text, 'manifest_sha=[0-9a-f]{64}')).Count -ne 1) { return $false }
+            if (([regex]::Matches($text, 'manifest_sha=0{64}')).Count -gt 0) { return $false }
+            if ($text.Contains('... FAILED')) { return $false }
+            if ($text.Contains('... ignored')) { return $false }
+            if ($text.Contains('test result: FAILED')) { return $false }
+            return $true
+          }
+          $log = Join-Path $env:RUNNER_TEMP 'n132-four.txt'
+          cargo test -p solo-adapters --test publication_manifest --locked n132_ -- --nocapture --test-threads=1 2>&1 | Tee-Object -FilePath $log
+          if ($LASTEXITCODE -ne 0) { throw 'n132 four-case run failed' }
+          if (-not (Test-N132 $log)) { throw 'authentic N132 4/4 run rejected' }
+          Write-Output 'n132_gate authentic=accepted'
+          $probe = Join-Path $env:RUNNER_TEMP 'n132-probe.txt'
+          $authentic = Get-Content -Raw -LiteralPath $log
+          $missing = [regex]::Replace($authentic, '(?m)^.*n132_04_binding_determinism_provenance_and_nonauthority.*$\r?\n', '')
+          Set-Content -LiteralPath $probe -NoNewline -Value $missing
+          if (Test-N132 $probe) { throw 'missing N132 case accepted' }
+          $unlisted = $authentic.Replace('unlisted_not_private=true', 'unlisted_not_private=false')
+          Set-Content -LiteralPath $probe -NoNewline -Value $unlisted
+          if (Test-N132 $probe) { throw 'forged unlisted claim accepted' }
+          $scope = $authentic.Replace('scope_exact=true', 'scope_exact=false').Replace('foreign_refused=true', 'foreign_refused=false')
+          Set-Content -LiteralPath $probe -NoNewline -Value $scope
+          if (Test-N132 $probe) { throw 'forged scope claim accepted' }
+          $authority = $authentic.Replace('publication=false', 'publication=true').Replace('route=false', 'route=true').Replace('zero_partial=true', 'zero_partial=false')
+          Set-Content -LiteralPath $probe -NoNewline -Value $authority
+          if (Test-N132 $probe) { throw 'forged authority or partial-result claim accepted' }
+          Write-Output 'n132_gate mutation=rejected'
+
 
       # Mandatory `SOLO-WO-118 R11` N124 gate: the V4 six-format whole-candidate composition on this
       # host, including the associated-alpha AVIF class beside the five legacy formats. The same

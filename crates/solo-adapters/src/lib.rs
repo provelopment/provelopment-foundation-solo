@@ -50,6 +50,7 @@ mod graphic_avif_inspection;
 mod graphic_gif_inspection;
 mod graphic_image_inspection;
 mod graphic_svg_inspection;
+mod manifest_visibility_bridge;
 mod media_worker_host;
 // One reserved process-native file, available on both hosts. The `any(..)` gates *module
 // availability* only; it is never a proof of the scope of an `unsafe` expression, and every
@@ -119,6 +120,12 @@ pub use graphic_svg_inspection::{
     MAX_SVG_FILTER_OPERATIONS_V1, MAX_SVG_NESTING_V1, MAX_SVG_PATH_COMMANDS_V1,
     MAX_SVG_REFERENCES_V1, MAX_SVG_SOURCE_BYTES_V1, SVG_CURRENT_COLOR_V1, SVG_MIME_V1,
     SVG_NAMESPACE_V1, SvgRefusalV1, SvgSanitizedV1, SvgVectorFactsV1, sanitize_svg_v1,
+};
+pub use manifest_visibility_bridge::{
+    MANIFEST_VISIBILITY_GRANTS_PUBLICATION_AUTHORITY, MANIFEST_VISIBILITY_LOCALE_PROFILE,
+    ManifestEfsScopeV1, ManifestVisibilityBridgeRefusalKindV1, ManifestVisibilityBridgeRefusalV1,
+    ManifestVisibilitySnapshotV1, check_manifest_efs_scope_v1,
+    parse_manifest_visibility_snapshot_v1,
 };
 pub use media_worker_host::{
     CHILD_OBSERVATION_MARKER_V1, EXIT_INTERNAL_PROBE_REFUSED, INTERNAL_PROBE_CHILD_TOKEN_V1,
