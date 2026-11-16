@@ -1,87 +1,107 @@
 # Execution Report
 
-**Work order:** `SOLO-WO-118 R12` — closed Platform asset catalogue contract and inert V4 fact-binding, Owner-review ready.
-**Required outcome:** `R03C-PLATFORM-ASSET-CATALOGUE-STRICT-INERT-N125-TWO-HOST-OWNER-REVIEW-READY-V1`.
+**Work order:** `SOLO-WO-118 R13` — pinned Foundation donor artwork, 81 review-only fixtures and an Owner-review packet.
+**Required outcome:** `R03C-FOUNDATION-DONOR-81-TABLER-ICONS-IMMUTABLE-OWNER-REVIEW-PACKET-N126-TWO-HOST-V1`.
 
-**status=COMPLETE** for that bounded outcome only. A closed, bounded, **inert** `1.0.0` catalogue parser/validator and an independent V4 evidence-matching gate now exist, proved against synthetic test records on both native hosts. **No product Platform library, no approved artwork, no rights clearance, no Platform source read, no publication authority, no `R03.C` and no Stage 03 closure exists or is claimed.**
+**status=STOPPED** — the packet is complete and authentic on Linux, but the **native Windows** host cannot satisfy the byte-identity requirement: the tracked `.gitattributes` rule `* text=auto` projects CRLF into the working tree for the `.svg`/`.txt` fixtures. That file is **outside the R13 write ledger**, and the ledger forbids adding an attribute file inside the two enumerated fixture directories ("exactly 81 donor SVG blobs", "exact pinned MIT text + exact pinned icon-provenance.json"). Per §2 the order stops rather than broadening the ledger or normalising donor bytes.
 
-**rights_review_pending=true** · **stage03_open=true** · **platform_library_delivered=false** · **publication_authority=false**
+**owner_per_asset_approval_pending=true** · **rights_review_pending=true** · **platform_library_delivered=false** · **platform_read_enabled=false** · **publication_authority=false** · **stage03_open=true**
 
 ## 1. Transaction
 
 | Step | SHA | Validation |
 |---|---|---|
-| baseline | `main` = R19 `a69486c7530e00f7006ee87ba6eeea4ad2785dba`, branch = T19 `5d35c892` | one `origin`, one worktree, 28 remote heads, four WIP files, empty stash, clean trees |
-| **A20** (`main`) | `964c169b1ef6add12a7a66be383db5124507820c` — tree `95f796e6fa105feb4731646203274087771e2f41`, parent `a69486c7` | ACTIVE blob `bcbf6f00a6c93a3e415a2ab9580f1aa68980b01a` identical in working tree, index, A20 and `origin/main` |
-| **T20.0** (branch) | `3cd18423428ba6e2eddac1636496f2163adab1aa`, parent `5d35c892` | single-path `git restore --source=A20`; identical blob; staged set = ACTIVE only |
-| **T20.1** (branch) | `23404593a97d647343fc48246bbddb4927489b37` | the R12 implementation: `8 files changed, 3171 insertions(+)`; run `43735794385` **failed** (see §5) |
-| **T20** (branch, final) | `d219f6b8943664f5e32eb4288edefb7ba3d3268c` | repair commit; push run **`43736439423` attempt 1** — all three jobs green |
-| **R20** (`main`) | this report's commit (SHA in chat) | parent `964c169b`, exactly one path changed |
+| baseline | `main` = R20 `b1c557244d276d3d04db2010fac681c92d61170c`; branch = T20 `d219f6b8943664f5e32eb4288edefb7ba3d3268c` | one `origin` = `provelopment/provelopment-foundation-solo`, one worktree, 28 remote heads, four WIP files, empty stash, clean trees |
+| **A21** (`main`) | `041a1449705f09928a9d8f7041d72207a033d9b9` — tree `4eac8409e974d2d68f7b4f964931994b1a367dbb`, parent `b1c5572` | ACTIVE blob `3857ff2cf36097d00456a5852165286afbd1cea1` identical in worktree, index, commit and `origin/main`; only path `.documents/WIP/workorder-active.md` |
+| **T21.0** (branch) | `1b97b60925ae27bb0e67e951313e69fbf0c66e23`, parent `d219f6b` | single-path `git restore --source=A21`; identical blob; staged set = ACTIVE only |
+| **T21.1** (branch) | `72425de9d5c91ec03f10089ce0db4810c36ee045` | the R13 packet: `87 files changed, 4540 insertions(+)`, no deletions, no edits to prior N093–N125 bodies |
+| **R21** (`main`) | this report's commit (SHA in chat) | parent `041a1449`, exactly one path changed |
 
-Final technical run `43736439423` attempt 1 at `d219f6b8`: `verify (ubuntu-24.04)` `132879959703` ✅, `verify (windows-2025)` `132879959898` ✅, `avif-reference-oracle` `132879959950` ✅ — one exact SHA, no rerun, no dispatch.
+Technical run **`43804143667` attempt 1** at `72425de9`: `verify (ubuntu-24.04)` `133090902932` ✅, `avif-reference-oracle` `133090902700` ✅, `verify (windows-2025)` `133090902898` ❌. No rerun, no dispatch, no `continue-on-error`, no `--skip`.
 
-Changed paths (exactly the ledger): `.documents/WIP/workorder-active.md` (T20.0 only), `crates/solo-application/src/platform_asset_catalogue.rs` (**new**), `crates/solo-application/src/lib.rs`, `crates/solo-application/tests/platform_asset_catalogue.rs` (**new**), `crates/solo-adapters/src/platform_asset_catalogue.rs` (**new**), `crates/solo-adapters/src/lib.rs`, `crates/solo-adapters/tests/platform_asset_catalogue.rs` (**new**), `crates/solo-cli/tests/media_worker_host_smoke.rs` (additive `mod n125` only), `.github/workflows/rust-verify.yml` (two additive N125 gates). **No Cargo.toml, `Cargo.lock`, `deny.toml`, policy, crate, `unsafe`, feature, decoder, child, supervisor, protocol, CLI production source, reader, V1–V4 inspector, fixture, golden, oracle or SOP change.** `oxideav-avif =0.0.18` stays pinned at `fcaf60ff…b1cee`; zero lock drift.
+## 2. Donor provenance — exact and immutable
 
-## 2. The R12 product change
+- Donor repository `provelopment/provelopment-foundation`; **immutable commit** `fa599973a88ff77f6a8e012f3266c3c139b52c17`, recursive tree `89b57a92869d2e293d33527589f3f4680938f9b2`, commit date `2026-10-29T06:43:45Z`. Mutable `main` was never used as import authority.
+- 84 SVGs plus two metadata files were fetched **from that commit only**; every file matched the donor's own Git blob SHA before acceptance (88/88, 82 302 bytes).
+- `TABLER-ICONS-MIT.txt` blob `3e82379dab3fe93d9ee22251949604ed63ddea39`, 1 073 bytes, SHA-256 `b740a1d46122672da62833e97f7e7c8a13fa85cbc7445b584b297cc00dde93db`, with the MIT grant and `Copyright (c) 2020-2026 Paweł Kuna`.
+- `icon-provenance.json` blob `a74d234417d5bb63ff05e2b64f93d757864f3d46`, 25 274 bytes, SHA-256 `e0f0ea621c11140cf581d86aaab0b73421d0202114092a4e58dc3321ff1a325b`.
+- Programmatic reconciliation, both directions, **zero failures**: 84 records ↔ 84 files, **83 MIT + 1 original**, every MIT record `Tabler Icons 3.46.0`, every record naming its own `source_icon_name`, exactly the two declared byte-identical pairs (`icon-about` = `icon-status-info`, blob `c407077e4f849eaf536908a9ee444c4aa4752af4`; `icon-clients` = `icon-volunteer`, blob `b0d6ecc811b7e1fd4c6d98fc3a1a59e7224c54bc`) and no unexpected same-blob pair.
+- The donor root Apache-2.0 licence is recorded as **source-code-only** and is never applied to the icons.
 
-**Application contract** (`solo-application/src/platform_asset_catalogue.rs`, re-exported). Pure typed invariants, no serde, no I/O:
+## 3. 84 → 81 exclusion proof
 
-- `PlatformAssetDeclarationV1` carries one declared identity; `PlatformAssetCatalogueEntryV1::new(declaration, licence, provenance)` validates it and derives the format from the identifier's extension. `PlatformAssetCatalogueV1::new(selected_version, entries)` takes the **selected version as an independent trusted argument** (never discovered, guessed or upgraded), refuses anything but `"1.0.0"`, an empty set, more than 1024 entries, a duplicate id, a case-colliding id and a duplicate digest alias.
-- Identifier rules reuse the shared closed portable-relative-path grammar under the **Platform** namespace, plus ≤8 segments, reserved Windows stems, reserved namespace/route segments (`platform`, `entity`, `content`, `pages`) and the catalogue's own filename; no leading slash, traversal, control/percent/backslash ambiguity, uppercase extension or trailing dot/space. The V4 `declared_by` Entity gate is left untouched and is **not** repurposed for Platform.
-- MIME must be one of the six accepted V4 image types and must agree exactly with the extension; `mediaClass` is exactly `image`; geometry is 1..=8192 with a checked ≤32,000,000 pixel ceiling; licence/provenance text is 1–512 control-free scalars. **Syntactic non-emptiness is not licence truth**, and no constructor accepts an approval flag.
-- `PlatformCatalogueRefusalV1` is a closed, path-free taxonomy (17 categories) whose `Debug`/`Display` render only the token.
-- `match_catalogue_entry_to_v4_evidence_v1` and `bind_catalogue_to_v4_evidence_v1` compare an entry with an **already checked** `GraphicImageInspectionV4`: the parent-computed **source** digest (never an AVIF plane/output, GIF timeline, canonical SVG or decoded-plane digest), format, canonical MIME, media class and geometry. `PlatformCatalogueBindingScopeV1::PlatformSource` is refused with `PlatformSourceUnavailable` because R12 has no Platform reader; only the explicit test-only `ContentFactComparisonOnly` scope can reach `MatchedForReview`/`CompleteForReview{matched}`. The first disagreement refuses the whole binding with a position and a category and **retains no earlier match**. Every authority flag — `grants_publication_authority`, `proves_media_correctness`, `rights_reviewed`, `platform_source_readable`, `derived_output_verified`, `release_ready` — is a constant `false`.
+| Withheld | Reason | Representative kept |
+|---|---|---|
+| `icon-status-info.svg` | byte-identical duplicate of `icon-about.svg`; the R12 catalogue refuses duplicate SHA-256 aliases | `icon-about.svg` |
+| `icon-volunteer.svg` | byte-identical duplicate, declared `intentional_source_reuse` of `heart-handshake` | `icon-clients.svg` |
+| `icon-services.svg` | donor provenance says **Provelopment original artwork**, not MIT; the root Apache-2.0 grant does not cover artwork | none inferred — needs an explicit ownership/licensing decision |
 
-**Strict parser** (`solo-adapters/src/platform_asset_catalogue.rs`). Input is owned bytes, UTF-8, no BOM, ≤2 MiB, exactly one JSON object. `serde`'s `derive` feature is not in the locked feature set, so every nested shape is a **hand-written duplicate-rejecting visitor** with a closed key set and an explicit duplicate mask — the pattern the accepted worker-protocol parser already uses. A `serde_json::Value` round trip is never used as a proof. Duplicates are refused at every depth (root, asset, licence, provenance); unknown fields, nulls, wrong types, missing fields, trailing data and aliased spellings are refused.
+`platform-marks/` social logos, Foundation brand trees, placeholders, demonstration/synthetic assets and any screenshot- or UI-code-derived artwork were excluded **by category**, not treated as missing.
 
-**Boundary firewall.** The catalogue is **not** connected to `read_graphic_asset_bytes_v1` or `inspect_entity_graphic_images_v4`; no Platform reference became readable; `platform/assets/` and any production catalogue remain absent from the product tree.
+## 4. Imported review-only fixtures — byte identity proved
+
+- 81 SVGs under `crates/solo-cli/tests/fixtures/foundation-donor-icons/icons/` (identical filenames) plus the two pinned metadata files under `.../licensing/`; **83 files**, exactly the ledger's set.
+- For every one of the 83: working-tree `git hash-object` **and** staged index blob equal the donor Git blob; zero byte mutation; 81 unique source SHA-256 values. `text=auto` is a no-op **at commit level** because the donor bytes are already LF.
+- No colour replacement, recompression, comment removal, reflow, conversion or newline edit was applied anywhere.
+
+## 5. Candidate catalogue and Owner review sheet
+
+- `.documents/Reports/platform-library-1.0.0-foundation-candidate.json` — 81 entries, deterministic ascending `icons/<canonical filename>` order, unique digests, `image/svg+xml`, 24×24, `MIT` / `Paweł Kuna`, licence evidence naming the pinned commit and MIT blob, provenance naming `Tabler Icons v3.46.0` plus each authoritative `source_icon_name` and exact donor Git blob. 65 397 bytes, SHA-256 `33a8872be4ba131db58ca37d27b7bfb57166315248399e66701e59777c76119a`. It parses under the unchanged R12 `parse_platform_asset_catalogue_v1("1.0.0")` and carries **no** `approved`/`rightsReviewed`/`published`/`installed` key.
+- `.documents/Reports/platform-library-1.0.0-foundation-review.md` — **81 individually reviewable rows**, each with approval blank, catalogue ID, donor path, commit, Git blob, source SHA-256, byte count, 24×24 geometry, MIME, MIT/version/holder, authoritative source icon, licensing and metadata paths, the **real confined sanitizer classification and canonical output SHA-256**, and a direct link to the pinned donor blob; plus the withheld table, category exclusions, the NOTICE reproduction plan and the authority boundary. Marked **PENDING OWNER PER-ASSET APPROVAL — NOT DISTRIBUTABLE**. 75 313 bytes, SHA-256 `4d7b432e594498582ebc8e8c4995e7cd8dbf00547a022c0eb3cc347ebe77dabd`.
+- `rights_review_pending=true`: a well-formed MIT row is evidence for an Owner decision, not clearance.
 
 
-## 3. N125 evidence — four real cases on two native hosts
+## 6. N126 evidence — real confined workers, and the honest Windows failure
 
-Both hosts ran `cargo test -p solo-cli --test media_worker_host_smoke --locked n125_ -- --nocapture --test-threads=1` and reported `test result: ok. 4 passed; 0 failed; 0 ignored`, each case name exactly once and each `n125_evidence case=0N` exactly once:
+**Local (WSL, real `solo-cli` children; these tests need no Btrfs root):** `cargo test -p solo-cli --test media_worker_host_smoke --locked n126_ -- --nocapture --test-threads=1` → `3 passed; 0 failed; 0 ignored` in ~2.7 s, **81 genuine confined child invocations**, aggregate `3c34fe9919341862a5a70a87d205fbfc942741dec5f3996514d3edd0aeb1aaca`.
+
+**Ubuntu `133090902932` — accepted**, one authentic evidence line per case:
 
 ```text
-Ubuntu  case=01 formats=png,webp,jpeg,gif,svg,avif records=6 levels=5
-        pids=[7925, 7929, 7933, 7937, 7941, 7945] distinct_pids=6 matched=6
-        review_only=true platform_read=false publication=false unapproved_synthetic=true
-Ubuntu  case=02 refusals=24 duplicate_keys=refused version_mismatch=refused approval=false
+case=01 originals=81 inspected=81 real_children=81 geometry=24x24 donor_pinned=true
+        source_scope=review-fixture publication=false aggregate=3c34fe9919341862a5a70a87d205fbfc942741dec5f3996514d3edd0aeb1aaca
+case=02 entries=81 mit_covered=81 originals_withheld=1 duplicate_aliases_withheld=2
         review_only=true platform_read=false publication=false
-Ubuntu  case=03 records=6 zero_partial=true private_path_absent=true
-        source_hash_not_plane_hash=true fallback=false version_fallback=false
-        review_only=true platform_read=false publication=false
-Ubuntu  case=04 platform=unverified entity_alias=false worker_launches=0
-        catalogue_shipped=false review_only=true platform_read=false publication=false
-Windows identical tokens; case=01 pids=[6816, 896, 5468, 7272, 7388, 9008] distinct_pids=6
+case=03 forgeries_refused=true alias_digest_refused=true licence_missing_refused=true
+        donor_drift_refused=true platform_unavailable=true zero_authority=true
+n126_gate authentic=accepted
+n126_gate mutation=rejected
 ```
 
-- **case 01** — one **synthetic** six-entry candidate whose every digest, MIME and dimension is derived from six genuine confined children over the accepted five-level Entity fixture; the real composed V4 path really launches six distinct children (five legacy PIDs from their own records plus the one AVIF child), and the inert binder returns `CompleteForReview{matched:6}`. The test states the Entity/Platform distinction explicitly: the records are Entity-sourced, the catalogue is a Platform assertion, `platform_source_readable()==false`, and the `PlatformSource` scope is refused. GIF timeline (3 frames), canonical SVG digest `0403e067…` and the AVIF four-plane 256×512 class are asserted unchanged, with no publication or rights authority.
-- **case 02** — 24 independently instantiated hostile documents in the host test (plus 34 in the parser unit target): bad/missing version, wrong selected version, duplicate root/asset/nested-licence keys, unknown fields, empty set, traversal, absolute, reserved-name and uppercase-extension ids, Platform-prefixed ids, malformed/uppercase/all-zero digests, unsupported MIME, wrong extension/MIME pair, bad media class, zero/overflow/fraction geometry, missing licence and provenance evidence, NUL rights text, BOM, trailing JSON and an oversize body. Every one returns its closed typed refusal, with no partial output and a path-free rendering.
-- **case 03** — six authentic V4 records; the first five fact-match, and the final AVIF entry is forged in five separate runs (source hash, displayed dimensions, declared format/MIME, a **plane digest used as a source digest**, and a missing identifier). Each refuses the **whole** binding at that position with zero partial matches, never falls back and never upgrades; the refusals expose no asset id, path or rights text.
-- **case 04** — with a real Entity `icon.png` readable as a control, an Entity-declared `platform/icon.png` never resolves inside the Entity tree, a catalogued Platform entry with the same basename confers nothing, the `PlatformSource` binding is refused, and the repository carries no `platform/`, `platform/assets/` or `content/platform` tree. Zero worker launches. The typed `PlatformUnverified` refusal for a **real** Platform obligation is proved separately in `solo-application`'s catalogue test (`the_real_read_use_case_refuses_a_platform_obligation_before_any_source_read`) with a fake read port whose call counter stays **0** — the refusal precedes every source read. This split is deliberate: the CLI crate cannot name the domain namespace types its neighbours do.
+The aggregate matched the locally measured value exactly, and the gate rejected all four corruptions (missing case, 80-asset count, forged `publication`/`platform_read`, wrong `mit_sha`).
 
-Both hosts printed `n125_gate authentic=accepted` and `n125_gate mutation=rejected`: the same verifier rejected all **four** corrupted copies of the live log — a deleted case, a changed success count (`3 passed; 1 failed`), forged `platform_read=true`/`publication=true` flags, and corrupted `duplicate_keys`/`zero_partial` refusal evidence.
+**Windows `133090902898` — rejected.** All three N126 tests fail while every other test in that step passes:
 
+```text
+n126_01 → icons/icon-about.svg: the original source bytes match the catalogue entry
+  left:  bbe534455dbcebfa1b99b9fe248c22c91c8adad01d3e269de064798b139415b0  (455 bytes)
+  right: bf4377dff0aaaddf1676a4bb7292f90f1102f19daaca7021331ba6a191317c1c  (439 bytes)
+n126_02 → the pinned Tabler MIT notice is unchanged
+  left:  dbfa6cff2e8426878267c6719ff68dcd8bc3dadaffb2207f5c46ce939c4becd3  (1094 bytes)
+  right: b740a1d46122672da62833e97f7e7c8a13fa85cbc7445b584b297cc00dde93db  (1073 bytes)
+```
 
-## 4. Retained contracts and earlier evidence
+**Cause proved, not guessed:** both left-hand digests are exactly the SHA-256 of the **CRLF projection** of those files (439→455 and 1073→1094 bytes). The committed blobs are byte-exact — `git cat-file blob` of `icons/icon-about.svg` hashes to `bf4377df…` and its blob is the donor's `c407077e…`; the MIT notice blob is `3e82379d…` hashing to `b740a1d4…`. The divergence appears only when Git materialises the working tree on Windows under the tracked rule `.gitattributes:2: * text=auto`.
 
-- **V4 / N124 preserved:** `inspect_graphic_image_source_set_v4`, `ConfinedGraphicInspectAdapterV4` and the six-format whole-candidate inspection are untouched; N124's four cases and both its gates are green on both hosts in this same run (`distinct_pids=6`, `distinct_pids=7`).
-- **V3, N116, N121–N123, N120 preserved:** the `avif-unsupported-v3` refusal, the native read boundary, the six accepted confined workers, the R03 independent goldens and the AVIF planes all remain; N121/N122/N123 gates report `authentic=accepted` and `mutation=rejected` on both hosts.
-- **Independent oracle:** `avif-reference-oracle` green at the same SHA (`pristine_manifest_matches=true`, `mutation_rejections=3/3`).
-- **Architecture measured, not assumed:** the two new modules and two new test targets change the graph as expected — `architecture=legal packages=4 targets=36 files=70 edges=93` (was `34/66/93`). Four crates, inward-only edges, no forbidden import, no `unsafe`, no new dependency edge. The checker was **not** modified or weakened.
-- **Honest failure record:** run `43735794385` at `23404593` failed `Test (workspace, all targets, locked)` on both hosts because one N125 assertion claimed the declaration grammar refuses `platform/icon.png` — it does not, because the shared path grammar admits a directory literally named `platform`. The repair replaced that claim with the true behaviour: an Entity-declared `platform/icon.png` never resolves inside the Entity tree, and the typed `PlatformUnverified` refusal is proved where the namespace can be constructed. A second local-only finding was real too: `assets` had been listed as a reserved first segment, so an `assets/…` id was refused as `InvalidId` before its digest was examined; the reserved set now names only the namespace/route prefixes and the catalogue filename. Nothing was skipped or weakened, and neither failure was hidden.
+**Why this is a STOP and not a workaround:** `.gitattributes` is outside the R13 ledger; adding an attribute file inside `.../icons/` or `.../licensing/` would contradict "exactly 81 donor SVG blobs" and "exact pinned MIT text + exact pinned icon-provenance.json"; normalising CRLF at read time is precisely the byte modification and hidden transformation the order forbids; and editing the sanitizer or the assertions would weaken the proof.
 
-## 5. Local verification and honest limits
+## 7. Retained gates, local verification and repository state
 
-Recorded in the single Owner checkout: `cargo fmt --all -- --check` 0; `cargo check --workspace --all-targets --locked` 0; `cargo clippy --workspace --all-targets --locked -- -D warnings` 0; `workspace_graph` `32 passed`; `check_architecture_fixtures` `35 passed`; `check-architecture` 0 at `packages=4 targets=36 files=70 edges=93`; `graphic_avif_inspection` `5 passed`; `media_worker` `16 passed`; `platform_asset_catalogue` (application) `7 passed`; `platform_asset_catalogue` (adapters) `3 passed`; host-smoke `--no-run` builds; `n125_02` also passes **locally** (24 refusals, real evidence line) because it needs no source filesystem; `cargo test --workspace --all-targets --locked` → **87 passed, 5 failed**, the five being the documented `source_read_native::snapshot_proofs` precondition panics (no verified disposable Btrfs `SOLO_TEST_SOURCE_FS_ROOT` on this WSL host). `n116_`/`n121_`/`n122_`/`n124_` and N125 cases 01/03/04 are therefore **NOT RUN LOCALLY**, and native Windows linkage (`link.exe`) is unavailable: all host evidence above is native CI only. The N125 verifier logic was exercised locally against a synthetic log in the printed shape — `authentic=accepted`, `mutation=rejected` — before the push, and the hosted logs then reproduced those verdicts natively. No `#[ignore]`, `--skip`, `|| true`, `continue-on-error`, exemption or fabricated token was introduced.
+- Every prior gate is intact and green at `72425de9` on Ubuntu: N093/N102/N108/N113/N116/N120–N125 with their own mutation rejections, V2/V3/V4 format gates, architecture `packages=4 targets=36 files=70 edges=93` (unchanged — the packet adds fixtures and test code only, no target or edge), strict Clippy, safe-code, `cargo-deny` with a fresh RustSec refresh, release reproducibility, and the independent `avif-reference-oracle` (`133090902700`) at the same SHA.
+- Local: `cargo fmt --all -- --check` 0; `cargo check --workspace --all-targets --locked` 0; `cargo clippy … -D warnings` 0; `workspace_graph` 32 passed; `check_architecture_fixtures` 35 passed; `check-architecture` legal; `platform_asset_catalogue` 7 + 3 passed; `media_worker` 16 passed; `graphic_avif_inspection` 5 passed; `cargo test --workspace --all-targets --locked` → **87 passed, 5 failed**, the five being the documented `source_read_native::snapshot_proofs` Btrfs preconditions (**NOT RUN LOCALLY**, not reclassified as green). Native Windows linkage is unavailable locally, so Windows host evidence could only come from CI.
+- Repository: one worktree, one `origin`, **28** remote heads, exactly four `.documents/WIP/` files, empty stash, clean `main` and technical trees, no branch/tag/PR/merge/release/deploy, no force push, no `reset --hard`, no `git clean`. Task scratch under `.temp/` (donor download, generator scripts, captured rows) was deleted at run end.
 
-## 6. Repository state and the required Owner decision
+## 8. STOP disposition and the least permissible next change
 
-`main` = A20 `964c169b` + this report; technical branch = `d219f6b8` (clean); **28** remote heads, one worktree, one `origin`, exactly four `.documents/WIP/` files, empty stash, no branch/tag/PR/merge/release/deploy, no force push, no `reset --hard`, no `git clean`. Task scratch files were removed from Solo `.temp/`.
+`status=STOPPED` for `R03C-FOUNDATION-DONOR-81-TABLER-ICONS-IMMUTABLE-OWNER-REVIEW-PACKET-N126-TWO-HOST-V1`, because the two-host requirement cannot be met while Windows materialises the fixtures as CRLF.
 
-**The product still has no installed approved Platform catalogue and no product artwork**, accepts **no** real Platform namespace source, and grants **no** publication rights. An R12 `COMPLETE` is a parser-and-binding milestone, never the charter's Owner-reviewed asset delivery. **rights_review_pending=true**, **stage03_open=true**.
+**Least permissible next change (one authorized line, one existing file):** append to the tracked `.gitattributes`
 
-**Required next Owner decision (not authorized here):** supply the actual lawful initial Platform artwork, or authorize a separately reviewed original-art creation package, and approve **each** intended asset id, exact bytes/SHA, format, intrinsic/display dimensions, licence, rights holder and supporting provenance. Only then can a later order install `platform/assets/`, pin the complete immutable `1.0.0` catalogue and provide a **separate native Platform root** — never tunnelled through `content/assets/`. No generated stand-in, copied Foundation artwork, guessed licence or self-certified approval may fill that gap.
+```text
+crates/solo-cli/tests/fixtures/foundation-donor-icons/** -text
+```
 
-**Stage 03 / `R03.C`: OPEN.** No release, deployment, publication, source fallback or closure is authorized or claimed by R12.
+This changes **no** fixture byte, no test, no assertion and no sanitizer behaviour; it only stops Git from projecting CRLF into that directory, after which `72425de9`'s existing code should pass on Windows unchanged and the packet can be re-proved at one final SHA. An equivalent alternative is an Owner-authorized `.gitattributes` inside each of the two fixture directories (two new files, changing the "exactly 81 blobs" / "exact two metadata files" wording). Anything else — normalising bytes, relaxing an assertion, re-materialising tracked files in CI — is a weaker proof and is not proposed.
+
+No artwork is approved, nothing is installed, no Platform read is enabled, nothing is published, deployed or released, and **`R03.C` / Stage 03 remain OPEN**.
 
