@@ -193,6 +193,9 @@ impl PlatformRootCapabilityV1 {
     }
 
     /// Reads the approved catalogue document under its own bound.
+    ///
+    /// A missing catalogue leaf is reported as [`PlatformAssetReadRefusalKindV1::CatalogueUnavailable`]
+    /// rather than as a missing *asset*: the library's own catalogue is what could not be produced.
     #[must_use]
     pub fn read_catalogue_document(&self, max_bytes: u64) -> PlatformCatalogueSourceV1 {
         let max_bytes = max_bytes.min(MAX_PLATFORM_CATALOGUE_BYTES_V1);
@@ -204,7 +207,12 @@ impl PlatformRootCapabilityV1 {
                 links: document.links,
                 fingerprint: document.fingerprint,
             },
-            Err(kind) => PlatformCatalogueSourceV1::Refused(kind),
+            Err(kind) => PlatformCatalogueSourceV1::Refused(match kind {
+                PlatformAssetReadRefusalKindV1::MissingSource => {
+                    PlatformAssetReadRefusalKindV1::CatalogueUnavailable
+                }
+                other => other,
+            }),
         }
     }
 
