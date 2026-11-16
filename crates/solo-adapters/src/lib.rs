@@ -61,6 +61,7 @@ mod media_worker_host;
 mod media_worker_host_native;
 mod media_worker_protocol;
 mod platform_asset_catalogue;
+mod platform_asset_read;
 mod property_resolution;
 mod publication_manifest;
 mod source_body_preflight;
@@ -127,6 +128,11 @@ pub use media_worker_protocol::{
 };
 pub use platform_asset_catalogue::{
     MAX_PLATFORM_CATALOGUE_BYTES_V1, parse_platform_asset_catalogue_v1,
+};
+pub use platform_asset_read::{
+    PlatformInspectionRefusalV1, PlatformInspectionStageV1, PlatformLicensingDocumentV1,
+    PlatformPinnedIconEvidenceV1, PlatformPinnedIconInspectionV1, PlatformPinnedIconSetV1,
+    PlatformRootCapabilityV1, inspect_pinned_platform_icon_sources_v1,
 };
 pub use property_resolution::{
     ManifestPropertyCandidateV1, ManifestPropertyRefusalKind, ManifestPropertyRefusalV1,

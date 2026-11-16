@@ -8828,3 +8828,1089 @@ mod n126 {
         );
     }
 }
+
+/// `SOLO-WO-118 R15` — the installed, Owner-approved Platform library `1.0.0`.
+///
+/// These four cases are the load-bearing proof of the **installed product library**, not of a
+/// review packet: the tracked `platform/assets/` tree is copied into a scratch Platform root on
+/// the verified native filesystem, the real new Platform capability reads it, and the accepted
+/// `solo-cli` SVG worker runs once per approved asset. Nothing here publishes, derives a public
+/// asset, releases, deploys or closes `R03.C` / Stage 03.
+mod n127 {
+    use std::fs;
+    use std::path::{Path, PathBuf};
+
+    use solo_adapters::{
+        PlatformLicensingDocumentV1, PlatformPinnedIconInspectionV1, PlatformRootCapabilityV1,
+        inspect_pinned_platform_icon_sources_v1, parse_platform_asset_catalogue_v1,
+    };
+    use solo_application::{
+        PlatformAssetCatalogueEntryV1, PlatformAssetCatalogueV1, PlatformAssetDeclarationV1,
+        PlatformAssetLibraryReadPortV1, PlatformAssetLicenceV1, PlatformAssetProvenanceV1,
+        PlatformAssetReadRefusalKindV1, PlatformAssetRefV1, PlatformAssetSourceSetV1,
+        PlatformAssetSourceV1, PlatformCatalogueBindingScopeV1, PlatformCatalogueBindingV1,
+        PlatformCatalogueMatchRefusalV1, PlatformCatalogueSourceV1, PlatformRootProvenanceV1,
+        bind_catalogue_to_v4_evidence_v1, read_pinned_platform_sources_v1,
+        sha256_media_worker_bytes_v1,
+    };
+
+    use super::BIN;
+
+    /// The approved library version.
+    const VERSION: &str = "1.0.0";
+
+    /// The approved catalogue document, pinned by the SHA-256 of its exact raw bytes.
+    const CATALOGUE_SHA256: &str =
+        "ad8ea718b50641206cc4f4fe13e866ad266366a7aa11ef799c83ae8187858fc7";
+    const CATALOGUE_BYTES: usize = 65_397;
+
+    /// The retained licensing evidence, pinned the same way.
+    const MIT_SHA256: &str = "b740a1d46122672da62833e97f7e7c8a13fa85cbc7445b584b297cc00dde93db";
+    const MIT_BYTES: usize = 1_073;
+    const PROVENANCE_SHA256: &str =
+        "e0f0ea621c11140cf581d86aaab0b73421d0202114092a4e58dc3321ff1a325b";
+    const PROVENANCE_BYTES: usize = 25_274;
+
+    /// The accepted R14 cross-host worker aggregate: an independent consistency anchor.
+    const PINNED_AGGREGATE_SHA256: &str =
+        "3c34fe9919341862a5a70a87d205fbfc942741dec5f3996514d3edd0aeb1aaca";
+
+    /// The approved library size and the exact product file count.
+    const APPROVED: usize = 81;
+    const PRODUCT_FILES: usize = 84;
+
+    /// The three names the Owner authorization excludes from the product library.
+    const WITHHELD: [&str; 3] = [
+        "icon-services.svg",
+        "icon-status-info.svg",
+        "icon-volunteer.svg",
+    ];
+
+    /// The tracked product tree, read only as a copy source and as byte evidence.
+    fn product_root() -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../platform")
+    }
+
+    /// The review fixtures, used as the independent byte witness for the same 81 sources.
+    fn fixture_root() -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/foundation-donor-icons")
+    }
+
+    /// The directory a scratch Platform root is created in.
+    ///
+    /// On Linux this must be the verified fixture filesystem: the reader takes an immutable clone,
+    /// and a filesystem without reflink could only refuse. A missing value is a loud failure.
+    fn scratch_parent() -> PathBuf {
+        #[cfg(target_os = "linux")]
+        {
+            match std::env::var_os("SOLO_TEST_SOURCE_FS_ROOT") {
+                Some(root) if !root.is_empty() => PathBuf::from(root),
+                _ => panic!(
+                    "SOLO_TEST_SOURCE_FS_ROOT must name the R03 snapshot fixture filesystem; refusing to run the real Platform reader on an unverified filesystem"
+                ),
+            }
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            std::env::temp_dir()
+        }
+    }
+
+    /// Reads one file, or panics with its own name: a missing product byte is never tolerated.
+    fn read(path: &Path) -> Vec<u8> {
+        fs::read(path).unwrap_or_else(|error| panic!("{} is unreadable: {error}", path.display()))
+    }
+
+    /// Copies one directory tree of regular files without dereferencing links.
+    fn copy_tree(from: &Path, to: &Path) {
+        fs::create_dir_all(to).expect("create a scratch directory");
+        for entry in fs::read_dir(from).expect("read a product directory") {
+            let entry = entry.expect("a product directory entry");
+            let file_type = entry.file_type().expect("a product file type");
+            assert!(
+                !file_type.is_symlink(),
+                "the tracked product tree holds no link"
+            );
+            let target = to.join(entry.file_name());
+            if file_type.is_dir() {
+                copy_tree(&entry.path(), &target);
+            } else {
+                assert!(file_type.is_file(), "the product tree holds regular files");
+                fs::copy(entry.path(), &target).expect("copy one product file");
+            }
+        }
+    }
+
+    /// A disposable Platform root holding one copy of the tracked product library.
+    struct ScratchPlatform {
+        base: PathBuf,
+        platform: PathBuf,
+    }
+
+    impl ScratchPlatform {
+        fn new(label: &str) -> Self {
+            let base =
+                scratch_parent().join(format!("solo-n127-platform-{}-{label}", std::process::id()));
+            let _ = fs::remove_dir_all(&base);
+            let platform = base.join("platform");
+            copy_tree(&product_root(), &platform);
+            Self { base, platform }
+        }
+
+        /// An empty Platform root with no catalogue: the "replaced root" case.
+        fn empty(label: &str) -> Self {
+            let base =
+                scratch_parent().join(format!("solo-n127-empty-{}-{label}", std::process::id()));
+            let _ = fs::remove_dir_all(&base);
+            let platform = base.join("platform");
+            fs::create_dir_all(platform.join("assets/icons")).expect("create an empty root");
+            Self { base, platform }
+        }
+
+        fn capability(&self) -> PlatformRootCapabilityV1 {
+            PlatformRootCapabilityV1::adopt_bootstrap_path(
+                &self.platform,
+                PlatformRootProvenanceV1::OperatorDesignatedPlatformRoot,
+            )
+            .expect("the scratch Platform root is adoptable")
+        }
+
+        fn icon(&self, name: &str) -> PathBuf {
+            self.platform.join("assets/icons").join(name)
+        }
+    }
+
+    impl Drop for ScratchPlatform {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.base);
+        }
+    }
+
+    /// The loaded, verified product library.
+    struct Library {
+        catalogue: PlatformAssetCatalogueV1,
+        bytes: Vec<u8>,
+    }
+
+    impl Library {
+        fn load() -> Self {
+            let bytes = read(&product_root().join("assets/catalogue-1.0.0.json"));
+            assert_eq!(
+                sha256_media_worker_bytes_v1(&bytes).to_hex(),
+                CATALOGUE_SHA256,
+                "the installed catalogue is the approved one"
+            );
+            assert_eq!(bytes.len(), CATALOGUE_BYTES);
+            let catalogue = parse_platform_asset_catalogue_v1(&bytes, VERSION)
+                .expect("the strict R12 parser accepts the installed catalogue");
+            Self { catalogue, bytes }
+        }
+
+        fn requests(&self) -> Vec<PlatformAssetRefV1> {
+            self.catalogue
+                .entries()
+                .iter()
+                .map(|entry| {
+                    PlatformAssetRefV1::from_identifier(entry.id())
+                        .expect("every declared identifier is a typed Platform reference")
+                })
+                .collect()
+        }
+
+        fn source(&self, asset_id: &str) -> Vec<u8> {
+            let name = asset_id
+                .split_once('/')
+                .map(|(_, name)| name)
+                .expect("a declared identifier is icons/<name>");
+            read(&product_root().join("assets/icons").join(name))
+        }
+    }
+
+    /// The aggregate of sorted `id` + source SHA-256 + canonical SHA-256 records.
+    ///
+    /// Identical framing to the accepted R14 anchor, so the two proofs can be compared directly.
+    fn aggregate_digest(records: &mut [(String, String, String)]) -> String {
+        records.sort();
+        let mut text = String::new();
+        for (id, source, canonical) in records.iter() {
+            text.push_str(id);
+            text.push('\t');
+            text.push_str(source);
+            text.push('\t');
+            text.push_str(canonical);
+            text.push('\n');
+        }
+        sha256_media_worker_bytes_v1(text.as_bytes()).to_hex()
+    }
+
+    /// Every regular file beneath a root, as `relative/path` in sorted order.
+    fn tree_files(root: &Path) -> Vec<String> {
+        fn walk(base: &Path, current: &Path, out: &mut Vec<String>) {
+            let Ok(entries) = fs::read_dir(current) else {
+                return;
+            };
+            for entry in entries {
+                let entry = entry.expect("a directory entry");
+                let path = entry.path();
+                let file_type = entry.file_type().expect("a file type");
+                assert!(!file_type.is_symlink(), "no link in a product tree");
+                if file_type.is_dir() {
+                    walk(base, &path, out);
+                } else {
+                    out.push(
+                        path.strip_prefix(base)
+                            .expect("a relative path")
+                            .to_string_lossy()
+                            .replace('\\', "/"),
+                    );
+                }
+            }
+        }
+        let mut out = Vec::new();
+        walk(root, root, &mut out);
+        out.sort();
+        out
+    }
+
+    #[test]
+    fn n127_01_owner_approved_platform_81_real_confined_svg_sources() {
+        let library = Library::load();
+        assert_eq!(library.catalogue.len(), APPROVED, "81 approved entries");
+
+        // The installed product tree is exactly 84 files: 81 icons, two records, one catalogue.
+        let files = tree_files(&product_root().join("assets"));
+        assert_eq!(files.len(), PRODUCT_FILES, "exactly 84 product files");
+        assert_eq!(
+            files
+                .iter()
+                .filter(|path| path.starts_with("icons/"))
+                .count(),
+            APPROVED
+        );
+        assert!(files.iter().any(|path| path == "catalogue-1.0.0.json"));
+        assert!(
+            files
+                .iter()
+                .any(|path| path == "licensing/TABLER-ICONS-MIT.txt")
+        );
+        assert!(
+            files
+                .iter()
+                .any(|path| path == "licensing/icon-provenance.json")
+        );
+        for withheld in WITHHELD {
+            assert!(
+                !files.iter().any(|path| path.ends_with(withheld)),
+                "{withheld} is not part of the approved product library"
+            );
+        }
+
+        // Every product source equals its catalogue digest and its review-fixture bytes.
+        let mut digests: Vec<String> = Vec::new();
+        for entry in library.catalogue.entries() {
+            let name = entry
+                .id()
+                .split_once('/')
+                .map(|(_, name)| name)
+                .expect("an icons/<name> identifier");
+            let bytes = library.source(entry.id());
+            let digest = sha256_media_worker_bytes_v1(&bytes).to_hex();
+            assert_eq!(digest, entry.sha256().to_hex(), "{}", entry.id());
+            assert_eq!(
+                bytes,
+                read(&fixture_root().join("icons").join(name)),
+                "{}: the installed byte is the reviewed donor byte",
+                entry.id()
+            );
+            assert!(
+                !bytes.windows(2).any(|window| window == b"\r\n"),
+                "{}: the installed source is LF",
+                entry.id()
+            );
+            digests.push(digest);
+        }
+        digests.sort();
+        digests.dedup();
+        assert_eq!(digests.len(), APPROVED, "81 distinct approved digests");
+
+        // The retained licensing evidence travels with the sources, unchanged.
+        let notice = read(&product_root().join("assets/licensing/TABLER-ICONS-MIT.txt"));
+        assert_eq!(sha256_media_worker_bytes_v1(&notice).to_hex(), MIT_SHA256);
+        assert_eq!(notice.len(), MIT_BYTES);
+        assert_eq!(
+            notice,
+            read(&fixture_root().join("licensing/TABLER-ICONS-MIT.txt"))
+        );
+        let provenance = read(&product_root().join("assets/licensing/icon-provenance.json"));
+        assert_eq!(
+            sha256_media_worker_bytes_v1(&provenance).to_hex(),
+            PROVENANCE_SHA256
+        );
+        assert_eq!(provenance.len(), PROVENANCE_BYTES);
+
+        // The native root, the real read and the 81 genuine confined SVG children.
+        prove_approved_library();
+    }
+
+    /// The native mechanism this host reports, asserted per host rather than by one substring.
+    fn assert_native_mechanism(mechanism: &str) {
+        assert!(!mechanism.is_empty(), "a mechanism is always reported");
+        #[cfg(target_os = "linux")]
+        assert!(
+            mechanism.contains("ficlone"),
+            "Linux must report the immutable clone: {mechanism}"
+        );
+        #[cfg(windows)]
+        assert!(
+            mechanism.contains("ntcreatefile") && mechanism.contains("dont-reparse"),
+            "Windows must report the no-reparse, no-write-sharing handle: {mechanism}"
+        );
+    }
+
+    /// The native root, the real read and the 81 genuine confined SVG children.
+    fn approved_inspection_tail(
+        library: &Library,
+    ) -> (PlatformPinnedIconInspectionV1, ScratchPlatform) {
+        let scratch = ScratchPlatform::new("approved");
+        let capability = scratch.capability();
+        assert_native_mechanism(capability.mechanism());
+        let requests = library.requests();
+        let inspection = inspect_pinned_platform_icon_sources_v1(
+            &capability,
+            VERSION,
+            &requests,
+            Path::new(BIN),
+        );
+        (inspection, scratch)
+    }
+
+    /// Runs the approved whole-library inspection and proves the accepted aggregate.
+    ///
+    /// Kept separate so the refusal cases below can reuse the same verified library without
+    /// paying for 81 child processes.
+    fn prove_approved_library() {
+        let library = Library::load();
+        let (inspection, scratch) = approved_inspection_tail(&library);
+        let set = match inspection {
+            PlatformPinnedIconInspectionV1::Complete(set) => set,
+            PlatformPinnedIconInspectionV1::Refused(refusal) => {
+                panic!("the approved library must be readable: {refusal:?}")
+            }
+        };
+        assert_eq!(set.len(), APPROVED, "81 inspected approved sources");
+        assert_eq!(set.source_root(), "platform");
+        assert!(!set.grants_publication_authority());
+        assert!(!set.produces_public_derivative());
+        assert!(!set.proves_global_snapshot());
+
+        let mut records: Vec<(String, String, String)> = Vec::new();
+        let mut children: usize = 0;
+        for (position, record) in set.records().iter().enumerate() {
+            let entry = &library.catalogue.entries()[position];
+            assert_eq!(
+                record.asset_id(),
+                entry.id(),
+                "catalogue order is preserved"
+            );
+            assert_eq!(
+                (record.width(), record.height()),
+                (24, 24),
+                "{}",
+                record.asset_id()
+            );
+            assert_eq!(record.source_sha256(), entry.sha256().to_hex());
+            assert_ne!(record.source_sha256(), record.canonical_sha256());
+            assert!(record.worker_pid() != 0);
+            children += 1;
+            println!(
+                "n127_row id={} source_sha={} canonical_sha={} elements={} depth={} path_commands={} pid_nonzero=true",
+                record.asset_id(),
+                record.source_sha256(),
+                record.canonical_sha256(),
+                record.elements(),
+                record.depth(),
+                record.path_commands()
+            );
+            records.push((
+                record.asset_id().to_owned(),
+                record.source_sha256().to_owned(),
+                record.canonical_sha256().to_owned(),
+            ));
+        }
+        assert_eq!(children, APPROVED, "81 genuine confined SVG children");
+        let aggregate = aggregate_digest(&mut records);
+        assert_eq!(aggregate, PINNED_AGGREGATE_SHA256);
+        drop(scratch);
+
+        println!(
+            "n127_evidence case=01 approved=81 read=81 real_children=81 version=1.0.0 \
+             exact_sha=true aggregate={aggregate} publication=false source_root=platform \
+             entity_fallback=false derived_output=false release_authority=false"
+        );
+    }
+
+    /// Requires a source-stage refusal and returns its closed kind.
+    fn expect_source_refusal(
+        inspection: PlatformPinnedIconInspectionV1,
+        label: &str,
+    ) -> PlatformAssetReadRefusalKindV1 {
+        match inspection {
+            PlatformPinnedIconInspectionV1::Complete(_) => {
+                panic!("{label}: the hostile request must be refused")
+            }
+            PlatformPinnedIconInspectionV1::Refused(refusal) => {
+                assert_eq!(
+                    refusal.stage(),
+                    solo_adapters::PlatformInspectionStageV1::SourceRead,
+                    "{label}: the refusal must precede any media work"
+                );
+                refusal
+                    .source_refusal()
+                    .unwrap_or_else(|| panic!("{label}: a source refusal is expected"))
+                    .kind()
+            }
+        }
+    }
+
+    /// Runs one whole-library inspection against one scratch root and returns its refusal kind.
+    fn inspection_kind(
+        root: &Path,
+        version: &str,
+        request: &PlatformAssetRefV1,
+        label: &str,
+    ) -> PlatformAssetReadRefusalKindV1 {
+        let capability = PlatformRootCapabilityV1::adopt_bootstrap_path(
+            root,
+            PlatformRootProvenanceV1::OperatorDesignatedPlatformRoot,
+        )
+        .expect("the scratch Platform root is adoptable");
+        expect_source_refusal(
+            inspect_pinned_platform_icon_sources_v1(
+                &capability,
+                version,
+                std::slice::from_ref(request),
+                Path::new(BIN),
+            ),
+            label,
+        )
+    }
+
+    #[test]
+    fn n127_02_version_catalogue_licence_and_scope_refusal_matrix() {
+        let library = Library::load();
+        let approved = ScratchPlatform::new("matrix");
+        let capability = approved.capability();
+        let request = library.requests()[0].clone();
+        let mut refusals: usize = 0;
+
+        // 1-3. The selected version is mandatory and must be the approved one.
+        for version in ["", "1.0.1", "2.0.0"] {
+            let kind = expect_source_refusal(
+                inspect_pinned_platform_icon_sources_v1(
+                    &capability,
+                    version,
+                    std::slice::from_ref(&request),
+                    Path::new(BIN),
+                ),
+                version,
+            );
+            assert_eq!(
+                kind,
+                PlatformAssetReadRefusalKindV1::UnselectedVersion,
+                "{version}"
+            );
+            refusals += 1;
+        }
+
+        // 4. A replaced root holds no catalogue at all.
+        let empty = ScratchPlatform::empty("matrix");
+        assert_eq!(
+            inspection_kind(&empty.platform, VERSION, &request, "replaced-root"),
+            PlatformAssetReadRefusalKindV1::CatalogueUnavailable
+        );
+        refusals += 1;
+
+        // 5. A changed catalogue body that stays self-consistent is still not approved.
+        let changed_root = ScratchPlatform::new("changed-catalogue");
+        let catalogue_path = changed_root.platform.join("assets/catalogue-1.0.0.json");
+        let mut changed = read(&catalogue_path);
+        let index = changed
+            .windows(10)
+            .position(|window| window == b"\"height\": ")
+            .expect("the height key");
+        changed[index + 9] = b'5';
+        assert_ne!(
+            sha256_media_worker_bytes_v1(&changed).to_hex(),
+            CATALOGUE_SHA256
+        );
+        fs::write(&catalogue_path, &changed).expect("write a changed catalogue");
+        assert_eq!(
+            inspection_kind(
+                &changed_root.platform,
+                VERSION,
+                &request,
+                "changed-catalogue"
+            ),
+            PlatformAssetReadRefusalKindV1::CatalogueUnapproved
+        );
+        refusals += 1;
+
+        // 6. A wholly different but valid document is not the approved catalogue.
+        let other_root = ScratchPlatform::new("other-catalogue");
+        fs::write(
+            other_root.platform.join("assets/catalogue-1.0.0.json"),
+            b"{\"platformAssetLibraryVersion\": \"1.0.0\", \"assets\": []}",
+        )
+        .expect("write another catalogue");
+        assert_eq!(
+            inspection_kind(&other_root.platform, VERSION, &request, "other-catalogue"),
+            PlatformAssetReadRefusalKindV1::CatalogueUnapproved
+        );
+        refusals += 1;
+
+        // 7-8. The retained notice must exist and must be the pinned bytes.
+        let no_notice = ScratchPlatform::new("no-notice");
+        fs::remove_file(
+            no_notice
+                .platform
+                .join("assets/licensing/TABLER-ICONS-MIT.txt"),
+        )
+        .expect("remove the notice");
+        let notice_refusal = no_notice
+            .capability()
+            .read_licensing_document(PlatformLicensingDocumentV1::MitNotice, 1024 * 1024)
+            .expect_err("a missing notice is refused");
+        assert_eq!(
+            notice_refusal.kind(),
+            PlatformAssetReadRefusalKindV1::MissingSource
+        );
+        refusals += 1;
+
+        let swapped_notice = ScratchPlatform::new("swapped-notice");
+        fs::write(
+            swapped_notice
+                .platform
+                .join("assets/licensing/TABLER-ICONS-MIT.txt"),
+            b"MIT License\n\nPermission is hereby granted.\n",
+        )
+        .expect("write a different notice");
+        let swapped = swapped_notice
+            .capability()
+            .read_licensing_document(PlatformLicensingDocumentV1::MitNotice, 1024 * 1024)
+            .expect("the swapped notice is readable");
+        assert_ne!(
+            sha256_media_worker_bytes_v1(&swapped).to_hex(),
+            MIT_SHA256,
+            "a swapped notice cannot keep its identity"
+        );
+        refusals += 1;
+
+        // 9. Changed provenance bytes cannot keep their identity.
+        let changed_provenance = ScratchPlatform::new("changed-provenance");
+        let provenance_path = changed_provenance
+            .platform
+            .join("assets/licensing/icon-provenance.json");
+        let mut provenance = read(&provenance_path);
+        provenance.push(b' ');
+        assert_ne!(
+            sha256_media_worker_bytes_v1(&provenance).to_hex(),
+            PROVENANCE_SHA256
+        );
+        fs::write(&provenance_path, &provenance).expect("write changed provenance");
+        let provenance_read = changed_provenance
+            .capability()
+            .read_licensing_document(PlatformLicensingDocumentV1::Provenance, 1024 * 1024)
+            .expect("the changed record is readable");
+        assert_ne!(
+            sha256_media_worker_bytes_v1(&provenance_read).to_hex(),
+            PROVENANCE_SHA256
+        );
+        refusals += 1;
+
+        // 10-11. An unapproved extra entry and an absent entry both refuse at the catalogue size.
+        let entries = library.catalogue.entries().to_vec();
+        let licence = PlatformAssetLicenceV1::new("MIT", "Paweł Kuna", "pinned notice")
+            .expect("a bounded licence");
+        let provenance_text = PlatformAssetProvenanceV1::new("Tabler Icons v3.46.0", "pinned")
+            .expect("bounded provenance");
+        let extra_digest = sha256_media_worker_bytes_v1(b"an unapproved extra asset").to_hex();
+        let mut extended = entries.clone();
+        extended.push(
+            PlatformAssetCatalogueEntryV1::new(
+                &PlatformAssetDeclarationV1::of(
+                    "icons/icon-unapproved-extra.svg",
+                    &extra_digest,
+                    "image",
+                    "image/svg+xml",
+                    24,
+                    24,
+                ),
+                licence.clone(),
+                provenance_text.clone(),
+            )
+            .expect("a syntactically valid extra entry"),
+        );
+        let extended = PlatformAssetCatalogueV1::new(VERSION, extended).expect("an 82-entry model");
+        let outcome = read_pinned_platform_sources_v1(
+            capability.selection(),
+            VERSION,
+            &extended,
+            std::slice::from_ref(&request),
+            &capability,
+        );
+        assert_eq!(
+            outcome.refusal().map(|refusal| refusal.kind()),
+            Some(PlatformAssetReadRefusalKindV1::CatalogueCountMismatch)
+        );
+        refusals += 1;
+
+        let truncated = entries[..APPROVED - 1].to_vec();
+        let truncated =
+            PlatformAssetCatalogueV1::new(VERSION, truncated).expect("an 80-entry model");
+        let outcome = read_pinned_platform_sources_v1(
+            capability.selection(),
+            VERSION,
+            &truncated,
+            std::slice::from_ref(&request),
+            &capability,
+        );
+        assert_eq!(
+            outcome.refusal().map(|refusal| refusal.kind()),
+            Some(PlatformAssetReadRefusalKindV1::CatalogueCountMismatch)
+        );
+        refusals += 1;
+
+        // 12-15. Identifier spellings: case alias, injected prefixes and non-membership.
+        for (label, identifier) in [
+            ("id-case-alias", "icons/ICON-about.svg"),
+            ("platform-prefix", "platform/icons/icon-about.svg"),
+            (
+                "content-assets-prefix",
+                "content/assets/icons/icon-about.svg",
+            ),
+            ("assets-prefix", "assets/icons/icon-about.svg"),
+        ] {
+            assert_eq!(
+                PlatformAssetRefV1::from_identifier(identifier)
+                    .expect_err(label)
+                    .kind(),
+                PlatformAssetReadRefusalKindV1::UnsafeAssetIdentifier,
+                "{label}"
+            );
+            refusals += 1;
+        }
+        let non_member = PlatformAssetRefV1::from_identifier("icons/icon-not-approved.svg")
+            .expect("a syntactically valid identifier");
+        assert_eq!(
+            inspection_kind(&approved.platform, VERSION, &non_member, "non-member"),
+            PlatformAssetReadRefusalKindV1::UnapprovedAssetIdentifier
+        );
+        refusals += 1;
+
+        // 16. An Entity- or route-shaped spelling can never address a Platform source: the typed
+        //     identifier refuses it before any read, so no Entity namespace can alias one here.
+        for identifier in [
+            "entity/icons/icon-about.svg",
+            "icons/icon-about.svg?entity",
+            "icons/entity/icon-about.svg",
+        ] {
+            assert_eq!(
+                PlatformAssetRefV1::from_identifier(identifier)
+                    .expect_err(identifier)
+                    .kind(),
+                PlatformAssetReadRefusalKindV1::UnsafeAssetIdentifier,
+                "{identifier}"
+            );
+            refusals += 1;
+        }
+
+        // 17. A document that declares one digest twice is refused by the unchanged parser.
+        let mut duplicated: serde_json::Value =
+            serde_json::from_slice(&library.bytes).expect("the approved document");
+        let assets = duplicated["assets"]
+            .as_array_mut()
+            .expect("the assets array");
+        let mut alias = assets[0].clone();
+        alias["id"] = serde_json::Value::String("icons/icon-status-info.svg".to_owned());
+        assets.push(alias);
+        let duplicated = serde_json::to_vec(&duplicated).expect("a re-serialised document");
+        assert!(
+            parse_platform_asset_catalogue_v1(&duplicated, VERSION).is_err(),
+            "a duplicate digest alias is refused by the closed catalogue invariant"
+        );
+        refusals += 1;
+
+        // 18. The pre-existing Entity-only reader still refuses any Platform obligation, and the
+        //     R12 inert PlatformSource binding is still refused: this order adds a *separate*
+        //     proven source, it does not relabel the inert comparison as a real read.
+        assert_eq!(
+            bind_catalogue_to_v4_evidence_v1(
+                &library.catalogue,
+                &[],
+                PlatformCatalogueBindingScopeV1::PlatformSource
+            ),
+            PlatformCatalogueBindingV1::Refused {
+                position: 0,
+                kind: PlatformCatalogueMatchRefusalV1::PlatformSourceUnavailable,
+            }
+        );
+        refusals += 1;
+
+        assert!(
+            refusals >= 12,
+            "the hostile matrix must contain at least twelve independent refusals, found {refusals}"
+        );
+        println!(
+            "n127_evidence case=02 refusals={refusals} pin_refused=true licence_refused=true \
+             provenance_refused=true entity_fallback=false publication=false \
+             entity_source_reader_refuses_platform=true platform_source_binding_refused=true"
+        );
+    }
+
+    /// Requires one refused native read of one exact identifier.
+    fn expect_read_refusal(
+        capability: &PlatformRootCapabilityV1,
+        asset_id: &str,
+        max_bytes: u64,
+        label: &str,
+    ) -> PlatformAssetReadRefusalKindV1 {
+        match capability.read_platform_source(asset_id, max_bytes) {
+            PlatformAssetSourceV1::Present { .. } => {
+                panic!("{label}: the native boundary must refuse this object")
+            }
+            PlatformAssetSourceV1::Refused(kind) => kind,
+        }
+    }
+
+    #[test]
+    fn n127_03_separate_native_root_symlink_hardlink_and_changed_source_refused() {
+        let library = Library::load();
+        let scratch = ScratchPlatform::new("confinement");
+        let capability = scratch.capability();
+        let approved = library.catalogue.entries()[0].id().to_owned();
+        let approved_name = approved
+            .split_once('/')
+            .map(|(_, name)| name)
+            .expect("an icons/<name> identifier");
+        let mut natives: usize = 0;
+
+        // 1. A regular approved file is accepted by the same capability...
+        assert!(matches!(
+            capability.read_platform_source(&approved, 20 * 1024 * 1024),
+            PlatformAssetSourceV1::Present { links: 1, .. }
+        ));
+        // ...which is what makes every refusal below load-bearing.
+        let target = scratch.icon(approved_name);
+        let original = read(&target);
+
+        // 2. A hardlink alias is an ambiguous identity even with correct bytes.
+        let alias = scratch.icon("icon-hardlink-alias.svg");
+        fs::hard_link(&target, &alias).expect("create a hardlink alias");
+        assert_eq!(
+            expect_read_refusal(
+                &capability,
+                "icons/icon-hardlink-alias.svg",
+                20 * 1024 * 1024,
+                "hardlink"
+            ),
+            PlatformAssetReadRefusalKindV1::IdentityCollision
+        );
+        fs::remove_file(&alias).expect("remove the hardlink alias");
+        natives += 1;
+
+        // 3. A symlinked leaf cannot redirect an approved identifier.
+        #[cfg(unix)]
+        {
+            let displaced = scratch.icon("icon-displaced.svg");
+            fs::rename(&target, &displaced).expect("move the approved source aside");
+            std::os::unix::fs::symlink(&displaced, &target).expect("create a symlink leaf");
+            assert_eq!(
+                expect_read_refusal(&capability, &approved, 20 * 1024 * 1024, "symlink-leaf"),
+                PlatformAssetReadRefusalKindV1::UnsafeSourceLocation
+            );
+            fs::remove_file(&target).expect("remove the symlink");
+            fs::rename(&displaced, &target).expect("restore the approved source");
+            natives += 1;
+        }
+        #[cfg(windows)]
+        {
+            // The Windows reader refuses reparse points; the accepted R03 Windows canaries already
+            // execute that negative with the privilege they need. The attempt is still made here,
+            // and a privilege refusal is recorded as an OS refusal, never as a passing product case.
+            let displaced = scratch.icon("icon-displaced.svg");
+            fs::rename(&target, &displaced).expect("move the approved source aside");
+            match std::os::windows::fs::symlink_file(&displaced, &target) {
+                Ok(()) => {
+                    assert_eq!(
+                        expect_read_refusal(&capability, &approved, 20 * 1024 * 1024, "symlink"),
+                        PlatformAssetReadRefusalKindV1::UnsafeSourceLocation
+                    );
+                    fs::remove_file(&target).expect("remove the symlink");
+                    natives += 1;
+                }
+                Err(error) => {
+                    assert_eq!(
+                        error.kind(),
+                        std::io::ErrorKind::PermissionDenied,
+                        "a symlink can only be declined for privilege here: {error}"
+                    );
+                }
+            }
+            fs::rename(&displaced, &target).expect("restore the approved source");
+        }
+
+        // 3. A directory leaf is not a regular source.
+        fs::create_dir_all(scratch.icon("icon-directory.svg")).expect("create a directory leaf");
+        assert_eq!(
+            expect_read_refusal(
+                &capability,
+                "icons/icon-directory.svg",
+                20 * 1024 * 1024,
+                "directory-leaf"
+            ),
+            PlatformAssetReadRefusalKindV1::UnsafeSourceLocation
+        );
+        fs::remove_dir_all(scratch.icon("icon-directory.svg")).expect("remove the directory leaf");
+        natives += 1;
+
+        // 4. A missing leaf is a refusal, never absence-as-success.
+        assert_eq!(
+            expect_read_refusal(
+                &capability,
+                "icons/icon-absent.svg",
+                20 * 1024 * 1024,
+                "absent"
+            ),
+            PlatformAssetReadRefusalKindV1::MissingSource
+        );
+        natives += 1;
+
+        // 5. An unsafe identifier never reaches the filesystem.
+        for identifier in [
+            "icons/../icons/icon-about.svg",
+            "icons/icon about.svg",
+            "assets/icons/icon-about.svg",
+        ] {
+            assert_eq!(
+                expect_read_refusal(&capability, identifier, 20 * 1024 * 1024, identifier),
+                PlatformAssetReadRefusalKindV1::UnsafeAssetIdentifier,
+                "{identifier}"
+            );
+            natives += 1;
+        }
+
+        // 6. A file adopted as the root is not a directory capability.
+        assert!(
+            PlatformRootCapabilityV1::adopt_bootstrap_path(
+                &target,
+                PlatformRootProvenanceV1::OperatorDesignatedPlatformRoot
+            )
+            .is_err()
+        );
+        natives += 1;
+
+        // 7. An oversize source is refused, never truncated.
+        assert_eq!(
+            expect_read_refusal(&capability, &approved, 8, "oversize"),
+            PlatformAssetReadRefusalKindV1::OversizeSource
+        );
+        natives += 1;
+
+        // 8. A replaced root with no catalogue cannot address the approved library.
+        let empty = ScratchPlatform::empty("confinement");
+        assert_eq!(
+            match empty.capability().read_catalogue(2 * 1024 * 1024) {
+                PlatformCatalogueSourceV1::Present { .. } =>
+                    panic!("an empty root has no catalogue"),
+                PlatformCatalogueSourceV1::Refused(kind) => kind,
+            },
+            PlatformAssetReadRefusalKindV1::MissingSource
+        );
+        natives += 1;
+
+        // 9. Linux: the immutable-clone requirement is not silently downgraded to a copy.
+        #[cfg(target_os = "linux")]
+        {
+            let parent = match std::env::var_os("SOLO_TEST_UNSUPPORTED_FS_ROOT") {
+                Some(root) if !root.is_empty() => PathBuf::from(root),
+                _ => panic!(
+                    "SOLO_TEST_UNSUPPORTED_FS_ROOT must name a filesystem without reflink; the refusal cannot be proven without it"
+                ),
+            };
+            let base = parent.join(format!("solo-n127-unsupported-{}", std::process::id()));
+            let _ = fs::remove_dir_all(&base);
+            let platform = base.join("platform");
+            copy_tree(&product_root(), &platform);
+            let unsupported = PlatformRootCapabilityV1::adopt_bootstrap_path(
+                &platform,
+                PlatformRootProvenanceV1::OperatorDesignatedPlatformRoot,
+            )
+            .expect("the unverified-filesystem root is adoptable");
+            assert_eq!(
+                expect_read_refusal(&unsupported, &approved, 20 * 1024 * 1024, "no-reflink"),
+                PlatformAssetReadRefusalKindV1::Unsupported
+            );
+            let _ = fs::remove_dir_all(&base);
+            natives += 1;
+        }
+
+        // The approved source bytes were restored exactly.
+        assert_eq!(read(&target), original);
+        assert!(natives >= 9, "native refusals: {natives}");
+        println!(
+            "n127_evidence case=03 confinement=true hardlink_refused=true unsafe_refused=true \
+             native_mechanism={} natives={natives} publication=false",
+            capability.mechanism()
+        );
+    }
+
+    #[test]
+    fn n127_04_late_hidden_platform_failure_zero_partial_and_no_namespace_alias() {
+        let library = Library::load();
+        let scratch = ScratchPlatform::new("late");
+        let capability = scratch.capability();
+        let requests = library.requests();
+
+        // 1. The requested set does complete under the new standalone gate first, so the late
+        //    failure below is a real change of state rather than a gate that never worked.
+        let baseline = read_pinned_platform_sources_v1(
+            capability.selection(),
+            VERSION,
+            &library.catalogue,
+            &requests[..4],
+            &capability,
+        );
+        let baseline = baseline
+            .complete()
+            .unwrap_or_else(|| panic!("the first four approved sources must complete"));
+        assert_eq!(baseline.len(), 4);
+        assert!(!baseline.grants_publication_authority());
+        assert!(!baseline.proves_global_snapshot());
+
+        // 2. Corrupt the *last* requested source while the earlier ones still match exactly.
+        let last = requests[3].as_str().to_owned();
+        let last_name = last
+            .split_once('/')
+            .map(|(_, name)| name)
+            .expect("an icons/<name> identifier");
+        let last_path = scratch.icon(last_name);
+        let original = read(&last_path);
+        let mut corrupted = original.clone();
+        let tail = corrupted.len() - 1;
+        corrupted[tail] ^= 0x01;
+        assert_eq!(
+            corrupted.len(),
+            original.len(),
+            "same length, different bytes"
+        );
+        fs::write(&last_path, &corrupted).expect("corrupt the last requested source");
+
+        let outcome = read_pinned_platform_sources_v1(
+            capability.selection(),
+            VERSION,
+            &library.catalogue,
+            &requests[..4],
+            &capability,
+        );
+        let refusal = outcome
+            .refusal()
+            .copied()
+            .unwrap_or_else(|| panic!("the corrupted last source must refuse the set"));
+        assert_eq!(
+            refusal.kind(),
+            PlatformAssetReadRefusalKindV1::SourceDigestMismatch,
+            "the corruption is caught by the recomputed source digest"
+        );
+        assert_eq!(
+            refusal.position(),
+            Some(3),
+            "the refusal names the late ordinal"
+        );
+        assert!(
+            outcome.complete().is_none(),
+            "zero partial records survive a late failure"
+        );
+        assert!(!refusal.detail().contains('/'), "{}", refusal.detail());
+        assert!(!refusal.detail().contains("icons"), "{}", refusal.detail());
+
+        // 3. The whole-request inspection refuses at the source stage, before any worker exists, so
+        //    a late corruption can never produce media evidence for the earlier assets.
+        let inspection = inspect_pinned_platform_icon_sources_v1(
+            &capability,
+            VERSION,
+            &requests[..4],
+            Path::new(BIN),
+        );
+        assert_eq!(
+            expect_source_refusal(inspection, "late-corruption"),
+            PlatformAssetReadRefusalKindV1::SourceDigestMismatch
+        );
+
+        // 4. Restoring the byte restores the complete set: the refusal was about the bytes.
+        fs::write(&last_path, &original).expect("restore the approved source");
+        let restored = read_pinned_platform_sources_v1(
+            capability.selection(),
+            VERSION,
+            &library.catalogue,
+            &requests[..4],
+            &capability,
+        );
+        assert_eq!(
+            restored.complete().map(PlatformAssetSourceSetV1::len),
+            Some(4)
+        );
+
+        // 5. A wrong root cannot smuggle an Entity-shaped `assets/icons/…` file of the same
+        //    basename: with no approved catalogue there, the request refuses.
+        let entity_like = ScratchPlatform::empty("late");
+        fs::copy(
+            scratch.icon(last_name),
+            entity_like.platform.join("assets/icons").join(last_name),
+        )
+        .expect("copy an Entity-shaped file into the wrong root");
+        assert_eq!(
+            inspection_kind(&entity_like.platform, VERSION, &requests[3], "wrong-root"),
+            PlatformAssetReadRefusalKindV1::CatalogueUnavailable
+        );
+
+        // 6. No namespace alias: an Entity- or route-shaped spelling cannot address a Platform
+        //    source, and the namespace-free identifier type refuses it before any read.
+        for alias in [
+            "platform/icons/icon-about.svg",
+            "assets/icons/icon-about.svg",
+            "content/assets/icons/icon-about.svg",
+            "icons/ICON-about.svg",
+            "icons/icon-status-info.svg",
+        ] {
+            let refusal = PlatformAssetRefV1::from_identifier(alias)
+                .expect_err("an aliased spelling must never address an approved source");
+            assert_eq!(
+                refusal.kind(),
+                PlatformAssetReadRefusalKindV1::UnsafeAssetIdentifier
+            );
+        }
+        // The single representative of the duplicate pair is the only approved member, and the
+        // withheld names remain non-members of the installed catalogue.
+        for withheld in WITHHELD {
+            assert!(
+                library
+                    .catalogue
+                    .exact_entry(&format!("icons/{withheld}"))
+                    .is_none(),
+                "{withheld} must remain absent"
+            );
+        }
+        assert!(
+            library
+                .catalogue
+                .exact_entry("icons/icon-about.svg")
+                .is_some()
+        );
+
+        println!(
+            "n127_evidence case=04 late_refused=true zero_partial=true private_path_absent=true \
+             fallback=false publication=false standalone_set_complete=true wrong_root_refused=true \
+             namespace_alias_refused=true"
+        );
+    }
+}

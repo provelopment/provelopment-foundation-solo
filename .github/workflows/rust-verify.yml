@@ -1413,6 +1413,108 @@ jobs:
           (Get-Content -LiteralPath $log) | ForEach-Object { $_.Replace('mit_sha=b740a1d46122672da62833e97f7e7c8a13fa85cbc7445b584b297cc00dde93db', 'mit_sha=0000000000000000000000000000000000000000000000000000000000000000') } | Set-Content -LiteralPath $probe
           if (Test-N126Log -Path $probe) { throw 'corrupted licence evidence accepted' }
           Write-Output 'n126_gate mutation=rejected'
+      # Mandatory `SOLO-WO-118 R15` N127 gate: the **installed** Owner-approved Platform library
+      # `1.0.0`, read through the separate native Platform capability and inspected by 81 genuine
+      # confined SVG children. The same verifier must reject four altered copies of the real log.
+      - name: Owner-approved Platform library N127 gate (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          check_n127() {
+            local log="$1"
+            for name in n127_01_owner_approved_platform_81_real_confined_svg_sources n127_02_version_catalogue_licence_and_scope_refusal_matrix n127_03_separate_native_root_symlink_hardlink_and_changed_source_refused n127_04_late_hidden_platform_failure_zero_partial_and_no_namespace_alias; do
+              grep -qF "test n127::$name " "$log" || return 1
+            done
+            [ "$(grep -Ec '^test n127::n127_0[0-9]_[A-Za-z0-9_]*( |$)' "$log")" -eq 4 ] || return 1
+            grep -qF 'test result: ok. 4 passed; 0 failed; 0 ignored' "$log" || return 1
+            ! grep -qF '... FAILED' "$log" || return 1
+            ! grep -qF '... ignored' "$log" || return 1
+            ! grep -qF 'test result: FAILED' "$log" || return 1
+            [ "$(grep -cF 'n127_evidence case=01' "$log")" -eq 1 ] || return 1
+            [ "$(grep -cF 'n127_evidence case=02' "$log")" -eq 1 ] || return 1
+            [ "$(grep -cF 'n127_evidence case=03' "$log")" -eq 1 ] || return 1
+            [ "$(grep -cF 'n127_evidence case=04' "$log")" -eq 1 ] || return 1
+            [ "$(grep -cF 'n127_row id=' "$log")" -eq 81 ] || return 1
+            grep -qF 'approved=81 read=81 real_children=81 version=1.0.0 exact_sha=true' "$log" || return 1
+            grep -qF 'aggregate=3c34fe9919341862a5a70a87d205fbfc942741dec5f3996514d3edd0aeb1aaca' "$log" || return 1
+            grep -qF 'publication=false source_root=platform' "$log" || return 1
+            grep -qF 'pin_refused=true licence_refused=true provenance_refused=true entity_fallback=false' "$log" || return 1
+            grep -qF 'confinement=true hardlink_refused=true unsafe_refused=true' "$log" || return 1
+            grep -qF 'late_refused=true zero_partial=true private_path_absent=true fallback=false' "$log" || return 1
+          }
+          log="$RUNNER_TEMP/n127-four.txt"
+          cargo test -p solo-cli --test media_worker_host_smoke --locked n127_ -- --nocapture --test-threads=1 >"$log" 2>&1 || { cat "$log"; exit 1; }
+          cat "$log"
+          check_n127 "$log" || { echo 'authentic N127 4/4 run rejected'; exit 1; }
+          echo 'n127_gate authentic=accepted'
+          probe="$RUNNER_TEMP/n127-probe.txt"
+          cp "$log" "$probe"
+          sed -i '/n127_04_late_hidden_platform_failure_zero_partial_and_no_namespace_alias/d' "$probe"
+          if check_n127 "$probe"; then echo 'missing N127 case accepted'; exit 1; fi
+          cp "$log" "$probe"
+          sed -i 's/approved=81 read=81/approved=80 read=80/; s/real_children=81/real_children=80/' "$probe"
+          if check_n127 "$probe"; then echo 'false 80-asset count accepted'; exit 1; fi
+          cp "$log" "$probe"
+          sed -i 's/publication=false/publication=true/g; s/fallback=false/fallback=true/g' "$probe"
+          if check_n127 "$probe"; then echo 'forged publication or fallback flag accepted'; exit 1; fi
+          cp "$log" "$probe"
+          sed -i 's/aggregate=3c34fe9919341862a5a70a87d205fbfc942741dec5f3996514d3edd0aeb1aaca/aggregate=0000000000000000000000000000000000000000000000000000000000000000/' "$probe"
+          sed -i 's/zero_partial=true/zero_partial=false/' "$probe"
+          if check_n127 "$probe"; then echo 'corrupted aggregate or partial-set claim accepted'; exit 1; fi
+      - name: Owner-approved Platform library N127 gate (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $required = @(
+            'n127_01_owner_approved_platform_81_real_confined_svg_sources',
+            'n127_02_version_catalogue_licence_and_scope_refusal_matrix',
+            'n127_03_separate_native_root_symlink_hardlink_and_changed_source_refused',
+            'n127_04_late_hidden_platform_failure_zero_partial_and_no_namespace_alias')
+          $tokens = @(
+            'approved=81 read=81 real_children=81 version=1.0.0 exact_sha=true',
+            'aggregate=3c34fe9919341862a5a70a87d205fbfc942741dec5f3996514d3edd0aeb1aaca',
+            'publication=false source_root=platform',
+            'pin_refused=true licence_refused=true provenance_refused=true entity_fallback=false',
+            'confinement=true hardlink_refused=true unsafe_refused=true',
+            'late_refused=true zero_partial=true private_path_absent=true fallback=false')
+          function Test-N127Log {
+            param([string]$Path)
+            $text = Get-Content -LiteralPath $Path -Raw
+            foreach ($name in $required) {
+              if (-not $text.Contains('test n127::' + $name + ' ')) { return $false }
+            }
+            if (([regex]::Matches($text, '(?m)^test n127::n127_0[0-9]_[A-Za-z0-9_]*( |$)')).Count -ne 4) { return $false }
+            if (-not $text.Contains('test result: ok. 4 passed; 0 failed; 0 ignored')) { return $false }
+            if ($text.Contains('... FAILED') -or $text.Contains('... ignored') -or $text.Contains('test result: FAILED')) { return $false }
+            foreach ($marker in @('n127_evidence case=01', 'n127_evidence case=02', 'n127_evidence case=03', 'n127_evidence case=04')) {
+              if (([regex]::Matches($text, [regex]::Escape($marker))).Count -ne 1) { return $false }
+            }
+            if (([regex]::Matches($text, 'n127_row id=')).Count -ne 81) { return $false }
+            foreach ($token in $tokens) {
+              if (-not $text.Contains($token)) { return $false }
+            }
+            return $true
+          }
+          $log = Join-Path $env:RUNNER_TEMP 'n127-four.txt'
+          cargo test -p solo-cli --test media_worker_host_smoke --locked n127_ -- --nocapture --test-threads=1 *>&1 | Tee-Object -FilePath $log
+          if ($LASTEXITCODE -ne 0) { throw 'the N127 suite did not exit zero' }
+          Get-Content -LiteralPath $log
+          if (-not (Test-N127Log -Path $log)) { throw 'authentic N127 4/4 run rejected' }
+          Write-Output 'n127_gate authentic=accepted'
+          $probe = Join-Path $env:RUNNER_TEMP 'n127-probe.txt'
+          (Get-Content -LiteralPath $log | Where-Object { -not $_.Contains('n127_04_late_hidden_platform_failure_zero_partial_and_no_namespace_alias') }) | Set-Content -LiteralPath $probe
+          if (Test-N127Log -Path $probe) { throw 'missing N127 case accepted' }
+          (Get-Content -LiteralPath $log) | ForEach-Object { $_.Replace('approved=81 read=81', 'approved=80 read=80').Replace('real_children=81', 'real_children=80') } | Set-Content -LiteralPath $probe
+          if (Test-N127Log -Path $probe) { throw 'false 80-asset count accepted' }
+          (Get-Content -LiteralPath $log) | ForEach-Object { $_.Replace('publication=false', 'publication=true').Replace('fallback=false', 'fallback=true') } | Set-Content -LiteralPath $probe
+          if (Test-N127Log -Path $probe) { throw 'forged publication or fallback flag accepted' }
+          (Get-Content -LiteralPath $log) | ForEach-Object { $_.Replace('aggregate=3c34fe9919341862a5a70a87d205fbfc942741dec5f3996514d3edd0aeb1aaca', 'aggregate=0000000000000000000000000000000000000000000000000000000000000000').Replace('zero_partial=true', 'zero_partial=false') } | Set-Content -LiteralPath $probe
+          if (Test-N127Log -Path $probe) { throw 'corrupted aggregate or partial-set claim accepted' }
+          Write-Output 'n127_gate mutation=rejected'
+
+          echo 'n127_gate mutation=rejected'
+
       # Mandatory `SOLO-WO-118 R11` N124 gate: the V4 six-format whole-candidate composition on this
       # host, including the associated-alpha AVIF class beside the five legacy formats. The same
       # verifier must reject four altered copies of the real log before printing its verdict.

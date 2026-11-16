@@ -18,6 +18,7 @@ mod graphic_asset_read;
 mod graphic_image_inspection;
 mod media_worker;
 mod platform_asset_catalogue;
+mod platform_asset_read;
 mod property_resolution;
 mod source_read;
 
@@ -100,6 +101,19 @@ pub use platform_asset_catalogue::{
     PlatformCatalogueMatchV1, PlatformCatalogueRefusalV1, bind_catalogue_to_v4_evidence_v1,
     match_catalogue_entry_to_v4_evidence_v1,
 };
+pub use platform_asset_read::{
+    APPROVED_PLATFORM_ASSET_COUNT_V1, APPROVED_PLATFORM_CATALOGUE_SHA256_V1,
+    APPROVED_PLATFORM_LIBRARY_VERSION_V1, MAX_PLATFORM_CATALOGUE_BYTES_V1,
+    MAX_PLATFORM_SOURCE_BYTES_V1, PLATFORM_ASSET_NAMESPACE_SEGMENT_V1,
+    PLATFORM_ASSET_READ_GRANTS_PUBLICATION_AUTHORITY_V1,
+    PLATFORM_ASSET_READ_PROVES_GLOBAL_SNAPSHOT_V1, PLATFORM_ASSET_READ_PROVES_MEDIA_V1,
+    PLATFORM_ICON_DIRECTORY_V1, PLATFORM_IMAGE_EXTENSION_V1, PlatformAssetLibraryReadPortV1,
+    PlatformAssetReadRefusalKindV1, PlatformAssetReadRefusalV1, PlatformAssetRefV1,
+    PlatformAssetSourceEvidenceV1, PlatformAssetSourceSetV1, PlatformAssetSourceV1,
+    PlatformCatalogueSourceV1, PlatformLibraryReadOutcomeV1, PlatformRootProvenanceV1,
+    PlatformRootSelectionV1, read_pinned_platform_sources_v1,
+};
+
 pub use property_resolution::{
     PROPERTY_CANDIDATE_GRANTS_PUBLICATION_AUTHORITY, PropertyResolutionCandidateV1,
     PropertyResolutionRequestV1, resolve_declared_properties_v1,

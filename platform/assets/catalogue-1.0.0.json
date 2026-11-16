@@ -1,0 +1,1382 @@
+{
+  "platformAssetLibraryVersion": "1.0.0",
+  "assets": [
+    {
+      "id": "icons/icon-about.svg",
+      "sha256": "bf4377dff0aaaddf1676a4bb7292f90f1102f19daaca7021331ba6a191317c1c",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-about.svg; source info-circle",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob c407077e4f849eaf536908a9ee444c4aa4752af4"
+      }
+    },
+    {
+      "id": "icons/icon-account.svg",
+      "sha256": "5fe81e0a0cdf02535e033615774eedf975aa0b8aedf7c47302bff1e42d95fa1c",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-account.svg; source user-circle",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 08718bc1fc807d2d2589681bdba8e6e69df9fdb9"
+      }
+    },
+    {
+      "id": "icons/icon-appointment.svg",
+      "sha256": "da9fd5f54ea2b47b0e63699243998d60098165d11202c93c011a7f0559a630b6",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-appointment.svg; source calendar-time",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 93e066491630112c52ed4f471270530b49a4c0e3"
+      }
+    },
+    {
+      "id": "icons/icon-bag.svg",
+      "sha256": "dceed6301c60ed1d257bd11fbc8348bd960f194eeaf92924b117822033becb3a",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-bag.svg; source basket",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 844f1deb1ccd0edeee7fee269f1cd18165ee5c99"
+      }
+    },
+    {
+      "id": "icons/icon-beauty.svg",
+      "sha256": "ffafcb1ef22c839851ebcda13a9c73c62b36615acc458faa2f158254edadf3b6",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-beauty.svg; source sparkles",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 65698da5ee20659f215fcf57f8fc9de9ebccd373"
+      }
+    },
+    {
+      "id": "icons/icon-benefits.svg",
+      "sha256": "b45866d7f9af810ca0245c91ed8476172616c4dcc6904f2a0f0812ea5002094e",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-benefits.svg; source checklist",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 292cce91e9fedc94f69e8df0065ac33a340d3f28"
+      }
+    },
+    {
+      "id": "icons/icon-blog.svg",
+      "sha256": "a75f64c67ba19ea1553b5af11cc0b8ddae70a5e834ed2975f07fd1e0d8d10a5f",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-blog.svg; source writing",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 246bc874e6cc27d94106ced9ccbeddbc6db97306"
+      }
+    },
+    {
+      "id": "icons/icon-book.svg",
+      "sha256": "8607fe3e1de626e15272e6875f632e9f8fcc89e48b2cf0aa47aea6bb444d46eb",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-book.svg; source calendar-plus",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob e3f482c058de2102b1bc3cf597fcb24113c0543a"
+      }
+    },
+    {
+      "id": "icons/icon-calendar.svg",
+      "sha256": "349153065c0fcde52fbd0cab04220baa19be11fe53fb5454ebd6856a59af575c",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-calendar.svg; source calendar",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob cf31525af8f3cd712ab4f1c7ae8fc4d26b10c610"
+      }
+    },
+    {
+      "id": "icons/icon-careers.svg",
+      "sha256": "df1fcd4b35dd03cc638a79cc96276c149ef32c7c98028fa498a871dc6e1dbbc3",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-careers.svg; source user-search",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob c335948d70b2c2f20ce9383679f5e8ba3afc5722"
+      }
+    },
+    {
+      "id": "icons/icon-cart.svg",
+      "sha256": "26d8fc190a20d614e1beafb2c2738bcb56ccc918ea8acf346a2490c97085934f",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-cart.svg; source shopping-cart",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob ee5a160150e9ccf34668fa32084534a26acaa55c"
+      }
+    },
+    {
+      "id": "icons/icon-case-studies.svg",
+      "sha256": "703a2820f489541236a766a3d4c30b15e717082ceae1f413fe1fc73a78e86287",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-case-studies.svg; source file-search",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 2f6891849313e547367f0a45d03636af971215a1"
+      }
+    },
+    {
+      "id": "icons/icon-checkout.svg",
+      "sha256": "26257411838df501af71b8313bb2a223e2dafa0a73493c67ee20e216f00bb8b6",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-checkout.svg; source shopping-cart-check",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob fb5b98ebc5edec89f3c4f3c52b8a101acf7bca78"
+      }
+    },
+    {
+      "id": "icons/icon-clients.svg",
+      "sha256": "944697c41cc10ebada52ca069d8a6f7da5ddf96a9b6c1c6df653f33933f22053",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-clients.svg; source heart-handshake",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob b0d6ecc811b7e1fd4c6d98fc3a1a59e7224c54bc"
+      }
+    },
+    {
+      "id": "icons/icon-community.svg",
+      "sha256": "1c4bbe2078ebb0b1ae5c913a3890d277b79993474f0bcb1a7e13f697d55fd7f7",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-community.svg; source building-community",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob db09573174bfa9070fb4f3091fbb7d495f65d959"
+      }
+    },
+    {
+      "id": "icons/icon-consultation.svg",
+      "sha256": "226648ac88ba158762e9e5bea6bfe737dc30ff4deaec8660f9e6040de03e0707",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-consultation.svg; source messages",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob f140d5fd80a837edacfc17b5e5725d8bc3d69807"
+      }
+    },
+    {
+      "id": "icons/icon-contact.svg",
+      "sha256": "a6a9b259fdc7a1bc5a8a06507e1c5246035774a0dfca929e3838c5fa6f9711b0",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-contact.svg; source address-book",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 33ff484478c4e14d0abf05af536ffeb6d8f8de82"
+      }
+    },
+    {
+      "id": "icons/icon-courses.svg",
+      "sha256": "2165d80e3433a00df743688ec6c8c9052f2237b8be29020ca300db3dcc81c8dd",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-courses.svg; source certificate",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 445b28ef87348b797340f11bed5746ced25a9302"
+      }
+    },
+    {
+      "id": "icons/icon-delivery.svg",
+      "sha256": "a774d0b45ef54c002a9ff3fb35510ed824b61c26c197d564dabb8862ca3412a5",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-delivery.svg; source truck-delivery",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 0410bf532d413b02e369e50e9e39dc4d9e49793d"
+      }
+    },
+    {
+      "id": "icons/icon-directions.svg",
+      "sha256": "e40e786700bf2e41086f63ae89b871d93132b23a8b03d4da9afc2de720b4e366",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-directions.svg; source direction-sign",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob d60546b7c2870a550c9bde06184aa213a0d47b62"
+      }
+    },
+    {
+      "id": "icons/icon-document.svg",
+      "sha256": "755cf3cf9be7a851defe2d7fa52f9430bee608f68fb2a25122ad1eefce9171d0",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-document.svg; source file-description",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob b7afcf75259b4fa63e91270a9c039525aee8f833"
+      }
+    },
+    {
+      "id": "icons/icon-donate.svg",
+      "sha256": "becb0341bb50763eda70f54a3581f5815e6cd4d50b6e6b982041c23e4db09209",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-donate.svg; source coin",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 8d0bd0012a4abbb8743728e9542351d8eaee06b5"
+      }
+    },
+    {
+      "id": "icons/icon-download.svg",
+      "sha256": "cbd1714bda2ebd0fa70ab725a6845be0853ba908b2c05a7cadf2ba4fef41cbdf",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-download.svg; source download",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob d3108757c1ea4e2089bd32f6aa70ec3c19cd214d"
+      }
+    },
+    {
+      "id": "icons/icon-drink.svg",
+      "sha256": "28df055979f2083ca1a46ba3437b3bf527127b43c202b665d7865497bd3602a6",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-drink.svg; source cup",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 881485f45bad0f3f4d7173b686d956d7b341830f"
+      }
+    },
+    {
+      "id": "icons/icon-email.svg",
+      "sha256": "3ddd2564591bf0a44ac83bd7084429b25a902f068445f99460b6ab6d57c20430",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-email.svg; source mail-opened",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 799927d84bc43679974ceb7fa367dde4b7bc5c2a"
+      }
+    },
+    {
+      "id": "icons/icon-emergency.svg",
+      "sha256": "9ca158fa6e2a64389f57010156d678bfeac093f1d79200501a7e86f93db3ce8b",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-emergency.svg; source urgent",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 97fda461d88bf0cbb7f970cb0bff8637f73e685e"
+      }
+    },
+    {
+      "id": "icons/icon-enquire.svg",
+      "sha256": "6937143a5205911849812e4af43380d8d940a414e24b77bf75af870c3d5bf752",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-enquire.svg; source message-question",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 080beef8a58cc565db25126dc52fd9198bd0dfeb"
+      }
+    },
+    {
+      "id": "icons/icon-enrol.svg",
+      "sha256": "b2e567000b8e13574798b9b501f0c6d063142c5b313eeed16ae529828139753a",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-enrol.svg; source clipboard-plus",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 9891f0660b3be300c1b859612428e89f49df4fb6"
+      }
+    },
+    {
+      "id": "icons/icon-events.svg",
+      "sha256": "3c21a0d2b54410655a32575cbc242f626c82ac3ac95cc04ef6e5771469b9c763",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-events.svg; source ticket",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob fbdb9853dcf924e9d875ff5c48d47027ab10d515"
+      }
+    },
+    {
+      "id": "icons/icon-external-link.svg",
+      "sha256": "21623891fb11b028b31ad59e8f864592ea1fcb3900607e70366f9157dc107b7a",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-external-link.svg; source external-link",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 59c6c55281bfc755f579504a2ee69509dcd57e8f"
+      }
+    },
+    {
+      "id": "icons/icon-faq.svg",
+      "sha256": "5c7e8783641882e83ae36fc23dbd16add35bf2f7e3fcd4650f293054a9d3eb61",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-faq.svg; source question-mark",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 36bcdbd86a3afeb74d92f7ec053f3136efe9c311"
+      }
+    },
+    {
+      "id": "icons/icon-feature.svg",
+      "sha256": "0f06eab5764346fa796ef1058a22345b38df476bd758954316f40efa4b28c584",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-feature.svg; source diamond",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 08bc139aab0ec6350d7afbf7925facee9ecc4ef3"
+      }
+    },
+    {
+      "id": "icons/icon-filter.svg",
+      "sha256": "eb4cf4b099901c28fab2e13a70c52e3318cee10e918bd99c39373c2b19085deb",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-filter.svg; source filter",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob f8c0eaee09282d158e9677990fdf4b0528e4bcbb"
+      }
+    },
+    {
+      "id": "icons/icon-food.svg",
+      "sha256": "bc2388c1a8f2dd7647a6490d0f181dfb7b24565c364994f761d39f4c61b9204b",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-food.svg; source chef-hat",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 77019302fb38920e7eaf923e7776c66c3e5ab787"
+      }
+    },
+    {
+      "id": "icons/icon-gallery.svg",
+      "sha256": "9aa0bd44bef46e1b80445220ea04499ca145fb3339005e13f1da1b17ad8ac159",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-gallery.svg; source photo",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 77473c770ad42b8d754ab45ede4aee2f384d26c7"
+      }
+    },
+    {
+      "id": "icons/icon-gift.svg",
+      "sha256": "2d6e7bf8f1306d591082a4237f2540515fbad3f186c8468cfb73e92d67449482",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-gift.svg; source gift",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 7bc85651d9ae004a5ff57c8c2c07ff41f3b490ab"
+      }
+    },
+    {
+      "id": "icons/icon-globe.svg",
+      "sha256": "a4bbd70cffcc07b4180c2bc8794f5f6c84dd9a03edcac77937b4fbfd0d5e42db",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-globe.svg; source globe",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 10df8efe2e4ba66acc3c5d9812f37b968bfff975"
+      }
+    },
+    {
+      "id": "icons/icon-health.svg",
+      "sha256": "792ee4a8e053991aba1552bbefae32a25cf60804f61e9cff7b575d34ab8682ce",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-health.svg; source heart",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 6e93b3bf20f1dbf03f6b71e88b0dc855e4383b52"
+      }
+    },
+    {
+      "id": "icons/icon-home.svg",
+      "sha256": "cb742a3b1aa0007ec0c3f26f898e5833c6e67476e136b8eae3c52e2f2c751b5c",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-home.svg; source home",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 3d738af7ff081cd372e408600ce025e464a37aac"
+      }
+    },
+    {
+      "id": "icons/icon-hours.svg",
+      "sha256": "4d2ae0be8ffd37c03e7dfa37a8ce97e9fd8c65f37c408811bc472d04b43aee0a",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-hours.svg; source clock-hour-4",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 04fab14dd49e1d4ae720cd3c0a2165cd89323ff1"
+      }
+    },
+    {
+      "id": "icons/icon-information.svg",
+      "sha256": "b329a07ace6ef61c5ac64dbf89b194ddc3fec6d599fcc97cfc0ac53c63bcbf0f",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-information.svg; source info-square",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 3b7237e93ce35f6f5ff3b7530ab0a940dea8f46f"
+      }
+    },
+    {
+      "id": "icons/icon-link.svg",
+      "sha256": "63c88f996a6c8c3a1687b92f75ef11cab9a549a1408f9ed85d7baf78c7cad12d",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-link.svg; source link",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob fb623dfcfbc5807c13c406b3da443acc007d847a"
+      }
+    },
+    {
+      "id": "icons/icon-location.svg",
+      "sha256": "4ca0c252b79ea1dd51d6ad73e4187427a32db8b5d8b5225b40c3b5e132c4824c",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-location.svg; source map-pin",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob d06db73e06c4de8e027eac2648c8dde0a8a225f1"
+      }
+    },
+    {
+      "id": "icons/icon-login.svg",
+      "sha256": "514aa3507360ec312d49fcb6a97e6e0136a3195adc3e5ad81c3c0f237d219e36",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-login.svg; source login",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 1f677e4ebc53cfe31222b1580211f8ee95ca0524"
+      }
+    },
+    {
+      "id": "icons/icon-map.svg",
+      "sha256": "9906d1550ddd40ec75d282869966c0c5dfa5776f5f17bd99ef486a2f6b2f7329",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-map.svg; source map",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 977a25d81533b6af0ba81c04c120ade27240713f"
+      }
+    },
+    {
+      "id": "icons/icon-membership.svg",
+      "sha256": "a34aa215ef1c916cb14db3531f3f0279bfae714836e1dbbcd7f3454b789845c0",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-membership.svg; source user-check",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob c3028a82b12437f85306861bd626cfeca7ece308"
+      }
+    },
+    {
+      "id": "icons/icon-menu.svg",
+      "sha256": "0962fc59e4cdd6933d1e242d94c1920a1a56ec8c55773df67ab46b27e97c79bf",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-menu.svg; source list-details",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob e3e62909e9e53c2001722a32df3794fbd8ebb5c3"
+      }
+    },
+    {
+      "id": "icons/icon-message.svg",
+      "sha256": "de96c172cfdd0bf7b7e83759f54dd30acec8b4dd85bd6794c5f917fe91d77143",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-message.svg; source message",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 5bad41ef0b32507e83ef8f18263fd662558d85d5"
+      }
+    },
+    {
+      "id": "icons/icon-news.svg",
+      "sha256": "192a019a944067a6b3b19fac189e9ccbe8fb74bef669715e32166556d9bddabd",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-news.svg; source news",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob c98e926ae8154331fdc3dcaba957cefa3ece5555"
+      }
+    },
+    {
+      "id": "icons/icon-order.svg",
+      "sha256": "c51d46a020ec5f6496b11507ec64b1c78929258449e15fbd6bc2bd42cae6fcb7",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-order.svg; source receipt-2",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 77de0819fb41fe52fa31aaa202b06c26429326e3"
+      }
+    },
+    {
+      "id": "icons/icon-payment.svg",
+      "sha256": "31ec3ee91099a3d2d0930f8127079714e0efb5e51676ca9f7f9ef073ddf23b8f",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-payment.svg; source credit-card",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 3436b074821dfc554ba2fc99cf2c6df4e64a9f6f"
+      }
+    },
+    {
+      "id": "icons/icon-phone.svg",
+      "sha256": "e8e01c914ec201647affe477f597ac827e63d07b3a22b59043bd4adbdd48158b",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-phone.svg; source phone",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob f61d1802ef7b60bd0e70379e74ac6d7de050eab2"
+      }
+    },
+    {
+      "id": "icons/icon-pickup.svg",
+      "sha256": "f314cded170980101448e1fa2ffc9bd55c340e99b03a2f56f860ea803f00da02",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-pickup.svg; source package-import",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 8c7f3b89994535114d68eb376a6308208c9197d9"
+      }
+    },
+    {
+      "id": "icons/icon-portfolio.svg",
+      "sha256": "9b0506b842b0ecde35037882f8de145563bb7aee41e627d5060f885ea6229035",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-portfolio.svg; source briefcase-2",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 25fd0cd070e517f660e913ed58709191468564ab"
+      }
+    },
+    {
+      "id": "icons/icon-pricing.svg",
+      "sha256": "4309c8b8115bfd5bebb59e18cd45df5b385a43c65176ab0952445a050a630ff4",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-pricing.svg; source tag",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 38c3e8fba74bb9d467ace8a7e2d506bd5a564be1"
+      }
+    },
+    {
+      "id": "icons/icon-process.svg",
+      "sha256": "70565936c915e95a1c48948a388a073e13520218a92a27d91e7ffb44a362a0f3",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-process.svg; source timeline",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 5621cb8f0586a51cfe4609f94caaf112e91f6280"
+      }
+    },
+    {
+      "id": "icons/icon-products.svg",
+      "sha256": "2db62a21e2e2b3b016d0c7375c3d1dcef043d7b5db31087eae07d56173d85673",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-products.svg; source package",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 39f3b134be60262327f7dc0d61a8614ac2c8fdb7"
+      }
+    },
+    {
+      "id": "icons/icon-projects.svg",
+      "sha256": "5b833a4f1806d54fcf41cb4324c31830c9045e495e6de50ff01c06035e33cf76",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-projects.svg; source folder",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 8f71ca64bffeadd545115765623917581adc5d4c"
+      }
+    },
+    {
+      "id": "icons/icon-quote.svg",
+      "sha256": "5d1b46ca5c057a478bd8607ad377caadde8e1726da0f6a5ad8a2e8d24887b13c",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-quote.svg; source file-invoice",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 3a86d2ad1897feab0645bade4188c90b0a6f625e"
+      }
+    },
+    {
+      "id": "icons/icon-register.svg",
+      "sha256": "9a7b6ca2f2f9d6c99b60d4f4d36106305a019cacd44b49f2d83d9e7c5dcbe951",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-register.svg; source user-plus",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob e43260e7610cc00d31d475f19ad32ef478fa4f7b"
+      }
+    },
+    {
+      "id": "icons/icon-reservation.svg",
+      "sha256": "6ffb48cbf83331e100678f87dc90a1c07f61f8c401d66bd85dc7c69970abc6fe",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-reservation.svg; source calendar-check",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob e8660070f35ccdf69b09691d0aff6049b8ad50de"
+      }
+    },
+    {
+      "id": "icons/icon-resources.svg",
+      "sha256": "c33820ac8e6fda4fafb76bbe410bb6bbb9a79a364d136135949d1a1438ccc60f",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-resources.svg; source books",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 2c83e4305dbd949dd497dbaa943e9375ee8f90f6"
+      }
+    },
+    {
+      "id": "icons/icon-reviews.svg",
+      "sha256": "9903f4359966f48225710d78088db8fdfbc30eb82596a4bb28bc49b56399465d",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-reviews.svg; source star",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 44173bbc15b993613f9ac9d86020c9d0c0589196"
+      }
+    },
+    {
+      "id": "icons/icon-rooms.svg",
+      "sha256": "1276000dcc6d0058315f1acce6525283069ea305b6d9b69e8d6eebbb5341502c",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-rooms.svg; source bed",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 494cec4815c44d6859c9cf06295f52a1b86a086a"
+      }
+    },
+    {
+      "id": "icons/icon-sale.svg",
+      "sha256": "48b10d8055b4230631f4d46fa76bb1e4a8597d36ff127726282e903e862cdf00",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-sale.svg; source discount",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 6fe14cf981a3ada2b004bc7458a494c1d24a6c2b"
+      }
+    },
+    {
+      "id": "icons/icon-search.svg",
+      "sha256": "57e054b6c1508be40d5eba1ea434b702f5ff55dca04e28e5e3f22472c2f6176d",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-search.svg; source search",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob aec8bd8432c639996a0e4c1ea29c8d4b5e2ffab7"
+      }
+    },
+    {
+      "id": "icons/icon-service-area.svg",
+      "sha256": "f3221c089a05868154d9fed0251899ca39aaaf7fc5a200f318d1791b6e0e107a",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-service-area.svg; source route",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 50160b26bf08213742b4522adf1fd44c39b2ca6d"
+      }
+    },
+    {
+      "id": "icons/icon-share.svg",
+      "sha256": "73577e440cd98afe46e07ec7eeec3068b42ada44cf1fc1c462147881e928df8b",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-share.svg; source share",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob e3ed58f5e4c82ef2e8b93a76b833d502e2db1455"
+      }
+    },
+    {
+      "id": "icons/icon-shop.svg",
+      "sha256": "cd71cf844dcdf0ba2ce6f9df82d2619dc45e2225c84fa9bb70b6fb79aba0e112",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-shop.svg; source building-store",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob c598f97a0238d4eebbcb2deff32d9f14755a4ec3"
+      }
+    },
+    {
+      "id": "icons/icon-sidebar-close.svg",
+      "sha256": "9c546a639dbfff17ec8f017c32bb3330eba4fdfc4554fdbe2e00c6d10a4261d9",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-sidebar-close.svg; source layout-sidebar-left-collapse",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 859218fd2bed7d6235304284551f42b2313c4e78"
+      }
+    },
+    {
+      "id": "icons/icon-sidebar-open.svg",
+      "sha256": "0354e9ebeb4f875dedf6b5b242790e7bfd2a098eb8008323b82a81f255449ff6",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-sidebar-open.svg; source layout-sidebar-left-expand",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob d6807ce141b37568721bd7c78b228275e7063df8"
+      }
+    },
+    {
+      "id": "icons/icon-status-error.svg",
+      "sha256": "b335229a55cd1029a3f6b320a24f40005985c912b5924e4330107fdec3d504a4",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-status-error.svg; source circle-x",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 286c54d44c299649a2402e3070085674a1a14915"
+      }
+    },
+    {
+      "id": "icons/icon-status-success.svg",
+      "sha256": "321fb0a26939c8bb1674e8a62c90d0538db23cbb9c46d4c1cce25e0ea313d5bd",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-status-success.svg; source circle-check",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob cd087eef39ea62de4349f60a6e6e4c11328d919a"
+      }
+    },
+    {
+      "id": "icons/icon-status-warning.svg",
+      "sha256": "92a951d8e90c1b1d986449e74a8b2e1c52982dc3dbe09b141ac11990420408f4",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-status-warning.svg; source alert-triangle",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 06079123944cdb0411f2cb0182f66f45c24412b4"
+      }
+    },
+    {
+      "id": "icons/icon-support.svg",
+      "sha256": "1c180f7d8b88b8190730314d93f219dd032c0516daa2fbad0fb629804bbf16e4",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-support.svg; source headset",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 806a4e3a2b331a81efa74bf08bc406bae28029b1"
+      }
+    },
+    {
+      "id": "icons/icon-table.svg",
+      "sha256": "84e391f68fd2f93762366a6ee9cde7670abcea02736d0e46150fef8047c88a94",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-table.svg; source table",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 478906d2e5bd6a1355c3d9c2eb4ec72481d7fa14"
+      }
+    },
+    {
+      "id": "icons/icon-team.svg",
+      "sha256": "d101892f8e25d628d32a9011f75a7582878d917892c0a055ea1c80ffbf4b4340",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-team.svg; source users",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob b28335dde5e51f6385eb8ce802fdd780cdda8270"
+      }
+    },
+    {
+      "id": "icons/icon-testimonials.svg",
+      "sha256": "556588828cc273bd558e9a295aba2a434ecb456ae0a0de4df29bde428bb55a21",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-testimonials.svg; source quote",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 4638fd5681bcc4fe870b32aacc01a22229eaf614"
+      }
+    },
+    {
+      "id": "icons/icon-treatment.svg",
+      "sha256": "cd5432b1a9ff065f4a9517f5478e2a232486e0bb62a1da1114f4e5b9864e4d3f",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-treatment.svg; source stethoscope",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 380478a85a1d8e5e33dc2c9158107ce98a35ffcb"
+      }
+    },
+    {
+      "id": "icons/icon-upload.svg",
+      "sha256": "7f0524e0eb36c694dda24352199d1b2b4609b98a0096d10cf1eb0f82cf8084d8",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-upload.svg; source upload",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob 2df32433aa33c1712bd911d2619b190db3d1896f"
+      }
+    },
+    {
+      "id": "icons/icon-wellness.svg",
+      "sha256": "23642ab287caff024af52f35eba2cf372120cf2a449a73146c2292312559b146",
+      "mediaClass": "image",
+      "mime": "image/svg+xml",
+      "width": 24,
+      "height": 24,
+      "licence": {
+        "expression": "MIT",
+        "rightsHolder": "Paweł Kuna",
+        "evidence": "Foundation pinned Tabler MIT notice at fa599973a88ff77f6a8e012f3266c3c139b52c17; licensing/TABLER-ICONS-MIT.txt blob 3e82379dab3fe93d9ee22251949604ed63ddea39"
+      },
+      "provenance": {
+        "source": "Tabler Icons v3.46.0, icons/outline; canonical name icon-wellness.svg; source yoga",
+        "evidence": "Foundation fa599973a88ff77f6a8e012f3266c3c139b52c17 icon-provenance.json; exact donor Git blob ccbd198ed54ecc39c3474f63ad9e08f068c9b20b"
+      }
+    }
+  ]
+}
