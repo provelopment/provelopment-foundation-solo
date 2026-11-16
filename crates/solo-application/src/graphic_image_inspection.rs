@@ -26,7 +26,7 @@
 //! success and returns exactly one typed refusal. A refusal is never reported as absence and never
 //! yields an empty set.
 
-use solo_domain::{AssetNamespace, PropertyKey, QualifiedOwnerV1};
+use solo_domain::{AssetNamespace, AssetReferenceV1, PropertyKey, QualifiedOwnerV1};
 
 use crate::graphic_asset_inventory::{
     GraphicAssetObligationV1, MixedGraphicObligationV1, MixedGraphicPlanRefusalV1,
@@ -3671,6 +3671,25 @@ fn inspect_avif_v4(
     })
 }
 
+/// The format one typed reference declares, in either admitted namespace.
+///
+/// The accepted [`GraphicImageFormatV3::declared_by`] deliberately admits only the Entity namespace
+/// because every caller before `SOLO-WO-118 R18` was Entity-only. The mixed composition must
+/// classify a `platform` reference with the **same** closed extension grammar and no additional
+/// rule, so this helper reuses [`GraphicImageFormatV3::accepted_extensions`] and adds nothing: no
+/// media sniffing, no MIME guess, no file access and no relaxed admission.
+fn format_of_reference(reference: &AssetReferenceV1) -> Option<GraphicImageFormatV3> {
+    let text = reference.reference();
+    let segment = text.rsplit('/').next().unwrap_or(text);
+    let (_, extension) = segment.rsplit_once('.')?;
+    if extension.is_empty() {
+        return None;
+    }
+    GraphicImageFormatV3::ALL
+        .into_iter()
+        .find(|format| format.accepted_extensions().contains(&extension))
+}
+
 /// The checked facts of one declared graphic source, as either V4 composition needs them.
 ///
 /// Extracted from the accepted V4 loop so the Entity-only composition and the R18 mixed
@@ -3705,7 +3724,7 @@ fn inspect_item_v4(
     use GraphicImageInspectRefusalKindV3 as LegacyKind;
     use GraphicImageInspectRefusalKindV4 as Kind;
 
-    let format = match GraphicImageFormatV3::declared_by(reference) {
+    let format = match format_of_reference(reference) {
         Some(format) => format,
         None => return Err(Kind::Legacy(LegacyKind::UnsupportedFormat)),
     };
@@ -4252,7 +4271,7 @@ where
         // envelope's provenance. This composition refuses that combination explicitly instead of
         // fabricating a carrier; no approved `1.0.0` asset is AVIF.
         if obligation.declaring_owner().is_none()
-            && GraphicImageFormatV3::declared_by(obligation.reference())
+            && format_of_reference(obligation.reference())
                 .is_some_and(GraphicImageFormatV3::is_avif)
         {
             return MixedGraphicCandidateOutcomeV1::InspectRefused(MixedGraphicInspectRefusalV1 {

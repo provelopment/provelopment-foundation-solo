@@ -10072,8 +10072,8 @@ mod n129 {
         GraphicAssetReadRefusalKind, MixedGraphicCandidateOutcomeV1,
         MixedGraphicInspectRefusalKindV1, MixedGraphicOriginV1, MixedGraphicPlanRefusalKindV1,
         MixedGraphicPlanV1, PlatformAssetCatalogueV1, PlatformAssetReadRefusalKindV1,
-        PlatformRootProvenanceV1, PlatformRootSelectionV1, PlatformSourceRequestV1,
-        sha256_media_worker_bytes_v1,
+        PlatformGraphicBaselineRefusalKindV1, PlatformRootProvenanceV1, PlatformRootSelectionV1,
+        PlatformSourceRequestV1, sha256_media_worker_bytes_v1,
     };
 
     use super::BIN;
@@ -10825,10 +10825,12 @@ mod n129 {
             mutated,
             Path::new(BIN),
         ) {
-            MixedGraphicCandidateOutcomeV1::PlatformReadRefused(refusal) => {
+            // The accepted reader reads the catalogue through its own port, so a mutated
+            // `catalogue_bytes` argument is caught by the verified binding's independent pin.
+            MixedGraphicCandidateOutcomeV1::BindingRefused(refusal) => {
                 assert_eq!(
                     refusal.kind(),
-                    PlatformAssetReadRefusalKindV1::CatalogueUnapproved
+                    PlatformGraphicBaselineRefusalKindV1::CatalogueUnapproved
                 );
             }
             other => panic!("a mutated catalogue must refuse: {other:?}"),
