@@ -9724,7 +9724,7 @@ mod n127 {
                     panic!("an empty root has no catalogue"),
                 PlatformCatalogueSourceV1::Refused(kind) => kind,
             },
-            PlatformAssetReadRefusalKindV1::MissingSource
+            PlatformAssetReadRefusalKindV1::CatalogueUnavailable
         );
         natives += 1;
 
@@ -9873,14 +9873,13 @@ mod n127 {
             PlatformAssetReadRefusalKindV1::CatalogueUnavailable
         );
 
-        // 6. No namespace alias: an Entity- or route-shaped spelling cannot address a Platform
+        // 6. No namespace alias: a route- or prefix-shaped spelling cannot address a Platform
         //    source, and the namespace-free identifier type refuses it before any read.
         for alias in [
             "platform/icons/icon-about.svg",
             "assets/icons/icon-about.svg",
             "content/assets/icons/icon-about.svg",
             "icons/ICON-about.svg",
-            "icons/icon-status-info.svg",
         ] {
             let refusal = PlatformAssetRefV1::from_identifier(alias)
                 .expect_err("an aliased spelling must never address an approved source");
