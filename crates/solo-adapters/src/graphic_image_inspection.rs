@@ -1514,6 +1514,358 @@ pub fn inspect_entity_graphic_images_v2(
     }
 }
 
+/// The authored format one host-test mixed candidate uses (`SOLO-WO-118 R18`).
+///
+/// A **slot-aware** candidate uses R17 slot selections; a **legacy** candidate uses the accepted
+/// property envelope's unqualified graphic values, which is the byte-identical parity case.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TestMixedFormatV1 {
+    /// R17 slot selections (`supersede`/`append`), the opt-in format.
+    SlotAware,
+    /// The accepted legacy envelope format, which carries no slot identity.
+    LegacyEnvelope,
+    /// Both formats at once. The closed obligation plan must refuse this ambiguity rather than
+    /// double-count or silently reinterpret one of them.
+    Both,
+}
+
+/// One authored declaration for the closed R18 host-test seam.
+#[derive(Debug, Clone, Copy)]
+pub struct TestMixedDeclarationV1 {
+    /// The EFS owner that authored it.
+    pub owner: TestOwnerV1,
+    /// The registered graphic role token: `logo`, `favicon`, `banner`, `background` or
+    /// `social-preview`.
+    pub role: &'static str,
+    /// The explicit slot: `primary` for a singular role, any named slot for `background`.
+    pub slot: &'static str,
+    /// The explicit namespace: `entity` or `platform`. Never inferred from the reference text.
+    pub namespace: &'static str,
+    /// The authored reference text, with no namespace prefix.
+    pub reference: &'static str,
+    /// Whether the slot-aware selection supersedes rather than appends.
+    pub supersede: bool,
+    /// `public` or `internal`.
+    pub exposure: &'static str,
+}
+
+/// The closed result of the R18 host-test seam.
+///
+/// It carries the accepted plan plus the resolved facts a host test needs, all as plain strings, so
+/// the `solo-cli` integration-test crate can prove the real cascade and the real plan without a
+/// `solo-domain` dependency of its own.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestMixedCandidateV1 {
+    plan: solo_application::MixedGraphicPlanV1,
+    refusal: Option<&'static str>,
+    slot_aware: bool,
+    winners: Vec<(String, String)>,
+    logo_lineage: usize,
+    banner_suppressed: bool,
+}
+
+impl TestMixedCandidateV1 {
+    /// The accepted plan, or an empty plan when the candidate itself was refused.
+    #[must_use]
+    pub const fn plan(&self) -> &solo_application::MixedGraphicPlanV1 {
+        &self.plan
+    }
+
+    /// The stable token of the first construction/plan refusal, when the candidate was refused.
+    #[must_use]
+    pub const fn refusal(&self) -> Option<&'static str> {
+        self.refusal
+    }
+
+    /// Whether the candidate is in the opt-in slot-aware format.
+    #[must_use]
+    pub const fn is_slot_aware(&self) -> bool {
+        self.slot_aware
+    }
+
+    /// The representation's winning `(role, reference)` pairs, in registry then slot order.
+    #[must_use]
+    pub fn winners(&self) -> &[(String, String)] {
+        &self.winners
+    }
+
+    /// The `graphic.logo` winner's lineage length at the representation, when one resolved.
+    #[must_use]
+    pub const fn logo_lineage(&self) -> usize {
+        self.logo_lineage
+    }
+
+    /// Whether `graphic.banner` carries a recorded suppression at or above the representation.
+    #[must_use]
+    pub const fn banner_suppressed(&self) -> bool {
+        self.banner_suppressed
+    }
+}
+
+/// Builds one **real** validated R17 mixed candidate for the host tests (`SOLO-WO-118 R18`).
+///
+/// It runs the production constructors — the validated declaration stage, the verified approved
+/// binding, the closed registration table, the slot selections, the whole-candidate resolution and
+/// the closed obligation plan — and returns the accepted plan plus the resolved facts as plain
+/// strings. It opens no file, reads no catalogue and grants no authority; the host test supplies
+/// the real roots and the real reader separately.
+#[must_use]
+pub fn test_mixed_candidate_v1(
+    registration: Option<(&'static str, &str)>,
+    format: TestMixedFormatV1,
+    declarations: &[TestMixedDeclarationV1],
+) -> TestMixedCandidateV1 {
+    use solo_application::collect_mixed_graphic_obligations_v1;
+    use solo_domain::{ApprovedPlatformAssetV1, ApprovedPlatformGraphicBindingV1};
+    use solo_domain::{
+        AuthoredPropertyValueV1, CurrentContextV1, DeclaredOwnerPropertiesV1, EfsOwnershipDraft,
+        EntityIdV1, FacetDraft, FacetIdV1, GraphicCascadeInputV1, GraphicSlotSelectionV1,
+        Inheritance, LocaleKeyV1, OwnerGraphicSelectionsV1, PageDraft, PageIdV1,
+        PlatformAssetMediaClassV1, PlatformGraphicBaselineRecordV1, PlatformGraphicBaselineV1,
+        PropertyDeclarationV1, PropertyKey, PropertyValueV1, SiteDraft, SiteIdV1,
+        validate_declared_properties_v1,
+    };
+
+    let refused = |token: &'static str| TestMixedCandidateV1 {
+        plan: solo_application::MixedGraphicPlanV1::empty(),
+        refusal: Some(token),
+        slot_aware: format == TestMixedFormatV1::SlotAware,
+        winners: Vec::new(),
+        logo_lineage: 0,
+        banner_suppressed: false,
+    };
+
+    let entity = EntityIdV1::parse("example").expect("a canonical Entity identifier");
+    let mut page = PageDraft::new(PageIdV1::parse("home").expect("a canonical Page identifier"));
+    page.add_representation(
+        LocaleKeyV1::from_already_canonical("en-001").expect("a canonical full locale"),
+    );
+    let mut site = SiteDraft::new(SiteIdV1::parse("bali").expect("a canonical Site identifier"));
+    site.add_page(page);
+    let mut facet =
+        FacetDraft::new(FacetIdV1::parse("main").expect("a canonical Facet identifier"));
+    facet.add_site(site);
+    let mut draft = EfsOwnershipDraft::new(entity.clone());
+    draft.add_facet(facet);
+    let graph = match draft.build() {
+        Ok(graph) => graph,
+        Err(_) => return refused("graph-invalid"),
+    };
+
+    // The verified approved binding: one asset when a registration is requested, otherwise a
+    // binding that registers nothing. The digest text is the caller's, so a host test can pin the
+    // real catalogue value or deliberately supply an unapproved one.
+    let asset_id = registration.map_or("icons/icon-home.svg", |(id, _)| id);
+    let asset_digest = registration.map_or_else(|| "0".repeat(64), |(_, digest)| digest.to_owned());
+    let class = if asset_id.ends_with(".png") {
+        PlatformAssetMediaClassV1::Png
+    } else {
+        PlatformAssetMediaClassV1::Svg
+    };
+    let asset = match ApprovedPlatformAssetV1::new(asset_id, &asset_digest, class) {
+        Ok(asset) => asset,
+        Err(_) => return refused("binding-invalid"),
+    };
+    let binding = match ApprovedPlatformGraphicBindingV1::new(
+        "1.0.0",
+        "ad8ea718b50641206cc4f4fe13e866ad266366a7aa11ef799c83ae8187858fc7",
+        vec![asset],
+    ) {
+        Ok(binding) => binding,
+        Err(_) => return refused("binding-invalid"),
+    };
+    let baseline = match registration {
+        None => PlatformGraphicBaselineV1::empty(binding),
+        Some((id, digest)) => {
+            let reference = match solo_domain::AssetReferenceV1::parse(
+                solo_domain::AssetNamespace::Platform,
+                id,
+            ) {
+                Ok(reference) => reference,
+                Err(_) => return refused("registration-invalid"),
+            };
+            let record = match PlatformGraphicBaselineRecordV1::new(
+                PropertyKey::GraphicLogo,
+                "primary",
+                reference,
+                digest,
+            ) {
+                Ok(record) => record,
+                Err(refusal) => return refused(refusal.detail()),
+            };
+            match PlatformGraphicBaselineV1::new(binding, vec![record]) {
+                Ok(baseline) => baseline,
+                Err(refusal) => return refused(refusal.detail()),
+            }
+        }
+    };
+    let mut declared: Vec<DeclaredOwnerPropertiesV1> = Vec::new();
+    let mut blocks: Vec<OwnerGraphicSelectionsV1> = Vec::new();
+    for owner in [
+        TestOwnerV1::Entity,
+        TestOwnerV1::Facet,
+        TestOwnerV1::Site,
+        TestOwnerV1::Page,
+        TestOwnerV1::Representation,
+    ] {
+        let entries: Vec<&TestMixedDeclarationV1> = declarations
+            .iter()
+            .filter(|declaration| declaration.owner == owner)
+            .collect();
+        if entries.is_empty() {
+            continue;
+        }
+        let wants_selections = matches!(
+            format,
+            TestMixedFormatV1::SlotAware | TestMixedFormatV1::Both
+        );
+        let wants_envelope = matches!(
+            format,
+            TestMixedFormatV1::LegacyEnvelope | TestMixedFormatV1::Both
+        );
+        if wants_selections {
+            let mut selections = Vec::new();
+            for entry in &entries {
+                let Some(role) = role_of(entry.role) else {
+                    return refused("role-invalid");
+                };
+                let Some(namespace) = namespace_of(entry.namespace) else {
+                    return refused("namespace-invalid");
+                };
+                let Ok(reference) =
+                    solo_domain::AssetReferenceV1::parse(namespace, entry.reference)
+                else {
+                    return refused("reference-invalid");
+                };
+                let Some(exposure) = exposure_of(entry.exposure) else {
+                    return refused("exposure-invalid");
+                };
+                let selection = if entry.supersede {
+                    GraphicSlotSelectionV1::supersede(role, entry.slot, reference, exposure)
+                } else {
+                    GraphicSlotSelectionV1::append(role, entry.slot, reference, exposure)
+                };
+                match selection {
+                    Ok(selection) => selections.push(selection),
+                    Err(refusal) => return refused(refusal.detail()),
+                }
+            }
+            match OwnerGraphicSelectionsV1::new(owner.owner_v1(), selections) {
+                Ok(block) => blocks.push(block),
+                Err(refusal) => return refused(refusal.detail()),
+            }
+        }
+        if wants_envelope {
+            {
+                let mut per_role: Vec<(PropertyKey, Vec<AuthoredPropertyValueV1>)> = Vec::new();
+                for entry in &entries {
+                    let Some(role) = role_of(entry.role) else {
+                        return refused("role-invalid");
+                    };
+                    let Some(namespace) = namespace_of(entry.namespace) else {
+                        return refused("namespace-invalid");
+                    };
+                    let Ok(reference) =
+                        solo_domain::AssetReferenceV1::parse(namespace, entry.reference)
+                    else {
+                        return refused("reference-invalid");
+                    };
+                    let Some(exposure) = exposure_of(entry.exposure) else {
+                        return refused("exposure-invalid");
+                    };
+                    let Ok(authored) =
+                        AuthoredPropertyValueV1::new(PropertyValueV1::graphic(reference), exposure)
+                    else {
+                        return refused("authored-invalid");
+                    };
+                    match per_role.iter_mut().find(|(key, _)| *key == role) {
+                        Some((_, values)) => values.push(authored),
+                        None => per_role.push((role, vec![authored])),
+                    }
+                }
+                let entries_v1: Vec<(PropertyKey, PropertyDeclarationV1)> = per_role
+                    .into_iter()
+                    .map(|(role, values)| {
+                        (
+                            role,
+                            PropertyDeclarationV1::new(
+                                Inheritance::Inherit,
+                                CurrentContextV1::Values(values),
+                            ),
+                        )
+                    })
+                    .collect();
+                match DeclaredOwnerPropertiesV1::new(owner.owner_v1(), entries_v1) {
+                    Ok(set) => declared.push(set),
+                    Err(refusal) => return refused(refusal.detail()),
+                }
+            }
+        }
+    }
+
+    let validated = match validate_declared_properties_v1(&graph, declared) {
+        Ok(validated) => validated,
+        Err(refusal) => return refused(refusal.detail()),
+    };
+    let input = match GraphicCascadeInputV1::new(validated, baseline, blocks) {
+        Ok(input) => input,
+        Err(refusal) => return refused(refusal.detail()),
+    };
+    let slot_aware = input.is_slot_aware();
+    let plan = match collect_mixed_graphic_obligations_v1(&input) {
+        Ok(plan) => plan,
+        Err(refusal) => return refused(refusal.detail()),
+    };
+    let resolved = match input.resolve_graphic_cascade_all_v1() {
+        Ok(resolved) => resolved,
+        Err(failure) => return refused(failure.detail()),
+    };
+    let target = TestOwnerV1::Representation.owner_v1();
+    let Some(record) = resolved.for_owner(&target) else {
+        return refused("resolution-incomplete");
+    };
+    let mut winners: Vec<(String, String)> = Vec::new();
+    let mut logo_lineage = 0_usize;
+    let mut banner_suppressed = false;
+    for role in PropertyKey::ALL.into_iter().filter(|key| key.is_graphic()) {
+        let Some(role_record) = record.role(role) else {
+            continue;
+        };
+        for slot in role_record.slots() {
+            winners.push((role.name().to_owned(), slot.source().reference().to_owned()));
+            if role == PropertyKey::GraphicLogo {
+                logo_lineage = slot.lineage().len();
+            }
+        }
+        if role == PropertyKey::GraphicBanner && role_record.suppressed_at().is_some() {
+            banner_suppressed = true;
+        }
+    }
+    TestMixedCandidateV1 {
+        plan,
+        refusal: None,
+        slot_aware,
+        winners,
+        logo_lineage,
+        banner_suppressed,
+    }
+}
+
+/// Maps one host-test role token to the registered graphic role.
+fn role_of(token: &str) -> Option<solo_domain::PropertyKey> {
+    solo_domain::PropertyKey::from_name(&format!("graphic.{token}"))
+}
+
+/// Maps one host-test namespace token to the explicit namespace.
+fn namespace_of(token: &str) -> Option<solo_domain::AssetNamespace> {
+    solo_domain::AssetNamespace::from_name(token)
+}
+
+/// Maps one host-test exposure token to the authored exposure.
+fn exposure_of(token: &str) -> Option<solo_domain::Exposure> {
+    solo_domain::Exposure::from_name(token)
+}
+
 /// Which EFS owner a host-test declaration is authored on.
 ///
 /// It exists so the `solo-cli` integration-test crate — which has no `solo-domain` dependency and
@@ -3257,4 +3609,35 @@ pub fn inspect_entity_graphic_images_v4(
             EntityImageOutcomeV4::Refused(refusal)
         }
     }
+}
+
+/// `SOLO-WO-118 R18` — acquires and inspects one **mixed** Entity/Platform candidate.
+///
+/// This is the outward wiring of exactly one composed application path. It takes the two
+/// independently adopted roots — the Entity content root and the separate Platform library root —
+/// and never substitutes one for the other, never builds an external path from an asset identifier
+/// and never infers a namespace from a filename, a route or a locale. Every Entity source is read
+/// through the accepted confined Entity reader that `ContentRootCapability` already implements;
+/// every Platform source is read through the accepted pinned Platform reader that
+/// `PlatformRootCapabilityV1` already implements; every decode happens in the accepted confined
+/// worker child.
+///
+/// A refusal is a whole-candidate refusal: no earlier successful read or worker result survives.
+/// Nothing here publishes, derives, routes or authorizes; the returned set is inert evidence.
+pub fn inspect_mixed_graphic_candidate_from_roots_v1(
+    entity_root: &ContentRootCapability,
+    platform_root: &crate::platform_asset_read::PlatformRootCapabilityV1,
+    plan: &solo_application::MixedGraphicPlanV1,
+    request: solo_application::PlatformSourceRequestV1<'_>,
+    executable: &Path,
+) -> solo_application::MixedGraphicCandidateOutcomeV1 {
+    let adapter = ConfinedGraphicInspectAdapterV4::new(executable);
+    solo_application::inspect_mixed_graphic_candidate_v1(
+        plan,
+        entity_root,
+        platform_root,
+        request,
+        &adapter,
+        &adapter,
+    )
 }

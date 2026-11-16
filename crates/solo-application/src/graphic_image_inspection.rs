@@ -28,12 +28,27 @@
 
 use solo_domain::{AssetNamespace, PropertyKey, QualifiedOwnerV1};
 
-use crate::graphic_asset_inventory::GraphicAssetObligationV1;
-use crate::graphic_asset_read::{GraphicAssetSourceSetV1, MAX_GRAPHIC_SOURCE_BYTES};
+use crate::graphic_asset_inventory::{
+    GraphicAssetObligationV1, MixedGraphicObligationV1, MixedGraphicPlanRefusalV1,
+    MixedGraphicPlanV1,
+};
+use crate::graphic_asset_read::{
+    GraphicAssetReadPort, GraphicAssetReadRefusalV1, GraphicAssetReadSetOutcomeV1,
+    GraphicAssetSourceSetV1, MAX_GRAPHIC_SOURCE_BYTES, read_graphic_asset_bytes_v1,
+};
 use crate::media_worker::{
     MediaWorkerCheckedEnvelopeV1, MediaWorkerDigestV1, MediaWorkerOrientationV1, MediaWorkerPortV1,
     MediaWorkerRefusalKindV1, MediaWorkerRequestV1, MediaWorkerRunV1, check_observation_v1,
     sha256_media_worker_bytes_v1,
+};
+use crate::platform_asset_catalogue::PlatformAssetCatalogueV1;
+use crate::platform_asset_read::{
+    PlatformAssetLibraryReadPortV1, PlatformAssetReadRefusalV1, PlatformAssetRefV1,
+    PlatformAssetSourceSetV1, PlatformLibraryReadOutcomeV1, PlatformRootSelectionV1,
+    read_pinned_platform_sources_v1,
+};
+use crate::platform_graphic_baseline::{
+    PlatformGraphicBaselineRefusalV1, approved_platform_graphic_binding_v1,
 };
 
 /// Whether a complete inspection authorizes publication of any kind.
@@ -3656,6 +3671,98 @@ fn inspect_avif_v4(
     })
 }
 
+/// The checked facts of one declared graphic source, as either V4 composition needs them.
+///
+/// Extracted from the accepted V4 loop so the Entity-only composition and the R18 mixed
+/// composition share **one** implementation of the format, role, bound, AVIF and legacy checks.
+/// Nothing about those checks is reordered, relaxed or duplicated.
+struct V4ItemFactsV1 {
+    format: GraphicImageFormatV3,
+    mime: &'static str,
+    source_digest: MediaWorkerDigestV1,
+    width: u32,
+    height: u32,
+    pixels: u64,
+    payload: GraphicImagePayloadV4,
+    worker_pid: u32,
+    wall_ms: u64,
+}
+
+/// Runs the accepted per-item V4 checks over one declared source.
+///
+/// `avif_carrier` is the authored obligation the parent-checked AVIF envelope records as its own
+/// provenance. It is `Some` for every authored obligation and `None` for a root-layer Platform
+/// registration, which has no EFS owner; an AVIF root registration is therefore refused rather than
+/// given a fabricated carrier record.
+fn inspect_item_v4(
+    role: PropertyKey,
+    reference: &solo_domain::AssetReferenceV1,
+    bytes: &[u8],
+    avif_carrier: Option<&GraphicAssetObligationV1>,
+    legacy: &impl GraphicImageInspectPortV3,
+    avif: &impl MediaWorkerPortV1,
+) -> Result<V4ItemFactsV1, GraphicImageInspectRefusalKindV4> {
+    use GraphicImageInspectRefusalKindV3 as LegacyKind;
+    use GraphicImageInspectRefusalKindV4 as Kind;
+
+    let format = match GraphicImageFormatV3::declared_by(reference) {
+        Some(format) => format,
+        None => return Err(Kind::Legacy(LegacyKind::UnsupportedFormat)),
+    };
+    if !role_admits_format_v3(role, format) {
+        return Err(Kind::Legacy(LegacyKind::FaviconNotPng));
+    }
+    let length = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
+    if bytes.is_empty() {
+        return Err(Kind::Legacy(LegacyKind::EmptySource));
+    }
+    if length > MAX_IMAGE_SOURCE_BYTES_V1 {
+        return Err(Kind::Legacy(LegacyKind::OversizeSource));
+    }
+
+    if format.is_avif() {
+        let carrier = match avif_carrier {
+            Some(carrier) => carrier,
+            None => return Err(Kind::Legacy(LegacyKind::UnsupportedFormat)),
+        };
+        let checked = inspect_avif_v4(carrier, bytes, avif)?;
+        return Ok(V4ItemFactsV1 {
+            format,
+            mime: format.canonical_mime(),
+            source_digest: checked.checked.source_sha256(),
+            width: checked.checked.width(),
+            height: checked.checked.height(),
+            pixels: checked.pixels,
+            payload: GraphicImagePayloadV4::Avif(AvifEvidenceV4 {
+                checked: checked.checked,
+                orientation: checked.orientation,
+                planes: checked.planes,
+                wall_ms: 0,
+            }),
+            // The closed V1 envelope carries no process identifier: the adapter reports the
+            // PIDs it actually observed, and none is invented here.
+            worker_pid: 0,
+            wall_ms: 0,
+        });
+    }
+
+    let (request, checked) = match inspect_legacy_v4(format, bytes, legacy) {
+        Ok(checked) => checked,
+        Err(kind) => return Err(Kind::Legacy(kind)),
+    };
+    Ok(V4ItemFactsV1 {
+        format,
+        mime: format.canonical_mime(),
+        source_digest: *request.source_digest(),
+        width: checked.width,
+        height: checked.height,
+        pixels: checked.pixels,
+        payload: GraphicImagePayloadV4::Legacy(checked.payload),
+        worker_pid: checked.worker_pid,
+        wall_ms: checked.wall_ms,
+    })
+}
+
 /// Inspects one whole candidate across all six declared formats, once, in one order.
 ///
 /// Each obligation is dispatched on its authored extension alone: PNG/JPEG/WebP/GIF/SVG through the
@@ -3667,76 +3774,554 @@ pub fn inspect_graphic_image_source_set_v4(
     legacy: &impl GraphicImageInspectPortV3,
     avif: &impl MediaWorkerPortV1,
 ) -> GraphicImageInspectionOutcomeV4 {
-    use GraphicImageInspectRefusalKindV3 as LegacyKind;
-    use GraphicImageInspectRefusalKindV4 as Kind;
-
     let evidence = source_set.evidence();
     let mut inspections: Vec<GraphicImageInspectionV4> = Vec::with_capacity(evidence.len());
 
     for item in evidence {
         let obligation = item.obligation();
-        let Some(format) = GraphicImageFormatV3::declared_by(obligation.reference()) else {
-            return refuse_v4(Kind::Legacy(LegacyKind::UnsupportedFormat), obligation);
-        };
-        if !role_admits_format_v3(obligation.role(), format) {
-            return refuse_v4(Kind::Legacy(LegacyKind::FaviconNotPng), obligation);
-        }
-
-        let bytes = item.bytes();
-        let length = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
-        if bytes.is_empty() {
-            return refuse_v4(Kind::Legacy(LegacyKind::EmptySource), obligation);
-        }
-        if length > MAX_IMAGE_SOURCE_BYTES_V1 {
-            return refuse_v4(Kind::Legacy(LegacyKind::OversizeSource), obligation);
-        }
-
-        if format.is_avif() {
-            let checked = match inspect_avif_v4(obligation, bytes, avif) {
-                Ok(checked) => checked,
-                Err(kind) => return refuse_v4(kind, obligation),
-            };
-            inspections.push(GraphicImageInspectionV4 {
-                obligation: obligation.clone(),
-                logical_path: item.logical_path().to_owned(),
-                format,
-                mime: format.canonical_mime(),
-                source_digest: checked.checked.source_sha256(),
-                width: checked.checked.width(),
-                height: checked.checked.height(),
-                pixels: checked.pixels,
-                payload: GraphicImagePayloadV4::Avif(AvifEvidenceV4 {
-                    checked: checked.checked,
-                    orientation: checked.orientation,
-                    planes: checked.planes,
-                    wall_ms: 0,
-                }),
-                // The closed V1 envelope carries no process identifier: the adapter reports the
-                // PIDs it actually observed, and none is invented here.
-                worker_pid: 0,
-                wall_ms: 0,
-            });
-            continue;
-        }
-
-        let (request, checked) = match inspect_legacy_v4(format, bytes, legacy) {
-            Ok(checked) => checked,
-            Err(kind) => return refuse_v4(Kind::Legacy(kind), obligation),
+        let facts = match inspect_item_v4(
+            obligation.role(),
+            obligation.reference(),
+            item.bytes(),
+            Some(obligation),
+            legacy,
+            avif,
+        ) {
+            Ok(facts) => facts,
+            Err(kind) => return refuse_v4(kind, obligation),
         };
         inspections.push(GraphicImageInspectionV4 {
             obligation: obligation.clone(),
             logical_path: item.logical_path().to_owned(),
-            format,
-            mime: format.canonical_mime(),
-            source_digest: *request.source_digest(),
-            width: checked.width,
-            height: checked.height,
-            pixels: checked.pixels,
-            payload: GraphicImagePayloadV4::Legacy(checked.payload),
-            worker_pid: checked.worker_pid,
-            wall_ms: checked.wall_ms,
+            format: facts.format,
+            mime: facts.mime,
+            source_digest: facts.source_digest,
+            width: facts.width,
+            height: facts.height,
+            pixels: facts.pixels,
+            payload: facts.payload,
+            worker_pid: facts.worker_pid,
+            wall_ms: facts.wall_ms,
         });
     }
 
     GraphicImageInspectionOutcomeV4::Complete(GraphicImageInspectionSetV4 { inspections })
+}
+
+// ---------------------------------------------------------------------------
+// `SOLO-WO-118 R18` — one mixed Entity/Platform whole-candidate inspection
+// ---------------------------------------------------------------------------
+//
+// This is the composed path the Owner asked for: the accepted R17 cascade decides the governing
+// source per role/slot, the accepted Entity reader acquires Entity sources, the accepted Platform
+// reader acquires approved Platform sources, and the accepted V4 inspector checks every acquired
+// source with the same six-format worker proof. Nothing about the two existing entry points changes:
+// `inspect_graphic_image_source_set_v4` stays Entity-only and `read_graphic_asset_bytes_v1` still
+// refuses a Platform obligation, so neither legacy refusal can be reported as a Platform read.
+
+/// Whether a successful mixed inspection authorizes publication. Always `false`.
+pub const MIXED_GRAPHIC_INSPECTION_GRANTS_PUBLICATION_AUTHORITY_V1: bool = false;
+
+/// Whether a successful mixed inspection proves a globally consistent public snapshot. Always
+/// `false`: the Platform set and the Entity set are separate confined reads, not one snapshot.
+pub const MIXED_GRAPHIC_INSPECTION_PROVES_WHOLE_PUBLICATION_V1: bool = false;
+
+/// The closed reason a mixed inspection refused one authored source.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MixedGraphicInspectRefusalKindV1 {
+    /// One of the accepted per-source media/role/format checks refused this source.
+    Image(GraphicImageInspectRefusalKindV4),
+    /// A root-layer registration selected an AVIF source. The accepted AVIF envelope records an
+    /// authored EFS obligation as its own provenance and a root registration has none, so this
+    /// composition refuses rather than fabricate a carrier. No approved `1.0.0` asset is AVIF.
+    RootRegistrationAvifUnsupported,
+    /// The acquired Platform evidence did not cover an obligation the plan requires, so the
+    /// verified approved binding cannot vouch for it.
+    BindingDoesNotCoverObligation,
+}
+
+impl MixedGraphicInspectRefusalKindV1 {
+    /// The stable, safe detail token.
+    #[must_use]
+    pub const fn detail(self) -> &'static str {
+        match self {
+            Self::Image(kind) => kind.token(),
+            Self::RootRegistrationAvifUnsupported => "root-registration-avif-unsupported",
+            Self::BindingDoesNotCoverObligation => "binding-does-not-cover-obligation",
+        }
+    }
+}
+
+/// One refused mixed inspection, attributed to the exact authored obligation that failed.
+///
+/// The diagnostic names the namespace, role, slot, declaring owner and authored ordinal only. It
+/// carries no bytes, no path, no resolved value and no internal provenance.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MixedGraphicInspectRefusalV1 {
+    kind: MixedGraphicInspectRefusalKindV1,
+    obligation: Box<MixedGraphicObligationV1>,
+}
+
+impl MixedGraphicInspectRefusalV1 {
+    /// The closed refusal reason.
+    #[must_use]
+    pub const fn kind(&self) -> MixedGraphicInspectRefusalKindV1 {
+        self.kind
+    }
+
+    /// The authored obligation that failed.
+    #[must_use]
+    pub const fn obligation(&self) -> &MixedGraphicObligationV1 {
+        &self.obligation
+    }
+
+    /// The stable, safe detail token.
+    #[must_use]
+    pub const fn detail(&self) -> &'static str {
+        self.kind.detail()
+    }
+}
+
+impl core::fmt::Display for MixedGraphicInspectRefusalV1 {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(
+            formatter,
+            "mixed-graphic-inspection-refused: {}",
+            self.detail()
+        )
+    }
+}
+
+impl std::error::Error for MixedGraphicInspectRefusalV1 {}
+
+/// One inspected source of a mixed candidate.
+///
+/// It records the exact namespace and logical path the bytes came from, the confirmed format and
+/// canonical MIME, the accepted media facts, the real child process that produced them and the
+/// authored obligation they answer. It carries no source bytes, no filesystem path, no internal
+/// value and no publication authority.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GraphicMixedInspectionV1 {
+    obligation: MixedGraphicObligationV1,
+    namespace: AssetNamespace,
+    logical_path: String,
+    format: GraphicImageFormatV3,
+    mime: &'static str,
+    source_digest: MediaWorkerDigestV1,
+    width: u32,
+    height: u32,
+    pixels: u64,
+    payload: GraphicImagePayloadV4,
+    worker_pid: u32,
+    wall_ms: u64,
+}
+
+impl GraphicMixedInspectionV1 {
+    /// The authored obligation this record answers.
+    #[must_use]
+    pub const fn obligation(&self) -> &MixedGraphicObligationV1 {
+        &self.obligation
+    }
+
+    /// The explicit namespace the bytes were read from.
+    #[must_use]
+    pub const fn namespace(&self) -> AssetNamespace {
+        self.namespace
+    }
+
+    /// The confined logical path inside that namespace's own root.
+    #[must_use]
+    pub fn logical_path(&self) -> &str {
+        &self.logical_path
+    }
+
+    /// The confirmed format.
+    #[must_use]
+    pub const fn format(&self) -> GraphicImageFormatV3 {
+        self.format
+    }
+
+    /// The canonical MIME of that format.
+    #[must_use]
+    pub const fn mime(&self) -> &'static str {
+        self.mime
+    }
+
+    /// The parent's own digest of the acquired source bytes.
+    #[must_use]
+    pub const fn source_digest(&self) -> &MediaWorkerDigestV1 {
+        &self.source_digest
+    }
+
+    /// The confirmed width.
+    #[must_use]
+    pub const fn width(&self) -> u32 {
+        self.width
+    }
+
+    /// The confirmed height.
+    #[must_use]
+    pub const fn height(&self) -> u32 {
+        self.height
+    }
+
+    /// `width × height` under checked arithmetic.
+    #[must_use]
+    pub const fn pixels(&self) -> u64 {
+        self.pixels
+    }
+
+    /// The typed payload: retained V3 evidence or a parent-checked AVIF envelope.
+    #[must_use]
+    pub const fn payload(&self) -> &GraphicImagePayloadV4 {
+        &self.payload
+    }
+
+    /// The real child process that produced this record.
+    #[must_use]
+    pub const fn worker_pid(&self) -> u32 {
+        self.worker_pid
+    }
+
+    /// The observed wall time of that child.
+    #[must_use]
+    pub const fn wall_ms(&self) -> u64 {
+        self.wall_ms
+    }
+
+    /// Whether this source was read from the Entity namespace.
+    #[must_use]
+    pub const fn is_entity(&self) -> bool {
+        matches!(self.namespace, AssetNamespace::Entity)
+    }
+
+    /// Whether this source was read from the Platform namespace.
+    #[must_use]
+    pub const fn is_platform(&self) -> bool {
+        matches!(self.namespace, AssetNamespace::Platform)
+    }
+
+    /// Whether this record authorizes publication. Always `false`.
+    #[must_use]
+    pub const fn grants_publication_authority(&self) -> bool {
+        MIXED_GRAPHIC_INSPECTION_GRANTS_PUBLICATION_AUTHORITY_V1
+    }
+}
+
+/// The complete inspected set of one whole mixed candidate. Complete or absent.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct GraphicMixedInspectionSetV1 {
+    inspections: Vec<GraphicMixedInspectionV1>,
+}
+
+impl GraphicMixedInspectionSetV1 {
+    /// Every inspection, in plan order.
+    #[must_use]
+    pub fn inspections(&self) -> &[GraphicMixedInspectionV1] {
+        &self.inspections
+    }
+
+    /// How many authored sources were inspected.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.inspections.len()
+    }
+
+    /// Whether the candidate declared no graphic source at all.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.inspections.is_empty()
+    }
+
+    /// How many inspected sources came from the Entity namespace.
+    #[must_use]
+    pub fn entity_count(&self) -> usize {
+        self.inspections
+            .iter()
+            .filter(|inspection| inspection.namespace == AssetNamespace::Entity)
+            .count()
+    }
+
+    /// How many inspected sources came from the Platform namespace.
+    #[must_use]
+    pub fn platform_count(&self) -> usize {
+        self.inspections
+            .iter()
+            .filter(|inspection| inspection.namespace == AssetNamespace::Platform)
+            .count()
+    }
+
+    /// The distinct real child processes that produced these records, ascending.
+    ///
+    /// A zero identifier (the closed AVIF envelope carries none) is never counted as a process.
+    #[must_use]
+    pub fn distinct_worker_pids(&self) -> Vec<u32> {
+        let mut pids: Vec<u32> = self
+            .inspections
+            .iter()
+            .map(|inspection| inspection.worker_pid)
+            .filter(|pid| *pid != 0)
+            .collect();
+        pids.sort_unstable();
+        pids.dedup();
+        pids
+    }
+
+    /// Whether this set authorizes publication. Always `false`.
+    #[must_use]
+    pub const fn grants_publication_authority(&self) -> bool {
+        MIXED_GRAPHIC_INSPECTION_GRANTS_PUBLICATION_AUTHORITY_V1
+    }
+
+    /// Whether this set is a global publishable snapshot. Always `false`.
+    #[must_use]
+    pub const fn proves_whole_publication(&self) -> bool {
+        MIXED_GRAPHIC_INSPECTION_PROVES_WHOLE_PUBLICATION_V1
+    }
+}
+
+/// The closed result of one whole-candidate mixed inspection.
+///
+/// Every arm other than `Complete` carries exactly one typed refusal and **no** records: a source
+/// that fails anywhere in the plan discards every earlier successful acquisition and worker run.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MixedGraphicCandidateOutcomeV1 {
+    /// Every authored obligation across both namespaces was acquired and inspected.
+    Complete(GraphicMixedInspectionSetV1),
+    /// The plan itself was ambiguous or over its bound.
+    PlanRefused(MixedGraphicPlanRefusalV1),
+    /// The accepted Entity reader refused one Entity obligation.
+    EntityReadRefused(GraphicAssetReadRefusalV1),
+    /// The accepted Platform reader refused one Platform obligation.
+    PlatformReadRefused(PlatformAssetReadRefusalV1),
+    /// The verified approved binding refused the acquired Platform evidence.
+    BindingRefused(PlatformGraphicBaselineRefusalV1),
+    /// One authored source failed its accepted media/role/format checks.
+    InspectRefused(MixedGraphicInspectRefusalV1),
+}
+
+impl MixedGraphicCandidateOutcomeV1 {
+    /// The complete set, when every obligation succeeded.
+    #[must_use]
+    pub const fn complete(&self) -> Option<&GraphicMixedInspectionSetV1> {
+        match self {
+            Self::Complete(set) => Some(set),
+            _ => None,
+        }
+    }
+
+    /// Whether any arm refused.
+    #[must_use]
+    pub const fn is_refused(&self) -> bool {
+        !matches!(self, Self::Complete(_))
+    }
+
+    /// The stable refusal token of whichever arm refused, if any.
+    #[must_use]
+    pub fn refusal_detail(&self) -> Option<&str> {
+        match self {
+            Self::Complete(_) => None,
+            Self::PlanRefused(refusal) => Some(refusal.detail()),
+            Self::EntityReadRefused(refusal) => Some(refusal.detail()),
+            Self::PlatformReadRefused(refusal) => Some(refusal.detail()),
+            Self::BindingRefused(refusal) => Some(refusal.detail()),
+            Self::InspectRefused(refusal) => Some(refusal.detail()),
+        }
+    }
+}
+
+/// The trusted inputs the Platform half of one mixed candidate needs.
+///
+/// The values are the caller's already adopted Platform root capability token, its independently
+/// selected library version, the catalogue model it parsed and the exact catalogue bytes the
+/// Platform reader transferred. Nothing here discovers, guesses or rewrites any of them.
+#[derive(Clone, Copy)]
+pub struct PlatformSourceRequestV1<'a> {
+    /// The adopted Platform root capability token, consumed by the accepted reader.
+    pub selection: PlatformRootSelectionV1,
+    /// The caller's independently selected library version.
+    pub selected_version: &'a str,
+    /// The parsed catalogue model, checked against the transferred bytes by the reader.
+    pub catalogue: &'a PlatformAssetCatalogueV1,
+    /// The exact catalogue bytes the Platform reader transferred.
+    pub catalogue_bytes: &'a [u8],
+}
+
+/// Acquires and inspects **every** authored graphic source of one mixed candidate.
+///
+/// This is the one composed path. It performs, in this order and without shortcuts:
+///
+/// 1. the accepted Entity acquisition for the Entity-namespace subset, through
+///    [`read_graphic_asset_bytes_v1`], which keeps its confinement, link-count, identity, transfer,
+///    boundedness and repeated-obligation checks and still refuses any `platform` obligation;
+/// 2. the accepted Platform acquisition for the Platform-namespace subset, through
+///    [`read_pinned_platform_sources_v1`], over a stable **unique** request set, with the catalogue
+///    pin recomputed from the transferred bytes and each source digest checked against the
+///    catalogue's own declaration;
+/// 3. the accepted R17 binding, through [`approved_platform_graphic_binding_v1`], so the acquired
+///    Platform evidence is vouched for by exact approved identifier and digest;
+/// 4. the accepted V4 six-format inspection of every acquired source, through the same per-item
+///    checks the Entity-only composition uses.
+///
+/// The candidate is all-or-nothing: the first failing source returns one attributed refusal and
+/// **no** record survives, whether the failure is an Entity source, a Platform source, an
+/// unapproved identity or a media check. Nothing here publishes, derives, routes or authorizes.
+#[must_use]
+pub fn inspect_mixed_graphic_candidate_v1<E, P, L, A>(
+    plan: &MixedGraphicPlanV1,
+    entity: &E,
+    platform: &P,
+    request: PlatformSourceRequestV1<'_>,
+    legacy: &L,
+    avif: &A,
+) -> MixedGraphicCandidateOutcomeV1
+where
+    E: GraphicAssetReadPort + ?Sized,
+    P: PlatformAssetLibraryReadPortV1 + ?Sized,
+    L: GraphicImageInspectPortV3,
+    A: MediaWorkerPortV1,
+{
+    // 1. Entity-namespace acquisition through the accepted Entity gate.
+    let entity_inventory = plan.entity_inventory_v1();
+    let entity_set: Option<GraphicAssetSourceSetV1> = if entity_inventory.is_empty() {
+        None
+    } else {
+        match read_graphic_asset_bytes_v1(&entity_inventory, entity) {
+            GraphicAssetReadSetOutcomeV1::Complete(set) => Some(set),
+            GraphicAssetReadSetOutcomeV1::Refused(refusal) => {
+                return MixedGraphicCandidateOutcomeV1::EntityReadRefused(refusal);
+            }
+        }
+    };
+
+    // 2. Platform-namespace acquisition through the accepted pinned Platform reader, over a stable
+    //    unique request set in plan order.
+    let mut platform_ids: Vec<&str> = Vec::new();
+    for obligation in plan.obligations() {
+        if obligation.namespace() != AssetNamespace::Platform {
+            continue;
+        }
+        let id = obligation.reference().reference();
+        if !platform_ids.contains(&id) {
+            platform_ids.push(id);
+        }
+    }
+    let platform_set: Option<PlatformAssetSourceSetV1> = if platform_ids.is_empty() {
+        None
+    } else {
+        let mut requests: Vec<PlatformAssetRefV1> = Vec::with_capacity(platform_ids.len());
+        for id in &platform_ids {
+            match PlatformAssetRefV1::from_identifier(id) {
+                Ok(reference) => requests.push(reference),
+                Err(refusal) => {
+                    return MixedGraphicCandidateOutcomeV1::PlatformReadRefused(refusal);
+                }
+            }
+        }
+        match read_pinned_platform_sources_v1(
+            request.selection,
+            request.selected_version,
+            request.catalogue,
+            &requests,
+            platform,
+        ) {
+            PlatformLibraryReadOutcomeV1::Complete(set) => Some(set),
+            PlatformLibraryReadOutcomeV1::Refused(refusal) => {
+                return MixedGraphicCandidateOutcomeV1::PlatformReadRefused(refusal);
+            }
+        }
+    };
+
+    // 3. The accepted R17 binding over exactly the evidence that was acquired.
+    if let Some(set) = platform_set.as_ref()
+        && let Err(refusal) = approved_platform_graphic_binding_v1(
+            request.selected_version,
+            request.catalogue_bytes,
+            request.catalogue,
+            set,
+        )
+    {
+        return MixedGraphicCandidateOutcomeV1::BindingRefused(refusal);
+    }
+
+    // 4. Whole-plan inspection, in plan order, over the acquired bytes only.
+    let mut inspections: Vec<GraphicMixedInspectionV1> = Vec::with_capacity(plan.len());
+    let mut entity_position = 0_usize;
+    for obligation in plan.obligations() {
+        // A root-layer registration has no authored EFS obligation to record as the accepted AVIF
+        // envelope's provenance. This composition refuses that combination explicitly instead of
+        // fabricating a carrier; no approved `1.0.0` asset is AVIF.
+        if obligation.declaring_owner().is_none()
+            && GraphicImageFormatV3::declared_by(obligation.reference())
+                .is_some_and(GraphicImageFormatV3::is_avif)
+        {
+            return MixedGraphicCandidateOutcomeV1::InspectRefused(MixedGraphicInspectRefusalV1 {
+                kind: MixedGraphicInspectRefusalKindV1::RootRegistrationAvifUnsupported,
+                obligation: Box::new(obligation.clone()),
+            });
+        }
+
+        let acquired = match obligation.namespace() {
+            AssetNamespace::Entity => entity_set.as_ref().and_then(|set| {
+                let evidence = set.evidence().get(entity_position)?;
+                entity_position += 1;
+                Some((
+                    evidence.bytes().to_vec(),
+                    evidence.logical_path().to_owned(),
+                ))
+            }),
+            AssetNamespace::Platform => platform_set
+                .as_ref()
+                .and_then(|set| set.exact(obligation.reference().reference()))
+                .map(|evidence| {
+                    (
+                        evidence.bytes().to_vec(),
+                        obligation.reference().reference().to_owned(),
+                    )
+                }),
+        };
+        let Some((bytes, logical_path)) = acquired else {
+            return MixedGraphicCandidateOutcomeV1::InspectRefused(MixedGraphicInspectRefusalV1 {
+                kind: MixedGraphicInspectRefusalKindV1::BindingDoesNotCoverObligation,
+                obligation: Box::new(obligation.clone()),
+            });
+        };
+
+        let carrier = obligation.authored_obligation_v1();
+        let facts = match inspect_item_v4(
+            obligation.role(),
+            obligation.reference(),
+            &bytes,
+            carrier.as_ref(),
+            legacy,
+            avif,
+        ) {
+            Ok(facts) => facts,
+            Err(kind) => {
+                return MixedGraphicCandidateOutcomeV1::InspectRefused(
+                    MixedGraphicInspectRefusalV1 {
+                        kind: MixedGraphicInspectRefusalKindV1::Image(kind),
+                        obligation: Box::new(obligation.clone()),
+                    },
+                );
+            }
+        };
+
+        inspections.push(GraphicMixedInspectionV1 {
+            obligation: obligation.clone(),
+            namespace: obligation.namespace(),
+            logical_path,
+            format: facts.format,
+            mime: facts.mime,
+            source_digest: facts.source_digest,
+            width: facts.width,
+            height: facts.height,
+            pixels: facts.pixels,
+            payload: facts.payload,
+            worker_pid: facts.worker_pid,
+            wall_ms: facts.wall_ms,
+        });
+    }
+
+    MixedGraphicCandidateOutcomeV1::Complete(GraphicMixedInspectionSetV1 { inspections })
 }

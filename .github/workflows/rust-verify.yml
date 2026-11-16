@@ -1608,6 +1608,103 @@ jobs:
           Set-Content -LiteralPath $probe -NoNewline -Value $authentic.Replace('test result: ok. 6 passed', 'test result: ok. 5 passed')
           if (Test-N128 $probe) { throw 'partial run accepted' }
           Write-Output 'n128_gate mutation=rejected'
+      # Mandatory `SOLO-WO-118 R18` N129 gate: the mixed Entity/Platform whole-candidate driver.
+      # The five focused cases run against the real roots and the real confined workers; the gate
+      # then requires the instrumented log to reject four altered copies of itself.
+      - name: Mixed Entity/Platform candidate N129 gate (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          check_n129() {
+            local log="$1"
+            for name in n129_01_mixed_five_level_two_root_success n129_02_all_declared_obligations_and_late_failure_zero_partial n129_03_two_root_isolation_and_native_identity_refusal n129_04_catalogue_role_format_and_binding_refusals n129_05_legacy_parity_determinism_and_guardrails; do
+              grep -qF "test n129::$name " "$log" || return 1
+            done
+            [ "$(grep -Ec '^test n129::n129_0[0-9]_[A-Za-z0-9_]*( |$)' "$log")" -eq 5 ] || return 1
+            grep -qF 'test result: ok. 5 passed; 0 failed; 0 ignored' "$log" || return 1
+            ! grep -qF '... FAILED' "$log" || return 1
+            ! grep -qF '... ignored' "$log" || return 1
+            ! grep -qF 'test result: FAILED' "$log" || return 1
+            for case in 01 02 03 04 05; do
+              [ "$(grep -cF "n129_evidence case=$case" "$log")" -eq 1 ] || return 1
+            done
+            grep -qF 'obligations=4 entity=3 platform=1' "$log" || return 1
+            grep -qF 'catalogue_sha=ad8ea718b50641206cc4f4fe13e866ad266366a7aa11ef799c83ae8187858fc7' "$log" || return 1
+            grep -qF 'platform_path=icons/icon-home.svg' "$log" || return 1
+            grep -qF 'entity_path=assets/icon-home.svg' "$log" || return 1
+            grep -qF 'zero_partial=true' "$log" || return 1
+            grep -qF 'publication=false' "$log" || return 1
+          }
+          log="$RUNNER_TEMP/n129-five.txt"
+          cargo test -p solo-cli --test media_worker_host_smoke --locked n129_ -- --nocapture --test-threads=1 >"$log" 2>&1 || { cat "$log"; exit 1; }
+          cat "$log"
+          check_n129 "$log" || { echo 'authentic N129 5/5 run rejected'; exit 1; }
+          echo 'n129_gate authentic=accepted'
+          probe="$RUNNER_TEMP/n129-probe.txt"
+          cp "$log" "$probe"
+          sed -i '/n129_05_legacy_parity_determinism_and_guardrails/d' "$probe"
+          if check_n129 "$probe"; then echo 'missing N129 case accepted'; exit 1; fi
+          cp "$log" "$probe"
+          sed -i 's/platform_path=icons\/icon-home.svg/platform_path=assets\/icon-home.svg/; s/entity_path=assets\/icon-home.svg/entity_path=icons\/icon-home.svg/' "$probe"
+          if check_n129 "$probe"; then echo 'forged namespace or wrong-root claim accepted'; exit 1; fi
+          cp "$log" "$probe"
+          sed -i 's/zero_partial=true/zero_partial=false/; s/publication=false/publication=true/g' "$probe"
+          if check_n129 "$probe"; then echo 'forged partial-set or publication claim accepted'; exit 1; fi
+          cp "$log" "$probe"
+          sed -i 's/catalogue_sha=ad8ea718b50641206cc4f4fe13e866ad266366a7aa11ef799c83ae8187858fc7/catalogue_sha=0000000000000000000000000000000000000000000000000000000000000000/; s/entity=3 platform=1/entity=1 platform=3/' "$probe"
+          if check_n129 "$probe"; then echo 'altered catalogue pin or obligation count accepted'; exit 1; fi
+          echo 'n129_gate mutation=rejected'
+      # The same five-case N129 matrix and authentic/mutation gate on the native Windows host.
+      - name: Mixed Entity/Platform candidate N129 gate (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tokens = @(
+            'test n129::n129_01_mixed_five_level_two_root_success ',
+            'test n129::n129_02_all_declared_obligations_and_late_failure_zero_partial ',
+            'test n129::n129_03_two_root_isolation_and_native_identity_refusal ',
+            'test n129::n129_04_catalogue_role_format_and_binding_refusals ',
+            'test n129::n129_05_legacy_parity_determinism_and_guardrails ',
+            'test result: ok. 5 passed; 0 failed; 0 ignored',
+            'n129_evidence case=01 obligations=4 entity=3 platform=1',
+            'n129_evidence case=02 obligations=4 internal_inspected=true',
+            'n129_evidence case=03 platform_path=icons/icon-home.svg entity_path=assets/icon-home.svg',
+            'n129_evidence case=04 unapproved_id=refused',
+            'n129_evidence case=05 legacy_parity=true',
+            'catalogue_sha=ad8ea718b50641206cc4f4fe13e866ad266366a7aa11ef799c83ae8187858fc7',
+            'zero_partial=true',
+            'publication=false')
+          function Test-N129([string] $path) {
+            $text = Get-Content -Raw -LiteralPath $path
+            foreach ($token in $tokens) { if (-not $text.Contains($token)) { return $false } }
+            if (([regex]::Matches($text, 'n129_evidence case=')).Count -lt 5) { return $false }
+            if ($text.Contains('... FAILED')) { return $false }
+            if ($text.Contains('... ignored')) { return $false }
+            if ($text.Contains('test result: FAILED')) { return $false }
+            return $true
+          }
+          $log = Join-Path $env:RUNNER_TEMP 'n129-five.txt'
+          cargo test -p solo-cli --test media_worker_host_smoke --locked n129_ -- --nocapture --test-threads=1 2>&1 | Tee-Object -FilePath $log
+          if ($LASTEXITCODE -ne 0) { throw 'n129 five-case run failed' }
+          if (-not (Test-N129 $log)) { throw 'authentic N129 5/5 run rejected' }
+          Write-Output 'n129_gate authentic=accepted'
+          $probe = Join-Path $env:RUNNER_TEMP 'n129-probe.txt'
+          $authentic = Get-Content -Raw -LiteralPath $log
+          $missing = [regex]::Replace($authentic, '(?m)^.*n129_05_legacy_parity_determinism_and_guardrails.*$\r?\n', '')
+          Set-Content -LiteralPath $probe -NoNewline -Value $missing
+          if (Test-N129 $probe) { throw 'missing N129 case accepted' }
+          $forged = $authentic.Replace('platform_path=icons/icon-home.svg entity_path=assets/icon-home.svg', 'platform_path=assets/icon-home.svg entity_path=icons/icon-home.svg')
+          Set-Content -LiteralPath $probe -NoNewline -Value $forged
+          if (Test-N129 $probe) { throw 'forged namespace or wrong-root claim accepted' }
+          $partial = $authentic.Replace('zero_partial=true', 'zero_partial=false').Replace('publication=false', 'publication=true')
+          Set-Content -LiteralPath $probe -NoNewline -Value $partial
+          if (Test-N129 $probe) { throw 'forged partial-set or publication claim accepted' }
+          $altered = $authentic.Replace('catalogue_sha=ad8ea718b50641206cc4f4fe13e866ad266366a7aa11ef799c83ae8187858fc7', 'catalogue_sha=0000000000000000000000000000000000000000000000000000000000000000').Replace('obligations=4 entity=3 platform=1', 'obligations=4 entity=1 platform=3')
+          Set-Content -LiteralPath $probe -NoNewline -Value $altered
+          if (Test-N129 $probe) { throw 'altered catalogue pin or obligation count accepted' }
+          Write-Output 'n129_gate mutation=rejected'
       # Mandatory `SOLO-WO-118 R11` N124 gate: the V4 six-format whole-candidate composition on this
       # host, including the associated-alpha AVIF class beside the five legacy formats. The same
       # verifier must reject four altered copies of the real log before printing its verdict.

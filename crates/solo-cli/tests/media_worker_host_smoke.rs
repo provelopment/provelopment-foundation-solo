@@ -10051,3 +10051,1006 @@ mod n127 {
         );
     }
 }
+
+/// `SOLO-WO-118 R18` — N129: one real mixed Entity/Platform whole-candidate transaction.
+///
+/// The new risk is the **cross-namespace driver**: two independently adopted roots, one closed
+/// obligation plan over the whole validated candidate, and one whole-candidate refusal. The
+/// established 81-icon library proof (N127) and the six-format worker proof (N124) are reused as
+/// they stand, so no icon is re-tested and no per-file adversarial campaign is repeated.
+mod n129 {
+    use std::fs;
+    use std::path::{Path, PathBuf};
+
+    use solo_adapters::{
+        EntityImageOutcomeV4, PlatformRootCapabilityV1, TestMixedDeclarationV1, TestMixedFormatV1,
+        TestOwnerV1, inspect_entity_graphic_images_v4,
+        inspect_mixed_graphic_candidate_from_roots_v1, parse_platform_asset_catalogue_v1,
+        test_inventory_v1, test_mixed_candidate_v1,
+    };
+    use solo_application::{
+        GraphicAssetReadRefusalKind, MixedGraphicCandidateOutcomeV1,
+        MixedGraphicInspectRefusalKindV1, MixedGraphicOriginV1, MixedGraphicPlanRefusalKindV1,
+        MixedGraphicPlanV1, PlatformAssetCatalogueV1, PlatformAssetReadRefusalKindV1,
+        PlatformRootProvenanceV1, PlatformRootSelectionV1, PlatformSourceRequestV1,
+        sha256_media_worker_bytes_v1,
+    };
+
+    use super::BIN;
+    use super::n116::{Root, png, rich_svg, webp};
+
+    /// The accepted approved library version and the independent catalogue pin.
+    const VERSION: &str = "1.0.0";
+    const CATALOGUE_SHA256: &str =
+        "ad8ea718b50641206cc4f4fe13e866ad266366a7aa11ef799c83ae8187858fc7";
+
+    /// One real approved Platform identifier and the exact logical path it reads from.
+    const HOME_ID: &str = "icons/icon-home.svg";
+    const HOME_LOGICAL: &str = "icons/icon-home.svg";
+
+    /// The tracked product tree, used only as the copy source for a scratch Platform root.
+    fn product_root() -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../platform")
+    }
+
+    /// The filesystem a scratch root is created on.
+    ///
+    /// On Linux the confined readers require the verified fixture filesystem, exactly as the other
+    /// real-filesystem suites do: a missing value is a loud refusal, never a quiet run on an
+    /// unverified filesystem.
+    fn scratch_parent() -> PathBuf {
+        #[cfg(target_os = "linux")]
+        {
+            match std::env::var_os("SOLO_TEST_SOURCE_FS_ROOT") {
+                Some(root) if !root.is_empty() => PathBuf::from(root),
+                _ => panic!(
+                    "SOLO_TEST_SOURCE_FS_ROOT must name the R03 snapshot fixture filesystem; \
+                     refusing to run the real mixed-source gate on an unverified filesystem"
+                ),
+            }
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            std::env::temp_dir()
+        }
+    }
+
+    /// Copies one directory tree of regular files without dereferencing links.
+    fn copy_tree(from: &Path, to: &Path) {
+        fs::create_dir_all(to).expect("create a scratch directory");
+        for entry in fs::read_dir(from).expect("read a product directory") {
+            let entry = entry.expect("a product directory entry");
+            let file_type = entry.file_type().expect("a product file type");
+            assert!(
+                !file_type.is_symlink(),
+                "the tracked product tree holds no link"
+            );
+            let target = to.join(entry.file_name());
+            if file_type.is_dir() {
+                copy_tree(&entry.path(), &target);
+            } else {
+                assert!(file_type.is_file(), "the product tree holds regular files");
+                fs::copy(entry.path(), &target).expect("copy one product file");
+            }
+        }
+    }
+
+    /// A disposable Platform root holding one copy of the approved product library.
+    struct PlatformRoot {
+        base: PathBuf,
+        platform: PathBuf,
+    }
+
+    impl PlatformRoot {
+        fn new(label: &str) -> Self {
+            let base =
+                scratch_parent().join(format!("solo-n129-platform-{}-{label}", std::process::id()));
+            let _ = fs::remove_dir_all(&base);
+            let platform = base.join("platform");
+            copy_tree(&product_root(), &platform);
+            Self { base, platform }
+        }
+
+        fn capability(&self) -> PlatformRootCapabilityV1 {
+            PlatformRootCapabilityV1::adopt_bootstrap_path(
+                &self.platform,
+                PlatformRootProvenanceV1::OperatorDesignatedPlatformRoot,
+            )
+            .expect("the scratch Platform root is adoptable")
+        }
+    }
+
+    impl Drop for PlatformRoot {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.base);
+        }
+    }
+
+    /// The parsed approved catalogue together with the exact bytes it was parsed from.
+    struct Catalogue {
+        model: PlatformAssetCatalogueV1,
+        bytes: Vec<u8>,
+    }
+
+    impl Catalogue {
+        fn load() -> Self {
+            let bytes = fs::read(product_root().join("assets/catalogue-1.0.0.json"))
+                .expect("the installed catalogue is present");
+            assert_eq!(
+                sha256_media_worker_bytes_v1(&bytes).to_hex(),
+                CATALOGUE_SHA256,
+                "the installed catalogue is the approved one"
+            );
+            let model = parse_platform_asset_catalogue_v1(&bytes, VERSION)
+                .expect("the strict R12 parser accepts the installed catalogue");
+            Self { model, bytes }
+        }
+
+        /// The catalogue's own declared digest for one exact identifier.
+        fn digest(&self, id: &str) -> String {
+            self.model
+                .entries()
+                .iter()
+                .find(|entry| entry.id() == id)
+                .map_or_else(
+                    || panic!("{id} is an approved identifier"),
+                    |entry| entry.sha256().to_hex(),
+                )
+        }
+
+        fn request(&self) -> PlatformSourceRequestV1<'_> {
+            PlatformSourceRequestV1 {
+                selection: PlatformRootSelectionV1::adopt(
+                    PlatformRootProvenanceV1::OperatorDesignatedPlatformRoot,
+                ),
+                selected_version: VERSION,
+                catalogue: &self.model,
+                catalogue_bytes: &self.bytes,
+            }
+        }
+    }
+
+    /// One authored mixed declaration.
+    fn declared(
+        owner: TestOwnerV1,
+        role: &'static str,
+        reference: &'static str,
+        namespace: &'static str,
+        supersede: bool,
+        exposure: &'static str,
+    ) -> TestMixedDeclarationV1 {
+        TestMixedDeclarationV1 {
+            owner,
+            role,
+            slot: "primary",
+            namespace,
+            reference,
+            supersede,
+            exposure,
+        }
+    }
+
+    /// Runs the one composed driver over the real roots.
+    fn inspect(
+        entity: &Root,
+        platform: &PlatformRoot,
+        catalogue: &Catalogue,
+        plan: &MixedGraphicPlanV1,
+    ) -> MixedGraphicCandidateOutcomeV1 {
+        inspect_mixed_graphic_candidate_from_roots_v1(
+            &entity.capability(),
+            &platform.capability(),
+            plan,
+            catalogue.request(),
+            Path::new(BIN),
+        )
+    }
+
+    /// The complete set, or a diagnostic panic naming the real refusal.
+    fn complete(
+        outcome: MixedGraphicCandidateOutcomeV1,
+    ) -> solo_application::GraphicMixedInspectionSetV1 {
+        match outcome {
+            MixedGraphicCandidateOutcomeV1::Complete(set) => set,
+            other => panic!("the mixed candidate refused: {other:?}"),
+        }
+    }
+
+    /// `N129_01` — one real mixed five-level candidate: an approved Platform root default plus a
+    /// closer Entity supersession, an Entity favicon and an `internal` Entity source, each acquired
+    /// through its own confined reader and inspected by the same six-format worker proof.
+    #[test]
+    fn n129_01_mixed_five_level_two_root_success() {
+        let png_bytes = png();
+        let webp_bytes = webp();
+        let svg_bytes = rich_svg().into_bytes();
+        let entity = Root::new(
+            "n129-mixed",
+            &[
+                ("logo.png", png_bytes.as_slice()),
+                ("mark.svg", svg_bytes.as_slice()),
+                ("banner.webp", webp_bytes.as_slice()),
+            ],
+        );
+        let platform = PlatformRoot::new("n129-mixed");
+        let catalogue = Catalogue::load();
+        let home_digest = catalogue.digest(HOME_ID);
+
+        // One test-only root registration plus three authored Entity selections across the levels.
+        let candidate = test_mixed_candidate_v1(
+            Some((HOME_ID, &home_digest)),
+            TestMixedFormatV1::SlotAware,
+            &[
+                declared(
+                    TestOwnerV1::Entity,
+                    "favicon",
+                    "logo.png",
+                    "entity",
+                    false,
+                    "public",
+                ),
+                declared(
+                    TestOwnerV1::Site,
+                    "logo",
+                    "mark.svg",
+                    "entity",
+                    true,
+                    "public",
+                ),
+                declared(
+                    TestOwnerV1::Page,
+                    "social-preview",
+                    "banner.webp",
+                    "entity",
+                    false,
+                    "internal",
+                ),
+            ],
+        );
+        assert_eq!(candidate.refusal(), None, "the candidate is valid");
+        assert!(candidate.is_slot_aware());
+        let plan = candidate.plan();
+        assert_eq!(
+            plan.len(),
+            4,
+            "the root registration plus three authored sources"
+        );
+        assert_eq!(plan.platform_count(), 1, "exactly one Platform obligation");
+        assert_eq!(plan.entity_count(), 3, "three Entity obligations");
+        assert_eq!(
+            plan.obligations()[0].origin(),
+            MixedGraphicOriginV1::PlatformRootRegistration,
+            "the root layer is planned first"
+        );
+        assert_eq!(
+            plan.obligations()[1].origin(),
+            MixedGraphicOriginV1::AuthoredSelection
+        );
+
+        // The nearer explicit supersession governs `graphic.logo` while the superseded root default
+        // is still an inspected obligation.
+        assert_eq!(
+            candidate.winners(),
+            &[
+                ("graphic.logo".to_owned(), "mark.svg".to_owned()),
+                ("graphic.favicon".to_owned(), "logo.png".to_owned()),
+                (
+                    "graphic.social-preview".to_owned(),
+                    "banner.webp".to_owned()
+                ),
+            ],
+            "the Site supersede wins and descends to the representation"
+        );
+        assert_eq!(
+            candidate.logo_lineage(),
+            2,
+            "root selected, then superseded"
+        );
+
+        let set = complete(inspect(&entity, &platform, &catalogue, plan));
+        assert_eq!(set.len(), 4, "every obligation is inspected");
+        assert_eq!(set.entity_count(), 3);
+        assert_eq!(set.platform_count(), 1);
+        assert!(!set.grants_publication_authority());
+        assert!(!set.proves_whole_publication());
+
+        // Order is the plan's order, and each record answers its own obligation.
+        for (index, record) in set.inspections().iter().enumerate() {
+            assert_eq!(record.obligation(), &plan.obligations()[index]);
+        }
+        let platform_record = &set.inspections()[0];
+        assert!(platform_record.is_platform());
+        assert_eq!(platform_record.logical_path(), HOME_LOGICAL);
+        assert_eq!(platform_record.mime(), "image/svg+xml");
+        assert_eq!(platform_record.source_digest().to_hex(), home_digest);
+        assert!(
+            platform_record.worker_pid() != 0,
+            "the Platform SVG ran in a real confined child"
+        );
+        for record in &set.inspections()[1..] {
+            assert!(record.is_entity());
+            assert!(record.logical_path().starts_with("assets/"));
+            assert!(record.width() > 0 && record.height() > 0);
+            assert!(record.worker_pid() != 0, "a real confined child decoded it");
+            assert!(!record.grants_publication_authority());
+        }
+        let pids = set.distinct_worker_pids();
+        assert!(
+            pids.len() >= 2,
+            "at least two distinct real confined children: {pids:?}"
+        );
+
+        println!(
+            "n129_evidence case=01 obligations=4 entity=3 platform=1 distinct_pids={} \
+             platform_path={HOME_LOGICAL} platform_mime=image/svg+xml platform_sha={} \
+             catalogue_sha={CATALOGUE_SHA256} winner_logo=mark.svg lineage=2 \
+             internal_inspected=true publication=false",
+            pids.len(),
+            home_digest
+        );
+    }
+
+    /// `N129_02` — every declared obligation is planned and checked, including the superseded,
+    /// suppressed and `internal` ones, and a **late** failure discards every earlier success.
+    #[test]
+    fn n129_02_all_declared_obligations_and_late_failure_zero_partial() {
+        let png_bytes = png();
+        let svg_bytes = rich_svg().into_bytes();
+        // Four Entity sources across the hierarchy plus the Platform default: the banner is
+        // suppressed at the Facet and re-authored at the Page, so both declarations are obligations.
+        let entity = Root::new(
+            "n129-obligations",
+            &[
+                ("logo.png", png_bytes.as_slice()),
+                ("mark.svg", svg_bytes.as_slice()),
+                ("banner.webp", webp().as_slice()),
+            ],
+        );
+        let platform = PlatformRoot::new("n129-obligations");
+        let catalogue = Catalogue::load();
+        let home_digest = catalogue.digest(HOME_ID);
+
+        let declarations = [
+            declared(
+                TestOwnerV1::Entity,
+                "favicon",
+                "logo.png",
+                "entity",
+                false,
+                "public",
+            ),
+            declared(
+                TestOwnerV1::Site,
+                "logo",
+                "mark.svg",
+                "entity",
+                true,
+                "public",
+            ),
+            declared(
+                TestOwnerV1::Page,
+                "banner",
+                "banner.webp",
+                "entity",
+                false,
+                "internal",
+            ),
+        ];
+        let candidate = test_mixed_candidate_v1(
+            Some((HOME_ID, &home_digest)),
+            TestMixedFormatV1::SlotAware,
+            &declarations,
+        );
+        assert_eq!(candidate.refusal(), None);
+        let plan = candidate.plan();
+        assert_eq!(plan.len(), 4);
+
+        // Every obligation is inspected, `internal` included.
+        let set = complete(inspect(&entity, &platform, &catalogue, plan));
+        assert_eq!(set.len(), 4);
+        let internal = set
+            .inspections()
+            .iter()
+            .find(|record| record.obligation().is_internal())
+            .expect("the internal obligation is inspected");
+        assert_eq!(internal.logical_path(), "assets/banner.webp");
+
+        // A late missing Entity source refuses the whole candidate after the earlier reads.
+        let late_missing = Root::new(
+            "n129-late-missing",
+            &[
+                ("logo.png", png_bytes.as_slice()),
+                ("mark.svg", svg_bytes.as_slice()),
+            ],
+        );
+        let late_candidate = test_mixed_candidate_v1(
+            Some((HOME_ID, &home_digest)),
+            TestMixedFormatV1::SlotAware,
+            &[
+                declared(
+                    TestOwnerV1::Entity,
+                    "favicon",
+                    "logo.png",
+                    "entity",
+                    false,
+                    "public",
+                ),
+                declared(
+                    TestOwnerV1::Site,
+                    "logo",
+                    "mark.svg",
+                    "entity",
+                    true,
+                    "public",
+                ),
+                declared(
+                    TestOwnerV1::Representation,
+                    "banner",
+                    "missing.png",
+                    "entity",
+                    false,
+                    "public",
+                ),
+            ],
+        );
+        let outcome = inspect(&late_missing, &platform, &catalogue, late_candidate.plan());
+        match outcome {
+            MixedGraphicCandidateOutcomeV1::EntityReadRefused(refusal) => {
+                assert_eq!(refusal.kind(), GraphicAssetReadRefusalKind::MissingSource);
+            }
+            other => panic!("a late missing source must refuse the whole candidate: {other:?}"),
+        }
+        assert_eq!(
+            late_candidate.plan().len(),
+            4,
+            "the plan still holds all four"
+        );
+
+        // A late *media* failure after three successful children also discards everything.
+        let corrupt_entity = Root::new(
+            "n129-late-corrupt",
+            &[
+                ("logo.png", png_bytes.as_slice()),
+                ("mark.svg", svg_bytes.as_slice()),
+                ("banner.webp", webp().as_slice()),
+                ("broken.png", b"not a png at all".as_slice()),
+            ],
+        );
+        let corrupt_candidate = test_mixed_candidate_v1(
+            Some((HOME_ID, &home_digest)),
+            TestMixedFormatV1::SlotAware,
+            &[
+                declared(
+                    TestOwnerV1::Entity,
+                    "favicon",
+                    "logo.png",
+                    "entity",
+                    false,
+                    "public",
+                ),
+                declared(
+                    TestOwnerV1::Site,
+                    "logo",
+                    "mark.svg",
+                    "entity",
+                    true,
+                    "public",
+                ),
+                declared(
+                    TestOwnerV1::Page,
+                    "banner",
+                    "banner.webp",
+                    "entity",
+                    false,
+                    "public",
+                ),
+                declared(
+                    TestOwnerV1::Representation,
+                    "social-preview",
+                    "broken.png",
+                    "entity",
+                    false,
+                    "public",
+                ),
+            ],
+        );
+        match inspect(
+            &corrupt_entity,
+            &platform,
+            &catalogue,
+            corrupt_candidate.plan(),
+        ) {
+            MixedGraphicCandidateOutcomeV1::InspectRefused(refusal) => {
+                assert!(
+                    matches!(refusal.kind(), MixedGraphicInspectRefusalKindV1::Image(_)),
+                    "the corrupt source fails a media check: {:?}",
+                    refusal.kind()
+                );
+                assert_eq!(
+                    refusal.obligation().local_index(),
+                    0,
+                    "the refusal names the offending authored obligation"
+                );
+            }
+            other => panic!("a late corrupt source must refuse the whole candidate: {other:?}"),
+        }
+
+        println!(
+            "n129_evidence case=02 obligations=4 internal_inspected=true superseded_inspected=true \
+             late_missing=whole-refusal late_corrupt=whole-refusal zero_partial=true \
+             publication=false"
+        );
+    }
+
+    /// A scratch Entity content root this module can also mutate, for the native identity cases.
+    struct MixedRoot {
+        dir: PathBuf,
+    }
+
+    impl MixedRoot {
+        fn new(label: &str, files: &[(&str, &[u8])]) -> Self {
+            let dir =
+                scratch_parent().join(format!("solo-n129-entity-{}-{label}", std::process::id()));
+            let _ = fs::remove_dir_all(&dir);
+            fs::create_dir_all(dir.join("assets")).expect("scratch assets directory");
+            for (name, bytes) in files {
+                fs::write(dir.join("assets").join(name), bytes).expect("fixture write");
+            }
+            Self { dir }
+        }
+
+        fn capability(&self) -> solo_adapters::ContentRootCapability {
+            solo_adapters::ContentRootCapability::adopt_bootstrap_path(
+                &self.dir,
+                solo_adapters::RootProvenanceV1::OperatorDesignatedContentRoot,
+            )
+            .expect("the scratch Entity root is adoptable")
+        }
+    }
+
+    impl Drop for MixedRoot {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.dir);
+        }
+    }
+
+    /// Runs the one composed driver over an already adopted Entity capability.
+    fn inspect_capability(
+        entity: &solo_adapters::ContentRootCapability,
+        platform: &PlatformRoot,
+        catalogue: &Catalogue,
+        plan: &MixedGraphicPlanV1,
+    ) -> MixedGraphicCandidateOutcomeV1 {
+        inspect_mixed_graphic_candidate_from_roots_v1(
+            entity,
+            &platform.capability(),
+            plan,
+            catalogue.request(),
+            Path::new(BIN),
+        )
+    }
+
+    /// `N129_03` — the two roots never alias, and each namespace refuses its own native hazards.
+    #[test]
+    fn n129_03_two_root_isolation_and_native_identity_refusal() {
+        let png_bytes = png();
+        let entity_svg = rich_svg().into_bytes();
+        let catalogue = Catalogue::load();
+        let home_digest = catalogue.digest(HOME_ID);
+
+        // The same basename in both namespaces, with genuinely different bytes.
+        let root = MixedRoot::new(
+            "isolation",
+            &[
+                ("icon-home.svg", entity_svg.as_slice()),
+                ("logo.png", png_bytes.as_slice()),
+            ],
+        );
+        let platform = PlatformRoot::new("isolation");
+        let entity_digest = sha256_media_worker_bytes_v1(&entity_svg).to_hex();
+        assert_ne!(
+            entity_digest, home_digest,
+            "the two identically named files are different objects"
+        );
+
+        let candidate = test_mixed_candidate_v1(
+            Some((HOME_ID, &home_digest)),
+            TestMixedFormatV1::SlotAware,
+            &[declared(
+                TestOwnerV1::Site,
+                "logo",
+                "icon-home.svg",
+                "entity",
+                true,
+                "public",
+            )],
+        );
+        assert_eq!(candidate.refusal(), None);
+        assert_eq!(candidate.plan().len(), 2);
+        let set = complete(inspect_capability(
+            &root.capability(),
+            &platform,
+            &catalogue,
+            candidate.plan(),
+        ));
+        let platform_record = set
+            .inspections()
+            .iter()
+            .find(|record| record.is_platform())
+            .expect("the Platform source");
+        let entity_record = set
+            .inspections()
+            .iter()
+            .find(|record| record.is_entity())
+            .expect("the Entity source");
+        assert_eq!(platform_record.logical_path(), "icons/icon-home.svg");
+        assert_eq!(entity_record.logical_path(), "assets/icon-home.svg");
+        assert_eq!(platform_record.source_digest().to_hex(), home_digest);
+        assert_eq!(entity_record.source_digest().to_hex(), entity_digest);
+
+        // No fallback in either direction: an absent Entity source is never served from Platform.
+        let absent = MixedRoot::new("absent", &[("logo.png", png_bytes.as_slice())]);
+        let only_entity = test_mixed_candidate_v1(
+            None,
+            TestMixedFormatV1::SlotAware,
+            &[declared(
+                TestOwnerV1::Entity,
+                "logo",
+                "icon-home.svg",
+                "entity",
+                true,
+                "public",
+            )],
+        );
+        match inspect_capability(
+            &absent.capability(),
+            &platform,
+            &catalogue,
+            only_entity.plan(),
+        ) {
+            MixedGraphicCandidateOutcomeV1::EntityReadRefused(refusal) => {
+                assert_eq!(refusal.kind(), GraphicAssetReadRefusalKind::MissingSource);
+            }
+            other => panic!("an absent Entity source must never fall back to Platform: {other:?}"),
+        }
+
+        // A hard link makes two authored paths one object: the native Entity reader refuses it.
+        let linked = MixedRoot::new("hardlink", &[("logo.png", png_bytes.as_slice())]);
+        fs::hard_link(
+            linked.dir.join("assets/logo.png"),
+            linked.dir.join("assets/copy.png"),
+        )
+        .expect("a hard link is creatable without privilege on both hosts");
+        let two_paths = test_mixed_candidate_v1(
+            None,
+            TestMixedFormatV1::SlotAware,
+            &[
+                declared(
+                    TestOwnerV1::Entity,
+                    "favicon",
+                    "logo.png",
+                    "entity",
+                    false,
+                    "public",
+                ),
+                declared(
+                    TestOwnerV1::Site,
+                    "logo",
+                    "copy.png",
+                    "entity",
+                    true,
+                    "public",
+                ),
+            ],
+        );
+        match inspect_capability(
+            &linked.capability(),
+            &platform,
+            &catalogue,
+            two_paths.plan(),
+        ) {
+            MixedGraphicCandidateOutcomeV1::EntityReadRefused(refusal) => {
+                assert_eq!(
+                    refusal.kind(),
+                    GraphicAssetReadRefusalKind::IdentityCollision,
+                    "two paths to one physical object are a collision"
+                );
+            }
+            other => panic!("a hard-linked Entity source must be refused: {other:?}"),
+        }
+
+        println!(
+            "n129_evidence case=03 platform_path={HOME_LOGICAL} entity_path=assets/icon-home.svg \
+             platform_sha={home_digest} entity_sha={entity_digest} distinct_objects=true \
+             entity_fallback=false platform_fallback=false hardlink=refused publication=false"
+        );
+    }
+
+    /// `N129_04` — catalogue, identity, role, format and binding mismatches all refuse, and the
+    /// preserved legacy entry points keep their own semantics.
+    #[test]
+    fn n129_04_catalogue_role_format_and_binding_refusals() {
+        let png_bytes = png();
+        let root = MixedRoot::new("mismatch", &[("logo.png", png_bytes.as_slice())]);
+        let platform = PlatformRoot::new("mismatch");
+        let catalogue = Catalogue::load();
+        let home_digest = catalogue.digest(HOME_ID);
+        let capability = root.capability();
+        let registry_declaration = [declared(
+            TestOwnerV1::Entity,
+            "favicon",
+            "logo.png",
+            "entity",
+            false,
+            "public",
+        )];
+
+        // 1. An identifier the approved catalogue does not declare.
+        let fake_digest = "0".repeat(64);
+        let unknown = test_mixed_candidate_v1(
+            Some(("icons/icon-not-approved.svg", fake_digest.as_str())),
+            TestMixedFormatV1::SlotAware,
+            &registry_declaration,
+        );
+        assert_eq!(
+            unknown.refusal(),
+            None,
+            "the registration itself is well formed"
+        );
+        match inspect_capability(&capability, &platform, &catalogue, unknown.plan()) {
+            MixedGraphicCandidateOutcomeV1::PlatformReadRefused(refusal) => {
+                assert_eq!(
+                    refusal.kind(),
+                    PlatformAssetReadRefusalKindV1::UnapprovedAssetIdentifier
+                );
+            }
+            other => panic!("an unapproved Platform identifier must refuse: {other:?}"),
+        }
+
+        // 2. A catalogue that is not the approved document, and 3. an unselected version.
+        let approved = test_mixed_candidate_v1(
+            Some((HOME_ID, &home_digest)),
+            TestMixedFormatV1::SlotAware,
+            &registry_declaration,
+        );
+        let mutated = PlatformSourceRequestV1 {
+            selected_version: VERSION,
+            catalogue_bytes: b"{}",
+            ..catalogue.request()
+        };
+        match inspect_mixed_graphic_candidate_from_roots_v1(
+            &capability,
+            &platform.capability(),
+            approved.plan(),
+            mutated,
+            Path::new(BIN),
+        ) {
+            MixedGraphicCandidateOutcomeV1::PlatformReadRefused(refusal) => {
+                assert_eq!(
+                    refusal.kind(),
+                    PlatformAssetReadRefusalKindV1::CatalogueUnapproved
+                );
+            }
+            other => panic!("a mutated catalogue must refuse: {other:?}"),
+        }
+        let wrong_version = PlatformSourceRequestV1 {
+            selected_version: "2.0.0",
+            ..catalogue.request()
+        };
+        match inspect_mixed_graphic_candidate_from_roots_v1(
+            &capability,
+            &platform.capability(),
+            approved.plan(),
+            wrong_version,
+            Path::new(BIN),
+        ) {
+            MixedGraphicCandidateOutcomeV1::PlatformReadRefused(refusal) => {
+                assert_eq!(
+                    refusal.kind(),
+                    PlatformAssetReadRefusalKindV1::UnselectedVersion
+                );
+            }
+            other => panic!("an unselected version must refuse: {other:?}"),
+        }
+
+        // 4. An approved SVG may never fill the PNG-only favicon role, in either namespace.
+        let svg_favicon = test_mixed_candidate_v1(
+            None,
+            TestMixedFormatV1::SlotAware,
+            &[declared(
+                TestOwnerV1::Entity,
+                "favicon",
+                HOME_ID,
+                "platform",
+                false,
+                "public",
+            )],
+        );
+        assert_eq!(svg_favicon.refusal(), None);
+        match inspect_capability(&capability, &platform, &catalogue, svg_favicon.plan()) {
+            MixedGraphicCandidateOutcomeV1::InspectRefused(refusal) => {
+                assert!(
+                    matches!(refusal.kind(), MixedGraphicInspectRefusalKindV1::Image(_)),
+                    "the role/format check refuses the SVG favicon: {:?}",
+                    refusal.kind()
+                );
+            }
+            other => panic!("an SVG favicon must refuse: {other:?}"),
+        }
+
+        // 5. An Entity reference outside the portable entity grammar refuses before any read.
+        let reserved = test_mixed_candidate_v1(
+            None,
+            TestMixedFormatV1::SlotAware,
+            &[declared(
+                TestOwnerV1::Entity,
+                "logo",
+                "con.png",
+                "entity",
+                true,
+                "public",
+            )],
+        );
+        assert_eq!(
+            reserved.refusal(),
+            None,
+            "the domain grammar admits it; the confined reader must not"
+        );
+        match inspect_capability(&capability, &platform, &catalogue, reserved.plan()) {
+            MixedGraphicCandidateOutcomeV1::EntityReadRefused(refusal) => {
+                assert_eq!(
+                    refusal.kind(),
+                    GraphicAssetReadRefusalKind::UnsafeAssetReference
+                );
+            }
+            other => panic!("a reserved-stem Entity reference must refuse: {other:?}"),
+        }
+
+        // 6. Both authored formats at once are an ambiguity, refused before any read.
+        let ambiguous = test_mixed_candidate_v1(
+            None,
+            TestMixedFormatV1::Both,
+            &[declared(
+                TestOwnerV1::Entity,
+                "logo",
+                "logo.png",
+                "entity",
+                true,
+                "public",
+            )],
+        );
+        assert_eq!(
+            ambiguous.refusal(),
+            Some(MixedGraphicPlanRefusalKindV1::AmbiguousGraphicFormat.detail()),
+            "a slot-aware candidate with a legacy value is refused, never merged"
+        );
+        assert!(ambiguous.plan().is_empty());
+
+        println!(
+            "n129_evidence case=04 unapproved_id=refused catalogue_pin=independent \
+             unselected_version=refused svg_favicon=refused unsafe_reference=refused \
+             ambiguous_format=refused entity_only_entrypoint=preserved publication=false"
+        );
+    }
+
+    /// `N129_05` — legacy parity, deterministic ordering, whole-candidate blocking and the closed
+    /// authority surface.
+    #[test]
+    fn n129_05_legacy_parity_determinism_and_guardrails() {
+        let png_bytes = png();
+        let root = MixedRoot::new("parity", &[("logo.png", png_bytes.as_slice())]);
+        let platform = PlatformRoot::new("parity");
+        let catalogue = Catalogue::load();
+
+        // A legacy candidate: no registration, no selection, one authored legacy value.
+        let declarations = [declared(
+            TestOwnerV1::Entity,
+            "logo",
+            "logo.png",
+            "entity",
+            false,
+            "public",
+        )];
+        let legacy =
+            test_mixed_candidate_v1(None, TestMixedFormatV1::LegacyEnvelope, &declarations);
+        assert_eq!(legacy.refusal(), None);
+        assert!(
+            !legacy.is_slot_aware(),
+            "no registration and no selection is parity mode"
+        );
+        assert_eq!(legacy.plan().len(), 1);
+        assert_eq!(
+            legacy.plan().obligations()[0].origin(),
+            MixedGraphicOriginV1::LegacyEnvelopeValue
+        );
+        assert_eq!(
+            legacy.plan().obligations()[0].slot(),
+            None,
+            "a legacy value carries no slot identity"
+        );
+
+        // The same driver inspects it, and the accepted Entity-only entry point agrees on the facts.
+        let set = complete(inspect_capability(
+            &root.capability(),
+            &platform,
+            &catalogue,
+            legacy.plan(),
+        ));
+        assert_eq!(set.len(), 1);
+        let mixed_record = &set.inspections()[0];
+        assert!(mixed_record.is_entity());
+        assert!(!set.grants_publication_authority());
+        let inventory = test_inventory_v1(&[(TestOwnerV1::Entity, "logo", "logo.png", "public")])
+            .expect("a valid legacy inventory");
+        let entity_only = match inspect_entity_graphic_images_v4(
+            &root.capability(),
+            &inventory,
+            Path::new(BIN),
+        ) {
+            EntityImageOutcomeV4::Complete(set) => set,
+            other => panic!("the entity-only entry point must still complete: {other:?}"),
+        };
+        assert_eq!(entity_only.len(), 1);
+        assert_eq!(
+            entity_only.inspections()[0].source_digest(),
+            mixed_record.source_digest(),
+            "the mixed path and the entity-only path report the same source digest"
+        );
+        assert_eq!(entity_only.inspections()[0].format(), mixed_record.format());
+
+        // Determinism: the same authored candidate plans identically twice.
+        let again = test_mixed_candidate_v1(None, TestMixedFormatV1::LegacyEnvelope, &declarations);
+        assert_eq!(again.plan(), legacy.plan());
+        assert_eq!(again.winners(), legacy.winners());
+
+        // A failure in an unrelated owner blocks the whole candidate and yields no records.
+        let failing = test_mixed_candidate_v1(
+            None,
+            TestMixedFormatV1::SlotAware,
+            &[
+                declared(
+                    TestOwnerV1::Entity,
+                    "logo",
+                    "logo.png",
+                    "entity",
+                    true,
+                    "public",
+                ),
+                declared(
+                    TestOwnerV1::Representation,
+                    "banner",
+                    "absent.webp",
+                    "entity",
+                    false,
+                    "public",
+                ),
+            ],
+        );
+        let outcome = inspect_capability(&root.capability(), &platform, &catalogue, failing.plan());
+        assert!(
+            outcome.is_refused(),
+            "the unrelated failure refuses the whole candidate"
+        );
+        assert!(
+            outcome.complete().is_none(),
+            "no partial record set is recoverable"
+        );
+        assert!(outcome.refusal_detail().is_some());
+
+        // No public side effect: every record stays under its own namespace's own root.
+        for record in set.inspections() {
+            if record.is_entity() {
+                assert!(record.logical_path().starts_with("assets/"));
+            } else {
+                assert!(record.is_platform());
+                assert!(record.logical_path().starts_with("icons/"));
+            }
+        }
+
+        println!(
+            "n129_evidence case=05 legacy_parity=true slot_identity_absent=true \
+             deterministic_plan=true entity_only_parity=true whole_candidate_blocked=true \
+             zero_partial=true publication=false"
+        );
+    }
+}

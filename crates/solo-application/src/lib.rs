@@ -29,7 +29,10 @@ pub use bootstrap_preflight::{
 };
 pub use graphic_asset_inventory::{
     GRAPHIC_ASSET_INVENTORY_GRANTS_PUBLICATION_AUTHORITY, GraphicAssetObligationInventoryV1,
-    GraphicAssetObligationV1, collect_graphic_asset_obligations_v1,
+    GraphicAssetObligationV1, MAX_MIXED_GRAPHIC_OBLIGATIONS_V1, MixedGraphicObligationV1,
+    MixedGraphicOperationV1, MixedGraphicOriginV1, MixedGraphicPlanRefusalKindV1,
+    MixedGraphicPlanRefusalV1, MixedGraphicPlanV1, collect_graphic_asset_obligations_v1,
+    collect_mixed_graphic_obligations_v1,
 };
 pub use graphic_asset_read::{
     ENTITY_ASSET_NAMESPACE_SEGMENT, EntityAssetPathV1, EntityAssetSourceV1,
@@ -42,7 +45,11 @@ pub use graphic_image_inspection::{
     AvifEvidenceV4, AvifPlaneEvidenceV4, GRAPHIC_IMAGE_INSPECTION_V4_GRANTS_PUBLICATION_AUTHORITY,
     GRAPHIC_IMAGE_INSPECTION_V4_PROVES_WHOLE_PUBLICATION, GraphicImageInspectRefusalKindV4,
     GraphicImageInspectRefusalV4, GraphicImageInspectionOutcomeV4, GraphicImageInspectionSetV4,
-    GraphicImageInspectionV4, GraphicImagePayloadV4, inspect_graphic_image_source_set_v4,
+    GraphicImageInspectionV4, GraphicImagePayloadV4, GraphicMixedInspectionSetV1,
+    GraphicMixedInspectionV1, MIXED_GRAPHIC_INSPECTION_GRANTS_PUBLICATION_AUTHORITY_V1,
+    MIXED_GRAPHIC_INSPECTION_PROVES_WHOLE_PUBLICATION_V1, MixedGraphicCandidateOutcomeV1,
+    MixedGraphicInspectRefusalKindV1, MixedGraphicInspectRefusalV1, PlatformSourceRequestV1,
+    inspect_graphic_image_source_set_v4, inspect_mixed_graphic_candidate_v1,
 };
 pub use graphic_image_inspection::{
     GIF87A_SIGNATURE_V2, GIF89A_SIGNATURE_V2,

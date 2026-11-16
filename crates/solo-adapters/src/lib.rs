@@ -92,14 +92,17 @@ pub use graphic_image_inspection::{
     IMAGE_WORKER_MODE_SHORT_OUTPUT_V1, IMAGE_WORKER_MODE_TRAILING_V1,
     IMAGE_WORKER_MODE_WRONG_OUTPUT_V1, IMAGE_WORKER_MODE_WRONG_SOURCE_V1,
     INTERNAL_IMAGE_WORKER_FLAG_V1, MAX_GIF_WORKER_STDOUT_BYTES_V1, MAX_IMAGE_WORKER_FRAME_BYTES_V1,
-    MAX_IMAGE_WORKER_STDOUT_BYTES_V1, TestOwnerV1, inspect_entity_graphic_images_v1,
+    MAX_IMAGE_WORKER_STDOUT_BYTES_V1, TestMixedCandidateV1, TestMixedDeclarationV1,
+    TestMixedFormatV1, TestOwnerV1, inspect_entity_graphic_images_v1,
     inspect_entity_graphic_images_v2, inspect_gif_bytes_v1, inspect_gif_bytes_with_executable_v1,
     inspect_gif_bytes_with_test_mode_v1, inspect_image_bytes_with_mode_v1,
     run_internal_image_worker_v1, test_inventory_suppressed_v1, test_inventory_v1,
+    test_mixed_candidate_v1,
 };
 pub use graphic_image_inspection::{
     ConfinedGraphicInspectAdapterV3, ConfinedGraphicInspectAdapterV4, EntityImageOutcomeV3,
     EntityImageOutcomeV4, inspect_entity_graphic_images_v3, inspect_entity_graphic_images_v4,
+    inspect_mixed_graphic_candidate_from_roots_v1,
 };
 pub use graphic_image_inspection::{
     MAX_SVG_WORKER_STDOUT_BYTES_V1, SVG_WORKER_FRAME_PREFIX_V1, SVG_WORKER_MODE_DECODE_V1,
