@@ -1,17 +1,16 @@
 # Execution Report
 
-**Work order:** `SOLO-WO-118 R17` — complete N127 evidence symmetry and implement the governed Platform-first graphic cascade.
-**Bounded required outcome:** `R03C-PLATFORM-FIRST-TYPED-GRAPHIC-BASELINE-SUPERSESSION-N128-TWO-HOST-V1`.
+**Work order:** `SOLO-WO-118 R18` — one real mixed Entity/Platform whole-candidate transaction with full-owner, two-root, six-format source validation.
+**Bounded outcome:** `R03C-MIXED-ENTITY-PLATFORM-ONE-CANDIDATE-CONFINED-SOURCE-INSPECTION-N129-TWO-HOST-V1`.
 
 ```
 owner_81_assets_approved=true
 platform_library_source_installed=true
 platform_source_read_verified=true
-foundation_donor_asset_inventory_paths=142/142
-foundation_canonical_assets_accounted=101/101
-additional_assets_delivered=false
 typed_platform_graphic_baseline_implemented=true
+mixed_entity_platform_whole_candidate_verified=true
 automatic_product_graphic_defaults_active=false
+additional_assets_delivered=false
 public_cascade_delivery=false
 publication_authority=false
 derived_output_publication=false
@@ -20,120 +19,103 @@ r03c_open=true
 stage03_open=true
 ```
 
-**Status: `COMPLETE` for this bounded outcome only.** The opt-in typed root-baseline and explicit-supersession slice now exists, is wired to a verified approved catalogue binding, and passes its focused two-host N128 gate; the R16 Ubuntu N127 verdict omission is repaired; every retained gate and the independent AVIF oracle are green at one SHA. Nothing was published, derived, released, deployed or merged, no product default was registered, and the 20 pending Foundation sources remain undelivered.
+**Status: `COMPLETE` for this bounded outcome only.** One composed transaction now builds a closed source-obligation plan from a whole validated candidate, acquires Entity sources through the accepted Entity reader and Platform sources through the accepted pinned Platform reader, and inspects **every** acquired source through the same accepted six-format worker proof — on native Ubuntu and native Windows. Two real defects were found and repaired forward; both are reported below. Nothing was published, derived, released, deployed or merged, no production default was registered, and the 20 pending Foundation sources remain undelivered.
 
-## 1. Transaction, SHAs and changed paths
+## 1. Transactions, SHAs and changed paths
 
 | Step | SHA | Validation |
 |---|---|---|
-| baseline | main R24 `d2cc9786531bfaa6d70fc0d247aa4a3e6ec4fa21`; technical T24 `a8e770f7de22049b89a7f31e353090be24e69cf4` | one `origin` (`provelopment/provelopment-foundation-solo`), one worktree, four WIP files, empty stash, clean trees, **30** remote heads (the 30-head R16 observation is unchanged) |
-| **A25** (main, ACTIVE only) | `40485af5c61dcf0fffe8603f1917ad629c101160`, tree `020593ec7e977318fedc644bf3b2b5450fe0deca`, parent `d2cc9786` | ACTIVE blob `fd5bcfd2130850223d0884a8d3230558b9607bef` identical in worktree, index, commit and `origin/main` |
-| **T25.0** (branch, ACTIVE only) | `e138880febd0181d8dd4f74142d43aea4e9e32e6`, parent `a8e770f7` | same blob; `git diff T24..T25.0` = ACTIVE only |
-| **T25** (branch, the R17 change) | `cbc47b13f74282e18cfcd9ab7235b048fdbb88e8`, tree `17954648df16ddf48e640ef8c9ad41b0b29c342b`, parent `e138880f` | exactly the eight ledgered paths below |
-| **R25** (main, report only) | this commit (SHA in the Owner handoff) | parent `40485af5`, one path |
+| baseline | main R25 `787041c6b6711645cb675f0de992abc975038cd1`; technical T25 `cbc47b13f74282e18cfcd9ab7235b048fdbb88e8` | one `origin` (`provelopment/provelopment-foundation-solo`), one worktree, four WIP files, empty stash, clean trees, **30** remote heads (unchanged; the two Dependabot app heads are untouched) |
+| **A26** (main, ACTIVE only) | `101c370fc8305d7559180045239e177905dbf0d4`, tree `9db71caa738da1c7a860680c11d78f0b13ea9499`, parent `787041c6` | ACTIVE blob `497db5b17480ac2f9750265494ea8725ccf63647` identical in worktree, index, commit and `origin/main` |
+| **T26.0** (branch, ACTIVE only) | `1744509339e0bd529776d56e2224e156e45830a4`, parent `cbc47b13` | same blob; `git diff T25..T26.0` = ACTIVE only |
+| **T26** (branch, first implementation) | `e4c55dd6da1c54a819d7bdaf342b1816e08260d8`, tree `70f1cf2da76052761343df2f297a1d94d44d26ca` | **failed its technical run honestly** (§2) |
+| **T26.1** (branch, forward repair — the evidence SHA) | `8015a840a6c2c0c55e993f60da28f3931f3706bc`, tree `ac6e76dd562bf4d7d774e4780c57b8d8aa3178bd`, parent `e4c55dd6` | all three technical jobs green |
+| **R26** (main, report only) | this commit (SHA in the Owner handoff) | parent `101c370f`, one path |
 
-`crates/solo-domain/src/property_registry.rs` and `crates/solo-cli/tests/media_worker_host_smoke.rs` were **not** needed and were **not** touched: every closed type lives in the graphic-specific resolution layer, and no existing N093–N127 body changed.
+Changed paths, all inside the ledger:
 
 | Path | Δ | Role |
 |---|---|---|
-| `crates/solo-domain/src/property_resolution.rs` | +1834 / −2 | the closed typed graphic slice; the two deletions are the widened import list |
-| `crates/solo-domain/src/lib.rs` | +14 / −4 | exports for the new seam |
-| `crates/solo-domain/tests/property_resolution.rs` | +1005 | additive `mod n128_domain` (six cases, facts 1–7 and 9) |
-| `crates/solo-application/src/platform_graphic_baseline.rs` | +181 (new) | inward verified-catalogue binding |
-| `crates/solo-application/tests/platform_graphic_baseline.rs` | +363 (new) | additive N128 case 07 (fact 10) |
-| `crates/solo-application/src/lib.rs` | +6 | module and re-exports |
-| `.github/workflows/rust-verify.yml` | +93 / −0 | **one** Linux N127 verdict echo + two additive N128 gates |
-| `.documents/Architecture/ARCHITECTURE.md` | +8 / −2 | the three closed decisions replace R16's open items |
+| `crates/solo-application/src/graphic_asset_inventory.rs` | +414 / −2 | the closed mixed obligation plan (types, builder, Entity-subset view) |
+| `crates/solo-application/src/graphic_image_inspection.rs` | +~660 / −55 | the one composed mixed driver; the accepted V4 loop body extracted verbatim into `inspect_item_v4` so both compositions share it; `format_of_reference` (repair) |
+| `crates/solo-application/src/lib.rs` | +9 / −2 | exports |
+| `crates/solo-adapters/src/graphic_image_inspection.rs` | +383 / −0 | the composed outward entry point over the two adopted roots and the closed host-test seam |
+| `crates/solo-adapters/src/lib.rs` | +4 / −1 | exports |
+| `crates/solo-cli/tests/media_worker_host_smoke.rs` | +1003 / −0 | **additive** `mod n129` only; no existing N093–N128 body changed (the diff has zero deletions) |
+| `.github/workflows/rust-verify.yml` | +97 / −0 | additive Linux and Windows N129 gates |
+| `.documents/Architecture/ARCHITECTURE.md` | +11 / −0 | §6.2I.2 truth note (source-validation scope only) |
 
-`git diff --name-only T25.0..T25 -- platform/assets .gitattributes crates/solo-cli` is **empty**. The 84 product files, the immutable `1.0.0` catalogue (`ad8ea718…`, 81 entries), the MIT notice, the provenance record, the donor fixtures, the reader, the decoder, the worker/supervisor, the architecture-checker policy and every dependency, lockfile and policy file are byte-unchanged.
+`git diff --name-only A26..T26.1 -- platform/assets .gitattributes Cargo.toml Cargo.lock deny.toml crates/solo-cli/src` is **empty**. The immutable `1.0.0` catalogue (`ad8ea718…`, 81 entries), the 84 product files, the worker/supervisor, the codec parsers, `source_read_native.rs`, `property_registry.rs`, `property_resolution.rs`, the R12 catalogue parser and the donor fixtures are byte-unchanged.
 
-**Architecture, measured (not assumed):** `architecture=legal packages=4 targets=39 files=76 edges=93` on Ubuntu and on Windows. R16 reported 38 targets / 74 files: the growth is exactly the one new application module and the one new application integration target, and `packages` and `edges` are unchanged.
+**Architecture, measured:** `architecture=legal packages=4 targets=39 files=76 edges=93` on both hosts — unchanged from R17, because R18 added no new file or target (the N129 cases live inside the existing CLI test target and the seam inside existing modules).
 
-## 2. The three closed decisions, as implemented
+## 2. Two real defects found and repaired forward (nothing hidden)
 
-R16 left three questions open. The order closed them conservatively and the slice implements exactly those answers:
+**First technical run `43841183938` at T26 `e4c55dd6` failed.** Ubuntu job `133209957326` and Windows job `133209957151` both failed inside `Test (workspace, all targets, locked)`; the independent oracle `133209956820` passed. Of the five N129 cases, `n129_05` passed on Ubuntu and `n129_01`–`n129_04` failed at their first completion assertion. The actual messages, not a paraphrase:
 
-1. **Registration is a separate closed table, never a catalogue field.** `PlatformGraphicBaselineRecordV1` pairs an already-registered graphic `PropertyKey`, one validated slot, one exact `AssetReferenceV1` in namespace `platform` and the declared digest of that asset; `PlatformGraphicBaselineV1::new` binds the table to a verified `ApprovedPlatformGraphicBindingV1` (library version, independently recomputed catalogue digest, approved asset set with media class) and refuses a non-graphic role, a non-Platform reference, a non-`primary` slot on a singular role, an unapproved identifier, a digest that is not the catalogue's own, a media class the role forbids, a duplicate role/slot, a role over its slot capacity, or a table past 64 records. The `1.0.0` catalogue gained nothing. **The production table is empty**, so `automatic_product_graphic_defaults_active=false`.
-2. **Slots are explicit lowercase identifiers.** `GraphicSlotIdV1` parses `[a-z][a-z0-9-]{0,62}` only — 1–63 bytes, no leading, trailing or adjacent hyphen — so an uppercase spelling cannot exist and a case collision is impossible rather than detected. `primary` is the only slot a singular role may use; `graphic.background` uses named slots bounded by its registered maximum of four. No index, filename or rendering order ever names a slot, an unqualified add never guesses one, and superseding one slot leaves its siblings and their order untouched.
-3. **An unregistered role stays absent.** Only a registered role/slot with an exact approved source carries a root default. `graphic.logo`, `graphic.favicon`, `graphic.banner`, `graphic.background` and `graphic.social-preview` are all unregistered in production, so none of them inherits anything: availability, count, sort order, route and filename are not selection.
+1. `InspectRefused(... Image(Legacy(UnsupportedFormat)) ..., reference: AssetReferenceV1 { namespace: Platform, reference: "icons/icon-home.svg" })` for cases 01, 02 and 03. **Cause:** the accepted `GraphicImageFormatV3::declared_by` deliberately admits only the `entity` namespace (its own doc comment says a non-Entity namespace is never admitted), so the mixed composition treated every Platform source as an unsupported format. **Repair (T26.1):** a new private `format_of_reference` reuses `accepted_extensions` and drops only that namespace precondition. `declared_by` and every Entity-only caller are untouched, so `inspect_graphic_image_source_set_v4` keeps its exact behaviour — proved by the retained N124–N127 gates on both hosts.
+2. `BindingRefused(PlatformGraphicBaselineRefusalV1 { kind: CatalogueUnapproved })` in case 04, where the test expected the reader to refuse a mutated `catalogue_bytes` argument. **Cause:** the accepted Platform reader reads the catalogue **through its own port**, so a mutated argument cannot influence it; the independent pin inside `approved_platform_graphic_binding_v1` caught it instead. **Repair (T26.1):** the case now asserts the refusal the composition really produces — a *stronger* statement, because the pin is enforced by a second independent computation.
 
-**The typed surface** (all in `solo-domain`, pure and I/O-free): `GraphicCascadeInputV1` (validated declarations + baseline + per-owner selection blocks), `GraphicSlotSelectionV1` with the closed `GraphicSlotOperationV1::{Supersede, Append}` and an authored `Exposure`, `OwnerGraphicSelectionsV1`, `ResolvedGraphicOwnerV1`/`ResolvedGraphicRoleV1`/`GraphicSlotResolutionV1` with `GraphicSourceV1` carrying kind, namespace, reference, exposure and an optional `GraphicPlatformBindingV1` (library version, catalogue digest, asset id, asset digest) plus an ordered `GraphicLineageStepV1` chain whose first step is `PlatformRoot` and never an EFS owner, `GraphicCascadeRefusalKind` (17 closed reasons), `GraphicCascadeFailureV1` (graphic or unchanged legacy), and `project_public_graphic_slots_v1`, a filtered view that emits only public winners and no provenance.
+Neither repair weakened a check, relaxed a bound or skipped a case.
 
-**Semantics proved, not asserted:** a registered default appears at the Entity and descends unchanged through Facet, Site, Page and representation without a fictitious Platform EFS owner; the nearer explicit supersede wins and a still-nearer one wins in turn with the full lineage; an `append` into an occupied slot refuses exactly as the legacy additive singular conflict does, and a sibling branch never sees another branch's supersede; `suppress` clears root-layer and inherited values for its key, a valid local value after suppression is eligible, and the literal `none` never acts as a supersede; an internal winner is resolved internally, is absent from every public projection, and is never replaced by a public root default; one late invalid declaration refuses the **whole** candidate so no earlier owner is returned; and a candidate that registers nothing and selects nothing is **byte-identical** to the accepted legacy graph, which is why installing `platform/assets/` cannot change an existing project.
-
-**Unchanged non-graphic semantics:** `location`, `seo.title`, `seo.description` and `contact.email` are resolved by the legacy algorithm itself (`ValidatedPropertyInputV1::resolve_key_from`) inside the new path, exposed as `ResolvedGraphicOwnerV1::non_graphic`, and asserted unchanged by N128 case 01. `crates/solo-domain/src/property_registry.rs` was not modified; the legacy `resolve`, `resolve_all`, refusals, `ResolutionEventV1` provenance and `project_public_properties_v1` keep their exact behaviour and their existing tests.
-
-
-## 3. N128 on both native hosts — the focused cascade proof
-
-Technical run **`43831041945`**, attempt 1, at `cbc47b13f74282e18cfcd9ab7235b048fdbb88e8`.
+## 3. Final technical proof — run `43842585265` at `8015a840`
 
 | Job | ID | Conclusion |
 |---|---|---|
-| `verify (ubuntu-24.04)` | `133176180625` | **success** |
-| `verify (windows-2025)` | `133176181068` | **success** |
-| `avif-reference-oracle` | `133176181009` | **success** |
+| `verify (ubuntu-24.04)` | `133214672270` | **success** |
+| `verify (windows-2025)` | `133214672019` | **success** |
+| `avif-reference-oracle` | `133214671630` | **success** |
 
-Seven N128 cases ran inside the workspace suite **and** again in the dedicated gate on both hosts. Each host emitted exactly these lines (identical text on Ubuntu and Windows):
+Every retained gate in that job was green on both hosts: `n127_gate authentic=accepted`, `n127_gate mutation=rejected`, `n128_gate authentic=accepted`, `n128_gate mutation=rejected`, and the `n124`/`n125`/`n126` mutation verdicts. The N127 aggregate is still `3c34fe9919341862a5a70a87d205fbfc942741dec5f3996514d3edd0aeb1aaca` with 81 real confined children, and the architecture line is still `packages=4 targets=39 files=76 edges=93` on both hosts.
+
+
+**N129 — five cases, identical on both native hosts.** Ubuntu (from `133214672270`), reproduced verbatim by Windows (`133214672019`):
 
 ```text
-n128_evidence case=01 root=visible_at_entity=true descends=5 unregistered_absent=true non_graphic_unchanged=true binding=1.0.0
-n128_evidence case=02 nearer=win still_nearer=win lineage=3 namespace=platform slot=primary append_conflict=refused sibling_isolated=true
-n128_evidence case=03 root_suppress=cleared descendant_suppress=final local_after_suppress=eligible none_is_not_supersede=true suppressed_at=recorded
-n128_evidence case=04 slot_replaced=1 others_preserved=2 order=stable max=4 append_occupied=refused capacity=refused duplicate_slot=refused wrong_slot=refused
-n128_evidence case=05 unregistered=absent wrong_role=refused favicon_svg=refused digest=refused namespace_alias=refused unapproved_asset=refused duplicate=refused slot_grammar=closed filename_inference=false
-n128_evidence case=06 internal_hidden=true no_public_reappearance=true late_refusal=whole zero_partial=true legacy_parity=identical defaults_without_optin=false
-n128_evidence case=07 binding=exact read=2 digest_matched=true unread_refused=true wrong_digest_refused=true catalogue_pin=independent version=1.0.0 publication_authority=false
+n129_evidence case=01 obligations=4 entity=3 platform=1 distinct_pids=4 platform_path=icons/icon-home.svg platform_mime=image/svg+xml platform_sha=cb742a3b1aa0007ec0c3f26f898e5833c6e67476e136b8eae3c52e2f2c751b5c catalogue_sha=ad8ea718b50641206cc4f4fe13e866ad266366a7aa11ef799c83ae8187858fc7 winner_logo=mark.svg lineage=2 internal_inspected=true publication=false
+n129_evidence case=02 obligations=4 internal_inspected=true superseded_inspected=true late_missing=whole-refusal late_corrupt=whole-refusal zero_partial=true publication=false
+n129_evidence case=03 platform_path=icons/icon-home.svg entity_path=assets/icon-home.svg platform_sha=cb742a3b1aa0007ec0c3f26f898e5833c6e67476e136b8eae3c52e2f2c751b5c entity_sha=ebbb6ec79c779257941f907235d9670e63d94f1fa2d67f680c693c6b22e510b1 distinct_objects=true entity_fallback=false platform_fallback=false hardlink=refused publication=false
+n129_evidence case=04 unapproved_id=refused catalogue_pin=independent unselected_version=refused svg_favicon=refused unsafe_reference=refused ambiguous_format=refused entity_only_entrypoint=preserved publication=false
+n129_evidence case=05 legacy_parity=true slot_identity_absent=true deterministic_plan=true entity_only_parity=true whole_candidate_blocked=true zero_partial=true publication=false
 ```
 
-Gate verdicts, per host: `n128_gate authentic=accepted` then `n128_gate mutation=rejected`. The gate re-derives every token from the instrumented log and rejects four altered copies of it — a forged precedence lineage (`lineage=3`→`1`), a forged privacy/publication claim (`internal_hidden=true`→`false` together with `publication_authority=false`→`true`), a deleted case (`n128_evidence case=04` removed) and a partial result (`ok. 6 passed`→`ok. 5 passed`) — before printing its own verdict. No hardcoded pass echo exists: the authentic branch is reachable only after both test binaries exit zero and every token and the case count are present.
+| Case | What the native run actually proves |
+|---|---|
+| **N129_01** | One test-only root Platform registration (`icons/icon-home.svg`) plus three authored Entity selections across the five levels: an Entity **PNG** favicon, an Entity **SVG** logo that explicitly supersedes the Platform default at the Site, and an Entity **WebP** social preview authored `internal`. Four obligations planned, four real confined children (`distinct_pids=4`) on each host, exact namespace and logical path per record, the real approved source digest, canonical MIME, the catalogue pin, and the closer supersession governing `graphic.logo` (`winner_logo=mark.svg`, `lineage=2`) while the superseded root default was still inspected. |
+| **N129_02** | The same plan proves the complete declared set (superseded and `internal` included), then two late failures — a missing Entity source and a corrupt Entity source at the Representation — each refuse the **whole** candidate with zero partial records. |
+| **N129_03** | Entity `assets/icon-home.svg` and Platform `icons/icon-home.svg` are both read from their own roots with different digests (`cb742a3b…` vs `ebbb6ec7…`); an absent Entity source is never served from Platform and vice versa; a hard link making two authored paths one object is refused by the native Entity reader (`hardlink=refused`). |
+| **N129_04** | An identifier the approved catalogue does not declare, an unselected library version, a mutated catalogue argument (caught by the binding's independent pin), an approved SVG in the PNG-only favicon role, an Entity reference outside the portable grammar (`con.png`) and a candidate mixing the two authored formats all refuse; the accepted Entity-only entry point keeps its own semantics (`entity_only_entrypoint=preserved`). |
+| **N129_05** | A legacy parity candidate carries no slot identity, is inspected through the same driver, and the accepted Entity-only entry point reports the same source digest and format for the same file; the plan is deterministic across two runs; an unrelated-owner failure blocks the whole candidate with no partial set; no record leaves its own namespace root and no record authorizes publication. |
 
-**The exact committed Linux step was dry-run locally** by extracting its `run:` block from `.github/workflows/rust-verify.yml` and executing it with `RUNNER_TEMP` set: `n128_gate authentic=accepted`, `n128_gate mutation=rejected`, exit 0 — so the gate is not merely present but functional.
+**Gate integrity.** Each host ran a dedicated N129 step after the workspace tests with `--nocapture --test-threads=1`, required all five test names, exactly five `n129_evidence` markers, the `ok. 5 passed` total, the pinned catalogue digest, both namespace paths, `zero_partial=true` and `publication=false`, and then rejected four directly altered copies of the same log: a deleted case, a swapped namespace/wrong-root claim, a flipped `zero_partial`/`publication` claim, and an altered catalogue pin with a swapped obligation count. Verdicts: `n129_gate authentic=accepted` then `n129_gate mutation=rejected` on both hosts. No verdict is printed before the real checks, and there is no `continue-on-error`, no `|| true` masking and no token echo substitute.
 
-## 4. The R16 evidence defect is repaired — and every retained gate still runs
-
-The repair is **exactly one line** in the Linux N127 step, after the fourth and final guarded mutated-log check: `echo 'n127_gate mutation=rejected'`. The four checks, the test subject, the tokens and the Windows step are unchanged, and the workflow diff contains **no deletions** (`+93 / −0`).
-
-Both hosts now emit all four verdicts:
-
-| Verdict | Ubuntu `133176180625` | Windows `133176181068` |
-|---|---|---|
-| `n127_gate authentic=accepted` | present | present |
-| `n127_gate mutation=rejected` | **present (was absent in R16)** | present |
-| `n128_gate authentic=accepted` | present | present |
-| `n128_gate mutation=rejected` | present | present |
-
-Retained and still green at this same SHA on both hosts: N127 (81 real confined children, `aggregate=3c34fe99…`, `natives=11` Linux / `10` Windows), N126, N125, N124, the N102 Windows repeatability canaries, the native filesystem security and Btrfs canaries, the test-failure tripwire, the architecture checker on the real tree, the forbidden-import refusal with guaranteed restore, the byte-reproducible release build and the release CLI smoke evidence, plus the independent AVIF reference oracle.
+**Honest limits of the proof.** No 81-icon campaign was repeated: N127 still proves the entire installed vector set. One approved Platform identity per candidate is exercised, exactly as the order asks, and the reported `distinct_pids=4` are the real PNG, SVG, WebP and Platform-SVG children of that candidate — not a fabricated count. The Linux gate logic was additionally dry-run locally against a synthetic instrumented log (authentic accepted, all four mutations rejected) before it was committed; the real five-case run is the hosted result above.
 
 
-## 5. The ten required acceptance/refusal facts
+## 4. What the implementation actually is
 
-| # | Required fact | Case | How it is proved |
-|---|---|---|---|
-| 1 | Root default visible at the Entity and descending to the representation, no fictitious Platform owner, unregistered roles absent, non-graphic values untouched | 01 | five owners asserted, `lineage[0]` is the root layer, four unregistered roles empty, the inherited SEO value is still present at level 4 |
-| 2 | Nearer supersede wins, still-nearer wins, provenance/slot chain correct, and the old additive singular conflict still refuses | 02 | Entity→Facet→Site chain, `lineage=3` with owners and operations, sibling isolation, `SlotAlreadyFilled` |
-| 3 | Root suppress clears the baseline; descendant suppress is final; a valid local value after suppress is eligible; `none` is not replacement | 03 | four scenarios, `suppressed_at` recorded, the literal `none` inherits unchanged |
-| 4 | Collection: named-slot supersession replaces only that slot, append preserves order and maximum, and wrong-slot, duplicate and same-owner conflicts refuse | 04 | slot order `[surface-main, layer-top, sidebar]`, the untouched slot keeps its default, `SlotAlreadyFilled`, `SlotCapacityExceeded`, `DuplicateGraphicSelection`, `SlotNotPermittedForRole` |
-| 5 | Unregistered/wrong-role registration, favicon SVG mismatch, invalid/missing/version-mismatched catalogue or source, Entity/Platform namespace alias and cross-root read attempts refuse before any public claim; no filename infers a role | 05 + 07 | seven distinct refusal kinds, closed slot grammar, and only the registered role filled even with four approved assets bound |
-| 6 | Internal and unlisted declarations, including suppressed material, stay in whole-owner validation; no private-to-public reappearance; a malicious late declaration refuses the entire candidate with zero partial result | 06 | the internal winner is absent from the site and representation projections, the ancestor default is intact, and both the whole-graph and the single-owner entry points refuse |
-| 7 | A legacy project obtains byte-identical previous graphic and non-graphic semantics; no new default appears merely because `platform/assets/` is installed | 06 | per-owner, per-key reference equality against `resolve_all`, empty slot carriers in parity mode, and the legacy answer unchanged with a registration present |
-| 8 | The N128 gate accepts a real terminal log and rejects at least three directly mutated versions; no hardcoded pass echo | §3 | four mutations rejected on both hosts after the authentic acceptance |
-| 9 | No public-derived output, release, deployment, new role fallback or automatic brand claim; the Entity reader still refuses `AssetNamespace::Platform` | 05 + retained N127 | a baseline record in the Entity namespace is refused (`BaselineNamespaceAlias`), the production table is empty, `publication_authority=false`, and N127 case 02 still reports `entity_source_reader_refuses_platform=true` on both hosts |
-| 10 | A dynamic selector binds to the installed immutable `1.0.0` catalogue's exact identifier/digest and one accepted confined read; a wrong identity or unapproved alias refuses | 07 | real bytes read through `read_pinned_platform_sources_v1` (one catalogue read and exactly two source reads), digest matched per identifier, unread asset refused, substituted digest refused, unpinned catalogue refused, unselected version refused |
+**One plan, from authored inputs only.** `collect_mixed_graphic_obligations_v1` orders the obligations deterministically: the root-layer Platform registrations first, then each EFS owner parent-first, and inside every owner its authored legacy values (parity candidates only) followed by its authored slot selections. Each obligation keeps the explicit namespace, the registered role, the slot (absent only for a legacy value, which has none), the qualified declaring owner (absent only for a root registration, which is not an EFS node), the authored ordinal, the authored exposure and the original typed reference. A registration that a closer `suppress` or `supersede` prevents from governing is still planned and still verified, because declaring it was an authored act. A candidate mixing the opt-in slot format with legacy unqualified graphic values is refused (`ambiguous-graphic-format`) rather than double-counted.
+
+**Two roots, two capabilities, no substitution.** The Entity subset is handed to the accepted `read_graphic_asset_bytes_v1` through the accepted `ContentRootCapability`; that gate still refuses any `platform` obligation, so the composition can only pass it Entity work. The Platform subset is handed to the accepted `read_pinned_platform_sources_v1` over a stable unique request set, with the catalogue pin recomputed from the transferred bytes and every source digest compared with the catalogue's own declaration, and the resulting evidence is additionally bound by `approved_platform_graphic_binding_v1`. No external path is ever built from an identifier, and neither root can serve the other namespace.
+
+**One media proof for both namespaces.** The accepted V4 loop body was extracted verbatim into `inspect_item_v4`, so the Entity-only composition and the mixed composition share one implementation of: extension-derived format, role/format compatibility (including the PNG-only favicon rule), non-empty and bounded source, then the PNG/JPEG/WebP/GIF/SVG worker port or the confined AVIF port with its trusted-parent checks. `inspect_graphic_image_source_set_v4` still calls it with the same inputs and produces the same records, which the retained N124 gate proves on both hosts. No second decoder exists and the parent never calls an SVG sanitizer.
+
+**Whole-candidate refusal.** The first failing source returns exactly one typed refusal naming the namespace, role, slot, declaring owner and authored ordinal; no record survives, and there is no partial set, no cross-namespace fallback and no fallback to a root default.
+
+**One known bounded limitation, disclosed in code and in architecture.** A root-layer Platform registration whose approved asset is AVIF is refused (`root-registration-avif-unsupported`) rather than inspected, because the accepted AVIF envelope records an authored EFS obligation as its own provenance and a root registration has none; the composition will not fabricate one. No approved `1.0.0` asset is AVIF, so nothing deliverable is lost today; admitting one later requires a separate order to extend that envelope.
+
+## 5. Rights, assets and what remains open
+
+- The installed library is still exactly the 81 Owner-approved MIT Tabler icons plus the catalogue, the complete MIT notice and the provenance record at `platform/assets/`; the catalogue digest is still `ad8ea718b50641206cc4f4fe13e866ad266366a7aa11ef799c83ae8187858fc7` at `platformAssetLibraryVersion: "1.0.0"`. **No catalogue field, entry, product byte or rights flag changed**, and the production registration table is still empty (`automatic_product_graphic_defaults_active=false`).
+- The 20 pending canonical sources remain undelivered: `icon-services.svg` (no recorded redistribution grant), the two byte-duplicate aliases (no alias model and no new versioned catalogue), the ten neutral placeholders (no per-file role/redistribution decision) and the seven third-party platform marks (donor record **PARKED — NOT INTEGRATED / Not approved**, conditions P-1…P-4 outstanding). No rights were invented; the R16 142/142 ledger remains the accounting evidence and was not regenerated.
+- `public_cascade_delivery=false`, `publication_authority=false`, `derived_output_publication=false`, `release_authority=false`, `additional_assets_delivered=false`, `r03c_open=true`, `stage03_open=true`. No preview, route, derived asset, release, deployment or merge was produced.
 
 
-## 6. Rights, assets and what remains closed
+## 6. Environment, cleanup and the next dependencies
 
-- The installed library is still exactly the 81 Owner-approved MIT Tabler icons plus the catalogue, the MIT notice and the provenance record at `platform/assets/`; the catalogue digest is still `ad8ea718b50641206cc4f4fe13e866ad266366a7aa11ef799c83ae8187858fc7`. **No catalogue field was added, no entry changed and no product byte was touched.**
-- The 20 pending canonical sources are still **undelivered**: `icon-services.svg` (no recorded licence), the two byte-identical aliases (no alias policy or new version), the ten neutral placeholders (no per-file redistribution authority or role mapping) and the seven third-party platform marks (the donor record is **PARKED — NOT INTEGRATED / Not approved**, preconditions P-1…P-4 outstanding). No rights were invented; the accepted R16 142/142 ledger remains the accounting evidence.
-- `additional_assets_delivered=false`, `automatic_product_graphic_defaults_active=false`, `public_cascade_delivery=false`, `publication_authority=false`, `derived_output_publication=false`, `release_authority=false`, `r03c_open=true`, `stage03_open=true`.
+- Local constraints, disclosed honestly: this machine has no reflink-capable filesystem and no Windows linker. The five N129 cases therefore cannot execute locally — they refuse loudly on the missing `SOLO_TEST_SOURCE_FS_ROOT`, and when pointed at a tmpfs they hit the readers' own `Unsupported` refusal. The plan, resolution, ordering and every refusal path ran locally; only the native transfer could not. Hosted native Linux Btrfs and Windows runs are the authoritative evidence, exactly as the order requires, and no local success is reported.
+- Repository state: `main` = A26 `101c370f` then R26 (report only); technical = T26.0 `17445093` → T26 `e4c55dd6` → **T26.1 `8015a840`**; all pushed, both trees clean, one worktree, one `origin`, four `.documents/WIP/` files, empty stash, `git status --porcelain` and `git diff --check` clean, **30** remote heads. No new branch, tag, PR or worktree; no force-push, rebase or history rewrite. The failed attempt is preserved in history and reported in §2.
+- Task scratch lived only in untracked `.temp/` (three transaction scripts, the gate dry-run harness, two patch scripts) and was deleted before handoff; the Owner's pre-existing `.temp/` entries were left untouched.
 
-## 7. Environment, cleanup and the next Owner action
-
-- Local constraints, disclosed honestly: this machine has no reflink-capable filesystem and no Windows linker, so the real-filesystem suites (`d2_product`, `n097`, `n116`, `n121`–`n127`, `source_read_native::snapshot_proofs`) cannot run locally. The N128 matrix was therefore executed **natively on both hosted hosts**, and no local snapshot is reported as native success. The N128 dry run of the exact committed Linux step *was* executed locally and is reported as such.
-- One failed local gate was repaired forward rather than waived: the first N128 application run refused with `IdentityCollision` because the fake reader reused one physical identity for every source; each source now has its own ordinal and the accepted read succeeds.
-- Repository state: `main` = A25 `40485af5` then R25 (report only); technical = T25 `cbc47b13`; both pushed, both clean, one worktree, one `origin`, four `.documents/WIP/` files, empty stash, `git status --porcelain` and `git diff --check` clean, **30** remote heads (the Dependabot app heads observed since R16 are untouched, unmerged and unmodified). No new branch, tag, PR or worktree was created; no force-push, rebase or history rewrite occurred.
-- Task scratch lived only in untracked `.temp/` (transaction scripts, one step extractor and one patch script) and was deleted before handoff; the Owner's pre-existing `.temp/` entries were left untouched.
-
-**Shortest next Owner action.** Decide the production graphic defaults: either (a) keep the registration table empty and advance the next committed roadmap stage, or (b) name the exact role/slot → approved-asset pairs to register as the first automatic baseline, together with an explicit adoption decision, because activating it deliberately changes product behaviour. Everything needed to implement (b) now exists and is proved; what is missing is the Owner's decision about *which* approved default belongs to *which* role — a choice that must never be inferred from a filename.
+**Next true dependencies after acceptance.** (a) The Owner's recorded rights/role grant for the remaining Foundation original, the placeholders and the marks — without it no further artwork can be installed; (b) a separate public-delivery/privacy/immutable-output order before anything this gate validates may be served, routed or released; (c) the still-open production graphic default decision from R17 — the registration table remains empty by design, and filling it is a product-behaviour change that must be authorised explicitly.
 
