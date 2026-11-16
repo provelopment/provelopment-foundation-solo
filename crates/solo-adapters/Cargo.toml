@@ -46,7 +46,7 @@ gif = { version = "=0.14.2", default-features = false, features = ["std"] }
 # XML reader and one SVG attribute-grammar parser. Exact versions only, no native code, no font
 # data, no codec and no alternate version.
 quick-xml = "=0.42.0"
-svgtypes = "=0.16.1"
+svgtypes = "=0.16.2"
 [target.'cfg(target_os = "linux")'.dependencies]
 rustix = { version = "=1.1.6", default-features = false, features = ["fs", "std"] }
 
