@@ -13169,15 +13169,12 @@ mod n131 {
         // ---- a late invalid source refuses the whole candidate with zero partial --------------
         let broken = candidate(
             Some((HOME_ID, home_digest.as_str())),
-            vec![
-                selection("logo", AssetNamespace::Platform, HOME_ID, Exposure::Public),
-                selection(
-                    "favicon",
-                    AssetNamespace::Entity,
-                    "icon-missing.png",
-                    Exposure::Public,
-                ),
-            ],
+            vec![selection(
+                "favicon",
+                AssetNamespace::Entity,
+                "icon-missing.png",
+                Exposure::Public,
+            )],
             target,
         );
         let refusal = preflight(
