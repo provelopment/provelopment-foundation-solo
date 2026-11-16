@@ -1,131 +1,128 @@
-# SOLO-WO-118 R13 — PIN FOUNDATION DONOR ICON ARTWORK, IMPORT REVIEW-ONLY FIXTURES, AND PROVE AN 81-ASSET OWNER-REVIEW PACKET
+# SOLO-WO-118 R14 — REPAIR WINDOWS CHECKOUT BYTE IDENTITY FOR THE PINNED FOUNDATION DONOR; COMPLETE N126 ON TWO NATIVE HOSTS
 
 **STATUS: OWNER-ISSUED — EXECUTE THIS WORK ORDER.**  
 **Issued:** 2026-11-16 (Asia/Jakarta)  
 **Repository:** `provelopment/provelopment-foundation-solo`  
-**Owner's single checkout:** `C:\Users\Sean\Documents\Provelopment\00.foundation-solo`  
+**Owner's sole working checkout:** `C:\Users\Sean\Documents\Provelopment\00.foundation-solo`  
 **Canonical ACTIVE destination:** `C:\Users\Sean\Documents\Provelopment\00.foundation-solo\.documents\WIP\workorder-active.md`  
-**Required bounded outcome:** `R03C-FOUNDATION-DONOR-81-TABLER-ICONS-IMMUTABLE-OWNER-REVIEW-PACKET-N126-TWO-HOST-V1`.
+**Required bounded outcome:** `R03C-FOUNDATION-DONOR-81-ICON-BYTE-IDENTITY-WINDOWS-REPAIRED-N126-TWO-HOST-V1`.
 
-## 1. Binding decision, authority, and current pinned state
+## 1. Binding architectural adjudication: R13 STOP justified; repair is one Git attribute
 
-The Chief Master Architect independently **ACCEPTED SOLO-WO-118 R12** for a strict but **inert** catalogue parser and V4 fact-matching gate. `origin/main` at handoff is R20 `b1c557244d276d3d04db2010fac681c92d61170c`; `origin/solo-wo-118-avif-v4-r01` is T20 `d219f6b8943664f5e32eb4288edefb7ba3d3268c`. The accepted technical run `43736439423` attempt 1 has successful Ubuntu `132879959703`, Windows `132879959898`, and independent `avif-reference-oracle` `132879959950`. R20 main baseline run `43737572434` passed on both hosts. Current architecture = `packages=4 targets=36 files=70 edges=93`; this is a baseline measurement, not a frozen count after edits.
+Chief Master Architect independently audited the canonical R21b report, precise Git refs, the root `.gitattributes`, and native CI logs. **SOLO-WO-118 R13 is not ACCEPTED or COMPLETE**: its technical implementation and Owner-review packet exist at **T21.1** but the two-host N126 proof is unfinished. The **STOP is accepted as justified**; carry the failed history and its root cause forward unaltered.
 
-The Owner has now explicitly selected **`https://github.com/provelopment/provelopment-foundation`** as the **donor repository for actual artwork**, rather than commissioning new illustrations. This is authority to identify, copy **MIT-eligible generic artwork into review-only test fixtures**, establish immutable provenance and prepare exact asset-by-asset catalogue data. It is **not** authority to deem every donor graphic generic, claim third-party trademarks, deem original artwork appropriately licensed, install a usable product `platform/assets/` library, enable Platform reads, or publish/release/deploy. R03.C / Stage 03 stay OPEN.
+Pinned repository refs at issuance:
 
-**Independently verified immutable donor:** `provelopment/provelopment-foundation` default-branch source commit / recursive tree `fa599973a88ff77f6a8e012f3266c3c139b52c17`, recorded October 29, 2026. Never use mutable `main` as import authority. The donor root `LICENSE` is Apache-2.0 **for covered source code** and expressly does **not** grant rights to Provelopment names/logos or relicense third-party material. The specific neutral-icon collection separately carries Tabler Icons **v3.46.0**, `icons/outline`, **MIT**, with copyright `(c) 2020-2026 Paweł Kuna` and a complete notice. Preserve this MIT text when copying the icons.
+| Authority | Exact SHA | What it proves |
+|---|---|---|
+| `origin/main` R21b | `2e39e919935287c0eff28e1b4c79304a2d747ef7` | Current canonical `status=STOPPED` report, including correction for Dependabot-created heads |
+| `origin/solo-wo-118-avif-v4-r01` T21.1 | `72425de9d5c91ec03f10089ce0db4810c36ee045` | R13 immutable 81-icon packet and unchanged N126 tests |
+| Foundation donor commit | `fa599973a88ff77f6a8e012f3266c3c139b52c17` | Pinned original source (never track donor `main`) |
+| Foundation donor tree | `89b57a92869d2e293d33527589f3f4680938f9b2` | Original donor blob manifest |
+| Technical CI run `43804143667` | Ubuntu job `133090902932` **green**; Windows `133090902898` **red**; oracle `133090902700` **green** | Same T21.1 SHA, no red-job waiver |
+| R21b main baseline run `43805633976` | Ubuntu `133095645294` **green**; Windows `133095645137` **green** | Baseline is distinct from technical branch |
 
-**Pinned donor paths, exact Git blobs:**
+**Root cause is Git materialization, not malformed icon source or codec.** Tracked root `.gitattributes` at T21.1 has blob **`027359ecea739c325da73236f3441579e7b5d342`** and the rule `* text=auto` but no exception for the LF-only review fixtures. On Windows, working-tree `icon-about.svg` became 455-byte CRLF data with SHA-256 `bbe534455dbcebfa1b99b9fe248c22c91c8adad01d3e269de064798b139415b0`, while the committed/donor 439-byte LF source is SHA-256 **`bf4377dff0aaaddf1676a4bb7292f90f1102f19daaca7021331ba6a191317c1c`**. The MIT notice became 1,094-byte CRLF data SHA-256 `dbfa6cff2e8426878267c6719ff68dcd8bc3dadaffb2207f5c46ce939c4becd3`, while its committed/donor 1,073-byte LF bytes are SHA-256 **`b740a1d46122672da62833e97f7e7c8a13fa85cbc7445b584b297cc00dde93db`**. Windows N126 **all three failed** on byte-preservation preconditions; all prior Windows test bodies in the same step passed. Linux N126 three cases passed, **81 genuine child invocations**, and its live-log authenticity/mutation gate passed; the independent AVIF oracle passed. Neither the Windows failure nor the existing frozen donor bytes may be normalized away.
 
-- 84 SVG inventory: `deployment/spokes/foundation/content/assets/icon-library/icons/icon-*.svg`.
-- Machine provenance: `deployment/spokes/foundation/content/assets/icon-library/licensing/icon-provenance.json`, Git blob `a74d234417d5bb63ff05e2b64f93d757864f3d46`.
-- Tabler MIT notice: `deployment/spokes/foundation/content/assets/icon-library/licensing/TABLER-ICONS-MIT.txt`, Git blob `3e82379dab3fe93d9ee22251949604ed63ddea39`.
-- Role dictionary: `deployment/spokes/foundation/content/assets/icon-library/icons/README.md`, blob `f002f2ab72aa7f02144f4acc2e5f8d41d8f8d8d4`; generic policy README: `deployment/spokes/foundation/content/assets/icon-library/README.md`, blob `e26e929197d9430e18be6c13714d0110ac532164`.
+**R14 sole technical decision:** add one precisely scoped `-text` rule to the **already tracked repository-root** `.gitattributes`, following existing rules. `-text` disables Git CRLF checkout conversion for this immutable donor fixture subtree; it does not modify canonical Git blob contents, sanitizer, fixture bytes, catalogue hashes, rights records or any product implementation. The ordinary general `*.json`/`*.md` `eol=lf` safeguards outside that subtree remain intact. This is a fix to how Git checks out immutable test inputs, not a broader binary/text governance revision.
 
-The donor records **83 Tabler/MIT files and one `icon-services.svg` original Provelopment work**, with two **byte-identical** artwork pairs:
+## 2. Preflight, transaction and absolutely closed path ledger
 
-1. `icon-about.svg` = `icon-status-info.svg`, both Git blob `c407077e4f849eaf536908a9ee444c4aa4752af4`;
-2. `icon-clients.svg` = `icon-volunteer.svg`, both Git blob `b0d6ecc811b7e1fd4c6d98fc3a1a59e7224c54bc`.
+Operate only in the Owner's established single checkout. Verify clean `main`, clean `solo-wo-118-avif-v4-r01`, empty stash, exactly **one** `origin`, exactly one worktree, four `.documents/WIP/` files (`plan-next.md`, `plan-outlook.md`, `plan-roadmap.md`, `workorder-active.md`), actual remote refs and the exact pinned main/technical commits above. Check no pending untracked artefacts would be overwritten. Git remote-head count was **30** at R21b because two Dependabot app PR branches arrived (not 28); record the present count and distinguish external changes, **do not fail solely because the external count changes**. No Dependabot merge or update is part of this order. If an actual pinned head moved, an Owner change exists, an index is dirty, or the root is ambiguous, **STOP** with evidence. Never reset hard, force-push, `git clean`, merge, rebase, cherry-pick, rebase or rename the branch; never touch another working directory.
 
-The **R12 catalogue rejects duplicate SHA-256 aliases**. Do not evade this by altering donor graphics or weakening the catalogue invariant. Choose `icon-about.svg` and `icon-clients.svg` as the sole representative entries for these duplicates. Record `icon-status-info.svg` and `icon-volunteer.svg` as WITHHELD ALIASES with their actual donor IDs, same-byte evidence and no automatic substitution. Withhold `icon-services.svg` as OWNER-ORIGINAL/SEPARATE-RIGHTS-PROFILE until an explicit per-asset licence/distribution decision. Thus the **R13 review candidate is exactly 81 unique MIT Tabler icons**, not 84 and not an inferred catalogue approval.
+The **entire authorized change ledger** is:
 
-**Exclude** all donor branded logos, brand/favicons, blank/identity placeholders, demonstration/synthetic assets, all `platform-marks/` social-service logos (third-party trademark policies, not blanket MIT), branded banners and unrelated code. In particular, do not import the Foundation `deployment/efs/.../assets/brand/` trees or any `deployment/spokes/*/content/assets/placeholders/` as Platform generic artwork. Do not use/derive copyrighted visual artwork from screenshots or UI code.
-
-## 2. One-checkout transaction and immutable write ledger
-
-Before doing anything, establish `git status --porcelain`, index, `origin/main`, technical head, `git worktree list`, `git remote -v`, `git stash list`, all remote heads, the four `.documents/WIP/` files, and absence of pre-existing untracked scratch changes. Expected 28 remote heads, one worktree, one `origin`, clean branches and empty stash. On unexpected state, **STOP**, report actual evidence; no cleanup, reset or forcing.
-
-**A21:** Owner installs this exact ACTIVE into the existing local checkout on `main`. Commit and push **ACTIVE-only** A21 from R20 `b1c557...`. Prove byte-identical ACTIVE worktree/index/commit/`origin/main` blob, commit parent and only-path diff.
-
-**T21.0:** On existing `solo-wo-118-avif-v4-r01` from `d219f6b...`, import ACTIVE byte-for-byte using the accepted single-path `git restore --source=A21` method, commit and push ACTIVE-only. No new branch, worktree, clone of Solo, alternate remote, tag or merge.
-
-**T21 technical:** Commit **only** the following review-only paths on that same technical branch, with normal forward commits and an exact final technical SHA:
-
-```
-.documents/WIP/workorder-active.md                                       # T21.0 ONLY
-.documents/Reports/platform-library-1.0.0-foundation-review.md         # NEW immutable owner review sheet
-.documents/Reports/platform-library-1.0.0-foundation-candidate.json     # NEW R12-shaped review-only catalogue
-crates/solo-cli/tests/fixtures/foundation-donor-icons/icons/            # NEW exactly 81 donor SVG blobs (one per eligible ID)
-crates/solo-cli/tests/fixtures/foundation-donor-icons/licensing/        # NEW exact pinned MIT text + exact pinned icon-provenance.json
-crates/solo-cli/tests/media_worker_host_smoke.rs                        # ADDITIVE mod n126 only
-.github/workflows/rust-verify.yml                                       # ADDITIVE N126 Ubuntu/Windows evidence gates only
+```text
+.documents/WIP/workorder-active.md      # A22 on main; byte-identical import T22.0 only
+.gitattributes                          # T22.1; exactly ONE appended attribute rule; no other edit
+.documents/Reports/execution-report.md # R22 on main; report-only final commit
 ```
 
-No product `platform/`, `platform/assets/`, product catalogue, extra fixture outside this ledger, second reader, modified codec, `Cargo.toml`, `Cargo.lock`, `deny.toml`, architecture checker, domain grammar, R12 parser/contract, V1–V4 code, prior N093–N125 test bodies, golden, Python oracle, package script, source data, WIP plan, or other file. If a real incompatibility requires a path outside this list, **STOP** and propose a separately Owner-authorized revision; do not quietly broaden the ledger.
+Everything else is **immutable and out of scope**: all 81 donor SVGs; the two pinned `licensing/` files; the 81-entry candidate catalogue; the Owner's 81-row review sheet; `media_worker_host_smoke.rs` N126 and all earlier tests; `.github/workflows/rust-verify.yml`; every Cargo manifest/lock file, `deny.toml`, toolchain, crate, architecture checker and policy; the entire V1–V4, source reader, worker/supervisor, catalogue parser, AVIF oracle/fixture/golden and output/authorization code. Do not add `.gitattributes` files within fixture directories or test-scoped scripts to the index. Temporary local evidence commands are allowed in `.temp/` only if untracked, task-owned and removed before handoff. **No production `platform/` directory or asset library may appear.**
 
-**R21 main report:** After technical CI completes, return to `main` with A21, replace only `.documents/Reports/execution-report.md` as one report-only R21 commit, then obtain fresh native Ubuntu + Windows baseline green CI. Report the full R21 commit SHA in the Owner handoff (not inside its own file). This is not a technical merge; technical output remains on its branch for review.
+Transaction:
 
-## 3. Audit and exact-copy procedure — NO assumed rights or hidden transformations
+1. **A22 (main, ACTIVE only):** After Owner installs **this** downloaded order at the canonical ACTIVE destination, start from R21b `2e39e919935287c0eff28e1b4c79304a2d747ef7`, stage **only** `.documents/WIP/workorder-active.md`, inspect the staged path set, commit and push A22. Verify working-tree/index/committed/`origin/main` ACTIVE blob identities, exact A22 parent and tree SHA. Do **not** commit `.gitattributes` on main: the main branch is an intentionally separate baseline.
+2. **T22.0 (technical branch, ACTIVE import only):** Start from T21.1 `72425de9d5c91ec03f10089ce0db4810c36ee045`, import **only** `.documents/WIP/workorder-active.md` from A22 by its full SHA, stage/commit this one path, and verify exact blob identity with A22. Preserve all T21.1 product and packet bytes. There is no merge from main.
+3. **T22.1 (technical branch, one attribute rule):** Append **exactly** the following line after the existing binary rules in repository-root `.gitattributes` (preserve all preceding bytes and LF style):
 
-Use a GitHub source download pinned to the **full donor commit `fa599973...`**, not a checkout of donor `main` and not the Owner's additional working tree. Use task-owned `.temp/` scratch **outside tracked paths** and clean only files this operation demonstrably created; never run `git clean`, `reset --hard`, branch deletion or force push. The donor is read-only. If source access is unavailable, **STOP**, do not silently replace the source with the pre-existing N116 generic fixture, a fetched other-version Tabler icon, generated art or a fake SHA.
+   ```gitattributes
+   crates/solo-cli/tests/fixtures/foundation-donor-icons/** -text
+   ```
 
-The donor Git tree at that commit is the authoritative list of paths and blob SHAs. Fetch pinned source bytes, calculate `git hash-object -- <download>` (must exactly equal the donor's Git blob SHA) and SHA-256 (64 lowerhex) for **each** of the 84 original icons and both metadata files. Extract the exact 81 selected originals without newline normalisation, SVG cleaning, colour replacement, font embedding, recompression, comments, reflow, conversions or any byte mutation. Preserve source files as test-only fixtures under `foundation-donor-icons/icons/` with identical filenames. Pin the two metadata files byte-for-byte inside `foundation-donor-icons/licensing/`. Verify metadata blob SHAs above. Collect exact byte counts.
+   There must be exactly one occurrence, with no broader `*.svg`, `*.txt`, `*.json`, repository-wide, other-fixture or root-path change. Stage **only** `.gitattributes`; verify `git diff --cached --name-only` equals that path, and `git diff --cached -- .gitattributes` is a one-line addition with no deletion or modified old line. Commit as T22.1. The two technical commits relative to T21.1 must change **exactly** ACTIVE and `.gitattributes`, not test or packet content. Push to the **same** `solo-wo-118-avif-v4-r01` branch normally (no force), then use the push-triggered CI.
+4. **R22 (main, report only):** Only after the required final technical verification exists, return to main A22; publish the single canonical `.documents/Reports/execution-report.md` with a **report-only** commit R22 and push. Run fresh two-host main baseline CI and report results. R22's own SHA is supplied in the Owner handoff rather than falsely embedded into its own committed file. A failed technical verification is recorded as `status=STOPPED`, not upgraded to COMPLETE.
 
-Programmatically reconcile the `icon-provenance.json` 84 canonical names against the 84 Git paths **in both directions**, every per-item source, version, `modified` value and declared licence; require `83 MIT + 1 original`, `84 present`, two exact duplicate pairs, and no unexpected same-SHA pair. Fail on one absent/extra record, changed source or undocumented licence. Confirm the MIT file actually contains its grant and copyright. Compare each selected SVG against its own provenance (`source_icon_name`, vendor version). The Git blob SHA is **not** a substitute for the 64-character SHA-256 catalogue field; record both separately.
+## 3. Proof that the attribute applies but does not rewrite any source
 
-No R13 process may infer permission for `icon-services.svg` from a repository licence; its provenance says `Provelopment original artwork` and its proposed rights require explicit Owner signoff. Social marks have their own brand-policy register and are excluded. Never treat the source repository's public visibility as proof of licence.
+**Before** the T22.1 commit, read the root `.gitattributes` and confirm the exact existing rules. Inspect the 83 tracked fixture paths under `crates/solo-cli/tests/fixtures/foundation-donor-icons/`: **81** `icons/icon-*.svg` plus **exactly two** licensing records (`licensing/TABLER-ICONS-MIT.txt`, `licensing/icon-provenance.json`). There may be no extra files beneath that subtree. Confirm the candidate packet files under `.documents/Reports/` exist and are unchanged.
 
-## 4. Review-only candidate catalogue and per-asset Owner decision sheet
+After applying the rule, prove from actual Git attribute precedence (not a comment or an inference):
 
-Produce `platform-library-1.0.0-foundation-candidate.json` with the **exact** R12 wire contract and field spelling, parseable by `parse_platform_asset_catalogue_v1(selected_version="1.0.0")`:
-
-```
-{
-  "platformAssetLibraryVersion":"1.0.0",
-  "assets":[{
-    "id":"icons/icon-home.svg",
-    "sha256":"<SHA-256 of exactly pinned SVG source bytes, NOT its Git blob>",
-    "mediaClass":"image",
-    "mime":"image/svg+xml",
-    "width":24,
-    "height":24,
-    "licence":{
-      "expression":"MIT",
-      "rightsHolder":"Paweł Kuna",
-      "evidence":"Foundation pinned Tabler MIT notice at fa599973...; source licensing/TABLER-ICONS-MIT.txt"
-    },
-    "provenance":{
-      "source":"Tabler Icons v3.46.0, icons/outline; canonical name icon-home.svg; source home",
-      "evidence":"Foundation fa599973... icon-provenance.json; exact donor Git blob <sha>"
-    }
-  }]
-}
+```bash
+git check-attr text eol -- \
+  crates/solo-cli/tests/fixtures/foundation-donor-icons/icons/icon-about.svg \
+  crates/solo-cli/tests/fixtures/foundation-donor-icons/icons/icon-home.svg \
+  crates/solo-cli/tests/fixtures/foundation-donor-icons/licensing/TABLER-ICONS-MIT.txt \
+  crates/solo-cli/tests/fixtures/foundation-donor-icons/licensing/icon-provenance.json
 ```
 
-The object above is a **shape example only**; its placeholder SHA **MUST NOT** enter the produced file. For every selected asset use the actual authoritative Tabler `source_icon_name` (not guessed from canonical filename), exact donor blob and SHA256, with bounded 1–512-scalar text and exact ID `icons/<canonical filename>`. The entries must be in deterministic ascending ID order and have 81 unique SHA256 digests. Keep exact selected source bytes in test fixtures separate from the prospective production destination. Do not set `approved`, `published`, `installed`, `rightsReviewed` or other invented trust keys. The catalogue must pass the R12 strict parser/typed invariants; its existence is **not** an installed Platform catalogue.
+Each must resolve **`text: unset`**, including the JSON file notwithstanding the earlier generic `*.json text eol=lf`. Check all 83 paths under the scoped subtree as well; unexpected attribute overrides or any file outside this exact scope changing attribute behavior **STOP**. A comparison for an unrelated ordinary SVG outside the subtree must still resolve under inherited policy, establishing that the exception is scoped.
 
-The Markdown Owner review sheet must contain **81 individually reviewable rows**, with at least: checkbox/approval blank, catalogue ID, donor exact source path, immutable donor commit, original Git blob SHA, source SHA-256, exact source size, width/height, canonical MIME, MIT/version/rights holder, provenance source-icon name, independent licensing/metadata paths, actual confined SVG sanitizer classification and canonical-output hash (when available), plus a stable link to the exact pinned donor source. Explicitly mark the entire sheet **PENDING OWNER PER-ASSET APPROVAL — NOT DISTRIBUTABLE**. Include a separate withheld table containing both duplicate aliases, the original `icon-services.svg`, each with cause and review alternative. Exclude all brand/placeholder/social assets by category, not by pretending they are missing. Include a rights and NOTICE reproduction plan (preserve Paweł Kuna 2020–2026 MIT notice in an eventual installation/distribution; no silent re-licensing under the root Apache grant).
+**Blob identity is an independent obligation:** for **each of all 83** fixtures, compare (a) the immutable donor blob at Foundation `fa599973a88ff77f6a8e012f3266c3c139b52c17`, (b) the technical Git index and T21.1 committed blob, and (c) the T22.1 committed blob. Git blob SHA must be **byte-identical** at every stage; the exact input SHA-256 from the R13 review sheet/catalogue is untouched. Representative anchors:
 
-Record 81 exact source hashes and evidence **without a disclaimer that substitutes for missing facts**. Any ambiguous SHA, byte modification, absent provenance or licence mismatch makes this order `STOPPED`, not an approval.
+```text
+icons/icon-about.svg: donor Git blob c407077e4f849eaf536908a9ee444c4aa4752af4
+  exact LF SHA256 bf4377dff0aaaddf1676a4bb7292f90f1102f19daaca7021331ba6a191317c1c
+licensing/TABLER-ICONS-MIT.txt: donor Git blob 3e82379dab3fe93d9ee22251949604ed63ddea39
+  exact LF SHA256 b740a1d46122672da62833e97f7e7c8a13fa85cbc7445b584b297cc00dde93db
+licensing/icon-provenance.json: donor Git blob a74d234417d5bb63ff05e2b64f93d757864f3d46
+  exact LF SHA256 e0f0ea621c11140cf581d86aaab0b73421d0202114092a4e58dc3321ff1a325b
+```
 
-## 5. N126 native evidence — review-only real SVG worker, no platform-source impersonation
+The R13 review-only catalogue `.documents/Reports/platform-library-1.0.0-foundation-candidate.json` retains **exactly 81 entries**, SHA-256 `33a8872be4ba131db58ca37d27b7bfb57166315248399e66701e59777c76119a`. The Owner review sheet `.documents/Reports/platform-library-1.0.0-foundation-review.md` retains SHA-256 `4d7b432e594498582ebc8e8c4995e7cd8dbf00547a022c0eb3cc347ebe77dabd`. Both are reviews, **not** production catalogue approval. Review dates, legal evidence and Owner approval fields may not be edited to manufacture clearance.
 
-In existing `crates/solo-cli/tests/media_worker_host_smoke.rs`, append **one new `mod n126`**. Use the already-pinned real `solo-cli` binary and `inspect_svg_bytes_with_executable_v1` / accepted SVG confined supervisor. Do not construct a fake observation to satisfy this order. Read the 81 actual **tracked review-only fixtures** as test data, not via a Platform source reader; plainly state `source_scope=review-fixture` in the evidence. Each accepted SVG must use the existing strict sanitizer and one genuine confined child invocation (81 actual child invocations per host); prove its original SHA-256 equals the independent candidate catalogue entry, its real SVG width/height equal 24×24, its canonical output is nonempty, bounded and stable, and its source-file / licence provenance is exactly represented. Never treat worker's own claims alone as rights verification. If any source is refused, retain its exact filename and refusal **in private CI diagnostics only**, fail and `STOP`; never modify SVG or weaken sanitizer to force acceptance.
+**Working-tree bytes are also material.** In a **fresh, disposable** native Windows clone/checkout of the final technical commit—or equivalently the clean `actions/checkout` already used by the hosted Windows job—read all 83 fixture files as raw bytes. They must match their T22.1 Git blobs and the donor; no file may show CRLF expansion, especially `icon-about.svg` and the MIT notice. Do not compute an adjusted/normalized digest, translate newlines in tests, disable the original assertion or rematerialize tracked fixture bytes in CI. The dedicated Git attribute is the only permitted mechanism. Existing Owner working trees must not be destroyed or force-rewritten to simulate a clean checkout. If the current Owner checkout already has old CRLF projections, use a separate disposable checkout to prove the new rule; **do not stage, commit or silently overwrite altered donor bytes**. `git status --porcelain` and `git diff --check` must be clean after the final commits.
 
-Required three focused tests, with exactly the names and intent below:
+The implementation agent must explain if any `core.autocrlf` override, subdirectory attribute or build-system transformation prevents raw identity; it must **STOP** rather than writing an extra workaround. Raw SHA-256 is the source rule, not `git hash-object` after a clean filter.
 
-1. `n126_01_exact_eighty_one_tabler_donor_vectors_real_confined_workers` — all 81 original SVGs, 81 genuine supervised invocations, 81 **observed nonzero child PIDs; do not assert global PID uniqueness because OS PID reuse is possible**, source hashes agree with 81 catalogue entries, width/height 24×24, canonical output verified and deterministic; report an **aggregate hash** of sorted `id + source_sha + canonical_sha` records, identical across hosts. Do not print rights-holder paths or private source data. Marker: `n126_evidence case=01 originals=81 inspected=81 real_children=81 geometry=24x24 donor_pinned=true source_scope=review-fixture publication=false` plus aggregate digest.
-2. `n126_02_pinned_mit_provenance_and_r12_catalogue_review_only` — strict R12 parse of 81-entry JSON, exact `1.0.0`, exact metadata hashes, 83/1 donor reconciliation, two aliases withheld, original withheld, one normalized static MIT notice, no product Platform tree, no approved rights flag, no Platform source. Marker: `n126_evidence case=02 entries=81 mit_covered=81 originals_withheld=1 duplicate_aliases_withheld=2 review_only=true platform_read=false publication=false`.
-3. `n126_03_forged_source_alias_missing_notice_and_platform_authority_refused` — independently tamper a selected fixture SHA, reinsert duplicate aliases as catalogue entries (must refuse `DuplicateDigest`), reintroduce original/unreviewed or social asset (test selection verifier refuses), omit the MIT notice, corrupt provenance source/version, change selected version, and attempt a `PlatformSource` R12 binding (must refuse). Never write to tracked assets as a mutation mechanism: mutate test-owned in-memory data only. Marker: `n126_evidence case=03 forgeries_refused=true alias_digest_refused=true licence_missing_refused=true donor_drift_refused=true platform_unavailable=true zero_authority=true`.
+## 4. Re-prove unchanged N126 with real workers on BOTH native hosts
 
-If 81 simultaneously installed entries cannot be matched because worker-canonical colors differ from donor `currentColor`, do **not** misrepresent: the worker's canonical SVG may deliberately resolve `currentColor` to fixed black. Report the source SHA over **unmodified bytes** and the independent canonical output SHA separately. Never change source SHA to the canonical digest. No automatic colour change or asset alias is authorized.
+**No new test cases, branches or mutable goldens.** The previously committed N126 tests and existing two-host N126 verifier in `.github/workflows/rust-verify.yml` are load-bearing and must remain byte-identical. The same test command runs in native hosted CI:
 
-The **existing R12 `PlatformSourceUnavailable` refusal and `read_graphic_asset_bytes_v1` Platform refusal stay binding**. The test-only fixtures and JSON must not be mistakenly included in a shipped product library, release-artifact contents, runtime asset glob or live read path. The legacy V3 `avif-unsupported-v3` refusal and all N093–N125 tests are immutable.
+```bash
+cargo test -p solo-cli --test media_worker_host_smoke --locked n126_ -- --nocapture --test-threads=1
+```
 
-## 6. Two-host CI / mutation gate and local honesty
+Both Ubuntu 24.04 and Windows 2025 must independently show `test result: ok. 3 passed; 0 failed; 0 ignored` and exactly the original N126 case names and evidence:
 
-Extend existing `rust-verify.yml` with only **two** N126 host stages (Ubuntu and Windows). Both must run `cargo test -p solo-cli --test media_worker_host_smoke --locked n126_ -- --nocapture --test-threads=1` against genuine compiled binary, require `3 passed; 0 failed; 0 ignored`, one case name and one `n126_evidence` line for each, exact 81/81 and review-only tokens, and the matching aggregate digest. Emit `n126_gate authentic=accepted` only after checking a **real captured** log. Use the **same verifier** on at least four deliberate corrupted copies (missing case, bad count 80, publication/platform_read forged true, wrong donor hash or licence token); emit `n126_gate mutation=rejected` only after *all* are rejected. Do not fabricate an expected log; local synthetic checker preflight is not host evidence.
+1. **`n126_01_exact_eighty_one_tabler_donor_vectors_real_confined_workers`** — `originals=81 inspected=81 real_children=81 geometry=24x24 donor_pinned=true source_scope=review-fixture publication=false`; **81 actual** confined SVG worker invocations, one per distinct immutable source, no fake port, no single-worker substitution; canonical cross-host aggregate **`3c34fe9919341862a5a70a87d205fbfc942741dec5f3996514d3edd0aeb1aaca`**. Do not alter a row, source digest, canonical output digest, `currentColor` policy or worker-count assertion.
+2. **`n126_02_pinned_mit_provenance_and_r12_catalogue_review_only`** — `entries=81 mit_covered=81 originals_withheld=1 duplicate_aliases_withheld=2 review_only=true platform_read=false publication=false`; exact pinned MIT digest **`b740a1d46122672da62833e97f7e7c8a13fa85cbc7445b584b297cc00dde93db`**, provenance digest **`e0f0ea621c11140cf581d86aaab0b73421d0202114092a4e58dc3321ff1a325b`**, committed donor SHA and the unchanged strict R12 parser.
+3. **`n126_03_forged_source_alias_missing_notice_and_platform_authority_refused`** — `forgeries_refused=true alias_digest_refused=true licence_missing_refused=true donor_drift_refused=true platform_unavailable=true zero_authority=true review_only=true platform_read=false publication=false`, including actual refusal paths; nothing reads `platform/assets/` or treats a review catalogue as a publication token.
 
-Keep all existing native Btrfs/Windows snapshot-source tests, N093–N125, reference oracle job, security/architecture, cargo-deny/RustSec refresh, release/reproducibility steps and log-mutation gates unchanged. At **one final technical SHA**, require three successful jobs: native Ubuntu, native Windows, independent `avif-reference-oracle` (same exact R03 pin). Also obtain fresh R21-main two-host baseline after report publication. Compare N126 aggregate across hosts from actual logs, and record exact job IDs, attempts and source/target SHAs.
+On **both** hosts, the existing N126 verifier must print **`n126_gate authentic=accepted`** and **`n126_gate mutation=rejected`**, having validated the real hosted log and rejected all four deliberately falsified copies (case deleted, 80 instead of 81, forged publication/Platform-read flags, corrupt MIT digest). Keep the original `n126_row` source/canonical digests, canonical 81-row aggregate and test scripts. Do not change `.github/workflows/rust-verify.yml` just to make a green result easier.
 
-Before pushing, run format/check/clippy, graph/architecture fixtures, relevant catalogue tests, new N126 tests **where host supports them**, unchanged smoke builds, and the full workspace suite. An unverified WSL Btrfs filesystem must continue to fail honestly (`NOT RUN LOCALLY` for real-source tests), not be reclassified as green. Windows linker absence locally is not a waiver of native CI. Never use `--skip`, `#[ignore]`, `continue-on-error`, `|| true`, fake tokens or an unconfined fallback. If any genuine host gate fails, correct forward under the fixed ledger with actual evidence or publish STOPPED; no repeat-until-green without diagnosis.
+**Existing green tests are mandatory too.** At the **same exact final technical SHA**, the normal push CI must show all three successful jobs: `verify (ubuntu-24.04)`, `verify (windows-2025)`, and `avif-reference-oracle`. Preserve the full `cargo test --workspace --all-targets --locked`, fmt, check, Clippy, architecture and forbidden-import/unsafe checks, cargo-deny / current RustSec refresh, genuine R03 native source-reader/Btrfs canaries, N093/N102/N108/N113/N116/N120–N125, every earlier adversarial log gate, release/CLI smoke and byte-for-byte reproducibility. Do not bypass Windows CI, dispatch a nonmatching branch, exclude N126 from the workspace suite, weaken CI `continue-on-error` semantics, update dependencies or merge Dependabot work. Architecture on the technical branch is expected to remain `packages=4 targets=36 files=70 edges=93`; independently record the measured actual result and stop if the graph changes unexpectedly. The **main** baseline remains separately at its own package/target/file/edge counts.
 
-## 7. R21 canonical report; acceptance boundary and Owner next step
+Local Windows linkage and native Btrfs snapshot verification may remain **NOT RUN LOCALLY** where the Owner checkout lacks those native prerequisites; never describe these cases as locally passed or classify precondition panics as product defects. The final hosted Ubuntu/Windows CI is authoritative. If the CI tests produce a new source/hash/codec failure, the single-line attribute repair is **not proven** and R14 must stop for a new, independently adjudicated bounded order.
 
-R21 `.documents/Reports/execution-report.md` must include exact two-repository provenance (Foundation pinned commit/tree, 81 selected donor IDs, 81 raw hashes, MIT notice and provenance blob SHA), 84→81 exclusion proof, all changed paths, test-only import decisions, the strict JSON and review sheet blob SHAs, genuine 81-worker evidence on *both* hosts, four mutations, prior gate outcomes, architecture measured change, baseline workflow and clean worktree/stash/remote checks. Record honest failures and corrections, no right-clearance overstatement.
+## 5. Rights, product and publication boundaries stay CLOSED
 
-Set `status=COMPLETE` **only** for `R03C-FOUNDATION-DONOR-81-TABLER-ICONS-IMMUTABLE-OWNER-REVIEW-PACKET-N126-TWO-HOST-V1` when all these gates pass. In the same report state: `owner_per_asset_approval_pending=true`, `rights_review_pending=true`, `platform_library_delivered=false`, `platform_read_enabled=false`, `publication_authority=false`, `stage03_open=true`. R13 **does not** close R03.C or Stage 03. If source/rights/compatibility/gate evidence fails, `status=STOPPED` and precise counterexample, not a fabricated success.
+R14 does **not** approve individual artwork, add an approval token, ship artwork, install an actual Platform root, copy Foundation brand artwork, license `icon-services.svg`, include duplicate aliases as extra catalogue entries, introduce third-party platform/social marks, create optimised derivatives or publish anything. The 81 MIT candidates are **review-only** and require explicit Owner approval at the per-asset review sheet before any product-distribution package. The MIT notice must be retained unchanged as evidence and must travel with any separately authorized eventual distribution. The Foundation root Apache-2.0 licence does **not** replace this third-party MIT notice, nor grant rights in logos/trademarks. `platform/assets/` remains absent; `AssetNamespace::Platform` remains unreadable by the Entity reader and V4 matcher `PlatformSource` remains refused.
 
-**Required subsequent Owner action:** Review the per-asset 81-row packet (or approve an explicitly reduced subset) and confirm the exact selected bytes, per-asset licensing/provenance and redistribution scope for the first pinned `platformAssetLibraryVersion: "1.0.0"` release. Only the *next* Owner-issued order after that review may install `platform/assets/`, its complete hash-pinned immutable catalogue, and a **separate native read-only Platform root**, prove N127 real approved Platform reads and derive/publish nothing prematurely. Withheld brand marks, original `icon-services.svg` and duplicate aliases require their own explicit decisions.
+The product still has constant-`false` rights/publication/derived-output/release authority flags. R14 success is **only** cross-host proof of a review packet; it is **not** `R03.C`, a completed `platformAssetLibraryVersion: "1.0.0"` installation, a product release, publication or Stage 03 closure. The next separate Owner review will examine the 81 actual rows, individual rights evidence, intended use and attribution; it is not delegated to the Implementation Agent by this order.
 
-**Architectural stop rule:** no new trust source is created by a Git URL, a right-hand licence string, a passing SVG decoder or the Owner's selection of a donor repository. Those inputs remain evidence for an informed, specific per-asset approval. GitHub connector use by the Chief Master Architect is READ ONLY; implementation through the Owner's existing checkout is exclusively the Implementation Agent's job.
+## 6. Required R22 report and exact STOP/COMPLETE semantics
+
+On success publish `status=COMPLETE` for **only** `R03C-FOUNDATION-DONOR-81-ICON-BYTE-IDENTITY-WINDOWS-REPAIRED-N126-TWO-HOST-V1`. The canonical `.documents/Reports/execution-report.md` must include:
+
+- A22 full SHA/tree/ACTIVE blob equality, T22.0 full SHA/blob equality, T22.1 full SHA and exact one-line attribute diff, R22 report-only parent/full SHA in the Owner handoff. Confirm main-vs-technical separation and exact changed-path ledger.
+- Original T21.1 Windows **FAILURE**, its specific CRLF hashes, the exact Git attribute precedence before/after, and all 83 committed donor blob identities **and** fresh Windows worktree-byte identities. Keep R13's justified STOP as history; do not rewrite it into a previously successful run.
+- Three real final technical CI job IDs/conclusions/attempts at **one identical SHA**; N126 full case names, pass counts, source/canonical digest and all evidence tokens on both hosts; verifier authentic/mutation verdicts and retained N093–N125 and R03 reference oracle; architecture facts, no dependency drift, no rule weakening; any local Btrfs/Windows constraints truthfully separated.
+- Exact SHA-256 for the **unchanged** 81-entry candidate catalogue, 81-row review sheet, MIT notice and provenance; all three withheld names, 81 original LF icon files still test-only; no added production `platform/assets/` or host Platform reader.
+- Fresh `main` baseline Ubuntu/Windows run/job IDs after R22; actual one-worktree/one-remote/clean branches/empty stash/WIP count and **observed** remote heads (externally created Dependabot heads distinguished from this agent's edits); task scratch cleanup.
+- Explicit **`owner_per_asset_approval_pending=true`**, **`rights_review_pending=true`**, **`platform_library_delivered=false`**, **`platform_read_enabled=false`**, **`publication_authority=false`**, **`stage03_open=true`**.
+
+If any bounded requirement is unsatisfied, publish **`status=STOPPED`** with exact cause, host logs and smallest necessary new proposal; never forge green, mutate the donor, silently expand the ledger or request broad approval. No PR, merge, release, deploy or publishing claim may be made.
+
+**Final Owner handoff:** exact A22/T22.0/T22.1/R22 SHAs, final CI run and three job IDs, first and final Windows N126 outcomes, R22 baseline CI, complete/review-only status, remaining Owner rights approval, and the next dependency. The Chief Master Architect alone separately audits and ACCEPTS this bounded outcome. Stage 03 remains OPEN.
