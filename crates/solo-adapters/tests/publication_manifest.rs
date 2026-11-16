@@ -1242,6 +1242,7 @@ mod n132_manifest_visibility {
         assert!(!parsed.is_publication_authorized());
 
         // `internal` is never a representation state: the closed type has exactly two tokens.
+
         assert!(RepresentationVisibilityV1::parse_token("internal").is_err());
         assert_eq!(
             RepresentationVisibilityV1::parse_token("public").expect("public"),
@@ -1256,6 +1257,772 @@ mod n132_manifest_visibility {
             "n132_evidence case=04 deterministic=true manifest_sha_pinned=true \
              label_sha_changed=true ledger_stable=true unlisted_not_private=true \
              routes_inert=true zero_partial=true publication=false route=false"
+        );
+    }
+}
+
+// `SOLO-WO-118 R22` acceptance cases for the manifest-bound route/visibility policy preflight.
+//
+// Every case runs real strict JSON bytes through the accepted R21 bridge and then the new pre-route
+// policy. Nothing here opens a file, reads a root, starts a worker, resolves a route or serves HTTP.
+
+mod n133_manifest_route_visibility {
+    use solo_adapters::{
+        EntryPathsPolicyV1, LandingAvailabilityV1, MANIFEST_ROUTE_POLICY_LOCALE_PROFILE,
+        ManifestEfsScopeV1, ManifestErrorKind, ManifestRoutePolicyRefusalKindV1,
+        ManifestRouteVisibilityPolicyV1, MissingTranslationPolicyV1, RouteComparisonIntentV1,
+        build_manifest_route_visibility_policy_v1, check_manifest_efs_scope_v1,
+        parse_manifest_visibility_snapshot_v1,
+    };
+    use solo_application::sha256_media_worker_bytes_v1;
+    use solo_domain::{
+        ApprovedPlatformAssetV1, ApprovedPlatformGraphicBindingV1, EfsOwnershipDraft,
+        EfsOwnershipGraph, EntityIdV1, FacetDraft, FacetIdV1, GraphicCascadeInputV1, LocaleKeyV1,
+        PageDraft, PageIdV1, PlatformAssetMediaClassV1, PlatformGraphicBaselineV1,
+        QualifiedOwnerV1, RepresentationVisibilityOriginV1, RepresentationVisibilityV1, SiteDraft,
+        SiteIdV1, validate_declared_properties_v1,
+    };
+
+    /// Two sibling Sites that both declare `home`, one mixed Page, one extra Page, one fully
+    /// unlisted Page and one Page whose only representation is an unlisted override.
+    const POLICY: &str = r#"{
+  "schemaVersion": "1.0.0",
+  "propertyRegistryVersion": "1.0.0",
+  "platformAssetLibraryVersion": "1.0.0",
+  "base": { "canonical": "https://example.test" },
+  "entity": {
+    "id": "acme",
+    "label": "Acme",
+    "facets": [
+      { "id": "main", "label": "Main", "sites": [
+        { "id": "bali", "label": "Bali", "defaultLocale": "en-001", "pages": [
+          { "id": "home", "label": "Home", "representations": [
+            { "locale": "en-001", "route": { "path": "/en-001/home" },
+              "sourceCandidates": { "json": "pages/bali-home-en-001.json" } },
+            { "locale": "de-DE",
+              "route": { "path": "/de-DE/home", "caseMatching": "sensitive" },
+              "sourceCandidates": { "json": "pages/bali-home-de-de.json" } },
+            { "locale": "fr-FR", "route": { "path": "/fr-FR/home" }, "visibility": "unlisted",
+              "sourceCandidates": { "json": "pages/bali-home-fr-fr.json" } } ] },
+          { "id": "about", "label": "About", "entryPaths": ["/about"], "representations": [
+            { "locale": "en-001", "route": { "path": "/en-001/about" },
+              "sourceCandidates": { "json": "pages/bali-about-en-001.json" } } ] } ] },
+        { "id": "ubud", "label": "Ubud", "defaultLocale": "en-001", "pages": [
+          { "id": "home", "label": "Home", "visibilityDefault": "unlisted", "representations": [
+            { "locale": "en-001", "route": { "path": "/en-001/ubud-home" },
+              "sourceCandidates": { "json": "pages/ubud-home-en-001.json" } } ] },
+          { "id": "legal", "label": "Legal", "representations": [
+            { "locale": "en-001", "route": { "path": "/en-001/legal" }, "visibility": "unlisted",
+              "sourceCandidates": { "json": "pages/ubud-legal-en-001.json" } } ] } ] } ] } ]
+  }
+}"#;
+
+    /// The plan over the fixture manifest.
+    fn plan() -> ManifestRouteVisibilityPolicyV1 {
+        let snapshot =
+            parse_manifest_visibility_snapshot_v1(POLICY.as_bytes()).expect("the fixture converts");
+        build_manifest_route_visibility_policy_v1(&snapshot)
+            .expect("the fixture passes the pre-route policy")
+    }
+
+    /// One exact representation owner inside the fixture Entity.
+    fn rep_owner(site: &str, page: &str, locale: &str) -> QualifiedOwnerV1 {
+        QualifiedOwnerV1::representation(
+            EntityIdV1::parse("acme").expect("canonical Entity"),
+            FacetIdV1::parse("main").expect("canonical Facet"),
+            SiteIdV1::parse(site).expect("canonical Site"),
+            PageIdV1::parse(page).expect("canonical Page"),
+            LocaleKeyV1::from_already_canonical(locale).expect("canonical locale"),
+        )
+    }
+
+    /// `N133_01` — the four-case matrix with closed intents, provenance and sibling identity.
+    #[test]
+    fn n133_01_four_case_matrix_keeps_intent_provenance_and_sibling_identity() {
+        let snapshot =
+            parse_manifest_visibility_snapshot_v1(POLICY.as_bytes()).expect("the fixture converts");
+        let plan = build_manifest_route_visibility_policy_v1(&snapshot).expect("the plan builds");
+
+        // Complete coverage, in authored containment order.
+        assert_eq!(plan.representations().len(), 6);
+        assert_eq!(plan.pages().len(), 4);
+        assert_eq!(plan.representations().len(), snapshot.ledger().len());
+        assert_eq!(
+            plan.representations().len(),
+            snapshot.representation_count()
+        );
+        assert_eq!(plan.locale_profile(), MANIFEST_ROUTE_POLICY_LOCALE_PROFILE);
+
+        let order: Vec<&QualifiedOwnerV1> = plan
+            .representations()
+            .iter()
+            .map(|record| record.owner())
+            .collect();
+        assert_eq!(order[0], &rep_owner("bali", "home", "en-001"));
+        assert_eq!(order[1], &rep_owner("bali", "home", "de-DE"));
+        assert_eq!(order[2], &rep_owner("bali", "home", "fr-FR"));
+        assert_eq!(order[3], &rep_owner("bali", "about", "en-001"));
+        assert_eq!(order[4], &rep_owner("ubud", "home", "en-001"));
+        assert_eq!(order[5], &rep_owner("ubud", "legal", "en-001"));
+
+        // The four accepted combinations, with their closed intents and provenance.
+        let cases = [
+            (
+                "bali",
+                "home",
+                "en-001",
+                RepresentationVisibilityV1::Public,
+                RepresentationVisibilityOriginV1::PageDefault,
+                RouteComparisonIntentV1::PublicInsensitive,
+                false,
+                true,
+            ),
+            (
+                "bali",
+                "home",
+                "de-DE",
+                RepresentationVisibilityV1::Public,
+                RepresentationVisibilityOriginV1::PageDefault,
+                RouteComparisonIntentV1::PublicSensitive,
+                true,
+                true,
+            ),
+            (
+                "bali",
+                "home",
+                "fr-FR",
+                RepresentationVisibilityV1::Unlisted,
+                RepresentationVisibilityOriginV1::RepresentationOverride,
+                RouteComparisonIntentV1::ExactUnlisted,
+                false,
+                false,
+            ),
+            (
+                "ubud",
+                "home",
+                "en-001",
+                RepresentationVisibilityV1::Unlisted,
+                RepresentationVisibilityOriginV1::PageDefault,
+                RouteComparisonIntentV1::ExactUnlisted,
+                false,
+                false,
+            ),
+            (
+                "ubud",
+                "legal",
+                "en-001",
+                RepresentationVisibilityV1::Unlisted,
+                RepresentationVisibilityOriginV1::RepresentationOverride,
+                RouteComparisonIntentV1::ExactUnlisted,
+                false,
+                false,
+            ),
+        ];
+        for (site, page, locale, effective, origin, comparison, authored, discoverable) in cases {
+            let record = plan
+                .representation(&rep_owner(site, page, locale))
+                .expect("every governed representation has one record");
+            assert_eq!(record.effective(), effective, "{site}/{page}/{locale}");
+            assert_eq!(record.origin(), origin, "{site}/{page}/{locale}");
+            assert_eq!(record.comparison(), comparison, "{site}/{page}/{locale}");
+            assert_eq!(record.case_matching_authored(), authored);
+            assert_eq!(record.discoverable(), discoverable);
+            assert_eq!(
+                record.robots_intent(),
+                if discoverable {
+                    "index,follow"
+                } else {
+                    "noindex,nofollow"
+                }
+            );
+            assert_eq!(record.alias_count(), 0, "no alias is ever promoted");
+        }
+
+        // The same `home` Page identifier in two sibling Sites stays two distinct owners.
+        let bali_home = rep_owner("bali", "home", "en-001");
+        let ubud_home = rep_owner("ubud", "home", "en-001");
+        assert_ne!(bali_home, ubud_home);
+        assert_eq!(bali_home.page_id(), ubud_home.page_id());
+        assert_ne!(bali_home.site_id(), ubud_home.site_id());
+        assert_ne!(
+            plan.representation(&bali_home)
+                .expect("bali home")
+                .effective(),
+            plan.representation(&ubud_home)
+                .expect("ubud home")
+                .effective(),
+            "sibling Pages never share a visibility decision"
+        );
+
+        // Page-level eligibility is per Page, and entryPaths stay pending inert claims.
+        assert_eq!(
+            plan.page(&page_owner("bali", "home"))
+                .expect("mixed Page")
+                .public_representation_count(),
+            2
+        );
+        assert_eq!(
+            plan.page(&page_owner("bali", "about"))
+                .expect("about Page")
+                .entry_paths(),
+            EntryPathsPolicyV1::PendingInert { count: 1 }
+        );
+        assert_eq!(
+            plan.page(&page_owner("ubud", "home"))
+                .expect("unlisted Page")
+                .public_representation_count(),
+            0
+        );
+
+        // Provenance identity is the accepted manifest digest, and no authority is claimed.
+        assert_eq!(plan.manifest_sha256(), snapshot.manifest_sha256());
+        assert_eq!(
+            plan.manifest_sha256(),
+            sha256_media_worker_bytes_v1(POLICY.as_bytes()).to_hex()
+        );
+        assert_eq!(plan.manifest_sha256().len(), 64);
+        assert!(!plan.grants_publication_authority());
+        assert!(!plan.grants_route_authority());
+        assert!(!plan.serves_http());
+        assert!(!plan.publishes_derived_output());
+        assert!(!plan.grants_release_authority());
+        assert!(!plan.grants_deployment_authority());
+
+        // Paths and the base stay unvalidated authored strings: nothing of the kind leaks out.
+        let authored_path = snapshot.parsed().entity().facets()[0].sites()[0].pages()[0]
+            .representations()[0]
+            .route()
+            .path();
+        assert_eq!(authored_path, "/en-001/home");
+        assert_eq!(snapshot.parsed().base().canonical(), "https://example.test");
+        let rendered = format!("{plan:?}");
+        for forbidden in [
+            "/en-001/home",
+            "/de-DE/home",
+            "https://example.test",
+            "pages/bali-home-en-001.json",
+            "Acme",
+        ] {
+            assert!(
+                !rendered.contains(forbidden),
+                "the plan must not expose {forbidden}"
+            );
+        }
+
+        println!(
+            "n133_evidence case=01 records=6 pages=4 public_insensitive=1 public_sensitive=1 \
+             exact_unlisted=3 origin_page_default=2 origin_override=1 sibling_isolated=true \
+             entry_paths_pending=1 landing=absent manifest_sha_pinned=true \
+             locale_profile=restricted publication=false route=false http=false"
+        );
+    }
+
+    /// One exact Page owner inside the fixture Entity.
+    fn page_owner(site: &str, page: &str) -> QualifiedOwnerV1 {
+        QualifiedOwnerV1::page(
+            EntityIdV1::parse("acme").expect("canonical Entity"),
+            FacetIdV1::parse("main").expect("canonical Facet"),
+            SiteIdV1::parse(site).expect("canonical Site"),
+            PageIdV1::parse(page).expect("canonical Page"),
+        )
+    }
+
+    /// Asserts that these real bytes are refused by the policy with the expected closed cause.
+    fn refused(bytes: &[u8], expected: ManifestRoutePolicyRefusalKindV1) -> String {
+        let snapshot = parse_manifest_visibility_snapshot_v1(bytes)
+            .expect("the accepted bridge admits these bytes");
+        let refusal = build_manifest_route_visibility_policy_v1(&snapshot)
+            .expect_err("the pre-route policy must refuse this claim");
+        assert_eq!(refusal.kind(), expected, "refusal cause");
+        assert_eq!(refusal.code(), "PREFLIGHT_MANIFEST_ROUTE_POLICY_INVALID");
+        assert!(!refusal.location().is_empty());
+        assert!(refusal.location().is_ascii(), "locations are fixed ASCII");
+        refusal.location().to_owned()
+    }
+
+    /// `N133_02` — unlisted leakage and unsafe authoring are blocked before any use.
+    #[test]
+    fn n133_02_unlisted_leakage_and_unsafe_authoring_are_blocked() {
+        // An effectively unlisted representation may not author `caseMatching`, either way.
+        for authored in ["sensitive", "insensitive"] {
+            let bytes = POLICY.replace(
+                r#""route": { "path": "/fr-FR/home" }, "visibility": "unlisted""#,
+                &format!(
+                    r#""route": {{ "path": "/fr-FR/home", "caseMatching": "{authored}" }}, "visibility": "unlisted""#
+                ),
+            );
+            assert_ne!(bytes, POLICY);
+            let location = refused(
+                bytes.as_bytes(),
+                ManifestRoutePolicyRefusalKindV1::UnlistedCaseMatching,
+            );
+            assert!(location.ends_with(".route.caseMatching"), "{location}");
+            assert!(location.contains("representations[2]"), "{location}");
+        }
+
+        // Nor may it author an alias: unlisted claims are never promoted or advertised.
+        let with_alias = POLICY.replace(
+            r#""route": { "path": "/fr-FR/home" }, "visibility": "unlisted""#,
+            r#""route": { "path": "/fr-FR/home", "aliases": [ { "path": "/fr/home" } ] }, "visibility": "unlisted""#,
+        );
+        assert_ne!(with_alias, POLICY);
+        let location = refused(
+            with_alias.as_bytes(),
+            ManifestRoutePolicyRefusalKindV1::UnlistedAliases,
+        );
+        assert!(location.ends_with(".route.aliases"), "{location}");
+
+        // A Page with no public representation may not contribute a discoverable entry.
+        let unlisted_entry = POLICY.replace(
+            r#"{ "id": "legal", "label": "Legal", "representations": ["#,
+            r#"{ "id": "legal", "label": "Legal", "entryPaths": ["/legal"], "representations": ["#,
+        );
+        assert_ne!(unlisted_entry, POLICY);
+        let location = refused(
+            unlisted_entry.as_bytes(),
+            ManifestRoutePolicyRefusalKindV1::UnlistedOnlyEntryPaths,
+        );
+        assert!(location.ends_with(".entryPaths"), "{location}");
+
+        // The mixed Page keeps its entry claims only because its own representation is public.
+        let snapshot =
+            parse_manifest_visibility_snapshot_v1(POLICY.as_bytes()).expect("the fixture converts");
+        let plan = build_manifest_route_visibility_policy_v1(&snapshot).expect("the plan builds");
+        assert_eq!(
+            plan.page(&page_owner("bali", "about"))
+                .expect("mixed Page")
+                .entry_paths()
+                .token(),
+            "pending-inert"
+        );
+        assert_eq!(
+            plan.page(&page_owner("ubud", "legal"))
+                .expect("unlisted Page")
+                .entry_paths(),
+            EntryPathsPolicyV1::Absent
+        );
+
+        // `internal` is still refused by the retained strict parser: it is a property exposure,
+        // never a third representation visibility, and this preflight never sees such a manifest.
+        let internal = POLICY.replace(r#""visibility": "unlisted""#, r#""visibility": "internal""#);
+        let parser_refusal = parse_manifest_visibility_snapshot_v1(internal.as_bytes())
+            .expect_err("the accepted parser refuses `internal`");
+        assert_eq!(
+            parser_refusal.detail(),
+            ManifestErrorKind::InvalidEnumValue.detail()
+        );
+
+        // A refused claim yields no plan at all: there is no partial record set to misuse.
+        let no_partial = build_manifest_route_visibility_policy_v1(
+            &parse_manifest_visibility_snapshot_v1(with_alias.as_bytes())
+                .expect("the bridge admits these bytes"),
+        );
+        assert!(no_partial.is_err());
+
+        println!(
+            "n133_evidence case=02 unlisted_case_sensitive=refused \
+             unlisted_case_insensitive=refused unlisted_aliases=refused \
+             unlisted_only_entry_paths=refused mixed_entry_paths=pending \
+             internal_representation=refused zero_partial=true before_read=true \
+             publication=false route=false http=false"
+        );
+    }
+
+    /// The fixture with one authored `base.landing` added.
+    fn with_landing(target: &str) -> String {
+        POLICY.replace(
+            r#""base": { "canonical": "https://example.test" },"#,
+            &format!(r#""base": {{ "canonical": "https://example.test", "landing": {target} }},"#),
+        )
+    }
+
+    /// The fixture with one Page `missingTranslation` added; `anchor` selects the Page uniquely and
+    /// must end with that Page's `"representations": [` member opening.
+    fn with_missing_translation(anchor: &str, body: &str) -> String {
+        let head = anchor.replace(r#""representations": ["#, "");
+        let replacement = format!(r#"{head}"missingTranslation": {body}, "representations": ["#);
+        let bytes = POLICY.replace(anchor, &replacement);
+        assert_ne!(bytes, POLICY, "the anchor must select exactly one Page");
+        bytes
+    }
+
+    /// `N133_03` — exact landing and same-Page missing-translation guard.
+    #[test]
+    fn n133_03_exact_landing_and_same_page_missing_translation_guard() {
+        const BALI_HOME: &str = r#"{ "id": "home", "label": "Home", "representations": ["#;
+        const UBUD_HOME: &str = r#"{ "id": "home", "label": "Home", "visibilityDefault": "unlisted", "representations": ["#;
+
+        // Absent landing: a future base entry is simply not found.
+        let plain = plan();
+        assert_eq!(
+            plain.landing().availability(),
+            LandingAvailabilityV1::Absent
+        );
+        assert!(!plain.landing().declared());
+        assert!(plain.landing().page().is_none());
+        assert_eq!(plain.landing().availability().token(), "absent");
+
+        // An exact qualified landing on a Page with a public representation is eligible.
+        let eligible = with_landing(
+            r#"{ "entity": "acme", "facet": "main", "site": "bali", "page": "about" }"#,
+        );
+        let eligible_plan = build_manifest_route_visibility_policy_v1(
+            &parse_manifest_visibility_snapshot_v1(eligible.as_bytes()).expect("the bridge admits"),
+        )
+        .expect("an exact landing with a public representation is eligible");
+        assert_eq!(
+            eligible_plan.landing().availability(),
+            LandingAvailabilityV1::EligibleExactPage
+        );
+        assert_eq!(
+            eligible_plan.landing().page(),
+            Some(&page_owner("bali", "about"))
+        );
+        assert!(
+            eligible_plan
+                .landing()
+                .page()
+                .expect("a resolved landing")
+                .locale()
+                .is_none(),
+            "no locale is ever inferred for a landing"
+        );
+        assert_eq!(
+            eligible_plan.landing().availability().token(),
+            "eligible-exact-page"
+        );
+
+        // An exact but entirely unlisted landing Page is honestly unavailable — never rerouted.
+        let unlisted_landing = with_landing(
+            r#"{ "entity": "acme", "facet": "main", "site": "ubud", "page": "home" }"#,
+        );
+        let unlisted_plan = build_manifest_route_visibility_policy_v1(
+            &parse_manifest_visibility_snapshot_v1(unlisted_landing.as_bytes())
+                .expect("the bridge admits"),
+        )
+        .expect("a valid but unlisted landing is not a refusal");
+        assert_eq!(
+            unlisted_plan.landing().availability(),
+            LandingAvailabilityV1::UnavailableNoPublicRepresentation
+        );
+        assert_eq!(
+            unlisted_plan.landing().page(),
+            Some(&page_owner("ubud", "home"))
+        );
+        assert_eq!(
+            unlisted_plan.landing().availability().token(),
+            "unavailable-no-public-representation"
+        );
+
+        // A landing that does not name an existing exact qualified Page refuses.
+        for target in [
+            r#"{ "entity": "acme", "facet": "main", "site": "kuta", "page": "about" }"#,
+            r#"{ "entity": "other", "facet": "main", "site": "bali", "page": "about" }"#,
+            r#"{ "entity": "acme", "facet": "aux", "site": "bali", "page": "about" }"#,
+            r#"{ "entity": "acme", "facet": "main", "site": "bali", "page": "contact" }"#,
+            r#"{ "entity": "acme", "facet": "main", "site": "ubud", "page": "home", "locale": "it-IT" }"#,
+        ] {
+            let bytes = with_landing(target);
+            let location = refused(
+                bytes.as_bytes(),
+                ManifestRoutePolicyRefusalKindV1::LandingUnknownTarget,
+            );
+            assert!(location.starts_with("base.landing"), "{location}");
+        }
+
+        // `strict` creates no fallback at all.
+        let strict = with_missing_translation(BALI_HOME, r#"{ "mode": "strict" }"#);
+        let strict_plan = build_manifest_route_visibility_policy_v1(
+            &parse_manifest_visibility_snapshot_v1(strict.as_bytes()).expect("the bridge admits"),
+        )
+        .expect("`strict` is a valid claim");
+        let strict_page = strict_plan
+            .page(&page_owner("bali", "home"))
+            .expect("the Page is governed");
+        assert_eq!(
+            strict_page.missing_translation(),
+            &MissingTranslationPolicyV1::Strict
+        );
+        assert_eq!(strict_page.missing_translation().token(), "strict");
+        assert!(
+            strict_page
+                .missing_translation()
+                .fallback_locale()
+                .is_none()
+        );
+
+        // `default` with a public same-Page Site-default representation names it exactly.
+        let default_public = with_missing_translation(BALI_HOME, r#"{ "mode": "default" }"#);
+        let default_public_plan = build_manifest_route_visibility_policy_v1(
+            &parse_manifest_visibility_snapshot_v1(default_public.as_bytes())
+                .expect("the bridge admits"),
+        )
+        .expect("`default` with a public target is valid");
+        let default_page = default_public_plan
+            .page(&page_owner("bali", "home"))
+            .expect("the Page is governed");
+        assert_eq!(
+            default_page.missing_translation(),
+            &MissingTranslationPolicyV1::DefaultPublicTarget {
+                locale: LocaleKeyV1::from_already_canonical("en-001").expect("canonical"),
+            }
+        );
+        assert_eq!(
+            default_page.missing_translation().token(),
+            "default-public-target"
+        );
+
+        // `default` with no public same-Page target is a conditional future not-found, and the Page
+        // itself stays valid: a visitor may simply never ask for that locale.
+        let default_unlisted = with_missing_translation(UBUD_HOME, r#"{ "mode": "default" }"#);
+        let default_unlisted_plan = build_manifest_route_visibility_policy_v1(
+            &parse_manifest_visibility_snapshot_v1(default_unlisted.as_bytes())
+                .expect("the bridge admits"),
+        )
+        .expect("an unlisted-only Page is still a valid authored Page");
+        let conditional = default_unlisted_plan
+            .page(&page_owner("ubud", "home"))
+            .expect("the Page is governed");
+        assert_eq!(
+            conditional.missing_translation(),
+            &MissingTranslationPolicyV1::DefaultConditionalNotFound
+        );
+        assert_eq!(
+            conditional.missing_translation().token(),
+            "default-conditional-not-found"
+        );
+        assert_eq!(conditional.public_representation_count(), 0);
+
+        // `default` where this Page does not declare the Site default at all stays conditional.
+        let default_absent = POLICY.replace(
+            r#""locale": "en-001", "route": { "path": "/en-001/ubud-home" }"#,
+            r#""locale": "id-ID", "route": { "path": "/id-ID/ubud-home" }"#,
+        );
+        assert_ne!(default_absent, POLICY);
+        let default_absent_plan = build_manifest_route_visibility_policy_v1(
+            &parse_manifest_visibility_snapshot_v1(default_absent.as_bytes())
+                .expect("the bridge admits"),
+        )
+        .expect("an unavailable default target never rejects the Page");
+        assert_eq!(
+            default_absent_plan
+                .page(&page_owner("ubud", "home"))
+                .expect("the Page is governed")
+                .missing_translation(),
+            &MissingTranslationPolicyV1::DefaultConditionalNotFound
+        );
+
+        // An explicit locale with a real public same-Page target is accepted exactly.
+        let explicit = with_missing_translation(
+            BALI_HOME,
+            r#"{ "mode": "locale", "fallbackLocale": "de-DE" }"#,
+        );
+        let explicit_plan = build_manifest_route_visibility_policy_v1(
+            &parse_manifest_visibility_snapshot_v1(explicit.as_bytes()).expect("the bridge admits"),
+        )
+        .expect("an explicit public same-Page target is valid");
+        let explicit_policy = explicit_plan
+            .page(&page_owner("bali", "home"))
+            .expect("the Page is governed")
+            .missing_translation();
+        assert_eq!(explicit_policy.token(), "explicit-public-target");
+        assert_eq!(
+            explicit_policy.fallback_locale().map(LocaleKeyV1::as_str),
+            Some("de-DE")
+        );
+
+        // Every unsafe explicit target refuses: missing, unlisted, non-canonical and sibling-only.
+        for (anchor, fallback, expected) in [
+            (
+                BALI_HOME,
+                "it-IT",
+                ManifestRoutePolicyRefusalKindV1::MissingTranslationTargetUnknown,
+            ),
+            (
+                BALI_HOME,
+                "fr-FR",
+                ManifestRoutePolicyRefusalKindV1::MissingTranslationTargetUnlisted,
+            ),
+            (
+                BALI_HOME,
+                "de-de",
+                ManifestRoutePolicyRefusalKindV1::MissingTranslationTargetNotCanonical,
+            ),
+            (
+                UBUD_HOME,
+                "de-DE",
+                ManifestRoutePolicyRefusalKindV1::MissingTranslationTargetUnknown,
+            ),
+        ] {
+            let bytes = with_missing_translation(
+                anchor,
+                &format!(r#"{{ "mode": "locale", "fallbackLocale": "{fallback}" }}"#),
+            );
+            let location = refused(bytes.as_bytes(), expected);
+            assert!(
+                location.ends_with(".missingTranslation.fallbackLocale"),
+                "{location}"
+            );
+        }
+
+        // No URL, no redirect target and no inferred locale preference leaves this preflight.
+        let rendered = format!("{explicit_plan:?}");
+        for forbidden in ["http", "/en-001/home", "Vary", "302", "Location"] {
+            assert!(!rendered.contains(forbidden), "must not emit {forbidden}");
+        }
+
+        println!(
+            "n133_evidence case=03 landing_eligible=1 landing_absent=1 \
+             landing_unlisted_unavailable=1 landing_foreign=refused missing_strict=1 \
+             default_public_target=1 default_conditional=2 explicit_public_target=1 \
+             explicit_refusals=4 no_url=true no_redirect=true no_locale_inference=true \
+             publication=false route=false http=false"
+        );
+    }
+
+    /// One graph of the fixture shape, with the second Site named by the caller.
+    fn graph_of(site_b: &str) -> EfsOwnershipGraph {
+        let mut facet = FacetDraft::new(FacetIdV1::parse("main").expect("canonical Facet"));
+        let mut bali = SiteDraft::new(SiteIdV1::parse("bali").expect("canonical Site"));
+        let mut home = PageDraft::new(PageIdV1::parse("home").expect("canonical Page"));
+        for locale in ["en-001", "de-DE", "fr-FR"] {
+            home.add_representation(LocaleKeyV1::from_already_canonical(locale).expect("locale"));
+        }
+        let mut about = PageDraft::new(PageIdV1::parse("about").expect("canonical Page"));
+        about.add_representation(LocaleKeyV1::from_already_canonical("en-001").expect("locale"));
+        bali.add_page(home);
+        bali.add_page(about);
+        let mut other = SiteDraft::new(SiteIdV1::parse(site_b).expect("canonical Site"));
+        for page in ["home", "legal"] {
+            let mut draft = PageDraft::new(PageIdV1::parse(page).expect("canonical Page"));
+            draft
+                .add_representation(LocaleKeyV1::from_already_canonical("en-001").expect("locale"));
+            other.add_page(draft);
+        }
+        facet.add_site(bali);
+        facet.add_site(other);
+        let mut entity = EfsOwnershipDraft::new(EntityIdV1::parse("acme").expect("Entity"));
+        entity.add_facet(facet);
+        entity.build().expect("the fixture graph is valid")
+    }
+
+    /// A candidate over one graph, authoring no graphics at all.
+    fn candidate_over(graph: &EfsOwnershipGraph) -> GraphicCascadeInputV1 {
+        let asset = ApprovedPlatformAssetV1::new(
+            "icons/icon-home.svg",
+            &"0".repeat(64),
+            PlatformAssetMediaClassV1::Svg,
+        )
+        .expect("a valid approved asset");
+        let binding = ApprovedPlatformGraphicBindingV1::new(
+            "1.0.0",
+            "ad8ea718b50641206cc4f4fe13e866ad266366a7aa11ef799c83ae8187858fc7",
+            vec![asset],
+        )
+        .expect("a valid approved binding");
+        let validated =
+            validate_declared_properties_v1(graph, Vec::new()).expect("the graph validates");
+        GraphicCascadeInputV1::new(
+            validated,
+            PlatformGraphicBaselineV1::empty(binding),
+            Vec::new(),
+        )
+        .expect("a valid empty candidate")
+    }
+
+    /// `N133_04` — determinism, provenance, foreign refusal and nonauthority.
+    #[test]
+    fn n133_04_determinism_provenance_and_nonauthority() {
+        // Identical bytes produce an identical plan, digest, record set and order.
+        let first = plan();
+        let second = plan();
+        assert_eq!(first, second);
+        assert_eq!(first.manifest_sha256(), second.manifest_sha256());
+        assert_eq!(first.representations(), second.representations());
+        assert_eq!(first.pages(), second.pages());
+        assert_eq!(first.landing(), second.landing());
+
+        // A label-only change moves the digest and not one governed policy fact.
+        let relabelled = POLICY.replace(r#""label": "Acme""#, r#""label": "Acme Renamed""#);
+        assert_ne!(relabelled, POLICY);
+        let third = build_manifest_route_visibility_policy_v1(
+            &parse_manifest_visibility_snapshot_v1(relabelled.as_bytes())
+                .expect("the relabelled manifest converts"),
+        )
+        .expect("the relabelled manifest still passes the policy");
+        assert_ne!(third.manifest_sha256(), first.manifest_sha256());
+        assert_eq!(third.representations(), first.representations());
+        assert_eq!(third.pages(), first.pages());
+        assert_eq!(third.landing(), first.landing());
+
+        // The R21 ownership guard is unchanged: a foreign, sibling-renamed or missing candidate is
+        // still refused before this policy could ever be handed foreign content.
+        let snapshot =
+            parse_manifest_visibility_snapshot_v1(POLICY.as_bytes()).expect("the fixture converts");
+        assert_eq!(
+            check_manifest_efs_scope_v1(&snapshot, &candidate_over(&graph_of("ubud")))
+                .expect("the exact membership matches"),
+            ManifestEfsScopeV1::ExactEfsMembership
+        );
+        for renamed in ["kuta", "ubud2"] {
+            let refusal =
+                check_manifest_efs_scope_v1(&snapshot, &candidate_over(&graph_of(renamed)))
+                    .expect_err("a foreign sibling is refused");
+            assert_eq!(refusal.detail(), "scope-mismatch");
+        }
+
+        // Complete coverage and closed tokens only.
+        assert_eq!(first.representations().len(), snapshot.ledger().len());
+        assert_eq!(first.pages().len(), snapshot.page_count());
+        for record in first.representations() {
+            assert!(matches!(
+                record.comparison().token(),
+                "public-insensitive" | "public-sensitive" | "exact-unlisted"
+            ));
+            assert!(matches!(
+                record.robots_intent(),
+                "index,follow" | "noindex,nofollow"
+            ));
+        }
+        for page in first.pages() {
+            assert!(matches!(
+                page.missing_translation().token(),
+                "strict"
+                    | "default-public-target"
+                    | "default-conditional-not-found"
+                    | "explicit-public-target"
+            ));
+            assert!(matches!(
+                page.entry_paths().token(),
+                "absent" | "pending-inert"
+            ));
+        }
+        assert!(matches!(
+            first.landing().availability().token(),
+            "absent" | "eligible-exact-page" | "unavailable-no-public-representation"
+        ));
+
+        // No authority, no source bytes and no output tree of any kind.
+        assert!(!first.grants_publication_authority());
+        assert!(!first.grants_route_authority());
+        assert!(!first.serves_http());
+        assert!(!first.publishes_derived_output());
+        assert!(!first.grants_release_authority());
+        assert!(!first.grants_deployment_authority());
+        let rendered = format!("{first:?}");
+        for forbidden in ["pages/", "icons/", "https://", "http://", "target/"] {
+            assert!(!rendered.contains(forbidden), "must not expose {forbidden}");
+        }
+        assert!(
+            !std::path::Path::new("manifest-route-policy.json").exists(),
+            "this preflight writes no output artifact"
+        );
+
+        println!(
+            "n133_evidence case=04 deterministic=true label_sha_changed=true policy_stable=true \
+             coverage=complete foreign_scope=refused sibling_scope=refused tokens_closed=true \
+             zero_partial=true no_source_bytes=true publication=false route=false http=false \
+             release=false deployment=false"
         );
     }
 }

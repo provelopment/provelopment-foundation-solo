@@ -2075,6 +2075,134 @@ jobs:
           if (Test-N132 $probe) { throw 'forged authority or partial-result claim accepted' }
           Write-Output 'n132_gate mutation=rejected'
 
+      # Mandatory `SOLO-WO-118 R22` N133 gate: the manifest-bound, nonpublishing pre-route
+      # route/visibility policy preflight. The four focused cases run real strict JSON bytes through
+      # the accepted R21 bridge and then the new policy; the gate then requires the instrumented log
+      # to reject four directly altered copies of itself.
+      - name: Manifest route/visibility policy N133 gate (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          check_n133() {
+            local log="$1"
+            for name in n133_01_four_case_matrix_keeps_intent_provenance_and_sibling_identity n133_02_unlisted_leakage_and_unsafe_authoring_are_blocked n133_03_exact_landing_and_same_page_missing_translation_guard n133_04_determinism_provenance_and_nonauthority; do
+              grep -qF "test n133_manifest_route_visibility::$name " "$log" || return 1
+            done
+            [ "$(grep -Ec '^test n133_manifest_route_visibility::n133_0[0-9]_[A-Za-z0-9_]*( |$)' "$log")" -eq 4 ] || return 1
+            grep -qF 'test result: ok. 4 passed; 0 failed; 0 ignored' "$log" || return 1
+            ! grep -qF '... FAILED' "$log" || return 1
+            ! grep -qF '... ignored' "$log" || return 1
+            ! grep -qF 'test result: FAILED' "$log" || return 1
+            for case in 01 02 03 04; do
+              [ "$(grep -cF "n133_evidence case=$case" "$log")" -eq 1 ] || return 1
+            done
+            grep -qF 'records=6' "$log" || return 1
+            grep -qF 'sibling_isolated=true' "$log" || return 1
+            grep -qF 'exact_unlisted=3' "$log" || return 1
+            grep -qF 'unlisted_aliases=refused' "$log" || return 1
+            grep -qF 'unlisted_only_entry_paths=refused' "$log" || return 1
+            grep -qF 'landing_unlisted_unavailable=1' "$log" || return 1
+            grep -qF 'default_conditional=2' "$log" || return 1
+            grep -qF 'explicit_refusals=4' "$log" || return 1
+            grep -qF 'foreign_scope=refused' "$log" || return 1
+            grep -qF 'manifest_sha_pinned=true' "$log" || return 1
+            grep -qF 'locale_profile=restricted' "$log" || return 1
+            grep -qF 'zero_partial=true' "$log" || return 1
+            grep -qF 'no_source_bytes=true' "$log" || return 1
+            grep -qF 'publication=false' "$log" || return 1
+            grep -qF 'route=false' "$log" || return 1
+            grep -qF 'http=false' "$log" || return 1
+            grep -qF 'release=false' "$log" || return 1
+            grep -qF 'deployment=false' "$log" || return 1
+            ! grep -qE 'manifest_sha=0{64}' "$log" || return 1
+          }
+          log="$RUNNER_TEMP/n133-four.txt"
+          cargo test -p solo-adapters --test publication_manifest --locked n133_ -- --nocapture --test-threads=1 >"$log" 2>&1 || { cat "$log"; exit 1; }
+          cat "$log"
+          check_n133 "$log" || { echo 'authentic N133 4/4 run rejected'; exit 1; }
+          echo 'n133_gate authentic=accepted'
+          probe="$RUNNER_TEMP/n133-probe.txt"
+          cp "$log" "$probe"
+          sed -i '/n133_03_exact_landing_and_same_page_missing_translation_guard/d' "$probe"
+          if check_n133 "$probe"; then echo 'missing N133 case accepted'; exit 1; fi
+          cp "$log" "$probe"
+          sed -i 's/unlisted_aliases=refused/unlisted_aliases=accepted/; s/exact_unlisted=3/exact_unlisted=0/' "$probe"
+          if check_n133 "$probe"; then echo 'forged unlisted acceptance accepted'; exit 1; fi
+          cp "$log" "$probe"
+          sed -i 's/landing_unlisted_unavailable=1/landing_unlisted_unavailable=0/; s/default_conditional=2/default_conditional=0/' "$probe"
+          if check_n133 "$probe"; then echo 'forged landing or fallback acceptance accepted'; exit 1; fi
+          cp "$log" "$probe"
+          sed -i 's/publication=false/publication=true/; s/route=false/route=true/; s/zero_partial=true/zero_partial=false/; s/manifest_sha_pinned=true/manifest_sha=0000000000000000000000000000000000000000000000000000000000000000/' "$probe"
+          if check_n133 "$probe"; then echo 'forged authority, partial or digest claim accepted'; exit 1; fi
+          echo 'n133_gate mutation=rejected'
+
+      # The same four-case N133 matrix and authentic/mutation gate on the native Windows host.
+      - name: Manifest route/visibility policy N133 gate (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $tokens = @(
+            'test n133_manifest_route_visibility::n133_01_four_case_matrix_keeps_intent_provenance_and_sibling_identity ',
+            'test n133_manifest_route_visibility::n133_02_unlisted_leakage_and_unsafe_authoring_are_blocked ',
+            'test n133_manifest_route_visibility::n133_03_exact_landing_and_same_page_missing_translation_guard ',
+            'test n133_manifest_route_visibility::n133_04_determinism_provenance_and_nonauthority ',
+            'test result: ok. 4 passed; 0 failed; 0 ignored',
+            'n133_evidence case=01',
+            'n133_evidence case=02',
+            'n133_evidence case=03',
+            'n133_evidence case=04',
+            'records=6',
+            'sibling_isolated=true',
+            'exact_unlisted=3',
+            'unlisted_aliases=refused',
+            'unlisted_only_entry_paths=refused',
+            'landing_unlisted_unavailable=1',
+            'default_conditional=2',
+            'explicit_refusals=4',
+            'foreign_scope=refused',
+            'manifest_sha_pinned=true',
+            'locale_profile=restricted',
+            'zero_partial=true',
+            'no_source_bytes=true',
+            'publication=false',
+            'route=false',
+            'http=false',
+            'release=false',
+            'deployment=false')
+          function Test-N133([string] $path) {
+            $text = Get-Content -Raw -LiteralPath $path
+            foreach ($token in $tokens) { if (-not $text.Contains($token)) { return $false } }
+            if (([regex]::Matches($text, 'n133_evidence case=')).Count -ne 4) { return $false }
+            if (([regex]::Matches($text, '^test n133_manifest_route_visibility::n133_0[0-9]_[A-Za-z0-9_]*( |$)', 'Multiline')).Count -ne 4) { return $false }
+            if (([regex]::Matches($text, 'manifest_sha=0{64}')).Count -gt 0) { return $false }
+            if ($text.Contains('... FAILED')) { return $false }
+            if ($text.Contains('... ignored')) { return $false }
+            if ($text.Contains('test result: FAILED')) { return $false }
+            return $true
+          }
+          $log = Join-Path $env:RUNNER_TEMP 'n133-four.txt'
+          cargo test -p solo-adapters --test publication_manifest --locked n133_ -- --nocapture --test-threads=1 2>&1 | Tee-Object -FilePath $log
+          if ($LASTEXITCODE -ne 0) { throw 'n133 four-case run failed' }
+          if (-not (Test-N133 $log)) { throw 'authentic N133 4/4 run rejected' }
+          Write-Output 'n133_gate authentic=accepted'
+          $probe = Join-Path $env:RUNNER_TEMP 'n133-probe.txt'
+          $authentic = Get-Content -Raw -LiteralPath $log
+          $missing = [regex]::Replace($authentic, '(?m)^.*n133_03_exact_landing_and_same_page_missing_translation_guard.*$\r?\n', '')
+          Set-Content -LiteralPath $probe -NoNewline -Value $missing
+          if (Test-N133 $probe) { throw 'missing N133 case accepted' }
+          $unlisted = $authentic.Replace('unlisted_aliases=refused', 'unlisted_aliases=accepted').Replace('exact_unlisted=3', 'exact_unlisted=0')
+          Set-Content -LiteralPath $probe -NoNewline -Value $unlisted
+          if (Test-N133 $probe) { throw 'forged unlisted acceptance accepted' }
+          $landing = $authentic.Replace('landing_unlisted_unavailable=1', 'landing_unlisted_unavailable=0').Replace('default_conditional=2', 'default_conditional=0')
+          Set-Content -LiteralPath $probe -NoNewline -Value $landing
+          if (Test-N133 $probe) { throw 'forged landing or fallback acceptance accepted' }
+          $authority = $authentic.Replace('publication=false', 'publication=true').Replace('route=false', 'route=true').Replace('zero_partial=true', 'zero_partial=false').Replace('manifest_sha_pinned=true', 'manifest_sha=0000000000000000000000000000000000000000000000000000000000000000')
+          Set-Content -LiteralPath $probe -NoNewline -Value $authority
+          if (Test-N133 $probe) { throw 'forged authority, partial or digest claim accepted' }
+          Write-Output 'n133_gate mutation=rejected'
+
+
 
       # Mandatory `SOLO-WO-118 R11` N124 gate: the V4 six-format whole-candidate composition on this
       # host, including the associated-alpha AVIF class beside the five legacy formats. The same

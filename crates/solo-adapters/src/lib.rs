@@ -50,6 +50,7 @@ mod graphic_avif_inspection;
 mod graphic_gif_inspection;
 mod graphic_image_inspection;
 mod graphic_svg_inspection;
+mod manifest_route_visibility_policy;
 mod manifest_visibility_bridge;
 mod media_worker_host;
 // One reserved process-native file, available on both hosts. The `any(..)` gates *module
@@ -120,6 +121,13 @@ pub use graphic_svg_inspection::{
     MAX_SVG_FILTER_OPERATIONS_V1, MAX_SVG_NESTING_V1, MAX_SVG_PATH_COMMANDS_V1,
     MAX_SVG_REFERENCES_V1, MAX_SVG_SOURCE_BYTES_V1, SVG_CURRENT_COLOR_V1, SVG_MIME_V1,
     SVG_NAMESPACE_V1, SvgRefusalV1, SvgSanitizedV1, SvgVectorFactsV1, sanitize_svg_v1,
+};
+pub use manifest_route_visibility_policy::{
+    EntryPathsPolicyV1, LandingAvailabilityV1, LandingPolicyV1,
+    MANIFEST_ROUTE_POLICY_LOCALE_PROFILE, ManifestRoutePolicyRefusalKindV1,
+    ManifestRoutePolicyRefusalV1, ManifestRouteVisibilityPolicyV1, MissingTranslationPolicyV1,
+    PageRoutePolicyV1, RepresentationRoutePolicyV1, RouteComparisonIntentV1,
+    build_manifest_route_visibility_policy_v1,
 };
 pub use manifest_visibility_bridge::{
     MANIFEST_VISIBILITY_GRANTS_PUBLICATION_AUTHORITY, MANIFEST_VISIBILITY_LOCALE_PROFILE,
