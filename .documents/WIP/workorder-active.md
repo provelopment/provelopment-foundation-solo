@@ -1,153 +1,251 @@
-# SOLO-WO-118 R22 — ENFORCE MANIFEST-BOUND UNLISTED, ENTRY, LANDING AND SAME-PAGE FALLBACK POLICY BEFORE ROUTING (R04.C3)
+# SOLO-WO-118 R23 — IMPLEMENT THE PINNED UNICODE 18 / ICU4X LOCALE AND ROUTE-KEY VALIDATION BOUNDARY (R04.A1 / R04.B1)
 
 **STATUS: OWNER-ISSUED — EXECUTE THIS WORK ORDER.**  
 **Issued:** 2026-11-16 (Asia/Jakarta)  
 **Repository:** `provelopment/provelopment-foundation-solo`  
-**Sole Owner checkout:** `C:\Users\Sean\Documents\Provelopment\00.foundation-solo`  
+**Owner's sole checkout:** `C:\Users\Sean\Documents\Provelopment\00.foundation-solo`  
 **Existing technical branch:** `solo-wo-118-avif-v4-r01`  
-**Canonical ACTIVE destination:** `.documents/WIP/workorder-active.md`  
-**Bounded outcome:** `R04C3-MANIFEST-BOUND-VISIBILITY-DEPENDENT-ROUTE-POLICY-PREFLIGHT-N133-TWO-HOST-NONPUBLISHING-V1`.
+**Canonical work-order file:** `.documents/WIP/workorder-active.md`  
+**Bounded outcome:** `R04AB1-UNICODE18-ICU4X-LOCALE-ROUTE-LITERAL-VALIDATION-N134-TWO-HOST-NONPUBLISHING-V1`.
 
-## 1. Chief Master Architect disposition and immutable starting pins
+## 1. Chief Master Architect disposition and starting authority
 
-**SOLO-WO-118 R21: ACCEPT, bounded result only.** The Chief Master Architect independently fetched R29's canonical execution report, compared the actual technical and `main` changes, verified the real N132 output and forged-log verdicts in both native job logs, and verified the independent AVIF oracle and fresh R29 `main` CI. Acceptance covers the strict-parser-to-validated-EFS-graph-and-visibility-ledger bridge, **not** semantically validated routes, full BCP47, a publisher or R04.C closure.
+**SOLO-WO-118 R22: ACCEPT for the bounded `R04.C3` manifest-bound, nonpublishing route/visibility policy preflight.** I independently inspected the canonical R30 report, the T30/R30 commits and changed-path ledger, real Ubuntu/Windows N133 execution output, both authentic-versus-mutated gate verdicts, the independent AVIF oracle and the fresh two-host R30 main baseline. This accepts only the governed R22 policy boundary, not complete routing, locale conformance, publication, asset delivery, Stage 03 closure, merge, release or deployment.
 
-| Authority | Exact pin / confirmed result |
+| Item | Exact accepted baseline |
 |---|---|
-| `origin/main` R29 | `28e803449e407c9c2f0b7ee45c6434a381c165f6` |
-| `origin/solo-wo-118-avif-v4-r01` T29 | `f02aa20d24c5d7d87fed4d391cb6bc74f6d3b69e` |
-| Canonical R29 report Git blob | `136d7a9b10e9b60442f51da496d61135b3cf2b21` |
-| R21 technical workflow, final | `43878336393`, attempt 1; 3/3 success |
-| Native Ubuntu | `133337210986`, N132 4/4, authentic and mutations rejected |
-| Native Windows | `133337211553`, N132 4/4, authentic and mutations rejected |
-| Independent AVIF oracle | `133337211574`, pristine and 3/3 hostile probes |
-| Fresh R29 `main` baseline | run `43880314082`; Ubuntu `133344145296` success, Windows `133344145658` success |
-| Technical architecture | four packages, 39 targets, 80 files, 93 edges, both hosts |
-| Retained R14/R15 catalogue pin | `ad8ea718b50641206cc4f4fe13e866ad266366a7aa11ef799c83ae8187858fc7`, immutable `1.0.0` |
-| Retained N127 all-icon aggregate | `3c34fe9919341862a5a70a87d205fbfc942741dec5f3996514d3edd0aeb1aaca` |
+| `origin/main` R30 | `9f43ffe28250858e3347e9e2083d40f762a8dd31` |
+| `origin/solo-wo-118-avif-v4-r01` T30 | `b3cbdeb589423b222bd8db9e683005f9b824b2a2` |
+| A30 ACTIVE-only commit | `ca743ec14ad42700bd620714aa3150aa4cadd62c` |
+| T30.0 ACTIVE-only commit | `56906f8b88cb1e23bed5ae3ab251eca0c346e961` |
+| T30 technical workflow | `43885719190`, attempt 1; Ubuntu job `133363180568`, Windows job `133363180876`, independent AVIF oracle job `133363181138`, all `success` |
+| Main R30 workflow | `43887645275`; Ubuntu job `133369999583`, Windows job `133369999914`, both `success` |
+| N133 | Four real tests on each host; `n133_gate authentic=accepted` and `n133_gate mutation=rejected` on each |
+| Technical architecture | `packages=4 targets=39 files=81 edges=93` |
+| Platform library | Exactly 81 Owner-approved MIT Tabler SVGs and catalogue/notice/provenance (84 files), catalogue SHA-256 `ad8ea718b50641206cc4f4fe13e866ad266366a7aa11ef799c83ae8187858fc7` |
 
-R21 adds **only** `crates/solo-adapters/src/manifest_visibility_bridge.rs` as its implementation file. The accepted `parse_manifest_bytes` in `crates/solo-adapters/src/publication_manifest.rs` remains the **sole** strict, duplicate-aware manifest parser. The accepted `ManifestVisibilitySnapshotV1` retains (1) the very `ParsedManifestCandidateV1` produced by that parser, (2) one validated complete EFS graph, (3) one complete effective `RepresentationVisibilityLedgerV1` and (4) the digest of the supplied manifest bytes. The bridge currently enforces a deliberately conservative *canonical-shaped* full-locale profile, not full Unicode/BCP47 conformance. Its `check_manifest_efs_scope_v1` verifies complete EFS membership only; it does not authenticate property/source declarations.
+A harmless `cargo-deny` **license-not-encountered** warning for the unused `Unicode-3.0` allowance exists on the main-only locked graph; do not mask it or turn a green exit into a claim that no warning occurred. Capture actual warning dispositions. The technical branch had no R22 scope-induced security warning.
 
-**Owner directions remain binding.** The installed 81 Owner-approved MIT Tabler SVGs remain the complete `platformAssetLibraryVersion: "1.0.0"` product library (84 files including catalogue, MIT notice and provenance). Platform-first graphic baseline applies only to explicitly registered role/slot defaults; a valid closer explicit supersession wins, suppression is final, an invalid nearer declaration never falls back. The production default table remains **empty**. The other 20 canonical Foundation sources are individually accounted for but **not** approved for installation or distribution. Risk-based testing: do not rerun an 81-icon adversarial campaign for an inert policy change; retain N127 and all existing gates instead.
+**Architectural authorities:** `AGENTS.md`; `.documents/About/FOUNDATION-SOLO.md`; `.documents/Architecture/ARCHITECTURE.md` §§3.2B, 6.2B, 6.2J.2–6, 6A.2 and 6A.7; Architect SOP §6B/§7B; Implementation SOP §5B/§5C/§7A. **Pinned implementation references:** [ICU4X 2.4 release](https://github.com/unicode-org/icu4x/releases), [NFC API](https://docs.rs/icu_normalizer/2.4.0/icu_normalizer/struct.ComposingNormalizerBorrowed.html), [case mapper](https://docs.rs/icu_casemap/2.4.0/icu_casemap/struct.CaseMapperBorrowed.html), [locale canonicalizer](https://docs.rs/icu_locale/2.4.0/icu_locale/struct.LocaleCanonicalizer.html), [general-category API](https://docs.rs/icu_properties/2.4.0/icu_properties/props/enum.GeneralCategory.html), and [Unicode 18](https://www.unicode.org/versions/Unicode18.0.0/). Current code inputs: `crates/solo-adapters/src/publication_manifest.rs` (sole accepted strict parser), `manifest_visibility_bridge.rs` (R21 validated membership and still-restricted authored locale profile), `manifest_route_visibility_policy.rs` (R22 effective visibility and claim intent). Preserve them unchanged in this order.
 
-## 2. Scope and design boundary
+## 2. Implement exactly this bounded capability
 
-**Goal:** From **one and the same** accepted R21 `ManifestVisibilitySnapshotV1`, produce a closed, deterministic, **nonpublishing** route-*policy* preflight for every localized representation and related Page/base entry. Enforce now the visibility-dependent authoring rules whose inputs are already available in the strict parsed candidate and the immutable visibility ledger. This must refuse an unsafe authored claim **before** a later route resolver, source reader or publisher can use it. Do not claim a resolved route, canonical URL, collision-free route ledger, validated Unicode path, accepted locale preference, content validity or active public response.
+**Objective:** Install and exercise the already Owner-selected ICU4X **2.4.0** data and APIs for **Unicode 18 / CLDR 49**, proving a reusable **pure, nonpublishing** validator of (a) authored, region-qualified full-locale identity and (b) every declared canonical representation path, public alias and locale-less Page entry-path in an R21 manifest snapshot. Bind it to the **same manifest's** R22 policy. The output is a validated **route-literal/key preflight**, **not** the complete R04.A route-claim collision ledger, IDNA/base URL validator, source/content validator, HTTP router, publication authority or release.
 
-Binding Architecture:
-- §3.2A: Page `visibilityDefault`, representation `visibility`, the four-case precedence matrix, unlisted reachable *only later* at an exact authorized address, `noindex,nofollow`, no discovery, and `internal` remaining a property exposure (not a representation state).
-- §3.2B: public insensitive/sensitive claim policy, exact-case unlisted claims, public/unlisted collision restrictions, no guessed route alias and no unlisted translation fallback.
-- §6.2B: strict authored `route.caseMatching`, `route.aliases`, Page `entryPaths`, `missingTranslation`, `base.landing`, with full qualified targets.
-- §6.2J.5–7 and §6.2K: no unlisted aliases, no public entry/landing exposure of an unlisted-only Page, no fabricated fallback, no early authority, refusal before unsafe use.
-- The future Unicode 18 / ICU4X / full BCP47 / IDNA, route collision, routing and HTTP obligations under §6A.7 and R04.A/B/D **remain unimplemented** and must not be simulated with ASCII `lowercase`, OS locale tables, `serde_json::Value` or ad hoc percent decoding.
+This task removes the existing use of a merely shape-checked locale **at this new boundary** and replaces guessed ASCII/standard-library Unicode behavior with the selected pinned data. The accepted R21 bridge remains intentionally conservative, and its current permitted authored locale subset is not widened by this order. Unsupported valid BCP47 forms are explicitly refused by the first physical profile; never claim that BCP47 itself forbids them. The full later request-language preference pipeline, IDNA host validation, whole-route collision ledger, complete Unicode 18 official-corpus proof and serving remain separate follow-on work.
 
-### 2.1 Mandatory policy semantics
+### 2.1 Install exactly the selected Unicode dependencies
 
-1. **One source of truth.** Public API consumes `&ManifestVisibilitySnapshotV1` created by R21; it does **not** accept caller-supplied booleans, a free-form Page/representation set, a replacement graph or a second visibility ledger. Traverse `snapshot.parsed().entity()` in exact authored containment order; each representation's effective visibility must be **looked up in the accepted ledger by fully qualified owner**, not recomputed from parsed strings. Every Page/representation in the graph must have exactly one policy record. Retain the manifest SHA as an internal provenance identity, not an authority claim. Refuse any impossible mismatch; never skip a Page or use an unqualified `home` key.
-2. **Unlisted claims.** An effectively unlisted representation MUST have **no authored** `route.caseMatching` and **zero** `route.aliases`. Any caseMatching (including `sensitive` or `insensitive`) or alias is an attributed refusal. An unlisted canonical `route.path` remains an *inert authored string*, not a route that can be served, normalized, matched or discovered. Record its only eligible future match policy as `exact-unlisted`, with `noindex,nofollow` intent and `discoverable=false`. **Unlisted is not private/authenticated**; it may later have direct exact-case authorized delivery once R04.A/C/D is implemented.
-3. **Public claims.** An effectively public representation may omit `caseMatching` (future default `insensitive`) or author `insensitive|sensitive` as the accepted parser permits; aliases remain syntactically declared and are not promoted into routes. Preserve whether caseMatching was actually present and the closed intended policy. Never silently change an unlisted representation into public because it has an alias, and never use declaration order or a guessed alias as conflict resolution. Path Unicode/NFC, route collisions, prefix, host, aliases' actual path validity and URL normalization remain explicitly unproved.
-4. **Page `entryPaths`.** A Page with **zero public** effective representations cannot contribute an automatically discoverable locale-less entry: if it authors nonempty `entryPaths`, refuse with a Page-attributed closed cause. A mixed Page with at least one public representation may retain its `entryPaths` only as **pending inert claims**; this order does not select a locale, test paths for collisions or produce any redirect target. No Page/Site sibling fallback may make an unlisted-only Page eligible. An empty `entryPaths` is fine for an entirely unlisted Page.
-5. **Base `landing`.** A present authored landing must name an **existing exact qualified Page** in the snapshot graph. Never infer the Facet, Site, Page or a landing Page from a slug, ID coincidence, locale, Site default, location or title. Compute one inert **landing-availability intent** from the Page's effective visibility: eligible for future consideration only if at least one public representation exists on the exact declared Page. A valid but entirely unlisted landing must never become discoverable or choose a sibling; report `unavailable-no-public-representation` (a future base-entry not-found intent), **not** an invented public route. An absent landing stays absent and means future base entry not-found. An unknown/partially bound landing refuses. No base URL or canonical address is emitted.
-6. **Page `missingTranslation`.** Keep the accepted closed parser's three forms: `strict`, `default`, and explicit `locale`. `strict` creates no fallback. For explicit `locale`, require the target to be exactly a **declared representation of this same qualified Page** whose effective state is `public`; require its token to satisfy the current R21 restricted locale profile (or a separately accepted full locale validator; this order does **not** introduce one). Missing, foreign, unlisted, unsupported or ambiguous explicit targets refuse before any publication step. For `default`, inspect the enclosing Site's actual declared `defaultLocale` and this same Page's representations: record an available public target **only if one exists exactly**; otherwise record a conditional future not-found intent. **Do not reject a valid Page merely because its default locale lacks an eligible public representation**: the user may never request a missing translation. Do not invent other-locale, another Page or sibling-Site fallbacks. No `302`, URL, `Vary` or header is generated.
-7. **Safe closed results.** Expose only typed per-representation policy facts (exact qualified owner, effective visibility, origin, closed comparison-policy *intent*, discovery and robots intent, alias count or equivalent inert metadata) plus exact Page-level fallback/entry/landing availability intents. No source paths, raw asset references, arbitrary author text, hidden property contents, hostnames or routes may leak through an outward/public-intent view. Error diagnostics may name safe structural field locations and stable tokens, never user-controlled text. Every outcome/method reports **`publication_authority=false`, `route_authority=false`, `serves_http=false`, `derived_output_publication=false`, `release_authority=false`, `deployment_authority=false`**. This is not a `RouteLedger`, `Published`, `ReadyToServe` or sealed candidate.
-8. **Whole-input refusal.** A malformed, foreign, incomplete or contradictory input returns *one* typed refusal and **no partial policy records**. Reject before any source read or media child (the API should have no source/worker port at all). This is pure, bounded, deterministic work; no mutable global registry, filesystem, network, process, environment variable or clock is permissible.
+In `crates/solo-adapters/Cargo.toml` add only the following direct normal dependencies and regenerate **one** tracked `Cargo.lock` using the pinned Rust toolchain:
 
-### 2.2 Conservative compatibility constraints
+```toml
+icu_normalizer = { version = "=2.4.0", default-features = false, features = ["compiled_data"] }
+icu_casemap = { version = "=2.4.0", default-features = false, features = ["compiled_data"] }
+icu_locale = { version = "=2.4.0", default-features = false, features = ["compiled_data"] }
+icu_locale_core = { version = "=2.4.0", default-features = false }
+icu_properties = { version = "=2.4.0", default-features = false, features = ["compiled_data"] }
+```
 
-The existing strict parser already retains authored `base`, `route.path`, `route.aliases`, `entryPaths`, `missingTranslation` and exact visibility fields with read-only accessors. **Do not edit `publication_manifest.rs` or introduce another JSON parser.** The R21 `ManifestVisibilitySnapshotV1` and EFS graph must remain unchanged. The new pure policy checker should operate on their read-only accessors and optionally new internal helper methods in its own file. Do not add a dependency merely to compare route strings. Full Unicode 18/ICU4X and IDNA are separately governed; no dependency changes in R22.
+Check the exact published feature names and compatibility against the pinned source before saving the lock. `icu_locale_core`'s own feature set may require a minimal explicitly justified feature for the used API; do not add a sixth package family, wildcard version, `icu` umbrella crate, a platform ICU library, a second Unicode version or any unapproved fallback. Confirm `cargo tree -p solo-adapters --locked` contains one coherent ICU4X 2.4 family and all Unicode data comes from the tracked dependency graph. Run the A1 freshness, advisories, provenance and license assessment for all new direct/transitive normal/build/dev dependencies; capture actual resolved versions and relevant warnings. Do not change `deny.toml` to make a failure disappear. A blocked advisory/license/source result is `STOPPED`, never a passed implementation.
 
-The policy checker may be an additive module `crates/solo-adapters/src/manifest_route_visibility_policy.rs`, exported minimally in `crates/solo-adapters/src/lib.rs`. No new crate, CLI, HTTP adapter, source reader, media worker, decoder or generic routing abstraction is authorized. Keep the future route-claim ledger and URL authority visibly separate from this intent ledger. Existing tests must pass unchanged.
+### 2.2 New adapter module and API: exact source binding, no I/O
 
-## 3. Exact technical changed-path ledger
+Create `crates/solo-adapters/src/manifest_unicode_route_literals.rs` as **one** new safe module. Add only minimal public exports in `crates/solo-adapters/src/lib.rs`. The module must have no filesystem, network, HTTP, process, clock, environment, source-reader, graphics-worker or provider dependency. No new crate, framework, transport, global registry, unsafe block or separate manifest parser.
 
-**Allowed technical source changes, and no others:**
+Provide exactly this closed public entrypoint and result/refusal type names; use private helpers for implementation details:
 
-| Path | Permitted change |
+```rust
+pub fn validate_manifest_unicode_route_literals_v1(
+    snapshot: &ManifestVisibilitySnapshotV1,
+) -> Result<ValidatedManifestRouteLiteralsV1, RouteLiteralRefusalV1>;
+```
+
+**Only the accepted R21 snapshot is input.** Internally call `build_manifest_route_visibility_policy_v1(snapshot)` once to obtain R22 policy (map a failure to a closed refusal preserving safe location). Walk `snapshot.parsed().entity()` in authored containment order, require every representation and Page policy to correspond to the same fully qualified EFS owner, and require complete representation/Page cardinality. The result is owned, immutable, carries the exact source `manifest_sha256`, and cannot be assembled publicly from arbitrary candidate records. A failure discards the whole result, never keeps earlier acceptable rows. No user-controlled path, label, source candidate, location or property value is placed in a diagnostic.
+
+Represent each validated canonical representation claim, alias claim and Page entry claim as an internal typed record with: `QualifiedOwnerV1`, closed `Canonical | Alias | PageEntry` kind, closed effective `PublicInsensitive | PublicSensitive | ExactUnlisted` comparison intent as applicable, authored path's **validated NFC** spelling, canonical spelling for a public-insensitive claim, and an explicit compare key. A Page entry is **preference-dependent and not itself a representation**. Keep each record's declaration ordinal or another deterministic authored-order key and a safe structural field location. Do not export these records to a public/browser projection, generate an URL, pretend an alias is published, or use raw authored strings in public diagnostics. This typed in-memory structure is a future input to the complete collision ledger, not an activated route set.
+
+### 2.3 Unicode 18 route-token implementation — do not substitute Rust std or ASCII
+
+Use compiled ICU4X 2.4 data to implement the **three different** normalizations demanded by Architecture §6.2J.4:
+
+1. **Authored/exact spelling:** NFC. Sensitive public claims and unlisted claims compare on this exact NFC key, retaining authored capitalization.
+2. **Insensitive compare key:** NFC → full **default** Unicode case folding → NFC. Not simple lowercase, not Turkish/Turkic folding and not a language-specific lower operation.
+3. **Public-insensitive canonical Page spelling:** NFC → full **root/default** Unicode lowercase mapping → NFC. This differs from the fold key (`Straße` and `STRASSE` have equal full-fold keys but are not the same lowercased display spelling).
+
+Executable API guidance, verified against the ICU4X 2.4 published interfaces (adapt lifetime/borrowing details to the compiler):
+
+```rust
+use icu_casemap::CaseMapperBorrowed;
+use icu_locale_core::LanguageIdentifier;
+use icu_normalizer::ComposingNormalizerBorrowed;
+
+let nfc = ComposingNormalizerBorrowed::new_nfc();
+let casemap = CaseMapperBorrowed::new();
+let root = LanguageIdentifier::default(); // invariant/root language, never a visitor locale
+let exact_nfc = nfc.normalize(authored).to_string();
+let caseless_key = nfc.normalize(&casemap.fold_string(&exact_nfc)).to_string();
+let public_insensitive_spelling = nfc
+    .normalize(&casemap.lowercase_to_string(&exact_nfc, &root))
+    .to_string();
+```
+
+Validate the **whole** authored path before deriving keys. Every representation or public alias path begins with exactly one `/`, then the **lowercase complete authored locale tag**, followed by **1–8 nonempty Page-route segments**; no trailing `/`, doubled separator or alternate/missing locale. Page entries have no locale segment, 1–8 Page-route segments, and never claim a reserved full-locale first segment. Page-route segments allow Unicode 18 letters, marks and decimal digits plus **internal** `-` / `_`; reject invalid general categories, controls, bidi format/control characters, null, `%` escapes in authored logical paths, encoded delimiters, backslash, dot/dot-dot, empty segments, leading/trailing hyphen or underscore and all ambiguous interpretations. Each Page segment is at most **60 Unicode scalars**, the complete Page token portion at most **160 scalars**; count scalar values with `.chars().count()`, not bytes. Reject malformed or double-encoded URI material rather than decoding it here. Keep URL request percent-decoding outside this source-declaration validator for a later authorized request boundary.
+
+Use Unicode 18 **property data** for validation, not `char::is_alphabetic()` or `char::is_alphanumeric()` as the authority:
+
+```rust
+use icu_properties::{CodePointMapData, props::GeneralCategory};
+let category = CodePointMapData::<GeneralCategory>::new().get(ch);
+let allowed = matches!(category,
+    GeneralCategory::UppercaseLetter
+    | GeneralCategory::LowercaseLetter
+    | GeneralCategory::TitlecaseLetter
+    | GeneralCategory::ModifierLetter
+    | GeneralCategory::OtherLetter
+    | GeneralCategory::NonspacingMark
+    | GeneralCategory::SpacingMark
+    | GeneralCategory::EnclosingMark
+    | GeneralCategory::DecimalNumber
+);
+```
+
+Allow `-` and `_` separately only at internal token positions. Other category values, including `Format`, fail closed. Do not alter the accepted EFS **technical identifier** grammar or the existing source-locator grammar. Do not guess equivalence for confusable-looking strings: this stage may flag a bounded fixed diagnostic for known dangerous forms, but **full UTS #39 v18 confusable tables and official-corpus verification remain an explicit future gate**. Do not claim them complete here.
+
+### 2.4 Full authored locale keys at the new validation boundary
+
+For each Site `defaultLocale` and each representation locale, use ICU4X 2.4's real parser and alias canonicalizer; require an explicit **region** (`US`, `DE`, `ID`, `CN`, `001`, etc.), optional script, lowercased language, title-cased script and uppercase region. The accepted first-release **authored/public identity profile** contains only language + optional script + region; no inferred region, variant, private-use or extension key. Preserve and test that valid BCP47 tags outside this authored profile are *unsupported by the product profile*, not invalid BCP47.
+
+Guidance for the selected API:
+
+```rust
+use icu_locale::{Locale, LocaleCanonicalizer};
+let mut parsed: Locale = candidate.parse().map_err(|_| LocaleRefusal::Syntax)?;
+LocaleCanonicalizer::new_extended().canonicalize(&mut parsed);
+// Inspect parsed.id.language, parsed.id.script, parsed.id.region,
+// parsed.id.variants and parsed.extensions, then require exact
+// canonical authored serialization and the mandatory explicit region.
+// Never call likely-subtag maximize() to invent a missing region.
+```
+
+Do **not** normalize a noncanonical authored locale into an apparently authored canonical member: `de-de`, `EN-001`, deprecated language aliases and bare `en` must be closed refusals for authored locale identity. The path locale portion must be exactly the **lowercase full path spelling of the already canonical authored key**; this does not lowercase the sensitive Page portion. For comparison/request handling later, a separate function may return a **non-authoritative canonicalized request-tag candidate**, but it may not select a representation, infer a region or grant a redirect in this order. Authoring identity and request-language negotiation are separate operations.
+
+Reject all duplicate normalized locale identities, unexpected membership, unsupported-extension/variant forms, or an absence of Site/representation coverage. Keep site default membership and mapping semantics for a later `R04.B` task; do not invent a representation because `defaultLocale` is declared. R21's current conservative locale bridge is unchanged and remains the source snapshot gate.
+
+### 2.5 Alias and Page-entry binding
+
+Every canonical path uses the matching R22 representation's effective visibility/intent. Every **alias** belongs to exactly its containing **public** representation and is validated with the same locale and Unicode grammar; its own authored `caseMatching`, when present, determines its intended comparison mode, otherwise the public default is `insensitive` according to the accepted per-claim rule. Unlisted aliasing remains refused by R22. Every `entryPaths` item belongs to exactly its Page, requires that Page's own `public_representation_count > 0` (already R22) and stays a locale-less preference-dependent entry claim, not a guessed target. Use the exact owning Facet/Site/Page; two sibling `home` Page IDs are not interchangeable.
+
+**This order validates individual literals and computes candidate keys only.** It does not accept or refuse *cross-claim collisions* as a complete route ledger; preserve all distinct claims in authored order even when their keys overlap. The next route-ledger work will perform complete whole-graph canonical/alias/entry/base collision refusal using these exact keys. No first-match-wins, route priority or implicit deduplication is permitted now.
+
+### 2.6 Closed refusals and nonauthority
+
+Refusal families: invalid/noncanonical Site/representation locale, locale/path mismatch, invalid route segment/category/length, unsafe URI encoding, unlisted-policy inconsistency, wrong/missing EFS policy membership, invalid alias, invalid Page entry, overflow, and a wrapped R22 policy failure. Report a **fixed ASCII** code and structural location like `entity.facets[0].sites[1].pages[0].representations[2].route.path`; no authored route string or private value in error text. Do not panic, truncate, partially build, silently normalize into acceptance or select an alternate manifest. No second parser, no `serde_json::Value` bypass.
+
+Every result must expose constant `false` authority claims: `publication=false`, `public_route_authority=false`, `http=false`, `derived_output=false`, `release=false`, `deployment=false`. The output is never called `Published`, `ReadyToServe`, `ValidatedManifest` or a complete `RouteLedger`.
+
+## 3. Exact allowed-path ledger
+
+Only these paths may change in the described transaction:
+
+| Path | Authorization |
 |---|---|
-| `crates/solo-adapters/src/manifest_route_visibility_policy.rs` | **New file only:** pure manifest-bound route/visibility policy preflight, closed typed records/refusals, no I/O or source/route authority. |
-| `crates/solo-adapters/src/lib.rs` | Minimal additive module declaration and exports only; no reorganization of existing exports. |
-| `crates/solo-adapters/tests/publication_manifest.rs` | Additive `mod n133_manifest_route_visibility` with four focused tests; no existing test/helper deletion or weakening. |
-| `.github/workflows/rust-verify.yml` | Additive native Ubuntu/Windows N133 authenticity/mutation gates; retain all earlier steps, jobs and pins. |
-| `.documents/Architecture/ARCHITECTURE.md` | Concise truth note that this is an inert pre-route policy gate, not validated routing or serving. Do not rewrite R04.A/B contracts. |
-| `.documents/WIP/workorder-active.md` | Identical Owner-issued ACTIVE bytes in A30 and T30.0 only, as required below. |
-| `.documents/Reports/execution-report.md` | **Main R30 only**: replace canonical report after completed final technical proof. |
+| `.documents/WIP/workorder-active.md` | **A31** on main and byte-identical **T31.0** on existing technical branch only; no other edits |
+| `crates/solo-adapters/Cargo.toml` | add the exact five ICU4X 2.4 dependencies only |
+| `Cargo.lock` | single `cargo`-generated update resolving those dependencies; no manual edits |
+| `crates/solo-adapters/src/manifest_unicode_route_literals.rs` | **NEW** pure Unicode-18/locale/route-literal validator, typed keys, closed failures |
+| `crates/solo-adapters/src/lib.rs` | minimal additive module and public re-exports |
+| `crates/solo-adapters/tests/publication_manifest.rs` | **additive** `mod n134_manifest_unicode_route_literals` with precisely five focused N134 tests; preserve all prior tests |
+| `.github/workflows/rust-verify.yml` | additive native Ubuntu/Windows N134 gate steps after N133; do not alter prior checks |
+| `.documents/Architecture/ARCHITECTURE.md` | one concise factual implementation status note near §6A.7/§3.2B; record remaining full corpus, full collision ledger, IDNA/HTTP, no false proof claims |
+| `.documents/Reports/execution-report.md` | R31 on main only, after technical proof; overwrite the one report |
 
-Strictly unchanged: `platform/assets/**` (all 84 files), the immutable `1.0.0` catalogue, MIT/provenance, donor inventory and fixture bytes, `Cargo.toml`, `Cargo.lock`, `deny.toml`, `.gitattributes`, all domain/application source, `crates/solo-adapters/src/publication_manifest.rs`, `manifest_visibility_bridge.rs`, all native filesystem/media/worker/decoder/codec modules, current tests N093–N132, the R12 parser, `plan-*.md`, CLI binaries and production registration defaults. No new third-party dependency, license assertion or worktree.
+**Strictly outside scope:** `crates/solo-domain/**`, `crates/solo-application/**`, `crates/solo-cli/**`, `publication_manifest.rs`, `manifest_visibility_bridge.rs`, `manifest_route_visibility_policy.rs`, all media/source/file-system/decoder modules, platform assets and licence files, the 81 approved icons, the 20 unapproved sources, all `.documents/WIP/plan-*`, `deny.toml`, `.gitattributes`, other CI workflows, new branches/worktrees/PRs, package major-version upgrades, IDNA crate installation, HTTP handler, output publication, release or deployment. If an exact required behavior cannot be implemented safely inside this ledger, STOP and report the precise blocker rather than trespassing into an unapproved path.
 
-**STOP** if this design cannot be safely implemented inside the permitted paths. Ask the Owner for a revised work order instead of changing a binding contract, introducing a homemade Unicode/locale router, or weakening any security gate.
+## 4. Mandatory transaction A31 → T31.0 → T31 → R31
 
-## 4. Required transaction A30 → T30.0 → T30 → R30
+1. **Preflight, READ ONLY.** Verify physical checkout root, `git rev-parse --show-toplevel`, `main`/technical remote heads at the exact starting SHAs in §1, clean index and working tree, empty stash, exactly one worktree and one `origin` pointing at `provelopment/provelopment-foundation-solo`, exactly four WIP files, expected ACTIVE bytes, current remote head inventory and preservation of Owner-owned `.temp/`. Do not create another clone/worktree. If any drift is unexplained, STOP and report.
+2. **A31 — main authority installation.** On `main`, commit **only** the newly Owner-installed `.documents/WIP/workorder-active.md`, push, verify the same byte-identical blob in worktree/index/commit/`origin/main`. No implementation source on main.
+3. **T31.0 — technical authority mirror.** Resume the existing `solo-wo-118-avif-v4-r01` branch from T30 `b3cbdeb5`, install the **identical** ACTIVE blob and commit **only** that file. Verify identical A31/T31.0 ACTIVE SHA and no unrelated diff.
+4. **T31 — technical implementation.** Change only §3 source/dependency/test/workflow/architecture files; use bounded, explainable commits. First prove behavior **locally** in Windows 11 PowerShell and/or WSL Ubuntu 26.04, using the pinned toolchain. Run focused new tests, correct defects, then entire target and all-workspace lint/test/architecture/security checks feasible locally **before pushing**. Do not present a WSL local test as a hosted Ubuntu native job. Push the final technical SHA and await hosted verification. Preserve any genuine RED CI run in history and repair forward as T31.1/T31.2, never amend/rebase/force-push or weaken a gate.
+5. **Hosted proof.** Obtain a single final fresh technical workflow at the same exact commit SHA with **Ubuntu `verify` SUCCESS, Windows `verify` SUCCESS and independent AVIF-reference-oracle SUCCESS**. Capture exact run/attempt/job IDs, N134 outputs and all previous retained N124–N133 verdicts. Re-check platform catalogue digest, lockfile/security gate and architecture checker. No skipped, ignored, mocked, red or absent mandatory gate is acceptance.
+6. **R31 — canonical report.** Return to `main` parented to A31. Overwrite **only** `.documents/Reports/execution-report.md` recording exact technical and native evidence, all SHA/changed-path/cleanliness truth, the new Unicode source-data pins, all failures and remaining limits. Commit and push only the report; capture fresh two-host **main** verification after R31, with exact run/job IDs. Report R31's final commit SHA in the chat handoff, not inside the report itself. Keep technical branch **unmerged**. Clean task-owned `.temp` without deleting Owner files.
 
-Perform a read-only preflight at exact pins above: one `origin`, one working tree in the named Owner checkout, four WIP files, empty stash/unresolved index, clean tracking, same existing branch names. Report the actual number of remote heads as an observation rather than a quota. Protect all Owner-owned `.temp` entries and unrelated Dependabot heads. Compare existing `main`, technical branch and ACTIVE bytes with the exact expected source; STOP on drift, foreign changes or conflicting work.
+**Local-first suggested commands (run from the verified Solo checkout; record actual exit statuses):**
 
-1. **A30**: on `main`, install this issued work order verbatim into the canonical ACTIVE path, commit **that one path only**, push and verify its blob byte-exact in worktree/index/commit/`origin/main`. No crate code on `main`.
-2. **T30.0**: on existing `solo-wo-118-avif-v4-r01` at T29, install the **identical** ACTIVE blob and commit **only** it. Verify the exact A30/T30.0 ACTIVE blob match and no out-of-ledger diff.
-3. **T30**: implement the additive, bounded policy preflight, N133 tests and native gates, and one architecture truth note **only** within §3. Format/lint/test locally as feasible, and push a technical commit. If real hosted CI finds an issue, preserve the RED attempt and repair **forward** as T30.1/T30.2; never amend, rebase, force-push, silently skip or relax tests.
-4. Obtain **one final three-success technical run at exactly one final technical SHA**: Ubuntu `verify`, Windows `verify`, independent AVIF reference oracle. Require N133 4/4 on both hosts, authentic and four genuinely rejected corrupted copies on both, and retained N093–N132 gates. Exact job logs, not Agent paraphrases, are proof. Architecture checker, strict Clippy, locked dependencies, byte/release/worker canaries remain active.
-5. **R30**: on `main` parented to A30, modify **only** `.documents/Reports/execution-report.md`, push, then capture a **fresh two-job** main Ubuntu/Windows success baseline at exact R30. Keep technical branch unmerged. No additional WIP or release artifact.
-
-No branch, worktree, tag, PR, merge, deployment, public URL, generated bundle or publication may be created. Task-specific `.temp` scratch may be used in the one checkout and removed on completion, without removing Owner-owned scratch.
-
-## 5. N133 — four proportionate acceptance cases, on both native hosts
-
-This is a policy-only, no-I/O change. Test **real strict manifest JSON bytes → existing R21 snapshot → new pre-route policy**; a model-only fabricated struct is insufficient. Retain the old 16+N132 publication-manifest tests unchanged. Place new tests additively in the existing adapter target and name them `n133_01_*` through `n133_04_*`. Each emits exactly one genuine `n133_evidence case=0X` line (after checks) for the dedicated `--nocapture --test-threads=1` CI step. Keep total N133 count **4/4**, not a new 81-asset or six-format media matrix.
-
-**N133_01 — full four-case visibility matrix, case intent, sibling identity.** A strict JSON manifest with at least four representations across two sibling Sites and a mixed Page must yield one record per representation. Include public-insensitive omitted mode, public-sensitive authored mode, an unlisted Page-default, and a representation-unlisted override. Prove public intended mode vs unlisted `exact-unlisted`, source-of-visibility provenance, `noindex,nofollow` for unlisted, `discoverable=false`, sibling `home` identities never cross, stable order, R21 manifest SHA intact and all authority false. The representation path and base remain **unvalidated authored strings**: do not print a fabricated canonical URL.
-
-**N133_02 — unlisted leakage and bad authoring blocked.** With actual strict JSON bytes, prove any effective-unlisted `route.caseMatching` is refused whether `sensitive` or `insensitive`, any unlisted `route.aliases` is refused, any Page `entryPaths` on a fully unlisted Page is refused. A mixed Page's `entryPaths` may be retained as pending only because its **own** real public representation exists, never because of a sibling. An internal representation visibility literal remains refused by the retained parser. No invalid claim produces a partial policy; show before-read/no-port semantics.
-
-**N133_03 — exact landing and same-Page missing-translation guard.** Include valid exact qualified landing on a Page with public representation, absent landing, an exact but fully unlisted Page (unavailable/not-found intent, no route) and a wrong/foreign qualified landing (refusal). Exercise `missingTranslation: strict`, `default` when same Page has a public Site-default representation, `default` when none is available (conditional future not-found **without rejecting otherwise valid authored Page**), and explicit `locale` with a real public same-Page target. Refuse explicit target that is missing, unlisted, foreign, noncanonical for the R21 bridge profile or declared only on a same-named sibling Page. Show **no URL, no redirect, no locale preference inference** and no fallback to another Page/Site.
-
-**N133_04 — deterministic whole-policy, foreign/partial and authority refusal.** Identical source bytes produce identical manifest SHA, complete records, eligibility and order; modifying only a harmless label changes the SHA while preserving governed policy. Refusals do not leak partial records. The policy cannot accept a caller-supplied replacement visibility ledger or a graph from another Entity because its only input is the accepted R21 snapshot. The already accepted R21 graph/scope check still refuses a foreign/sibling/missing ownership candidate. Verify complete coverage, closed safe diagnostic tokens, `publication=false`, `route=false`, `http=false`, `release=false`, `deployment=false`, no source bytes and no output tree. Distinguish this policy preflight from a true route-claim collision ledger or a validated manifest.
-
-### 5.1 Native CI gate and anti-forgery checks
-
-In both real host jobs add a dedicated N133 step, run the genuine `solo-adapters --test publication_manifest n133_` tests in a single capture with `--locked --nocapture --test-threads=1`, and make the step **fail closed** unless all four known case test names, exactly four real evidence lines in order, `test result: ok. 4 passed; 0 failed; 0 ignored`, the grounded case tokens and all expected no-authority flags are present; reject `FAILED`, `ignored`, truncated output, duplicate case, missing case, partial result, changed source SHA or falsified visibility/landing/missing-translation outcomes. Log verdicts **after** successful checks only:
-
-```
-n133_gate authentic=accepted
-n133_gate mutation=rejected
+```powershell
+rustc --version
+cargo tree -p solo-adapters --locked
+cargo test -p solo-adapters --test publication_manifest --locked n134_ -- --nocapture --test-threads=1
+cargo test -p solo-adapters --test publication_manifest --locked
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo test --workspace --all-targets --locked
+cargo build --workspace --release --locked
 ```
 
-Then mutate **four copies of the captured real test log** (not separate hand-written success tokens): (i) delete one case, (ii) forge an unlisted discovery/alias/case acceptance, (iii) forge landing/fallback to an unlisted or foreign Page or flip a declared refusal, (iv) forge `publication=true`, `route=true`, `zero_partial=false` or a zeroed manifest digest. All four must be rejected by the same verifier or the job fails. Do not use `continue-on-error`, `|| true`, echoes as proof, or mutable prefix comparisons. Preserve N124–N132 authenticity/mutation markers, independent AVIF oracle and all existing CI jobs. A dry-run is supplementary, never a substitute for genuine hosted Ubuntu and Windows evidence.
+Use the existing repository-specific architecture-checker and `cargo-deny` invocations **as defined in its workflow/SOP**, not invented commands or a global unpinned tool. Run WSL checks in the authorized **same checkout** through its mounted path; do not create a shadow checkout. Tool installation or registry access is allowed only as needed for the exact Owner-issued dependency additions. Test selection must not trigger a new decoder or unapproved source fetch.
 
-## 6. Reporting and bounded completion truth
+## 5. N134: five efficient acceptance cases, run against real strict manifest bytes
 
-The canonical `.documents/Reports/execution-report.md` at R30 must record:
+Add **exactly five** `n134_01...n134_05` tests inside `crates/solo-adapters/tests/publication_manifest.rs`, preserving its existing cases unmodified. Use the **real** `parse_manifest_visibility_snapshot_v1` then new `validate_manifest_unicode_route_literals_v1`; no model-only test that bypasses the parser, R21 graph or R22 policy. Emit exactly one `n134_evidence case=0X` line **after assertions** from each `--nocapture` test.
 
-1. Exact baseline, A30, T30.0, final T30(.x), R30 SHAs; clean branch/worktree evidence, changed-path ledger, file counts and unmodified Platform/catalogue bytes. Include all RED attempts, causes and forward repairs if any.
-2. Why the existing strict parser and R21 manifest snapshot are reused unchanged; exact new pre-route types/refusal causes; effective unlisted, entry, landing and same-Page fallback behavior; limits and the restricted locale profile; evidence that no Unicode/IDNA/full route ledger or HTTP authority was invented.
-3. N133 four case evidence on **both** native hosts, true authentic+mutation verdicts, retained N124–N132 and the independent oracle at one exact SHA, actual architecture measured on both hosts. No 81-icon rerun except retained N127.
-4. Fresh **post-R30** `main` run and both native job IDs/conclusions. Report source/provenance/refusal tokens truthfully, not invented CI tokens.
-5. The following explicit booleans or equivalent, all truthful:
+**N134_01 — Unicode 18 normalization, distinct canonical and fold keys.** Validate actual authored locale-qualified paths with `Straße` vs `STRASSE`, Greek sigma/final sigma, dotted I, NFC composed/decomposed forms and non-Latin letters. Prove insensitive full-fold equality where required, public-insensitive Unicode lowercase canonical spelling, and sensitive/unlisted exact-NFC case preservation. No locale-specific Turkish tailoring, no Rust `std`-only case/normalization. Assert `unicode_data=18`, `fold_not_lower=true`, `sensitive_exact=true`, no URL/serving.
 
+**N134_02 — full-locale authored contract.** Accept `en-001`, `de-DE`, `id-ID`, `zh-Hans-CN` at the *actual Site and representation declarations*, with path locale segment lowercase; refuse bare `en`, authored `de-de`, regionless locale, deprecated alias, duplicate after canonicalization, and valid-but-unsupported profile extension or variant without claiming invalid BCP47. Confirm no inferred `defaultLocale`, country or mapping and no change to R21's accepted source profile. Record `locales_checked=true`, `unsupported_profile=refused`.
+
+**N134_03 — route segment grammar and unsafe inputs.** Refuse malformed leading/trailing/multiple slash, wrong/uppercased locale path segment, empty Page segment, greater than eight segments, greater than 60 scalars per segment, greater than 160 Page-token scalars, leading/trailing `-` or `_`, dot segments, percent/encoded separator, backslash, control/bidi formatting code point, emoji/symbol and invalid category. Accept internal `_`/`-`, Unicode letters/marks/digits under the pinned property data and legitimate NFC decomposition. Each refusal yields no partially usable result and a safe structural location. Record `invalid_route=refused`, `whole_input_refusal=true`.
+
+**N134_04 — entire manifest ownership, aliases and Page entries.** One Entity with two sibling Sites each containing `home`, one public-sensitive representation, one public-insensitive representation, one unlisted representation, at least one public alias (with its own caseMatching), plus a mixed Page's locale-less `entryPaths`. Confirm exact fully qualified owner on **every** literal and authored order, all public alias and entry claims represented, no unlisted aliases (R22 refusal), no conversion of Page entry to a representation, and stable source digest. Use a specifically invalid alias and reserved full-locale entry to demonstrate refusal. Record `sibling_isolated=true`, `aliases_bound=true`, `entry_locale_less=true`, `before_read=true`.
+
+**N134_05 — deterministic, nonpublishing boundary and regression.** Identical input bytes yield identical validated literal records/source SHA; label-only changes move the SHA while governed keys remain equivalent. Check R22 policy-only behavior still holds, no artificial route collision resolution, no unreviewed dependency/class imports, no source reads and all six public-authority flags false. A syntactically parsed but unsafe route **cannot** be promoted to a validated literal. Record `deterministic=true`, `route_ledger=false`, `publication=false`, `http=false`, `release=false`, `zero_partial=true`.
+
+**N134 is bounded evidence, not the whole official Unicode corpus.** Full `NormalizationTest.txt`, `CaseFolding.txt`, `SpecialCasing.txt` and UTS #39 18.0.0 corpus/test-data SHA and independent route-oracle verification remain mandatory in the later complete E05/R04.A release gate. Do not report them passed just because N134 passes. Use normative official Unicode examples with fixed expected output; do not generate expected strings by calling the implementation under test.
+
+### 5.1 Native authenticity / mutation gates
+
+Add one N134 gate step to each **existing** native verify job **after N133**, without modifying existing N124–N133 steps. Capture the genuine `cargo test -p solo-adapters --test publication_manifest --locked n134_ -- --nocapture --test-threads=1` output to a task-owned temporary log; fail on command error, fewer/more than five exact named tests, any `ignored`/`FAILED`, missing evidence marker or unsafe/no-authority token. Require `test result: ok. 5 passed; 0 failed; 0 ignored`, five distinct named test/evidence lines `case=01..05`, rooted verified tokens, and the expected SHA provenance. The verifier must consume **captured test output**, never its own echoed code.
+
+Then create and reject at least **four direct mutations of the same authentic log**: remove one case; forge fold-vs-lower or sensitive/unlisted equality; forge acceptance of a malformed/foreign route or locale; forge `publication=true`, `route_ledger=true`, a partial result or zeroed digest. Fail the whole step if any forged log is accepted. Print the two tokens **only after actual verification**:
+
+```text
+n134_gate authentic=accepted
+n134_gate mutation=rejected
 ```
-status=COMPLETE
-manifest_visibility_bridge_implemented=true
-manifest_bound_route_visibility_policy_preflight_implemented=true
-visibility_dependent_unlisted_rules_verified=true
-same_page_missing_translation_policy_preflight_verified=true
-locale_conformance_full=false
-route_ledger_implemented=false
+
+Keep the prior full workflow, lock integrity, RustSec freshness, format, strict Clippy, architecture checker, reproducible release build, CLI smoke, source/codec gates and independent AVIF oracle. Do not repeat the whole 81-icon test campaign as a **new** N134 case; existing N127 continues to run as already required. Record observed architecture counts rather than hard-code a guessed count after dependency additions.
+
+## 6. Report, preservation and exact completion meaning
+
+The R31 report must state `status=COMPLETE` only if all code, dependency, negative-test, two-host N134, three-job technical, security and fresh main requirements are genuinely satisfied; otherwise `status=STOPPED` with the exact evidence and blocker. It must record the actual toolchain, `Cargo.lock`/ICU4X resolved graph, Unicode-data version, warnings, advisory-db freshness, positive and refusal results, changed paths and files, exact SHAs/run IDs, test counts, preserved Owner asset checksums and cleanup truth. Required explicit outcome facts (or equivalent):
+
+```text
+manifest_route_visibility_policy_preflight_implemented=true
+icu4x_2_4_0_installed_and_locked=true
+unicode18_route_literal_keys_verified=true
+full_locale_authored_profile_verified=true
+n134_two_host_gates_verified=true
+unicode18_complete_official_corpus_conformance=false
+uts39_complete_confusable_gate=false
+idna_base_validator_implemented=false
+complete_route_collision_ledger_implemented=false
+request_locale_negotiation_implemented=false
 whole_manifest_semantic_validation=false
 http_delivery_implemented=false
-public_cascade_delivery=false
 publication_authority=false
 public_route_authority=false
 derived_output_publication=false
 release_authority=false
-automatic_product_graphic_defaults_active=false
-additional_assets_delivered=false
+deployment_authority=false
+r04a_open=true
+r04b_open=true
+r04c_open=true
+r04d_open=true
 r03c_open=true
 stage03_open=true
 ```
 
-6. Remaining dependencies: full R04.A/R04.B validated Unicode-18/BCP47/IDNA route/base/alias collision ledger, R04.C publication semantics, real Stage 04 HTTP/locale/unlisted delivery and sealed candidate, plus separately authorized product default registrations and Owner rights/role decisions for the 20 still-unapproved Foundation assets.
+The 81 approved Tabler assets and immutable `1.0.0` catalogue remain unchanged; precisely 20 canonical Foundation sources remain unapproved; no automatic product role default is registered. `main` remains governance/report-only, technical source stays unmerged, one checkout and one origin remain, no release, serving, DNS/provider action, public preview or deployment is authorized.
 
-**Status `COMPLETE` means only this R04.C3 nonpublishing pre-route policy outcome.** It does not mean R04.C, R04.A, R04.B, R04.D, R03.C or Stage 03 completed or closed. The team may not serve, route, release, deploy, merge or publish a graphic by virtue of this outcome.
+**On fully proven success, the Agent's final handoff line is exactly:**
 
-## 7. Explicit Owner authorization limit
-
-This work order permits only the exact bounded work in §§2–6 and the A30 → T30.0 → T30 → R30 governance flow. It authorizes **no** outside licensing/trademark judgment, artwork import, logo/brand default, new Platform catalogue or alias, public preview, HTTP route, manifest activation, CDN, public asset writing, merge, release, deployment or Stage 03 closure. The 20 outstanding canonical Foundation sources remain recorded but undelivered. Any unmet safety prerequisite means **STOP** and an honest report, not a broadened implementation. The Chief Master Architect will independently ACCEPT/REVISE/STOP based on actual Git and native logs.
-
-**Implementation Agent handoff on verified success only:** `SOLO-WO-118 R22 — manifest-bound route/visibility policy preflight COMPLETE (nonpublishing)`.
+`SOLO-WO-118 R23 — Unicode-18/ICU4X validated manifest route-literal and full-locale foundation COMPLETE (nonpublishing)`.
