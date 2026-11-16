@@ -12588,12 +12588,12 @@ mod n131 {
         let home_digest = catalogue.digest(HOME_ID);
         let ledger = ledger();
 
-        // One public logo from the approved library, one public favicon, and one `internal`
-        // social preview: the internal value is authored, validated and inspected, never exported.
+        // One public favicon and one `internal` social preview from the Entity tree. The logo is
+        // the approved Platform root registration itself, so no `logo` selection is authored —
+        // an authored `logo` append would collide with the registered default.
         let candidate = candidate(
             Some((HOME_ID, home_digest.as_str())),
             vec![
-                selection("logo", AssetNamespace::Platform, HOME_ID, Exposure::Public),
                 selection(
                     "favicon",
                     AssetNamespace::Entity,
@@ -12808,7 +12808,16 @@ mod n131 {
         let complete_ledger = ledger();
 
         // A Page is not a representation target.
-        let page_target = candidate(None, Vec::new(), page_owner("bali", "home"));
+        let page_target = candidate(
+            None,
+            vec![selection(
+                "favicon",
+                AssetNamespace::Entity,
+                "icon-favicon.png",
+                Exposure::Public,
+            )],
+            page_owner("bali", "home"),
+        );
         let outcome = preflight(
             &entity_root,
             &platform,
@@ -12828,7 +12837,16 @@ mod n131 {
             &declarations_of("other", true),
         )
         .expect("the foreign ledger is itself complete");
-        let member = candidate(None, Vec::new(), rep_owner("bali", "home", "en-001"));
+        let member = candidate(
+            None,
+            vec![selection(
+                "favicon",
+                AssetNamespace::Entity,
+                "icon-favicon.png",
+                Exposure::Public,
+            )],
+            rep_owner("bali", "home", "en-001"),
+        );
         let outcome = preflight(
             &entity_root,
             &platform,
@@ -12886,7 +12904,6 @@ mod n131 {
         let candidate = candidate(
             Some((HOME_ID, home_digest.as_str())),
             vec![
-                selection("logo", AssetNamespace::Platform, HOME_ID, Exposure::Public),
                 selection(
                     "favicon",
                     AssetNamespace::Entity,
@@ -12988,7 +13005,6 @@ mod n131 {
 
         let selections = || {
             vec![
-                selection("logo", AssetNamespace::Platform, HOME_ID, Exposure::Public),
                 selection(
                     "favicon",
                     AssetNamespace::Entity,
@@ -13026,15 +13042,6 @@ mod n131 {
 
         // Legacy parity: the untouched R19 seam over the same sources produces the same keys.
         let legacy_declarations = [
-            TestMixedDeclarationV1 {
-                owner: TestOwnerV1::Representation,
-                role: "logo",
-                slot: "primary",
-                namespace: "platform",
-                reference: HOME_ID,
-                supersede: false,
-                exposure: "public",
-            },
             TestMixedDeclarationV1 {
                 owner: TestOwnerV1::Representation,
                 role: "favicon",
